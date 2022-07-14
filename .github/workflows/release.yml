@@ -1,0 +1,65 @@
+# commit with version tag(v1,v1.1,v1.1.1...) to create release.
+# need CHANGELOG-$tag.md(CHANGELOG-v1.0.md).
+
+# 1.setup go env
+# 2.build
+# 3.release
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.18
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Extract Tag
+        id: extract_tag
+        run:  echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+
+      - name: Build
+        if: github.event_name == 'push'
+        run:
+          KUBE_BUILD_PLATFORMS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64" make build
+
+      - name: Compress
+        run: |
+          pushd dist
+          tar -zcvf kc-linux-arm64.tar.gz linux_arm64/
+          tar -zcvf kc-linux-amd64.tar.gz kubeclipper-server kubeclipper-agent kcctl
+          tar -zcvf kc-darwin-amd64.tar.gz darwin_amd64/
+          tar -zcvf kc-darwin-arm64.tar.gz darwin_arm64/
+          popd
+      - name: Generate Release file
+        run: echo ${{ github.sha }} > Release.txt
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            Release.txt
+            dist/kc-linux-arm64.tar.gz
+            dist/kc-linux-amd64.tar.gz
+            dist/kc-darwin-amd64.tar.gz
+            dist/kc-darwin-arm64.tar.gz
+          body_path: ${{ github.workspace }}/CHANGELOG/CHANGELOG-${{ steps.extract_tag.outputs.version }}.md
+          # note you'll typically need to create a personal access token
+          # with permissions to create releases in the other repo
+          token: ${{ secrets.GH_TOKEN }}
