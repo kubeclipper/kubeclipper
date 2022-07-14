@@ -37,10 +37,10 @@ openapi:
 
 .PHONY:test coverage-ui
 test:
-	go test ./pkg/... -coverprofile=coverage.out
+	go test ./pkg/... -coverprofile=dist/coverage.out
 
-coverage-ui:
-	go tool cover -html=coverage.out
+coverage-ui:test
+	go tool cover -html=dist/coverage.out -o dist/coverage.html
 
 .PHONY: format-deps checkfmt fmt goimports vet lint
 format-deps:
