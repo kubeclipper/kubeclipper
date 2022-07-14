@@ -1,0 +1,24 @@
+categories:
+  - name: GETTING STARTED
+    include: _getting_started.md
+    commands:
+      - deploy
+      - clean
+      - create
+      - get
+      - delete
+  - name: NODE MANAGEMENT
+    include: _node_management.md
+    commands:
+      - join
+      - drain
+      - resource
+  - name: REGISTRY
+    include: _registry.md
+    commands:
+      - registry
+  - name: KCCTL SETTINGS AND USAGE
+    commands:
+      - completion
+      - login
+      - version

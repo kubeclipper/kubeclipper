@@ -1,0 +1,1008 @@
+[
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-view-users",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Users View",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"users\": \"view\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"users",
+					"users/loginrecords"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-view-roles",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Roles View",
+				"kubeclipper.io/dependencies": "[\"role-template-view-users\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"roles\": \"view\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"roles"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-create-roles",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Roles Create",
+				"kubeclipper.io/dependencies": "[\"role-template-view-roles\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"roles\": \"create\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"create"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"roles"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-edit-roles",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Roles Edit",
+				"kubeclipper.io/dependencies": "[\"role-template-view-roles\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"roles\": \"edit\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"roles"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-delete-roles",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Roles Delete",
+				"kubeclipper.io/dependencies": "[\"role-template-view-roles\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"roles\": \"delete\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"delete"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"roles"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-create-users",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Users Create",
+				"kubeclipper.io/dependencies": "[\"role-template-view-users\",\"role-template-view-roles\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"users\": \"create\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"create"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"users"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-edit-users",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Users Edit",
+				"kubeclipper.io/dependencies": "[\"role-template-view-users\",\"role-template-view-roles\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"users\": \"edit\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"users",
+					"users/password",
+					"users/enable",
+					"users/disable"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-delete-users",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Users Delete",
+				"kubeclipper.io/dependencies": "[\"role-template-view-users\",\"role-template-view-roles\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Access Control",
+				"kubeclipper.io/role-template-rules": "{\"users\": \"delete\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"delete"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"users"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-view-clusters",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Cluster View",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Cluster Management",
+				"kubeclipper.io/role-template-rules": "{\"clusters\": \"view\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters",
+					"nodes",
+					"regions",
+					"operations",
+					"logs",
+					"clusters/upgrade",
+					"nodes/terminal"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"terminal.key"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-create-clusters",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Cluster Create",
+				"kubeclipper.io/dependencies": "[\"role-template-view-clusters\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Cluster Management",
+				"kubeclipper.io/role-template-rules": "{\"clusters\": \"create\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"create"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters",
+					"nodes",
+					"regions",
+					"operations/retry",
+					"clusters/backups",
+					"clusters/upgrade"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"template"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch",
+					"create"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"templates"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-edit-clusters",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Cluster Edit",
+				"kubeclipper.io/dependencies": "[\"role-template-view-clusters\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Cluster Management",
+				"kubeclipper.io/role-template-rules": "{\"clusters\": \"edit\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters",
+					"clusters/plugins",
+					"clusters/nodes",
+					"clusters/status",
+					"nodes/disable",
+					"nodes/enable"
+				]
+			},
+			{
+				"verbs": [
+					"*"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters/plugins",
+					"clusters/nodes"
+				]
+			},
+			{
+				"verbs": [
+					"get"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters/terminal"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-delete-clusters",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Cluster Delete",
+				"kubeclipper.io/dependencies": "[\"role-template-view-clusters\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Cluster Management",
+				"kubeclipper.io/role-template-rules": "{\"clusters\": \"delete\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters",
+					"nodes",
+					"regions",
+					"clusters/plugins",
+					"clusters/nodes"
+				]
+			},
+			{
+				"verbs": [
+					"*"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters/plugins",
+					"clusters/nodes"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-view-platform",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Platform View",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Platform Setting",
+				"kubeclipper.io/role-template-rules": "{\"platform\": \"view\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"template"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"templates"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-edit-platform",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Platform Edit",
+				"kubeclipper.io/dependencies": "[\"role-template-view-platform\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Platform Setting",
+				"kubeclipper.io/role-template-rules": "{\"platform\": \"edit\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"template"
+				]
+			},
+			{
+				"verbs": [
+					"create"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"terminal.key"
+				]
+			},
+			{
+				"verbs": [
+					"update",
+					"patch",
+					"create",
+					"delete"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"templates"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-view-audit",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "Audit View",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "Audit",
+				"kubeclipper.io/role-template-rules": "{\"audit\": \"view\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"audit.kubeclipper.io"
+				],
+				"resources": [
+					"events"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-view-dns",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "DNS View",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "DNS",
+				"kubeclipper.io/role-template-rules": "{\"dns\": \"view\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"domains",
+					"domains/records"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-delete-dns",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "DNS Delete",
+				"kubeclipper.io/dependencies": "[\"role-template-view-dns\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "DNS",
+				"kubeclipper.io/role-template-rules": "{\"dns\": \"delete\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"delete"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"domains",
+					"domains/records"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-create-dns",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "DNS Create",
+				"kubeclipper.io/dependencies": "[\"role-template-view-dns\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "DNS",
+				"kubeclipper.io/role-template-rules": "{\"dns\": \"create\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"create"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"domains",
+					"domains/records"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "role-template-edit-dns",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/role-template": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/alias-name": "DNS Edit",
+				"kubeclipper.io/dependencies": "[\"role-template-view-dns\"]",
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/module": "DNS",
+				"kubeclipper.io/role-template-rules": "{\"dns\": \"edit\"}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"domains",
+					"domains/records"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "platform-admin",
+			"creationTimestamp": null,
+			"annotations": {
+				"kubeclipper.io/aggregation-roles": "[\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-create-roles\",\"role-template-edit-roles\",\"role-template-delete-roles\",\"role-template-create-users\",\"role-template-edit-users\",\"role-template-delete-users\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-edit-platform\",\"role-template-view-audit\",\"role-template-create-dns\",\"role-template-edit-dns\",\"role-template-delete-dns\",\"role-template-view-dns\"]",
+				"kubeclipper.io/internal": "true"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"*"
+				],
+				"apiGroups": [
+					"*"
+				],
+				"resources": [
+					"*"
+				]
+			},
+			{
+				"verbs": [
+					"*"
+				],
+				"nonResourceURLs": [
+					"*"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "platform-view",
+			"creationTimestamp": null,
+			"annotations": {
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-view-audit\",\"role-template-view-dns\"]",
+				"kubeclipper.io/internal": "true"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"*"
+				],
+				"resources": [
+					"*"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "authenticated",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/hidden": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/internal": "true",
+				"kubeclipper.io/rego-override": "package authz\ndefault allow = false\nallow = true {\n  allowedResources := [\"users\"]\n  allowedResources[_] == input.Resource\n  input.User.Name == input.Name\n}"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"*"
+				],
+				"nonResourceURLs": [
+					"*"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"configz",
+					"components",
+					"componentmeta"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch",
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"oauth"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "anonymous",
+			"creationTimestamp": null,
+			"labels": {
+				"kubeclipper.io/hidden": "true"
+			},
+			"annotations": {
+				"kubeclipper.io/internal": "true"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"*"
+				],
+				"nonResourceURLs": [
+					"*"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch",
+					"update",
+					"patch"
+				],
+				"apiGroups": [
+					"config.kubeclipper.io"
+				],
+				"resources": [
+					"oauth"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "iam-manager",
+			"creationTimestamp": null,
+			"annotations": {
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-roles\",\"role-template-create-roles\",\"role-template-edit-roles\",\"role-template-delete-roles\",\"role-template-create-users\",\"role-template-edit-users\",\"role-template-delete-users\",\"role-template-view-users\"]",
+				"kubeclipper.io/internal": "true"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"users"
+				]
+			},
+			{
+				"verbs": [
+					"*"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"users",
+					"users/password"
+				]
+			},
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"roles"
+				]
+			},
+			{
+				"verbs": [
+					"*"
+				],
+				"apiGroups": [
+					"iam.kubeclipper.io"
+				],
+				"resources": [
+					"roles"
+				]
+			}
+		]
+	},
+	{
+		"kind": "GlobalRole",
+		"apiVersion": "iam.kubeclipper.io/v1",
+		"metadata": {
+			"name": "cluster-manager",
+			"creationTimestamp": null,
+			"annotations": {
+				"kubeclipper.io/aggregation-roles": "[\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\"]",
+				"kubeclipper.io/internal": "true"
+			}
+		},
+		"rules": [
+			{
+				"verbs": [
+					"get",
+					"list",
+					"watch"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters",
+					"nodes",
+					"regions",
+					"operations"
+				]
+			},
+			{
+				"verbs": [
+					"*"
+				],
+				"apiGroups": [
+					"core.kubeclipper.io"
+				],
+				"resources": [
+					"clusters",
+					"clusters/nodes",
+					"clusters/plugins",
+					"nodes",
+					"regions",
+					"operations"
+				]
+			}
+		]
+	}
+]

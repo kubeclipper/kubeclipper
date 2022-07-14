@@ -1,0 +1,51 @@
+agentID: 847627ea-160f-48e2-9a90-07a9739425aa
+region: default
+registerNode: true
+nodeStatusUpdateFrequency: 1m
+downloader:
+  address: 127.0.0.1:8090
+  tlsCertFile: ""
+  tlsPrivateKey: ""
+log:
+  logFile: ""
+  logFileMaxSizeMB: 100
+  toStderr: true
+  level: debug
+  encodeType: console
+  maxBackups: 5
+  maxAge: 30
+  compress: false
+  useLocalTime: true
+mq:
+  client:
+    serverAddress:
+      - 127.0.0.1:9889
+    subjectSuffix: k8s-installer
+    queueGroupName: status-report-queue
+    nodeReportSubject: status-report-subj
+    timeOutSeconds: 10
+    reconnectInterval: 2s
+    maxReconnect: 600
+    pingInterval: 2m
+    maxPingsOut: 2
+  auth:
+    mode: basic
+    username: user
+    password: password
+    tlsCertPath: ""
+    tlsKeyPath: ""
+    tlsCaPath: ""
+oplog:
+  dir: ./dist/oplog
+backupStore:
+  type: fs
+#  provider:
+#    rootDir: /opt/kc/backups
+#  type: s3
+#  provider:
+#    bucket: default
+#    endpoint: http://127.0.0.1:9090
+#    accessKeyID: key
+#    accessKeySecret: secret
+#    ssl: true
+#    region: default

@@ -1,0 +1,86 @@
+generic:
+  bindAddress: 0.0.0.0
+  insecurePort: 8080
+  securePort: 0
+  tlsCertFile: ""
+  tlsPrivateKey: ""
+authentication:
+  authenticateRateLimiterMaxTries: 5
+  authenticateRateLimiterDuration: 30m
+  maximumClockSkew: 10s
+  multipleLogin: true
+  jwtSecret: "fyo2EuENJek7F9cu+t2lew=="
+#  oauthOptions:
+#    identityProviders:
+#    - name: keycloak
+#      type: OIDC
+#      mappingMethod: auto
+#      provider:
+#        clientID: kc
+#        clientSecret: KGEe62o096l41TjrzDgbdzFpyJahQJZ0
+#        issuer: http://172.20.150.104:7777/auth/realms/kubeclipper
+#        scopes:
+#        - openid
+#        - email
+#        redirectURL: http://localhost:8089/oauth/redirect/keycloak
+staticServer:
+  bindAddress: 0.0.0.0
+  insecurePort: 8090
+  securePort: 0
+  tlsCertFile: ""
+  tlsPrivateKey: ""
+  path: /tmp/kubeclipper-server/resource
+log:
+  logFile: ""
+  logFileMaxSizeMB: 100
+  toStderr: true
+  level: debug
+  encodeType: console
+  maxBackups: 5
+  maxAge: 30
+  compress: false
+  useLocalTime: true
+etcd:
+  serverList:
+    - http://localhost:2379
+  keyFile: ""
+  certFile: ""
+  trustedCAFile: ""
+  prefix: "/registry/kc-server"
+  paging: true
+  compactionInterval: 5m
+  countMetricPollPeriod: 1m
+  defaultStorageMediaType: "application/json"
+  deleteCollectionWorkers: 1
+  enableGarbageCollection: true
+  enableWatchCache: true
+  defaultWatchCacheSize: 100
+  #watchCacheSizes
+mq:
+  client:
+    serverAddress:
+      - 127.0.0.1:9889
+    subjectSuffix: k8s-installer
+    queueGroupName: status-report-queue
+    nodeReportSubject: status-report-subj
+    timeOutSeconds: 10
+    reconnectInterval: 2s
+    maxReconnect: 600
+    pingInterval: 2m
+    maxPingsOut: 2
+    tlsCertPath: ""
+    tlsKeyPath: ""
+    tlsCaPath: ""
+  server:
+    host: 0.0.0.0
+    port: 9889
+    cluster:
+      host: 0.0.0.0
+      port: 9890
+      leaderHost: 127.0.0.1:9890
+    tlsCertPath: ""
+    tlsKeyPath: ""
+    tlsCaPath: ""
+  auth:
+    username: user
+    password: password

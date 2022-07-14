@@ -1,0 +1,83 @@
+run:
+  skip-dirs:
+    - dist
+    - vendor
+    - hack
+    - generated.*
+  build-tags:
+    - codeanalysis
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - varcheck
+    - ineffassign
+    - exportloopref
+    - errcheck
+    - goimports
+    - gosimple
+    - gofmt
+    - govet
+    - staticcheck
+    - unconvert
+    - revive
+    #- unused
+
+issues:
+  exclude-use-default: true
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running at present, wait fix
+    - path: registry
+      linters:
+        - golint
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - exportloopref
+        - deadcode
+        - errcheck
+        - varcheck
+    - path: pkg/auditing/audit.go
+      linters:
+        - staticcheck
+      text: SA1019
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        arguments:
+         - disableStutteringCheck
+         - checkPrivateReceivers
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+        #- name: empty-block
+      - name: superfluous-else
+        #- name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+  staticcheck:
+    # Select the Go version to target. The default is '1.13'.
+    go: "1.18"
+    # https://staticcheck.io/docs/options#checks
+    checks: [ "all" ]

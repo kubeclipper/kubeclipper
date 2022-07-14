@@ -1,0 +1,81 @@
+package GENERIC_PACKAGE_NAME
+
+import (
+	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/names"
+
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+)
+
+var (
+	_ rest.RESTCreateStrategy = GENERIC_KINDStrategy{}
+	_ rest.RESTUpdateStrategy = GENERIC_KINDStrategy{}
+	_ rest.RESTDeleteStrategy = GENERIC_KINDStrategy{}
+)
+
+type GENERIC_KINDStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+func NewStrategy(typer runtime.ObjectTyper) GENERIC_KINDStrategy {
+	return GENERIC_KINDStrategy{typer, names.SimpleNameGenerator}
+}
+
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	c, ok := obj.(*v1.GENERIC_KIND)
+	if !ok {
+		return nil, nil, fmt.Errorf("given object is not a GENERIC_KIND")
+	}
+	return c.ObjectMeta.Labels, SelectableFields(c), nil
+}
+
+func SelectableFields(obj *v1.GENERIC_KIND) fields.Set {
+	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
+}
+
+func MatchGENERIC_KIND(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
+	}
+}
+
+func (GENERIC_KINDStrategy) NamespaceScoped() bool {
+	return false
+}
+
+func (GENERIC_KINDStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+}
+
+func (GENERIC_KINDStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+}
+
+func (GENERIC_KINDStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	return field.ErrorList{}
+}
+
+func (GENERIC_KINDStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+func (GENERIC_KINDStrategy) AllowUnconditionalUpdate() bool {
+	return false
+}
+
+func (GENERIC_KINDStrategy) Canonicalize(obj runtime.Object) {
+}
+
+func (GENERIC_KINDStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return field.ErrorList{}
+}

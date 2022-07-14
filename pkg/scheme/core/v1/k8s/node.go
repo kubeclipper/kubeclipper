@@ -1,0 +1,377 @@
+/*
+ *
+ *  * Copyright 2021 KubeClipper Authors.
+ *  *
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  *     http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
+ *
+ */
+
+package k8s
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	_ component.StepRunnable = (*JoinCmd)(nil)
+	_ component.StepRunnable = (*Drain)(nil)
+)
+
+const (
+	joinNodeCmd = "joinNodeCmd"
+	drain       = "drain"
+)
+
+func init() {
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, joinNodeCmd, version, component.TypeStep), &JoinCmd{}); err != nil {
+		panic(err)
+	}
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, drain, version, component.TypeStep), &Drain{}); err != nil {
+		panic(err)
+	}
+}
+
+type GenNode struct {
+	Nodes          component.NodeList `json:"nodes"`
+	Kubeadm        *v1.Kubeadm
+	installSteps   []v1.Step
+	uninstallSteps []v1.Step
+	upgradeSteps   []v1.Step
+}
+
+type JoinCmd struct {
+	ContainerRuntime string `json:"containerRuntime"`
+}
+
+type KubeadmJoinUtil struct {
+	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
+	Token                string `json:"token"`
+	DiscoveryHash        string `json:"discoveryHash"`
+	ContainerRuntime     string `json:"containerRuntime"`
+}
+
+type Drain struct {
+	Hostname  string   `json:"hostname"`
+	ExtraArgs []string `json:"extraArgs"`
+}
+
+func (stepper *GenNode) Validate() error {
+	if stepper.Kubeadm == nil {
+		return fmt.Errorf("GenNode kubeadm object is empty")
+	}
+
+	if stepper.Nodes == nil {
+		return fmt.Errorf("GenNode Nodes object is empty")
+	}
+
+	return nil
+}
+
+func (stepper *GenNode) InitStepper(metadata *component.ExtraMetadata, kubeadm *v1.Kubeadm, role string) *GenNode {
+	switch role {
+	case NodeRoleMaster:
+		stepper.Nodes = append(stepper.Nodes, metadata.Masters...)
+	case NodeRoleWorker:
+		stepper.Nodes = append(stepper.Nodes, metadata.Workers...)
+	}
+	stepper.Kubeadm = kubeadm
+	return stepper
+}
+
+func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string) error {
+	err := stepper.Validate()
+	if err != nil {
+		return err
+	}
+
+	patchNodes := utils.UnwrapNodeList(stepper.Nodes)
+	masters := utils.UnwrapNodeList(metadata.Masters)
+	// add node to cluster
+	if len(stepper.installSteps) == 0 {
+		// We should use kubeadm to create join token on the first control plane node.
+		steps, err := EnvSetupSteps(patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps...)
+
+		joinCmd := JoinCmd{}
+		steps, err = joinCmd.InitStepper(stepper.Kubeadm).InstallSteps([]v1.StepNode{masters[0]})
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps...)
+
+		join := ClusterNode{}
+		steps, err = join.InitStepper(stepper.Kubeadm, metadata).InstallSteps(role, patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps...)
+	}
+
+	if len(stepper.uninstallSteps) == 0 {
+		args := []string{"--ignore-daemonsets", "--delete-local-data"}
+		for _, node := range stepper.Nodes {
+			d := &Drain{}
+			steps, err := d.InitStepper(node.Hostname, args).UninstallSteps([]v1.StepNode{masters[0]})
+			if err != nil {
+				return err
+			}
+			stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
+		}
+
+		steps, err := KubeadmReset(patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
+		// worker nodes don't need to remove etcd data dir
+		stepper.uninstallSteps = append(stepper.uninstallSteps,
+			doCommandRemoveStep("removeKubeletDataDir", patchNodes, KubeletDefaultDataDir),
+			doCommandRemoveStep("removeDockershimDataDir", patchNodes, DockershimDefaultDataDir),
+		)
+		heal := Health{}
+		proxy := &stepper.Kubeadm.KubeComponents.KubeProxy
+		steps, err = heal.InitStepper(stepper.Kubeadm).UninstallSteps(proxy, patchNodes...)
+		if err != nil {
+			return err
+		}
+		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
+		// clean CNI config
+		steps, err = CleanCNI(&stepper.Kubeadm.KubeComponents.CNI, patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
+		// clean Kubernetes config
+		stepper.uninstallSteps = append(stepper.uninstallSteps,
+			doCommandRemoveStep("removeKubernetesConfig", patchNodes, K8SDefaultConfigDir))
+		// clear worker /etc/hosts vip domain
+		// sed -i '/apiserver.cluster.local/d' /etc/hosts
+		apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", stepper.Kubeadm.Networking.DNSDomain)
+		stepper.uninstallSteps = append(stepper.uninstallSteps, v1.Step{
+			ID:         strutil.GetUUID(),
+			Name:       "clearVIPDomain",
+			Timeout:    metav1.Duration{Duration: 5 * time.Second},
+			ErrIgnore:  true,
+			RetryTimes: 1,
+			Nodes:      patchNodes,
+			Action:     v1.ActionUninstall,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", fmt.Sprintf("sed -i '/%s/d' /etc/hosts", apiServerDomain)},
+				},
+			},
+		})
+
+	}
+
+	return nil
+}
+
+func (stepper *GenNode) GetSteps(action v1.StepAction) []v1.Step {
+	switch action {
+	case v1.ActionInstall:
+		return stepper.installSteps
+	case v1.ActionUninstall:
+		return stepper.uninstallSteps
+	}
+	return nil
+}
+
+func (stepper *JoinCmd) InitStepper(kubeadm *v1.Kubeadm) *JoinCmd {
+	stepper.ContainerRuntime = kubeadm.ContainerRuntime.Type.String()
+	return stepper
+}
+
+func (stepper *JoinCmd) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	bytes, err := json.Marshal(stepper)
+	if err != nil {
+		return nil, err
+	}
+
+	return []v1.Step{
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "getJoinCommand",
+			Timeout:    metav1.Duration{Duration: 10 * time.Second},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Commands: []v1.Command{
+				{
+					Type:          v1.CommandCustom,
+					Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, joinNodeCmd, version, component.TypeStep),
+					CustomCommand: bytes,
+				},
+			},
+		},
+	}, nil
+}
+
+func (stepper *JoinCmd) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	return nil, fmt.Errorf("joinCmd no support uninstall steps")
+}
+
+func (stepper *Drain) InitStepper(hostname string, extraArgs []string) *Drain {
+	stepper.Hostname = hostname
+	stepper.ExtraArgs = extraArgs
+	return stepper
+}
+
+func (stepper *Drain) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	return nil, fmt.Errorf("drain no support install steps")
+}
+
+func (stepper *Drain) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	bytes, err := json.Marshal(stepper)
+	if err != nil {
+		return nil, err
+	}
+	return []v1.Step{
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "drainNode",
+			Timeout:    metav1.Duration{Duration: 30 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Nodes:      nodes,
+			Action:     v1.ActionUninstall,
+			Commands: []v1.Command{
+				{
+					Type:          v1.CommandCustom,
+					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, drain, version, component.TypeStep),
+					CustomCommand: bytes,
+				},
+			},
+		},
+	}, nil
+}
+
+func (stepper *KubeadmJoinUtil) InitStepper(line, cri string) *KubeadmJoinUtil {
+	line = strings.TrimLeft(line, " ")
+	line = strings.TrimRight(line, " ")
+	for _, str := range []string{"  ", "   ", "    ", "     "} {
+		line = strings.ReplaceAll(line, str, " ")
+	}
+	strs := strings.Split(line, " ")
+	if len(strs) < 6 {
+		stepper = &KubeadmJoinUtil{}
+	}
+	stepper.ContainerRuntime = cri
+	stepper.ControlPlaneEndpoint = strs[2]
+	stepper.Token = strs[4]
+	stepper.DiscoveryHash = strs[6]
+	return stepper
+}
+
+func (stepper JoinCmd) NewInstance() component.ObjectMeta {
+	return &JoinCmd{}
+}
+
+func (stepper JoinCmd) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	if opts.DryRun {
+		return nil, nil
+	}
+
+	// kubeadm token create --print-join-command
+	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubeadm", "token", "create", "--print-join-command")
+	if err != nil {
+		logger.Error("run kubeadm token create error", zap.Error(err))
+		return nil, err
+	}
+	cmd := KubeadmJoinUtil{}
+	cmd.InitStepper(ec.StdOut(), stepper.ContainerRuntime)
+	// bytes, err = json.Marshal(cmd)
+	// format: ${master node join command};${worker node join command}
+	// Work around to split out the worker node join command.
+	return []byte("," + strings.Join(cmd.GetCmd(), " ")), nil
+}
+
+func (stepper JoinCmd) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+	return nil, fmt.Errorf("JoinNodeCmd no support Uninstall")
+}
+
+func (stepper *Drain) NewInstance() component.ObjectMeta {
+	return &Drain{}
+}
+
+func (stepper *Drain) Install(ctx context.Context, opts component.Options) (bytes []byte, err error) {
+	return
+}
+
+func (stepper *Drain) Uninstall(ctx context.Context, opts component.Options) (bytes []byte, err error) {
+	var ec *cmdutil.ExecCmd
+	var logErrMsg string
+	errMsg := fmt.Sprintf("nodes \"%s\" not found", stepper.Hostname)
+	defer func() {
+		if err != nil {
+			if strings.Contains(ec.StdErr(), errMsg) {
+				err = nil
+				return
+			}
+			err = fmt.Errorf(ec.StdErr())
+			logger.Error(logErrMsg, zap.Error(err))
+		}
+	}()
+
+	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "get", "node", stepper.Hostname)
+	if err != nil {
+		logErrMsg = "kubectl get nodes error"
+		return
+	}
+
+	cmds := strings.Split(fmt.Sprintf("kubectl drain %s", stepper.Hostname), " ")
+	cmds = append(cmds, stepper.ExtraArgs...)
+	// kubectl drain ${node_name} --ignore-daemonsets --delete-local-data (v1.20.13)
+	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, cmds[0], cmds[1:]...)
+	if err != nil {
+		logErrMsg = "kubectl drain node error"
+		return
+	}
+
+	// kubectl delete node ${node_name}
+	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "delete", "node", stepper.Hostname)
+	if err != nil {
+		// logger.Error("kubectl delete node error", zap.Error(err))
+		logErrMsg = "kubectl delete node error"
+		return
+	}
+
+	return
+}
+
+func (stepper *KubeadmJoinUtil) GetCmd() []string {
+	cmd := fmt.Sprintf("kubeadm join %s --token %s --discovery-token-ca-cert-hash %s",
+		stepper.ControlPlaneEndpoint, stepper.Token, stepper.DiscoveryHash)
+	if stepper.ContainerRuntime == "containerd" {
+		cmd += " --cri-socket /run/containerd/containerd.sock"
+	}
+	return strings.Split(cmd, " ")
+}

@@ -1,5 +1,5 @@
 <p align="center">
-<b>Manage kubernetes in the most light and convenient way</b>
+<b>KubeClipper 以向导式 UI 界面对多 Kubernetes 集群提供可视化的生命周期管理服务</b>
 </p>
 
 <!-- TODO: 添加 cicd 执行情况，代码质量等标签 -->
@@ -8,7 +8,7 @@
 
 ## KubeClipper
 
-> English | [中文](README_zh.md)
+> 中文 | [English](README.md)
 
 <!-- TODO: 介绍 -->
 

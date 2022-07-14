@@ -1,0 +1,77 @@
+/*
+ *
+ *  * Copyright 2021 KubeClipper Authors.
+ *  *
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  *     http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
+ *
+ */
+
+package sshutils
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
+)
+
+func MD5FromLocal(localPath string) (string, error) {
+	cmd := fmt.Sprintf("md5sum %s | cut -d\" \" -f1", localPath)
+	c := exec.Command("sh", "-c", cmd)
+	var bout, berr bytes.Buffer
+	c.Stdout, c.Stderr = &bout, &berr
+	err := c.Run()
+	if err != nil {
+		return "", err
+	}
+	stderr := berr.String()
+	if stderr != "" {
+		return "", errors.New(stderr)
+	}
+	md5 := bout.String()
+	md5 = strings.ReplaceAll(md5, "\n", "")
+	md5 = strings.ReplaceAll(md5, "\r", "")
+	logger.V(5).Infof("local file(%s) md5 is %s", localPath, md5)
+	return md5, nil
+}
+
+func (ss *SSH) MD5FromRemote(host, remoteFilePath string) (string, error) {
+	cmd := fmt.Sprintf("md5sum %s | cut -d\" \" -f1", remoteFilePath)
+	ret, err := SSHCmdWithSudo(ss, host, cmd)
+	if err != nil {
+		return "", err
+	}
+	if err = ret.Error(); err != nil {
+		return "", err
+	}
+	md5 := ret.StdoutToString("")
+	logger.V(5).Infof("[%s] remote file(%s) md5 is %s", host, remoteFilePath, md5)
+	return md5, nil
+}
+
+func (ss *SSH) ValidateMd5sumLocalWithRemote(host, localFile, remoteFile string) (bool, error) {
+	localMD5, err := MD5FromLocal(localFile)
+	if err != nil {
+		return false, err
+	}
+	logger.V(5).Infof("localFile file(%s) md5 value is %s", localFile, localMD5)
+	remoteMD5, err := ss.MD5FromRemote(host, remoteFile)
+	if err != nil {
+		return false, err
+	}
+	logger.V(5).Infof("remoteFile file(%s) md5 value is %s", remoteFile, remoteMD5)
+	return localMD5 == remoteMD5, nil
+}
