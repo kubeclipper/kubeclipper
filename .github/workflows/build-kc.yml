@@ -1,0 +1,68 @@
+# 1.setup go env
+# 2.build binary
+# 3.upload to oss
+
+name: build-kc
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release*'
+  schedule:
+    - cron: '0 0 * * *'
+
+# This ensures that previous jobs for the branch are canceled when the branch is updated.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and upload
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Set up Go 1.18
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Get branch name
+        id: extract_branch
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+
+      - name: Build
+        if: github.event_name == 'push'
+        run:
+          KUBE_BUILD_PLATFORMS="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64" make build
+
+      - name: Compress
+        run: |
+          pushd dist
+          tar -zcvf kc-linux-arm64.tar.gz linux_arm64/
+          tar -zcvf kc-linux-amd64.tar.gz kubeclipper-server kubeclipper-agent kcctl
+          tar -zcvf kc-darwin-amd64.tar.gz darwin_amd64/
+          tar -zcvf kc-darwin-arm64.tar.gz darwin_arm64/
+          popd
+
+      - name: Setup ossutil
+        uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint:  ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_SECRET }}
+          #sts-token: "sts_token"
+      - name: Upload to oss
+        run: |
+          ossutil cp -rf dist/kc-linux-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.branch }}/
+          ossutil cp -rf dist/kc-linux-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.branch }}/
+          ossutil cp -rf dist/kc-darwin-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.branch }}/
+          ossutil cp -rf dist/kc-darwin-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.branch }}/

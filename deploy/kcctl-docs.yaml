@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kcctl-docs-deployment
+  labels:
+    app: kcctl-docs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kcctl-docs
+  template:
+    metadata:
+      labels:
+        app: kcctl-docs
+    spec:
+      containers:
+        - name: kcctl-docs
+          image: kubeclipper/kcctl-docs:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "100m"
+            limits:
+              memory: "500Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kcctl-docs-svc
+spec:
+  selector:
+    app: kcctl-docs
+  ports:
+    - name: web
+      protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kcctl-docs-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: kcctldocs.kubeclipper.io
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kcctl-docs-svc
+                port:
+                  number: 80
+
