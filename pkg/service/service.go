@@ -41,12 +41,12 @@ type Interface interface {
 }
 
 type IDelivery interface {
-	DeliverTaskOperation(ctx context.Context, operation *v1.Operation, opts *Options) error
 	DeliverLogRequest(ctx context.Context, operation *LogOperation) (oplog.LogContentResponse, error) // request & response synchronously.
 	CmdDelivery
 }
 
 type CmdDelivery interface {
+	DeliverTaskOperation(ctx context.Context, operation *v1.Operation, opts *Options) error
 	DeliverCmd(ctx context.Context, toNode string, cmds []string, timeout time.Duration) ([]byte, error)
 }
 
