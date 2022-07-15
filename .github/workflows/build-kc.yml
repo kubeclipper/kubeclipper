@@ -7,10 +7,8 @@ name: build-kc
 on:
   push:
     branches:
-      - 'main'
+      - 'master'
       - 'release*'
-  schedule:
-    - cron: '0 0 * * *'
 
 # This ensures that previous jobs for the branch are canceled when the branch is updated.
 concurrency:
