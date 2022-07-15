@@ -578,7 +578,7 @@ func (stepper *ActBackup) makeInstallSteps(metadata *component.ExtraMetadata) er
 
 	step := v1.Step{
 		ID:         strutil.GetUUID(),
-		Name:       "CreateBackup",
+		Name:       "createBackup",
 		Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 0,
@@ -607,7 +607,7 @@ func (stepper *ActBackup) makeUninstallSteps(metadata *component.ExtraMetadata) 
 	metadata.Masters.GetNodeIDs()
 	step := v1.Step{
 		ID:         strutil.GetUUID(),
-		Name:       "DeleteBackup",
+		Name:       "deleteBackup",
 		Timeout:    metav1.Duration{Duration: 2 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 0,
@@ -714,7 +714,7 @@ func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) err
 	}
 	step = v1.Step{
 		ID:         strutil.GetUUID(),
-		Name:       "recovery",
+		Name:       "afterRecovery",
 		Timeout:    metav1.Duration{Duration: 7 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 0,
