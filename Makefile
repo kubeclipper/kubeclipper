@@ -35,12 +35,9 @@ build-e2e:
 openapi:
 	go run ./tools/doc-gen/main.go
 
-.PHONY:test coverage-ui
+.PHONY:test
 test:
-	go test ./pkg/... -coverprofile=dist/coverage.out
-
-coverage-ui:test
-	go tool cover -html=dist/coverage.out -o dist/coverage.html
+	go test -race ./pkg/... -coverprofile=coverage.out -covermode=atomic
 
 .PHONY: format-deps checkfmt fmt goimports vet lint
 format-deps:
