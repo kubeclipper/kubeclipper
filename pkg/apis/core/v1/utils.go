@@ -229,18 +229,20 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 	}
 
 	r := k8s.Recovery{
-		BackupPointRootDir: bp.FsConfig.BackupRootDir,
-		StoreType:          bp.StorageType,
-		RestoreDir:         restoreDir,
-		BackupFileName:     b.FileName,
-		NodeNameList:       nodeNames,
-		NodeIPList:         nodeIPs,
-		BackupFileSize:     b.Status.BackupFileSize,
-		BackupFileMD5:      b.Status.BackupFileMD5,
-		FileDir:            f,
+		StoreType:      bp.StorageType,
+		RestoreDir:     restoreDir,
+		BackupFileName: b.FileName,
+		NodeNameList:   nodeNames,
+		NodeIPList:     nodeIPs,
+		BackupFileSize: b.Status.BackupFileSize,
+		BackupFileMD5:  b.Status.BackupFileMD5,
+		FileDir:        f,
 	}
 
-	if bp.StorageType == bs.S3Storage {
+	switch bp.StorageType {
+	case bs.FSStorage:
+		r.BackupPointRootDir = bp.FsConfig.BackupRootDir
+	case bs.S3Storage:
 		r.AccessKeyID = bp.S3Config.AccessKeyID
 		r.AccessKeySecret = bp.S3Config.AccessKeySecret
 		r.Bucket = bp.S3Config.Bucket
