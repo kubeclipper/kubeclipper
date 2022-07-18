@@ -10,6 +10,7 @@
 
 <p align="center">
   <img alt="repo status" src="https://img.shields.io/badge/-Repo_Status_>-000000?style=flat-square&logo=github&logoColor=white" />
+  <a href="https://codecov.io/gh/kubeclipper-labs/kubeclipper" target="_blank"><img alt="coverage" src="https://codecov.io/gh/kubeclipper-labs/kubeclipper/branch/master/graph/badge.svg"/></a>
   <img alt="last commit" src="https://img.shields.io/github/last-commit/kubeclipper-labs/kubeclipper?style=flat-square">
   <img alt="Issues" src="https://img.shields.io/github/issues/kubeclipper-labs/kubeclipper?style=flat-square&labelColor=343b41"/>
   <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/kubeclipper-labs/kubeclipper?style=flat-square&labelColor=343b41"/>
