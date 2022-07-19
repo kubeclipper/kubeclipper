@@ -24,11 +24,12 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+
 	"github.com/google/uuid"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
-	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
@@ -305,14 +306,10 @@ func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMeta
 func (h *handler) parseActBackupSteps(c *v1.Cluster, b *v1.Backup, action v1.StepAction) ([]v1.Step, error) {
 	steps := make([]v1.Step, 0)
 
-	q := query.New()
-	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, c.Name)
-
 	bp, err := h.clusterOperator.GetBackupPointEx(context.TODO(), c.Labels[common.LabelBackupPoint], "0")
 	if err != nil {
 		return nil, err
 	}
-	// obtain the preferred node information
 	pNode, err := h.clusterOperator.GetNodeEx(context.TODO(), b.PreferredNode, "0")
 	if err != nil {
 		return nil, err

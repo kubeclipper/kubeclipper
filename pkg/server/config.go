@@ -406,6 +406,16 @@ var Roles = []iamv1.GlobalRole{
 				Resources: []string{"templates"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"backuppoints"},
+				Verbs:     []string{"get", "list", "watch", "create"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"cronbackups"},
+				Verbs:     []string{"get", "list", "watch", "create"},
+			},
 		},
 	},
 	{
@@ -442,6 +452,16 @@ var Roles = []iamv1.GlobalRole{
 				Resources: []string{"templates"},
 				Verbs:     []string{"*"},
 			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"backuppoints"},
+				Verbs:     []string{"update", "patch"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"cronbackups"},
+				Verbs:     []string{"get", "list", "watch", "create"},
+			},
 		},
 	},
 	{
@@ -472,6 +492,16 @@ var Roles = []iamv1.GlobalRole{
 				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"clusters/plugins", "clusters/nodes"},
 				Verbs:     []string{"*"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"backuppoints"},
+				Verbs:     []string{"delete"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"cronbackups"},
+				Verbs:     []string{"get", "list", "watch", "create"},
 			},
 		},
 	},
