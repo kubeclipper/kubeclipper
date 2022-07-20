@@ -75,6 +75,11 @@ func RunCmdWithContext(ctx context.Context, dryRun bool, command string, args ..
 	go func() {
 		select {
 		case <-ctx.Done():
+			// Send signal iff the process is in execution state
+			if ec.Cmd.Process == nil {
+				logger.Debug("the current command is not running", zap.String("cmd", ec.String()))
+				return
+			}
 			// If pid is less than -1, then sig is sent to every process in the process group whose ID is -pid.
 			// https://man7.org/linux/man-pages/man2/kill.2.html
 			err = syscall.Kill(-ec.Cmd.Process.Pid, syscall.SIGKILL)

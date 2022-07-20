@@ -37,6 +37,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -167,7 +168,7 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 		return nil, err
 	}
 	if err = instance.RemoveConfigs(); err != nil {
-		return nil, err
+		logger.Error("remove contanierd configs compressed file failed", zap.Error(err))
 	}
 	// remove containerd run dir
 	if err = os.RemoveAll("/run/containerd"); err == nil {
@@ -235,13 +236,12 @@ func (runnable *ContainerdRunnable) enableContainerdService(ctx context.Context,
 }
 
 func (runnable *ContainerdRunnable) disableContainerdService(ctx context.Context, dryRun bool) error {
-	// stop systemd containerd service
+	// the following command execution error is ignored
 	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "containerd"); err != nil {
-		return err
+		logger.Warn("stop systemd containerd service failed", zap.Error(err))
 	}
-	// disable systemd containerd service
 	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "containerd"); err != nil {
-		return err
+		logger.Warn("disable systemd containerd service failed", zap.Error(err))
 	}
 	return nil
 }

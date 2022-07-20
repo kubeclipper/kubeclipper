@@ -29,6 +29,8 @@ import (
 	"runtime"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
@@ -488,7 +490,7 @@ func (n *ImageLoader) Uninstall(ctx context.Context, opts component.Options) ([]
 		return nil, err
 	}
 	if err = instance.RemoveImages(); err != nil {
-		return nil, err
+		logger.Error("remove nfs images compressed file failed", zap.Error(err))
 	}
 	return nil, nil
 }

@@ -422,7 +422,7 @@ func (stepper *UpgradePackage) Uninstall(ctx context.Context, opts component.Opt
 	// remove image file
 	if stepper.DownloadImage {
 		if err = instance.RemoveImages(); err != nil {
-			return nil, err
+			logger.Error("remove k8s upgrade images compressed file failed", zap.Error(err))
 		}
 	}
 	return nil, nil

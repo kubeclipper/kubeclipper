@@ -36,6 +36,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -157,7 +158,7 @@ func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Opt
 		return nil, err
 	}
 	if err = instance.RemoveConfigs(); err != nil {
-		return nil, err
+		logger.Error("remove docker configs compressed file failed", zap.Error(err))
 	}
 	// remove unix socket
 	list := []string{"docker.sock", "dockershim.sock"}
@@ -211,18 +212,16 @@ func (runnable *DockerRunnable) enableDockerService(ctx context.Context, dryRun 
 	if err != nil {
 		return err
 	}
-	logger.Debug("enable docker systemd service successfully")
 	return nil
 }
 
 func (runnable *DockerRunnable) disableDockerService(ctx context.Context, dryRun bool) error {
-	// stop systemd docker service
+	// the following command execution error is ignored
 	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "docker"); err != nil {
-		return err
+		logger.Warn("stop systemd docker service failed", zap.Error(err))
 	}
-	// disable systemd docker service
 	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "docker"); err != nil {
-		return err
+		logger.Warn("disable systemd docker service failed", zap.Error(err))
 	}
 	return nil
 }
