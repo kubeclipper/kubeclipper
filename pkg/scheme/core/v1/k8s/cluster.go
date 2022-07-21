@@ -30,6 +30,9 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -41,8 +44,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sysutil"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -147,6 +148,7 @@ func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, kubeadm *
 		Etcd:                    kubeadm.KubeComponents.Etcd,
 		Network:                 kubeadm.Networking,
 		KubeProxy:               kubeadm.KubeComponents.KubeProxy,
+		Kubelet:                 kubeadm.KubeComponents.Kubelet,
 		ClusterName:             metadata.ClusterName,
 		KubernetesVersion:       kubeadm.KubernetesVersion,
 		ControlPlaneEndpoint:    cpEndpoint,
@@ -746,10 +748,10 @@ func (stepper *Recovery) Install(ctx context.Context, opts component.Options) ([
 	if err != nil {
 		return nil, err
 	}
-	//_, err = stepper.AfterRecovery(ctx, opts)
-	//if err != nil {
+	// _, err = stepper.AfterRecovery(ctx, opts)
+	// if err != nil {
 	//	return nil, err
-	//}
+	// }
 	return nil, nil
 }
 
