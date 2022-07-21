@@ -1,8 +1,8 @@
 <!-- Thanks for sending a pull request! Here are some tips for you:
 
-1. If you want **faster** PR reviews, read how: https://github.com/kubesphere/community/blob/master/developer-guide/development/the-pr-author-guide-to-getting-through-code-review.md
-2. In case you want to know how your PR got reviewed, read: https://github.com/kubesphere/community/blob/master/developer-guide/development/code-review-guide.md
-3. Here are some coding convetions followed by KubeSphere community: https://github.com/kubesphere/community/blob/master/developer-guide/development/coding-conventions.md
+1. If you want **faster** PR reviews, read how: https://github.com/kubeclipper/community/blob/master/developer-guide/development/the-pr-author-guide-to-getting-through-code-review.md
+2. In case you want to know how your PR got reviewed, read: https://github.com/kubeclipper/community/blob/master/developer-guide/development/code-review-guide.md
+3. Here are some coding convetions followed by KubeClipper community: https://github.com/kubeclipper/community/blob/master/developer-guide/development/coding-conventions.md
 -->
 
 ### What type of PR is this?

@@ -447,15 +447,17 @@ func (stepper *ActBackup) Install(ctx context.Context, opts component.Options) (
 
 	if stepper.StoreType == bs.FSStorage {
 		if !fileutil.PathExist(stepper.BackupPointRootDir) {
-			return nil, fmt.Errorf("'%s' directory does not exist. Please go to all node create this directory and mount it",
-				stepper.BackupPointRootDir)
+			fErr := fmt.Errorf("'%s' directory does not exist. Please go to all node create this directory and mount it", stepper.BackupPointRootDir)
+			// call RunCmdWithContext function in order to log the operation
+			_, _ = cmdutil.CheckContextAndAppendStepLogFile(ctx, []byte(fmt.Sprintf("[%s] + %s %s\n\n", time.Now().Format(time.RFC3339), "backup pre-check", fErr.Error())))
+			return nil, fErr
 		}
 	}
 
 	// etcdctl snapshot save
 	cmd := fmt.Sprintf("etcdctl --endpoints=https://%s:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt  --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save %s",
 		ip.String(), stepper.BackupFileName)
-	ec, err := cmdutil.RunCmdWithContext(ctx, false, "bash", "-c", cmd)
+	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", cmd)
 	if err != nil {
 		if ec != nil {
 			logger.Errorf("etcdctl snapshot save failed: %s", ec.StdErr())
@@ -503,7 +505,7 @@ func (stepper *ActBackup) Install(ctx context.Context, opts component.Options) (
 	}
 
 	// delete the local backup file
-	ec, err = cmdutil.RunCmdWithContext(ctx, false, "rm", "-rf", stepper.BackupFileName)
+	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "rm", "-rf", stepper.BackupFileName)
 	if err != nil {
 		if ec != nil {
 			logger.Errorf("delete local backup file failed: %s", ec.StdErr())
