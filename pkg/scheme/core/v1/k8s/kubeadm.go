@@ -29,6 +29,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/txn2/txeh"
+	"go.uber.org/zap"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -40,8 +43,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
-	"github.com/txn2/txeh"
-	"go.uber.org/zap"
 )
 
 func init() {
@@ -102,6 +103,7 @@ type KubeadmConfig struct {
 	Etcd                 v1.Etcd       `json:"etcd"`
 	Network              v1.Networking `json:"networking"`
 	KubeProxy            v1.KubeProxy  `json:"kubeProxy"`
+	Kubelet              v1.Kubelet    `json:"kubelet"`
 	ClusterName          string        `json:"clusterName"`
 	KubernetesVersion    string        `json:"kubernetesVersion"`
 	ControlPlaneEndpoint string        `json:"controlPlaneEndpoint"`
@@ -244,6 +246,11 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 		return err
 	}
 	stepper.ClusterConfigAPIVersion = apiVersion
+
+	if stepper.Kubelet.RootDir == "" {
+		stepper.Kubelet.RootDir = KubeletDefaultDataDir
+	}
+
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
 		return err
 	}

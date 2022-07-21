@@ -4615,6 +4615,9 @@
         },
         "kubeProxy": {
           "$ref": "#/definitions/v1.KubeProxy"
+        },
+        "kubelet": {
+          "$ref": "#/definitions/v1.Kubelet"
         }
       }
     },
@@ -4684,6 +4687,16 @@
           "items": {
             "$ref": "#/definitions/v1.WorkerNode"
           }
+        }
+      }
+    },
+    "v1.Kubelet": {
+      "required": [
+        "rootDir"
+      ],
+      "properties": {
+        "rootDir": {
+          "type": "string"
         }
       }
     },

@@ -26,11 +26,12 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -355,6 +356,7 @@ func (stepper *KubeadmConfig) InitStepper(kubeadm *v1.Kubeadm, metadata *compone
 	stepper.Etcd = kubeadm.KubeComponents.Etcd
 	stepper.Network = kubeadm.Networking
 	stepper.KubeProxy = kubeadm.KubeComponents.KubeProxy
+	stepper.Kubelet = kubeadm.KubeComponents.Kubelet
 	stepper.ClusterName = metadata.ClusterName
 	stepper.KubernetesVersion = kubeadm.KubernetesVersion
 	stepper.ControlPlaneEndpoint = cpEndpoint
@@ -866,8 +868,12 @@ func Clear(kubeadm *v1.Kubeadm, metadata *component.ExtraMetadata) ([]v1.Step, e
 	steps = append(steps,
 		doCommandRemoveStep("clearDatabase", masters,
 			kubeadm.KubeComponents.Etcd.DataDir))
+	kubeletDataDir := KubeletDefaultDataDir
+	if kubeadm.KubeComponents.Kubelet.RootDir != "" {
+		kubeletDataDir = kubeadm.KubeComponents.Kubelet.RootDir
+	}
 	steps = append(steps,
-		doCommandRemoveStep("removeKubeletDataDir", nodes, KubeletDefaultDataDir),
+		doCommandRemoveStep("removeKubeletDataDir", nodes, kubeletDataDir),
 		doCommandRemoveStep("removeDockershimDataDir", nodes, DockershimDefaultDataDir),
 	)
 

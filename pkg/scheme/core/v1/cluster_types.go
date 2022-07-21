@@ -247,6 +247,10 @@ type Networking struct {
 	DNSDomain     string `json:"dnsDomain"`
 }
 
+type Kubelet struct {
+	RootDir string `json:"rootDir" yaml:"rootDir"`
+}
+
 type CNI struct {
 	LocalRegistry string `json:"localRegistry" optional:"true"`
 	Type          string `json:"type" enum:"calico"`
@@ -276,6 +280,7 @@ type KubeProxy struct {
 type KubeComponents struct {
 	KubeProxy KubeProxy `json:"kubeProxy,omitempty" optional:"true"`
 	Etcd      Etcd      `json:"etcd,omitempty" optional:"true"`
+	Kubelet   Kubelet   `json:"kubelet,omitempty" yaml:"kubelet"`
 	CNI       CNI       `json:"cni"`
 }
 

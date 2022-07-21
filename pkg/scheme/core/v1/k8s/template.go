@@ -87,13 +87,15 @@ staticPodPath: /etc/kubernetes/manifests
 streamingConnectionIdleTimeout: 0s
 syncFrequency: 3s
 volumeStatsAggPeriod: 1m
-{{- if eq .ContainerRuntime  "containerd"}}
 ---
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: InitConfiguration
 nodeRegistration:
+{{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock
 {{end}}
+  kubeletExtraArgs:
+    root-dir: {{.Kubelet.RootDir}}
 `
 
 const lvscareV111 = `
