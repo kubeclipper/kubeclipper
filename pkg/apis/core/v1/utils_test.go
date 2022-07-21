@@ -65,7 +65,7 @@ var (
 				},
 			},
 			KubernetesVersion: "v1.18.6",
-			//ControlPlaneEndpoint: "172.18.94.114:6443",
+			// ControlPlaneEndpoint: "172.18.94.114:6443",
 			CertSANs:      nil,
 			LocalRegistry: "172.18.94.144:5000",
 			ContainerRuntime: v1.ContainerRuntime{
@@ -148,7 +148,7 @@ var (
 )
 
 func Test_parseOperationFromCluster(t *testing.T) {
-	h := newHandler(nil, nil, nil, nil, nil, nil)
+	h := newHandler(nil, nil, nil, nil, nil)
 	type args struct {
 		c      *v1.Cluster
 		meta   *component.ExtraMetadata
@@ -196,7 +196,7 @@ func Test_parseOperationFromComponent(t *testing.T) {
 		cluster    *v1.Cluster
 		components []v1.Component
 	}
-	h := newHandler(nil, nil, nil, nil, nil, nil)
+	h := newHandler(nil, nil, nil, nil, nil)
 	nfs := nfsprovisioner.NFSProvisioner{
 		ManifestsDir:     "/tmp/.nfs",
 		Namespace:        "kube-system",

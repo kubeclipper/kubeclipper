@@ -97,6 +97,7 @@ type Cluster struct {
 	ClusterType ClusterType   `json:"type"`
 	Kubeadm     *Kubeadm      `json:"kubeadm,omitempty"`
 	Status      ClusterStatus `json:"status,omitempty" optional:"true"`
+	KubeConfig  []byte        `json:"kubeconfig,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -238,6 +238,11 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.Status.DeepCopyInto(&out.Status)
+	if in.KubeConfig != nil {
+		in, out := &in.KubeConfig, &out.KubeConfig
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

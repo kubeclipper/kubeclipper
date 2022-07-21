@@ -32,7 +32,8 @@ import (
 
 	"k8s.io/client-go/tools/remotecommand"
 
-	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
+
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller"
@@ -84,7 +85,6 @@ type handler struct {
 	opOperator       operation.Operator
 	platformOperator platform.Operator
 	delivery         service.IDelivery
-	mgr              ctrl.Manager
 }
 
 const (
@@ -100,9 +100,8 @@ var (
 )
 
 func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, delivery service.IDelivery, mgr ctrl.Manager) *handler {
+	platform platform.Operator, delivery service.IDelivery) *handler {
 	return &handler{
-		mgr:              mgr,
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
 		opOperator:       op,
@@ -2218,15 +2217,30 @@ type SSHCredential struct {
 
 func (h *handler) SSHToPod(request *restful.Request, response *restful.Response) {
 	clusterName := request.PathParameter(query.ParameterName)
-	client, exists := h.mgr.GetClusterClientSet(clusterName)
-	if !exists {
-		logger.Errorf("get cluster %s client failed", clusterName)
-		restplus.HandleBadRequest(response, request, fmt.Errorf("get cluster %s client failed", clusterName))
+	clu, err := h.clusterOperator.GetCluster(context.TODO(), clusterName)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not exists", clusterName))
+			return
+		}
+		logger.Errorf("get cluster %s failed: %v", clusterName, err)
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if clu.KubeConfig == nil {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s clientset not init", clusterName))
+		return
+	}
+
+	clientcfg, clientset, err := client.FromKubeConfig(clu.KubeConfig)
+	if err != nil {
+		logger.Errorf("cluster %s generate clientset failed: %v", clusterName, err)
+		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
 	// find kubectl pod by label
-	list, err := client.Kubernetes().CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
+	list, err := clientset.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "k8s-app=kc-kubectl",
 	})
 	if err != nil {
@@ -2247,9 +2261,10 @@ func (h *handler) SSHToPod(request *restful.Request, response *restful.Response)
 		return
 	}
 	session := &sshutils.TerminalSession{Conn: wsConn, SizeChan: make(chan remotecommand.TerminalSize)}
-	t := sshutils.NewTerminaler(client.Kubernetes(), client.Config())
+	t := sshutils.NewTerminaler(clientset, clientcfg)
 	err = t.StartProcess("kube-system", podName, "kc-kubectl", []string{"sh"}, session)
 	if err != nil {
+		logger.Errorf("start process err: %v", err)
 		session.Close(2, err.Error())
 		return
 	}
