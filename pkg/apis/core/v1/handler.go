@@ -1147,8 +1147,8 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	}
-	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	_ = response.WriteHeaderAndEntity(http.StatusOK, backup)
 }
 
