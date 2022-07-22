@@ -306,6 +306,9 @@ func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMeta
 func (h *handler) parseActBackupSteps(c *v1.Cluster, b *v1.Backup, action v1.StepAction) ([]v1.Step, error) {
 	steps := make([]v1.Step, 0)
 
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, c.Name)
+
 	bp, err := h.clusterOperator.GetBackupPointEx(context.TODO(), c.Labels[common.LabelBackupPoint], "0")
 	if err != nil {
 		return nil, err
