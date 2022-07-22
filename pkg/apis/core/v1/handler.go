@@ -1106,10 +1106,6 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			return
 		}
 	}
-
-	// update cluster status to backing_up
-	c.Status.Status = v1.ClusterStatusBackingUp
-
 	// create operation
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -1130,13 +1126,13 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		backup.ClusterNodes[node.Status.Ipv4DefaultIP] = node.Status.NodeInfo.Hostname
 	}
 
-	op.Steps, err = h.parseActBackupSteps(c, backup, v1.ActionInstall)
-	if err != nil {
-		logger.Errorf("parse create backup step failed: %s", err.Error())
-		return
-	}
-
 	if !dryRun {
+		op.Steps, err = h.parseActBackupSteps(c, backup, v1.ActionInstall)
+		if err != nil {
+			logger.Errorf("parse create backup step failed: %s", err.Error())
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
 		if op, err = h.opOperator.CreateOperation(context.TODO(), op); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1145,14 +1141,14 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		// update cluster status to backing_up
+		c.Status.Status = v1.ClusterStatusBackingUp
 		if _, err = h.clusterOperator.UpdateCluster(context.TODO(), c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 	}
-
 	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
-
 	_ = response.WriteHeaderAndEntity(http.StatusOK, backup)
 }
 
@@ -1182,20 +1178,13 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	var nodes []v1.StepNode
 	if b.PreferredNode != "" {
-		n, err := h.clusterOperator.GetNodeEx(ctx, b.PreferredNode, "0")
+		_, err = h.clusterOperator.GetNodeEx(ctx, b.PreferredNode, "0")
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		nodes = append(nodes, v1.StepNode{
-			ID:       b.PreferredNode,
-			IPv4:     n.Status.Ipv4DefaultIP,
-			Hostname: n.Status.NodeInfo.Hostname,
-		})
 	}
-
 	// create operation
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -1206,7 +1195,6 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 	op.Labels[common.LabelBackupName] = b.Name
 	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
-	op.Steps = []v1.Step{{ID: strutil.GetUUID(), Name: "backup", Nodes: nodes, Action: v1.ActionInstall}}
 
 	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("backup is %s now, can't delete", b.Status.ClusterBackupStatus))
@@ -1219,21 +1207,22 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-
-		steps, err := h.parseActBackupSteps(c, b, v1.ActionUninstall)
+		// build the backup steps instance
+		op.Steps, err = h.parseActBackupSteps(c, b, v1.ActionUninstall)
 		if err != nil {
 			logger.Errorf("delete backup step parse failed: %s", err.Error())
-			return
-		}
-
-		op.Steps = steps
-
-		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
-
-		if err := h.clusterOperator.DeleteBackup(context.TODO(), backupName); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		if op, err = h.opOperator.CreateOperation(context.TODO(), op); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		if err = h.clusterOperator.DeleteBackup(context.TODO(), backupName); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	}
 	response.WriteHeader(http.StatusOK)
 }
