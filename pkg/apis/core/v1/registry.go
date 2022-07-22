@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
@@ -778,8 +777,8 @@ func SetupWebService(h *handler) *restful.WebService {
 }
 
 func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator,
-	leaseOperator lease.Operator, delivery service.IDelivery, mgr ctrl.Manager) error {
-	h := newHandler(clusterOperator, op, leaseOperator, platform, delivery, mgr)
+	leaseOperator lease.Operator, delivery service.IDelivery) error {
+	h := newHandler(clusterOperator, op, leaseOperator, platform, delivery)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

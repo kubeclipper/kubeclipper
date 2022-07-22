@@ -118,7 +118,7 @@ func (t TerminalSession) Read(p []byte) (int, error) {
 		if err != nil {
 			return copy(p, endOfTransmission), err
 		}
-		return copy(p, string(decodeString)+"\r\n"), nil
+		return copy(p, decodeString), nil
 	case wsMsgResize:
 		t.SizeChan <- remotecommand.TerminalSize{Width: uint16(msg.Cols), Height: uint16(msg.Rows)}
 		return 0, nil
