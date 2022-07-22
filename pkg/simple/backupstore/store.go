@@ -20,7 +20,15 @@ package backupstore
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 )
 
 const (
@@ -51,4 +59,26 @@ func GetProviderFactoryType() []string {
 		types = append(types, key)
 	}
 	return types
+}
+
+// logProbe are operation log probe needs to be invoked proactively by services
+func logProbe(ctx context.Context, cmd string, err error) {
+	var errStr string
+	if err != nil {
+		errStr = fmt.Sprintf("\n an error occurred: %+v", err)
+	}
+	ln := fmt.Sprintf("[%s] + %s %s\n\n", time.Now().Format(time.RFC3339), cmd, errStr)
+	if check, sErr := cmdutil.CheckContextAndAppendStepLogFile(ctx, []byte(ln)); sErr != nil {
+		// detect context content and distinguish errors
+		if check {
+			logger.Error("get operation step log file failed: "+sErr.Error(),
+				zap.String("operation", component.GetOperationID(ctx)),
+				zap.String("step", component.GetStepID(ctx)),
+				zap.String("cmd", cmd),
+			)
+		} else {
+			// commands do not need to be logged
+			logger.Debug("this command does not need to be logged", zap.String("cmd", cmd))
+		}
+	}
 }

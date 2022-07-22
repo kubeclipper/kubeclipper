@@ -396,7 +396,24 @@ func Test_parseActBackupSteps(t *testing.T) {
 			},
 		},
 		nil).AnyTimes()
-
+	clusterMockOperator.EXPECT().GetNodeEx(gomock.Any(), gomock.Any(), gomock.Eq("0")).Return(
+		&v1.Node{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Node",
+				APIVersion: "core.kubeclipper.io/v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "947627ea-160f-48e2-9a90-07a9739425aa",
+			},
+			ProxyIpv4CIDR: "10.0.0.0/32",
+			Status: v1.NodeStatus{
+				Ipv4DefaultIP: "127.0.0.1",
+				NodeInfo: v1.NodeSystemInfo{
+					Hostname: "test",
+				},
+			},
+		},
+		nil).AnyTimes()
 	h := &handler{
 		clusterOperator: clusterMockOperator,
 	}
