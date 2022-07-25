@@ -232,9 +232,8 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 	r := k8s.Recovery{
 		StoreType:      bp.StorageType,
 		RestoreDir:     restoreDir,
-		BackupFileName: b.FileName,
+		BackupFileName: b.Status.FileName,
 		NodeNameList:   nodeNames,
-		BackupFileName:     b.Status.FileName,
 		NodeIPList:     nodeIPs,
 		BackupFileSize: b.Status.BackupFileSize,
 		BackupFileMD5:  b.Status.BackupFileMD5,
