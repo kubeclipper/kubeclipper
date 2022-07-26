@@ -756,8 +756,6 @@ net.ipv4.ip_forward=1
 EOF
 cat > /etc/sysctl.conf << EOF
 net.ipv6.conf.all.forwarding=1
-fs.file-max = 100000
-vm.max_map_count=262144
 EOF
 cat > /etc/security/limits.conf << EOF
 #IncreaseMaximumNumberOfFileDescriptors
