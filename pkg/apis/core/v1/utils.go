@@ -24,11 +24,12 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+
 	"github.com/google/uuid"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
-	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
@@ -312,8 +313,11 @@ func (h *handler) parseActBackupSteps(c *v1.Cluster, b *v1.Backup, action v1.Ste
 	if err != nil {
 		return nil, err
 	}
-
-	actBackupStep, err := getActBackupStep(c, b, bp, action)
+	pNode, err := h.clusterOperator.GetNodeEx(context.TODO(), b.PreferredNode, "0")
+	if err != nil {
+		return nil, err
+	}
+	actBackupStep, err := getActBackupStep(c, b, bp, pNode, action)
 	if err != nil {
 		return nil, err
 	}
@@ -323,12 +327,16 @@ func (h *handler) parseActBackupSteps(c *v1.Cluster, b *v1.Backup, action v1.Ste
 	return steps, nil
 }
 
-func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, action v1.StepAction) (steps []v1.Step, err error) {
+func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1.Node, action v1.StepAction) (steps []v1.Step, err error) {
 	var actBackup *k8s.ActBackup
 	meta := component.ExtraMetadata{
 		ClusterName: c.Name,
 	}
-	meta.Masters = append(meta.Masters, component.Node{ID: b.PreferredNode})
+	meta.Masters = []component.Node{{
+		ID:       b.PreferredNode, // the preferred node is used by default
+		IPv4:     pNode.Status.Ipv4DefaultIP,
+		Hostname: pNode.Status.NodeInfo.Hostname,
+	}}
 	ctx := component.WithExtraMetadata(context.TODO(), meta)
 
 	switch bp.StorageType {

@@ -194,7 +194,7 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 		return err
 	}
 
-	if _, exist := r.mgr.GetClusterClientSet(clu.Name); exist {
+	if _, exist := r.mgr.GetClusterClientSet(clu.Name); exist && clu.KubeConfig != nil {
 		log.Debug("clientset has been init")
 		return nil
 	}
@@ -213,7 +213,14 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	//	logger.Error("get cluster service account token error", zap.String("cluster", name), zap.Error(err))
 	//	return err
 	// }
-	clientConfig, err := clientcmd.NewClientConfigFromBytes([]byte(getKubeConfig(clu.Name, fmt.Sprintf("https://%s:6443", node.Status.Ipv4DefaultIP), "kc-server", string(token))))
+	kubeconfig := getKubeConfig(clu.Name, fmt.Sprintf("https://%s:6443", node.Status.Ipv4DefaultIP), "kc-server", string(token))
+	clu.KubeConfig = []byte(kubeconfig)
+	_, err = r.ClusterWriter.UpdateCluster(ctx, clu)
+	if err != nil {
+		log.Error("update kube config failed", zap.String("cluster", clu.Name), zap.Error(err))
+		return err
+	}
+	clientConfig, err := clientcmd.NewClientConfigFromBytes([]byte(kubeconfig))
 	if err != nil {
 		log.Error("create cluster client config failed", zap.String("cluster", clu.Name), zap.Error(err))
 		return err

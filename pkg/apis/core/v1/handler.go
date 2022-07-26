@@ -30,9 +30,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/robfig/cron/v3"
+
 	"k8s.io/client-go/tools/remotecommand"
 
-	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
+
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller"
@@ -84,7 +87,6 @@ type handler struct {
 	opOperator       operation.Operator
 	platformOperator platform.Operator
 	delivery         service.IDelivery
-	mgr              ctrl.Manager
 }
 
 const (
@@ -100,9 +102,8 @@ var (
 )
 
 func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, delivery service.IDelivery, mgr ctrl.Manager) *handler {
+	platform platform.Operator, delivery service.IDelivery) *handler {
 	return &handler{
-		mgr:              mgr,
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
 		opOperator:       op,
@@ -1107,10 +1108,6 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			return
 		}
 	}
-
-	// update cluster status to backing_up
-	c.Status.Status = v1.ClusterStatusBackingUp
-
 	// create operation
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -1131,13 +1128,13 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		backup.ClusterNodes[node.Status.Ipv4DefaultIP] = node.Status.NodeInfo.Hostname
 	}
 
-	op.Steps, err = h.parseActBackupSteps(c, backup, v1.ActionInstall)
-	if err != nil {
-		logger.Errorf("parse create backup step failed: %s", err.Error())
-		return
-	}
-
 	if !dryRun {
+		op.Steps, err = h.parseActBackupSteps(c, backup, v1.ActionInstall)
+		if err != nil {
+			logger.Errorf("parse create backup step failed: %s", err.Error())
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
 		if op, err = h.opOperator.CreateOperation(context.TODO(), op); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1146,14 +1143,14 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		// update cluster status to backing_up
+		c.Status.Status = v1.ClusterStatusBackingUp
 		if _, err = h.clusterOperator.UpdateCluster(context.TODO(), c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	}
-
-	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
-
 	_ = response.WriteHeaderAndEntity(http.StatusOK, backup)
 }
 
@@ -1183,20 +1180,13 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	var nodes []v1.StepNode
 	if b.PreferredNode != "" {
-		n, err := h.clusterOperator.GetNodeEx(ctx, b.PreferredNode, "0")
+		_, err = h.clusterOperator.GetNodeEx(ctx, b.PreferredNode, "0")
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		nodes = append(nodes, v1.StepNode{
-			ID:       b.PreferredNode,
-			IPv4:     n.Status.Ipv4DefaultIP,
-			Hostname: n.Status.NodeInfo.Hostname,
-		})
 	}
-
 	// create operation
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -1207,7 +1197,6 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 	op.Labels[common.LabelBackupName] = b.Name
 	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
-	op.Steps = []v1.Step{{ID: strutil.GetUUID(), Name: "backup", Nodes: nodes, Action: v1.ActionInstall}}
 
 	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("backup is %s now, can't delete", b.Status.ClusterBackupStatus))
@@ -1220,21 +1209,22 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-
-		steps, err := h.parseActBackupSteps(c, b, v1.ActionUninstall)
+		// build the backup steps instance
+		op.Steps, err = h.parseActBackupSteps(c, b, v1.ActionUninstall)
 		if err != nil {
 			logger.Errorf("delete backup step parse failed: %s", err.Error())
-			return
-		}
-
-		op.Steps = steps
-
-		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
-
-		if err := h.clusterOperator.DeleteBackup(context.TODO(), backupName); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		if op, err = h.opOperator.CreateOperation(context.TODO(), op); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		if err = h.clusterOperator.DeleteBackup(context.TODO(), backupName); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	}
 	response.WriteHeader(http.StatusOK)
 }
@@ -2218,15 +2208,30 @@ type SSHCredential struct {
 
 func (h *handler) SSHToPod(request *restful.Request, response *restful.Response) {
 	clusterName := request.PathParameter(query.ParameterName)
-	client, exists := h.mgr.GetClusterClientSet(clusterName)
-	if !exists {
-		logger.Errorf("get cluster %s client failed", clusterName)
-		restplus.HandleBadRequest(response, request, fmt.Errorf("get cluster %s client failed", clusterName))
+	clu, err := h.clusterOperator.GetCluster(context.TODO(), clusterName)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not exists", clusterName))
+			return
+		}
+		logger.Errorf("get cluster %s failed: %v", clusterName, err)
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if clu.KubeConfig == nil {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s clientset not init", clusterName))
+		return
+	}
+
+	clientcfg, clientset, err := client.FromKubeConfig(clu.KubeConfig)
+	if err != nil {
+		logger.Errorf("cluster %s generate clientset failed: %v", clusterName, err)
+		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
 	// find kubectl pod by label
-	list, err := client.Kubernetes().CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
+	list, err := clientset.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "k8s-app=kc-kubectl",
 	})
 	if err != nil {
@@ -2247,9 +2252,10 @@ func (h *handler) SSHToPod(request *restful.Request, response *restful.Response)
 		return
 	}
 	session := &sshutils.TerminalSession{Conn: wsConn, SizeChan: make(chan remotecommand.TerminalSize)}
-	t := sshutils.NewTerminaler(client.Kubernetes(), client.Config())
+	t := sshutils.NewTerminaler(clientset, clientcfg)
 	err = t.StartProcess("kube-system", podName, "kc-kubectl", []string{"sh"}, session)
 	if err != nil {
+		logger.Errorf("start process err: %v", err)
 		session.Close(2, err.Error())
 		return
 	}
@@ -2564,4 +2570,202 @@ func (h *handler) UpdateBackupPoint(req *restful.Request, resp *restful.Response
 	}
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, obp)
+}
+
+func (h *handler) DescribeCronBackup(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter(query.ParameterName)
+	resourceVersion := strutil.StringDefaultIfEmpty("0", request.QueryParameter(query.ParameterResourceVersion))
+	result, err := h.clusterOperator.GetCronBackupEx(request.Request.Context(), name, resourceVersion)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteHeaderAndEntity(http.StatusOK, result)
+}
+
+func (h *handler) ListCronBackups(request *restful.Request, response *restful.Response) {
+	q := query.ParseQueryParameter(request)
+	if clientrest.IsInformerRawQuery(request.Request) {
+		result, err := h.clusterOperator.ListCronBackups(request.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
+	} else {
+		result, err := h.clusterOperator.ListCronBackupEx(request.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
+	}
+}
+
+func (h *handler) CreateCronBackup(request *restful.Request, response *restful.Response) {
+	cb := new(v1.CronBackup)
+	if err := request.ReadEntity(cb); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if cb.Spec.Schedule != "" {
+		s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cb.Spec.Schedule)
+		// update the next schedule time
+		nextRunAt := metav1.NewTime(s.Next(time.Now()))
+		cb.Status.NextScheduleTime = &nextRunAt
+	} else if cb.Spec.RunAt != nil {
+		cb.Status.NextScheduleTime = cb.Spec.RunAt
+	}
+
+	cb.Labels[common.LabelCronBackupEnable] = ""
+	createdCB, err := h.clusterOperator.CreateCronBackup(request.Request.Context(), cb)
+	if err != nil {
+		if apimachineryErrors.IsAlreadyExists(err) {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteHeaderAndEntity(http.StatusOK, createdCB)
+}
+
+func (h *handler) DeleteCronBackup(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter(query.ParameterName)
+	err := h.clusterOperator.DeleteCronBackup(request.Request.Context(), name)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			logger.Debug("cronBackup not exist when delete", zap.String("cronBackup", name))
+			response.WriteHeader(http.StatusOK)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	response.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) UpdateCronBackup(req *restful.Request, resp *restful.Response) {
+	cb := &v1.CronBackup{}
+	if err := req.ReadEntity(cb); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	name := req.PathParameter(query.ParameterName)
+	resourceVersion := strutil.StringDefaultIfEmpty("0", req.QueryParameter(query.ParameterResourceVersion))
+	ocb, err := h.clusterOperator.GetCronBackupEx(req.Request.Context(), name, resourceVersion)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	// disposable performed backup cannot be edited
+	if cb.Spec.RunAt != nil {
+		if after := metav1.NewTime(time.Now()).After(cb.Status.LastSuccessfulTime.Time); after {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		ocb.Spec.RunAt = cb.Spec.RunAt
+	}
+	ocb.Labels[common.AnnotationDescription] = cb.Labels[common.AnnotationDescription]
+	ocb.Spec.Schedule = cb.Spec.Schedule
+	_, err = h.clusterOperator.UpdateCronBackup(req.Request.Context(), ocb)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, ocb)
+}
+
+func (h *handler) EnableCronBackup(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter(query.ParameterName)
+	ctx := req.Request.Context()
+	resourceVersion := strutil.StringDefaultIfEmpty("0", req.QueryParameter(query.ParameterResourceVersion))
+	cronBackup, err := h.clusterOperator.GetCronBackupEx(ctx, name, resourceVersion)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	if _, ok := cronBackup.Labels[common.LabelCronBackupEnable]; ok {
+		restplus.HandleBadRequest(resp, req, fmt.Errorf("the cronbackup %s is already enable:%v", cronBackup.Name, cronBackup.Labels[common.LabelCronBackupEnable]))
+	}
+	delete(cronBackup.Labels, common.LabelCronBackupDisable)
+	cronBackup.Labels[common.LabelCronBackupEnable] = ""
+	updateCronBackup, err := h.clusterOperator.UpdateCronBackup(ctx, cronBackup)
+	if err != nil {
+		if apimachineryErrors.IsConflict(err) {
+			restplus.HandleBadRequest(resp, req, fmt.Errorf("the cronBackup %s has been modified; please apply "+
+				"your changes to the latest version and try again", cronBackup.Name))
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, updateCronBackup)
+}
+
+func (h *handler) DisableCronBackup(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter(query.ParameterName)
+	ctx := req.Request.Context()
+	resourceVersion := strutil.StringDefaultIfEmpty("0", req.QueryParameter(query.ParameterResourceVersion))
+	cronBackup, err := h.clusterOperator.GetCronBackupEx(ctx, name, resourceVersion)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	if _, ok := cronBackup.Labels[common.LabelCronBackupDisable]; ok {
+		restplus.HandleBadRequest(resp, req, fmt.Errorf("the cronbackup %s is already disable:%v", cronBackup.Name, cronBackup.Labels[common.LabelCronBackupDisable]))
+	}
+	delete(cronBackup.Labels, common.LabelCronBackupEnable)
+	cronBackup.Labels[common.LabelCronBackupDisable] = ""
+	updateCronBackup, err := h.clusterOperator.UpdateCronBackup(ctx, cronBackup)
+	if err != nil {
+		if apimachineryErrors.IsConflict(err) {
+			restplus.HandleBadRequest(resp, req, fmt.Errorf("the cronbackup %s has been modified; please apply "+
+				"your changes to the latest version and try again", updateCronBackup.Name))
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, updateCronBackup)
+}
+
+func (h *handler) ListBackupsWithCronBackup(req *restful.Request, resp *restful.Response) {
+	var result []v1.Backup
+	// cronBackup name in path
+	cronBackupName := req.PathParameter(query.ParameterName)
+	ctx := req.Request.Context()
+	cronBackup, err := h.clusterOperator.GetCronBackupEx(ctx, cronBackupName, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	q := query.ParseQueryParameter(req)
+
+	backupList, err := h.clusterOperator.ListBackups(ctx, q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	for _, b := range backupList.Items {
+		if len(b.GetOwnerReferences()) != 0 {
+			if b.GetOwnerReferences()[0].UID == cronBackup.UID {
+				result = append(result, b)
+			}
+		}
+	}
+
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
 }

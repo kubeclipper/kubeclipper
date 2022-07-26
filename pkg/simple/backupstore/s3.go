@@ -21,6 +21,7 @@ package backupstore
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -92,19 +93,23 @@ func (receiver *ObjectStore) Create() (BackupStore, error) {
 }
 
 func (receiver *ObjectStore) Save(ctx context.Context, r io.Reader, fileName string) (err error) {
+	defer logProbe(ctx, fmt.Sprintf("save backup to %s/%s", receiver.Bucket, fileName), err)
 	// -1: stream size is unknown to us
 	_, err = receiver.Client.PutObject(ctx, receiver.Bucket, fileName, r, -1, minio.PutObjectOptions{})
 	return err
 }
 
-func (receiver *ObjectStore) Delete(ctx context.Context, fileName string) error {
+func (receiver *ObjectStore) Delete(ctx context.Context, fileName string) (err error) {
+	defer logProbe(ctx, fmt.Sprintf("delete backup from %s/%s", receiver.Bucket, fileName), err)
 	// always delete file
-	return receiver.Client.RemoveObject(ctx, receiver.Bucket, fileName, minio.RemoveObjectOptions{
+	err = receiver.Client.RemoveObject(ctx, receiver.Bucket, fileName, minio.RemoveObjectOptions{
 		ForceDelete: true,
 	})
+	return
 }
 
-func (receiver *ObjectStore) Download(ctx context.Context, fileName string, w io.Writer) error {
+func (receiver *ObjectStore) Download(ctx context.Context, fileName string, w io.Writer) (err error) {
+	defer logProbe(ctx, fmt.Sprintf("download backup from %s/%s", receiver.Bucket, fileName), err)
 	obj, err := receiver.Client.GetObject(ctx, receiver.Bucket, fileName, minio.GetObjectOptions{})
 	if err != nil {
 		return err

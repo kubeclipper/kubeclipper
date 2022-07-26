@@ -29,6 +29,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/txn2/txeh"
+	"go.uber.org/zap"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -40,8 +43,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
-	"github.com/txn2/txeh"
-	"go.uber.org/zap"
 )
 
 func init() {
@@ -102,6 +103,7 @@ type KubeadmConfig struct {
 	Etcd                 v1.Etcd       `json:"etcd"`
 	Network              v1.Networking `json:"networking"`
 	KubeProxy            v1.KubeProxy  `json:"kubeProxy"`
+	Kubelet              v1.Kubelet    `json:"kubelet"`
 	ClusterName          string        `json:"clusterName"`
 	KubernetesVersion    string        `json:"kubernetesVersion"`
 	ControlPlaneEndpoint string        `json:"controlPlaneEndpoint"`
@@ -192,7 +194,7 @@ func (stepper *Package) Uninstall(ctx context.Context, opts component.Options) (
 		return nil, err
 	}
 	if err = instance.RemoveAll(); err != nil {
-		return nil, err
+		logger.Error("remove k8s configs and images compressed files failed", zap.Error(err))
 	}
 
 	if err = os.Remove(filepath.Join(KubeletDefaultDataDir, "config.yaml")); err != nil {
@@ -224,17 +226,13 @@ func (stepper *Package) enableKubeletService(ctx context.Context, dryRun bool) e
 }
 
 func (stepper *Package) disableKubeletService(ctx context.Context, dryRun bool) error {
-	// stop systemd kubelet service
-	_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "kubelet")
-	if err != nil {
-		return err
+	// The following command execution error is ignored
+	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "kubelet"); err != nil {
+		logger.Warn("stop systemd kubelet service failed", zap.Error(err))
 	}
-	// disable systemd kubelet service
-	_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "kubelet")
-	if err != nil {
-		return err
+	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "kubelet"); err != nil {
+		logger.Warn("disable systemd kubelet service failed", zap.Error(err))
 	}
-	logger.Debug("disable kubelet systemd service successfully")
 	return nil
 }
 
@@ -248,6 +246,11 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 		return err
 	}
 	stepper.ClusterConfigAPIVersion = apiVersion
+
+	if stepper.Kubelet.RootDir == "" {
+		stepper.Kubelet.RootDir = KubeletDefaultDataDir
+	}
+
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
 		return err
 	}

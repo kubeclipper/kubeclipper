@@ -30,6 +30,9 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -41,8 +44,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sysutil"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -147,6 +148,7 @@ func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, kubeadm *
 		Etcd:                    kubeadm.KubeComponents.Etcd,
 		Network:                 kubeadm.Networking,
 		KubeProxy:               kubeadm.KubeComponents.KubeProxy,
+		Kubelet:                 kubeadm.KubeComponents.Kubelet,
 		ClusterName:             metadata.ClusterName,
 		KubernetesVersion:       kubeadm.KubernetesVersion,
 		ControlPlaneEndpoint:    cpEndpoint,
@@ -422,7 +424,7 @@ func (stepper *UpgradePackage) Uninstall(ctx context.Context, opts component.Opt
 	// remove image file
 	if stepper.DownloadImage {
 		if err = instance.RemoveImages(); err != nil {
-			return nil, err
+			logger.Error("remove k8s upgrade images compressed file failed", zap.Error(err))
 		}
 	}
 	return nil, nil
@@ -445,15 +447,17 @@ func (stepper *ActBackup) Install(ctx context.Context, opts component.Options) (
 
 	if stepper.StoreType == bs.FSStorage {
 		if !fileutil.PathExist(stepper.BackupPointRootDir) {
-			return nil, fmt.Errorf("'%s' directory does not exist. Please go to all node create this directory and mount it",
-				stepper.BackupPointRootDir)
+			fErr := fmt.Errorf("'%s' directory does not exist. Please go to all node create this directory and mount it", stepper.BackupPointRootDir)
+			// call RunCmdWithContext function in order to log the operation
+			_, _ = cmdutil.CheckContextAndAppendStepLogFile(ctx, []byte(fmt.Sprintf("[%s] + %s %s\n\n", time.Now().Format(time.RFC3339), "backup pre-check", fErr.Error())))
+			return nil, fErr
 		}
 	}
 
 	// etcdctl snapshot save
 	cmd := fmt.Sprintf("etcdctl --endpoints=https://%s:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt  --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save %s",
 		ip.String(), stepper.BackupFileName)
-	ec, err := cmdutil.RunCmdWithContext(ctx, false, "bash", "-c", cmd)
+	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", cmd)
 	if err != nil {
 		if ec != nil {
 			logger.Errorf("etcdctl snapshot save failed: %s", ec.StdErr())
@@ -501,7 +505,7 @@ func (stepper *ActBackup) Install(ctx context.Context, opts component.Options) (
 	}
 
 	// delete the local backup file
-	ec, err = cmdutil.RunCmdWithContext(ctx, false, "rm", "-rf", stepper.BackupFileName)
+	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "rm", "-rf", stepper.BackupFileName)
 	if err != nil {
 		if ec != nil {
 			logger.Errorf("delete local backup file failed: %s", ec.StdErr())
@@ -746,10 +750,10 @@ func (stepper *Recovery) Install(ctx context.Context, opts component.Options) ([
 	if err != nil {
 		return nil, err
 	}
-	//_, err = stepper.AfterRecovery(ctx, opts)
-	//if err != nil {
+	// _, err = stepper.AfterRecovery(ctx, opts)
+	// if err != nil {
 	//	return nil, err
-	//}
+	// }
 	return nil, nil
 }
 
