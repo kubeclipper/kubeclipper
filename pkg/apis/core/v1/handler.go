@@ -502,14 +502,10 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 		return
 	}
 
-	timeoutSecs := v1.DefaultOperationTimeoutSecs
-	if v := request.QueryParameter("timeout"); v != "" {
-		timeoutSecs = v
-	}
 	op.Name = uuid.New().String()
 	op.Labels = map[string]string{
 		common.LabelClusterName:     c.Name,
-		common.LabelTimeoutSeconds:  timeoutSecs,
+		common.LabelTimeoutSeconds:  v1.DefaultOperationTimeoutSecs,
 		common.LabelOperationAction: v1.OperationUpdateCertification,
 	}
 	op.Status.Status = v1.OperationStatusRunning
