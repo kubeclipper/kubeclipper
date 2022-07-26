@@ -1,9 +1,10 @@
 package server
 
 import (
-	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
 
 var Roles = []iamv1.GlobalRole{

@@ -1450,6 +1450,7 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 
 	switch c.Status.Status {
 	case v1.ClusterStatusRestoring, v1.ClusterStatusBackingUp, v1.ClusterStatusDeleting, v1.ClusterStatusUpdating, v1.ClusterStatusInstalling:
+		// TODO: may cause panic, conditions not use now
 		restplus.HandleInternalError(response, request, fmt.Errorf("cluster %s current is %s, can't recovery",
 			c.Name, c.Status.Conditions[0].OperationStatus))
 		return
