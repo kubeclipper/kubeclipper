@@ -33,8 +33,6 @@ type Backup struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Status            BackupStatus      `json:"backupStatus,omitempty"`
-	KubernetesVersion string            `json:"kubernetesVersion"`
-	FileName          string            `json:"fileName"`
 	ClusterNodes      map[string]string `json:"clusterNodes"`
 	// a node selected for executing backup tasks
 	PreferredNode   string `json:"preferredNode,omitempty" optional:"true"`
@@ -42,6 +40,8 @@ type Backup struct {
 }
 
 type BackupStatus struct {
+	KubernetesVersion   string `json:"kubernetesVersion"`
+	FileName            string `json:"fileName"`
 	BackupFileSize      int64  `json:"backupFileSize"`
 	BackupFileMD5       string `json:"backupFileMD5"`
 	ClusterBackupStatus `json:"status"`

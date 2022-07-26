@@ -142,8 +142,9 @@ var (
 			Name: "backup01",
 		},
 		ClusterNodes: map[string]string{},
-		Status:       v1.BackupStatus{},
-		FileName:     "backupTests",
+		Status: v1.BackupStatus{
+			FileName: "backupTests",
+		},
 	}
 )
 
