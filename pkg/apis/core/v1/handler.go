@@ -477,6 +477,60 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 	response.WriteHeader(http.StatusOK)
 }
 
+func (h *handler) UpdateClusterCertification(request *restful.Request, response *restful.Response) {
+	cluName := request.PathParameter(query.ParameterName)
+	ctx := request.Request.Context()
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	c, err := h.clusterOperator.GetCluster(ctx, cluName)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if err = request.ReadEntity(&c); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	extraMeta, err := h.getClusterMetadata(ctx, c)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	op, err := h.parseUpdateCertOperation(extraMeta, c)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	timeoutSecs := v1.DefaultOperationTimeoutSecs
+	if v := request.QueryParameter("timeout"); v != "" {
+		timeoutSecs = v
+	}
+	op.Name = uuid.New().String()
+	op.Labels = map[string]string{
+		common.LabelClusterName:     c.Name,
+		common.LabelTimeoutSeconds:  timeoutSecs,
+		common.LabelOperationAction: v1.OperationUpdateCertification,
+	}
+	op.Status.Status = v1.OperationStatusRunning
+	c.Status.Status = v1.ClusterStatusUpdating
+	if !dryRun {
+		op, err = h.opOperator.CreateOperation(ctx, op)
+		if err != nil {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		_, err = h.clusterOperator.UpdateCluster(ctx, c)
+		if err != nil {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+	}
+
+	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
+	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
+}
+
 func (h *handler) ListNodes(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
 	if q.Watch {

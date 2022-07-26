@@ -453,6 +453,7 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 	(&controller.ClusterStatusMon{
 		ClusterWriter: clusterOperator,
 		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
+		CmdDelivery:   mgr.GetCmdDelivery(),
 	}).SetupWithManager(mgr)
 	(&controller.NodeStatusMon{
 		NodeLister:  informerFactory.Core().V1().Nodes().Lister(),

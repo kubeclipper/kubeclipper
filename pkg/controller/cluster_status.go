@@ -22,6 +22,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -42,6 +44,7 @@ const (
 type ClusterStatusMon struct {
 	ClusterWriter cluster.ClusterWriter
 	ClusterLister listerv1.ClusterLister
+	CmdDelivery   service.CmdDelivery
 	mgr           manager.Manager
 	log           logger.Logging
 }
@@ -78,6 +81,7 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		} else {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentUnhealthy)
 		}
+		s.updateClusterCertification(clu.Name)
 		for _, com := range clu.Kubeadm.Components {
 			comp, ok := component.Load(fmt.Sprintf(component.RegisterFormat, com.Name, com.Version))
 			if !ok {
@@ -133,6 +137,45 @@ func (s *ClusterStatusMon) updateClusterComponentStatus(clusterName string, cate
 	}
 	if _, err = s.ClusterWriter.UpdateCluster(context.TODO(), clu); err != nil {
 		s.log.Warn("update cluster component status failed", zap.String("cluster", clusterName), zap.String("component", component), zap.String("status", string(statusType)), zap.Error(err))
+		return
+	}
+}
+
+func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
+	clu, err := s.ClusterLister.Get(clusterName)
+	if err != nil {
+		s.log.Warn("get cluster failed when update cluster certification status, skip it", zap.String("cluster", clusterName))
+		return
+	}
+	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Kubeadm.Masters[0].ID, []string{"kubeadm", "certs", "check-expiration"}, 3*time.Minute)
+	if err != nil {
+		s.log.Warn("get cluster failed when get cluster certification status, skip it", zap.String("cluster", clusterName))
+		return
+	}
+	splitRes := strings.Split(string(res), "\n\n")
+	crts := strings.Split(splitRes[1], "\n")
+	cas := strings.Split(splitRes[2], "\n")
+	certification := make([]v1.Certification, 0)
+	for _, ca := range cas[1:4] {
+		crt := strings.Fields(ca)
+		certification = append(certification, v1.Certification{
+			Name:           crt[0],
+			CAName:         "",
+			ExpirationTime: strings.Join(crt[1:6], " "),
+		})
+	}
+	for _, cert := range crts[1:] {
+		crt := strings.Fields(cert)
+		certification = append(certification, v1.Certification{
+			Name:           crt[0],
+			CAName:         crt[7],
+			ExpirationTime: strings.Join(crt[1:6], " "),
+		})
+	}
+	clu.Status.Certifications = certification
+	logger.Infof(" clu.Status.Certifications lens : %d", len(clu.Status.Certifications))
+	if _, err = s.ClusterWriter.UpdateCluster(context.TODO(), clu); err != nil {
+		s.log.Warn("update cluster certification status failed", zap.String("cluster", clusterName), zap.Error(err))
 		return
 	}
 }
