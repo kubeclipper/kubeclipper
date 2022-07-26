@@ -240,8 +240,8 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
-	backup.KubernetesVersion = c.Kubeadm.KubernetesVersion
-	backup.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
+	backup.Status.KubernetesVersion = c.Kubeadm.KubernetesVersion
+	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
 	// check preferred node in cluster
 	if backup.PreferredNode == "" {
@@ -309,7 +309,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	case bs.S3Storage:
 		actBackup = &k8s.ActBackup{
 			StoreType:       bp.StorageType,
-			BackupFileName:  backup.FileName,
+			BackupFileName:  backup.Status.FileName,
 			AccessKeyID:     bp.S3Config.AccessKeyID,
 			AccessKeySecret: bp.S3Config.AccessKeySecret,
 			Bucket:          bp.S3Config.Bucket,
@@ -318,7 +318,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	case bs.FSStorage:
 		actBackup = &k8s.ActBackup{
 			StoreType:          bp.StorageType,
-			BackupFileName:     backup.FileName,
+			BackupFileName:     backup.Status.FileName,
 			BackupPointRootDir: bp.FsConfig.BackupRootDir,
 		}
 	}
@@ -449,7 +449,7 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	case bs.S3Storage:
 		actBackup = &k8s.ActBackup{
 			StoreType:       bp.StorageType,
-			BackupFileName:  backup.FileName,
+			BackupFileName:  backup.Status.FileName,
 			AccessKeyID:     bp.S3Config.AccessKeyID,
 			AccessKeySecret: bp.S3Config.AccessKeySecret,
 			Bucket:          bp.S3Config.Bucket,
@@ -458,7 +458,7 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	case bs.FSStorage:
 		actBackup = &k8s.ActBackup{
 			StoreType:          bp.StorageType,
-			BackupFileName:     backup.FileName,
+			BackupFileName:     backup.Status.FileName,
 			BackupPointRootDir: bp.FsConfig.BackupRootDir,
 		}
 	}

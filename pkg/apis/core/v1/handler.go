@@ -2531,7 +2531,7 @@ func (h *handler) DeleteBackupPoint(request *restful.Request, response *restful.
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	if ok := h.getBackupPoint(backups, name); ok {
+	if ok := h.checkBackupPointInUse(backups, name); ok {
 		restplus.HandleInternalError(response, request, errors.New("backup point is in use, please delete backup first"))
 		return
 	}
