@@ -393,7 +393,7 @@ var Roles = []iamv1.GlobalRole{
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "nodes", "regions", "operations/retry", "clusters/backups", "clusters/upgrade"},
+				Resources: []string{"clusters", "nodes", "regions", "operations/retry", "clusters/backups", "clusters/upgrade", "clusters/cronbackups"},
 				Verbs:     []string{"create"},
 			},
 			{
@@ -405,16 +405,6 @@ var Roles = []iamv1.GlobalRole{
 				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"templates"},
 				Verbs:     []string{"get", "list", "watch"},
-			},
-			{
-				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"backuppoints"},
-				Verbs:     []string{"get", "list", "watch", "create"},
-			},
-			{
-				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"cronbackups"},
-				Verbs:     []string{"get", "list", "watch", "create"},
 			},
 		},
 	},
@@ -452,16 +442,6 @@ var Roles = []iamv1.GlobalRole{
 				Resources: []string{"templates"},
 				Verbs:     []string{"*"},
 			},
-			{
-				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"backuppoints"},
-				Verbs:     []string{"update", "patch"},
-			},
-			{
-				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"cronbackups"},
-				Verbs:     []string{"update", "patch"},
-			},
 		},
 	},
 	{
@@ -492,16 +472,6 @@ var Roles = []iamv1.GlobalRole{
 				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"clusters/plugins", "clusters/nodes"},
 				Verbs:     []string{"*"},
-			},
-			{
-				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"backuppoints"},
-				Verbs:     []string{"delete"},
-			},
-			{
-				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"cronbackups"},
-				Verbs:     []string{"delete"},
 			},
 		},
 	},
