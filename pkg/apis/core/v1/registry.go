@@ -133,7 +133,7 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
-	webservice.Route(webservice.PATCH("/clusters/{name}/certification").
+	webservice.Route(webservice.POST("/clusters/{name}/certification").
 		To(h.UpdateClusterCertification).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Update certification of cluster.").
