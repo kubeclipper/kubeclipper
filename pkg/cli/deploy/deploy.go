@@ -101,7 +101,7 @@ const (
   kcctl deploy --deploy-config deploy-config.yaml
 
   Please read 'kcctl deploy -h' get more deploy flags`
-	defaultPkg              = "https://oss.kubeclipper.io/release/kc-minimal-latest.tar.gz"
+	defaultPkg              = "https://oss.kubeclipper.io/release/kc-latest.tar.gz"
 	allInOneEtcdClientPort  = 12379
 	allInOneEtcdPeerPort    = 12380
 	allInOneEtcdMetricsPort = 12381
