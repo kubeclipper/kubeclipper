@@ -380,3 +380,12 @@ func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) boo
 	}
 	return false
 }
+
+func (h *handler) getCertificationList(extraMeta *component.ExtraMetadata) ([]v1.Certification, error) {
+	// 只有 master 节点有 .conf 和 证书
+	certsList, err := k8s.GetCerts(extraMeta.Masters[0].ID, context.TODO(), h.delivery)
+	if err != nil {
+		return nil, err
+	}
+	return certsList, nil
+}

@@ -20,8 +20,14 @@ package k8s
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/hashutil"
 	"path/filepath"
 	"strings"
 	"time"
@@ -468,6 +474,65 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	stepper.EtcdDataPath = c.Etcd.DataDir
 
 	return stepper
+}
+
+func GetCerts(nodeID string, ctx context.Context, deliveryCmd service.CmdDelivery) ([]v1.Certification, error) {
+	list := make([]v1.Certification, 0)
+	kubeConfigs := []string{"admin.conf", "controller-manager.conf", "scheduler.conf"}
+	certsList := certs.GetDefaultCerts()
+	for _, cert := range certsList {
+		path := filepath.Join(cert.Path, cert.BaseName+".crt")
+		content, err := deliveryCmd.DeliverCmd(ctx, nodeID, []string{"cat", path}, 3*time.Minute)
+		if err != nil {
+			logger.Errorf(" cat %s.crt error: %s ", cert.BaseName, err.Error())
+			return nil, err
+		}
+		hashPem, err := hashutil.EncryptPassword(string(content))
+		if err != nil {
+			return nil, err
+		}
+		crt, err := certs.DecodeCertPEM(content)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, v1.Certification{
+			Name:           cert.BaseName,
+			CAName:         cert.CAName,
+			Content:        hashPem,
+			ExpirationTime: crt[0].NotAfter.String(),
+		})
+	}
+	for _, kubeConfig := range kubeConfigs {
+		path := filepath.Join("/etc/kubernetes/", kubeConfig)
+		content, err := deliveryCmd.DeliverCmd(ctx, nodeID, []string{"cat", path}, 3*time.Minute)
+		if err != nil {
+			logger.Errorf(" cat kubeConfig %s error: %s", kubeConfig, err.Error())
+			return nil, err
+		}
+		data, err := fileutil.GetSpecValueFromFile(content)
+		if err != nil {
+			return nil, err
+		}
+		pem, err := base64.StdEncoding.DecodeString(data)
+		if err != nil {
+			fmt.Println(" error: ", err)
+		}
+		hashPem, err := hashutil.EncryptPassword(string(pem))
+		if err != nil {
+			return nil, err
+		}
+		crt, err := certs.DecodeCertPEM(pem)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, v1.Certification{
+			Name:           kubeConfig,
+			CAName:         "",
+			Content:        hashPem,
+			ExpirationTime: crt[0].NotAfter.String(),
+		})
+	}
+	return list, nil
 }
 
 func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1.Step, error) {

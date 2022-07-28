@@ -181,6 +181,7 @@ func (c *Cluster) Complete() {
 type Certification struct {
 	Name           string `json:"name,omitempty"`
 	CAName         string `json:"caName"`
+	Content        string `json:"content,omitempty"`
 	ExpirationTime string `json:"expirationTime,omitempty"`
 }
 

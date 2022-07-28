@@ -523,6 +523,28 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
+func (h *handler) ListCertifications(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter(query.ParameterName)
+	ctx := request.Request.Context()
+	clu, err := h.clusterOperator.GetCluster(ctx, name)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	extraMeta, err := h.getClusterMetadata(ctx, clu)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	certsList, err := h.getCertificationList(extraMeta)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	_ = response.WriteHeaderAndEntity(http.StatusOK, certsList)
+}
+
 func (h *handler) ListNodes(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
 	if q.Watch {

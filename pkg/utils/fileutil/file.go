@@ -20,8 +20,10 @@ package fileutil
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/md5"
 	"fmt"
+	"github.com/spf13/viper"
 	"hash"
 	"io"
 	"os"
@@ -156,4 +158,14 @@ func Backup(filePath, dir string) (bakFile string, err error) {
 	defer dst.Close()
 	_, err = io.Copy(dst, src)
 	return
+}
+
+func GetSpecValueFromFile(content []byte) (string, error) {
+	viper.SetConfigType("yaml")
+	err := viper.ReadConfig(bytes.NewBuffer(content))
+	if err != nil {
+		return "", err
+	}
+	data := viper.GetString("users.0.user.client-certificate-data")
+	return data, nil
 }
