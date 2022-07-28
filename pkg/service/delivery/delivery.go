@@ -162,7 +162,7 @@ func (s *Service) stepStatusChannelController() {
 		for i := 0; i < updateOperationStatusRetry; i++ {
 			o, err := s.opOperator.GetOperation(context.TODO(), status.OperationIdentity)
 			if err != nil {
-				logger.Error("update operation step condition failed", zap.String("op", status.OperationIdentity),
+				logger.Error("get operation failed", zap.String("op", status.OperationIdentity),
 					zap.String("step", status.OperationCondition.StepID), zap.Any("step_status", status.OperationCondition), zap.Error(err))
 				continue
 			}
@@ -319,6 +319,16 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 		_, err := s.clusterOperator.UpdateCluster(context.TODO(), clu)
 		return err
 	case v1.OperationInstallComponents, v1.OperationUninstallComponents:
+		if op.Status.Status == v1.OperationStatusSuccessful {
+			clu.Status.Status = v1.ClusterStatusRunning
+		} else {
+			clu.Status.Status = v1.ClusterStatusUpdateFailed
+		}
+		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
+			return err
+		}
+		return nil
+	case v1.OperationUpdateCertification:
 		if op.Status.Status == v1.OperationStatusSuccessful {
 			clu.Status.Status = v1.ClusterStatusRunning
 		} else {

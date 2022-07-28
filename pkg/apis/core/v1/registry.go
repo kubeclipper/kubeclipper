@@ -133,6 +133,17 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
+	webservice.Route(webservice.POST("/clusters/{name}/certification").
+		To(h.UpdateClusterCertification).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Update certification of cluster.").
+		Reads(corev1.Cluster{}).
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
 	webservice.Route(webservice.PUT("/clusters/{name}/nodes").
 		To(h.AddOrRemoveNodes).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).

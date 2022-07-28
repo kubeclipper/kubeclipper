@@ -1094,6 +1094,46 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/clusters/{name}/certification": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Update certification of cluster.",
+        "operationId": "UpdateClusterCertification",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/clusters/{name}/nodes": {
       "put": {
         "produces": [
@@ -1235,6 +1275,314 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/cronbackups": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "List of cronbackup.",
+        "operationId": "ListCronBackups",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "foo~bar,bar~baz",
+            "description": "fuzzy search conditions",
+            "name": "fuzzy",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create a cronbackup.",
+        "operationId": "CreateCronBackup",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.CronBackup"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.CronBackup"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/cronbackups/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Get a cronbackup by name.",
+        "operationId": "DescribeCronBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cronbackup name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.CronBackup"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Update cronbackup.",
+        "operationId": "UpdateCronBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cronbackup name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.CronBackup"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Delete a cronbackup.",
+        "operationId": "DeleteCronBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cronbackup name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/cronbackups/{name}/backups": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "List backups created by cronBackup.",
+        "operationId": "ListBackupsWithCronBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cronBackup name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/cronbackups/{name}/disable": {
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "disable a cronbackup.",
+        "operationId": "DisableCronBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cronbackup name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/cronbackups/{name}/enable": {
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "enable a cronbackup.",
+        "operationId": "EnableCronBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cronbackup name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
           }
         }
       }
@@ -4034,8 +4382,6 @@
     },
     "v1.Backup": {
       "required": [
-        "kubernetesVersion",
-        "fileName",
         "clusterNodes",
         "backupPointName"
       ],
@@ -4056,14 +4402,8 @@
             "type": "string"
           }
         },
-        "fileName": {
-          "type": "string"
-        },
         "kind": {
           "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "kubernetesVersion": {
           "type": "string"
         },
         "metadata": {
@@ -4100,6 +4440,8 @@
     },
     "v1.BackupStatus": {
       "required": [
+        "kubernetesVersion",
+        "fileName",
         "backupFileSize",
         "backupFileMD5",
         "status"
@@ -4111,6 +4453,12 @@
         "backupFileSize": {
           "type": "integer",
           "format": "int64"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "kubernetesVersion": {
+          "type": "string"
         },
         "status": {
           "type": "string"
@@ -4200,6 +4548,22 @@
         }
       }
     },
+    "v1.Certification": {
+      "required": [
+        "caName"
+      ],
+      "properties": {
+        "caName": {
+          "type": "string"
+        },
+        "expirationTime": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "v1.Cluster": {
       "required": [
         "type"
@@ -4215,6 +4579,9 @@
         },
         "kubeadm": {
           "$ref": "#/definitions/v1.Kubeadm"
+        },
+        "kubeconfig": {
+          "type": "string"
         },
         "metadata": {
           "$ref": "#/definitions/v1.ObjectMeta"
@@ -4245,6 +4612,12 @@
     },
     "v1.ClusterStatus": {
       "properties": {
+        "certifications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.Certification"
+          }
+        },
         "componentConditions": {
           "type": "array",
           "items": {
@@ -4377,6 +4750,60 @@
           "enum": [
             "1.4.4"
           ]
+        }
+      }
+    },
+    "v1.CronBackup": {
+      "required": [
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/v1.CronBackupSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/v1.CronBackupStatus"
+        }
+      }
+    },
+    "v1.CronBackupSpec": {
+      "properties": {
+        "clusterName": {
+          "type": "string"
+        },
+        "maxBackupNum": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "runAt": {
+          "type": "string"
+        },
+        "schedule": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.CronBackupStatus": {
+      "properties": {
+        "LastScheduleTime": {
+          "type": "string"
+        },
+        "LastSuccessfulTime": {
+          "type": "string"
+        },
+        "NextScheduleTime": {
+          "type": "string"
         }
       }
     },

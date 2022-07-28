@@ -95,6 +95,7 @@ const (
 	OperationRecoverCluster      = "RecoveryCluster"
 	OperationInstallComponents   = "InstallComponents"
 	OperationUninstallComponents = "UninstallComponents"
+	OperationUpdateCertification = "UpdateCertifications"
 )
 
 // Step TODO: add commands struct instead of string

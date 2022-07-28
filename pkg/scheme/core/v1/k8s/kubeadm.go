@@ -135,6 +135,8 @@ type CNI v1.CNI
 
 type Health struct{}
 
+type Certification struct{}
+
 type Container struct {
 	CriType string
 }
@@ -664,6 +666,18 @@ func (stepper *Health) checkPodStatus(ctx context.Context, opts component.Option
 		return fmt.Errorf("there are no running pods: %s", strings.Join(ec.Args[1:], ","))
 	}
 	return err
+}
+
+func (stepper *Certification) NewInstance() component.ObjectMeta {
+	return &Certification{}
+}
+
+func (stepper *Certification) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	return nil, nil
+}
+
+func (stepper *Certification) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+	return nil, nil
 }
 
 func (stepper *Container) NewInstance() component.ObjectMeta {

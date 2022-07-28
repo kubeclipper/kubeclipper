@@ -208,7 +208,8 @@ const (
 )
 
 type ClusterStatus struct {
-	Status ClusterStatusType `json:"status,omitempty"`
+	Status         ClusterStatusType `json:"status,omitempty"`
+	Certifications []Certification   `json:"certifications,omitempty"`
 	// cluster component health status
 	ComponentConditions []ComponentConditions `json:"componentConditions,omitempty"`
 	Conditions          []ClusterCondition    `json:"conditions,omitempty"`
@@ -222,6 +223,12 @@ const (
 	ComponentUnKnown     ComponentStatus = "Unknown"
 	ComponentUnsupported ComponentStatus = "Unsupported"
 )
+
+type Certification struct {
+	Name           string `json:"name,omitempty"`
+	CAName         string `json:"caName"`
+	ExpirationTime string `json:"expirationTime,omitempty"`
+}
 
 type ComponentConditions struct {
 	Name     string          `json:"name"`

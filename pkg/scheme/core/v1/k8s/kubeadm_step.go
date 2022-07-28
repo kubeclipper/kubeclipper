@@ -662,6 +662,65 @@ func (stepper *Health) UninstallSteps(proxy *v1.KubeProxy, nodes ...v1.StepNode)
 	}, nil
 }
 
+func (stepper *Certification) InitStepper() *Certification {
+	return stepper
+}
+
+func (stepper *Certification) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	return []v1.Step{
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "updateCerts",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: 3 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"kubeadm", "certs", "renew", "all"},
+				},
+			},
+		},
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "restartPods",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: 3 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			// TODO: can use configMap get path
+			BeforeRunCommands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"mkdir", "-pv", "/tmp/.k8s/config"},
+				},
+			},
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", "mv /etc/kubernetes/manifests/etcd.yaml /etc/kubernetes/manifests/kube-apiserver.yaml /etc/kubernetes/manifests/kube-controller-manager.yaml /etc/kubernetes/manifests/kube-scheduler.yaml /tmp/.k8s/config && sleep 20"},
+				},
+			},
+			AfterRunCommands: []v1.Command{
+				{
+					Type: v1.CommandShell,
+					ShellCommand: []string{
+						"mv",
+						"/tmp/.k8s/config/etcd.yaml",
+						"/tmp/.k8s/config/kube-apiserver.yaml",
+						"/tmp/.k8s/config/kube-controller-manager.yaml",
+						"/tmp/.k8s/config/kube-scheduler.yaml",
+						"/etc/kubernetes/manifests",
+					},
+				},
+			},
+		},
+	}, nil
+}
+
 func (stepper *Container) InitStepper(kubeadm *v1.Kubeadm) *Container {
 	stepper.CriType = kubeadm.ContainerRuntime.Type.String()
 	return stepper

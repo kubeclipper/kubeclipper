@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/kubeclipper/kubeclipper/pkg/query"
-
 	"github.com/google/uuid"
+
+	"github.com/kubeclipper/kubeclipper/pkg/query"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
@@ -362,6 +362,14 @@ func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1
 	}
 
 	return actBackup.GetStep(action), nil
+}
+
+func (h *handler) parseUpdateCertOperation(extraMetadata *component.ExtraMetadata) (*v1.Operation, error) {
+	cert := &k8s.Certification{}
+	op := &v1.Operation{}
+	nodes := utils.UnwrapNodeList(extraMetadata.Masters)
+	op.Steps, _ = cert.InstallSteps(nodes)
+	return op, nil
 }
 
 func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) bool {
