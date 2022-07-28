@@ -94,7 +94,11 @@ func (h *handler) DescribeTemplate(req *restful.Request, resp *restful.Response)
 // Deprecated: use core/v1/handler.UpdateTemplate instead
 func (h *handler) UpdateTemplate(req *restful.Request, resp *restful.Response) {
 	c := &v1.DockerRegistry{}
-	if err := req.ReadEntity(c); err != nil {
+	var (
+		err     error
+		setting *v1.PlatformSetting
+	)
+	if err = req.ReadEntity(c); err != nil {
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
@@ -103,13 +107,19 @@ func (h *handler) UpdateTemplate(req *restful.Request, resp *restful.Response) {
 			c.InsecureRegistry[index].CreateAt = metav1.Now()
 		}
 	}
-	setting, err := h.platformOperator.GetPlatformSetting(req.Request.Context())
+	setting, err = h.platformOperator.GetPlatformSetting(req.Request.Context())
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	setting.Template = *c
-	_, err = h.platformOperator.UpdatePlatformSetting(req.Request.Context(), setting)
+	if setting == nil || setting.Name == "" {
+		setting = generatePlatformSetting()
+		setting.Template = *c
+		_, err = h.platformOperator.CreatePlatformSetting(req.Request.Context(), setting)
+	} else {
+		setting.Template = *c
+		_, err = h.platformOperator.UpdatePlatformSetting(req.Request.Context(), setting)
+	}
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
@@ -118,28 +128,37 @@ func (h *handler) UpdateTemplate(req *restful.Request, resp *restful.Response) {
 }
 
 func (h *handler) GetSSHRSAKey(req *restful.Request, resp *restful.Response) {
-	t := v1.WebTerminal{}
-	setting, err := h.platformOperator.GetPlatformSetting(req.Request.Context())
+	var (
+		err     error
+		setting *v1.PlatformSetting
+	)
+
+	setting, err = h.platformOperator.GetPlatformSetting(req.Request.Context())
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	if setting == nil {
-		restplus.HandlerErrorWithCustomCode(resp, req, http.StatusExpectationFailed, http.StatusExpectationFailed, "platform setting should not be nil", nil)
-		return
+	if setting == nil || setting.Name == "" {
+		setting = generatePlatformSetting()
+		setting.Terminal, err = generateWebTerminal()
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_, err = h.platformOperator.CreatePlatformSetting(req.Request.Context(), setting)
+	} else {
+		if setting.Terminal.PrivateKey == "" {
+			setting.Terminal, err = generateWebTerminal()
+			if err != nil {
+				restplus.HandleInternalError(resp, req, err)
+				return
+			}
+			_, err = h.platformOperator.UpdatePlatformSetting(req.Request.Context(), setting)
+		}
 	}
-	if setting.Terminal.PrivateKey == "" {
-		t.PrivateKey, t.PublicKey, err = certs.GetSSHKeyPair(512)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
-		setting.Terminal = t
-		setting, err = h.platformOperator.UpdatePlatformSetting(req.Request.Context(), setting)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
 	}
 	setting.Terminal.PrivateKey = ""
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, setting.Terminal)
@@ -164,4 +183,28 @@ func (h *handler) CreateSSHRSAKey(req *restful.Request, resp *restful.Response) 
 		return
 	}
 	resp.WriteHeader(http.StatusOK)
+}
+
+func generateWebTerminal() (v1.WebTerminal, error) {
+	priv, pub, err := certs.GetSSHKeyPair(512)
+	if err != nil {
+		return v1.WebTerminal{}, err
+	}
+	return v1.WebTerminal{
+		PrivateKey: priv,
+		PublicKey:  pub,
+	}, nil
+
+}
+
+func generatePlatformSetting() *v1.PlatformSetting {
+	return &v1.PlatformSetting{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PlatformSetting",
+			APIVersion: "core.kubeclipper.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "system-",
+		},
+	}
 }
