@@ -173,6 +173,7 @@ type BackupPointReaderEx interface {
 type BackupPointReader interface {
 	ListBackupPoints(ctx context.Context, query *query.Query) (*v1.BackupPointList, error)
 	GetBackupPoint(ctx context.Context, name string, resourceVersion string) (*v1.BackupPoint, error)
+	WatchBackupPoints(ctx context.Context, query *query.Query) (watch.Interface, error)
 	BackupPointReaderEx
 }
 
@@ -190,6 +191,7 @@ type CronBackupReaderEx interface {
 type CronBackupReader interface {
 	ListCronBackups(ctx context.Context, query *query.Query) (*v1.CronBackupList, error)
 	GetCronBackup(ctx context.Context, name string, resourceVersion string) (*v1.CronBackup, error)
+	WatchCronBackups(ctx context.Context, query *query.Query) (watch.Interface, error)
 	CronBackupReaderEx
 }
 
