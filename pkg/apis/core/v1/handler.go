@@ -486,10 +486,6 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-	if err = request.ReadEntity(&c); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
 
 	extraMeta, err := h.getClusterMetadata(ctx, c)
 	if err != nil {

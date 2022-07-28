@@ -691,6 +691,7 @@ func (stepper *Certification) InstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 			Timeout:    metav1.Duration{Duration: 3 * time.Minute},
 			ErrIgnore:  false,
 			RetryTimes: 1,
+			// TODO: can use configMap get path
 			BeforeRunCommands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
