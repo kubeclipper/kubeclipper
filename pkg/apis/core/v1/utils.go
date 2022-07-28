@@ -232,7 +232,7 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 	r := k8s.Recovery{
 		StoreType:      bp.StorageType,
 		RestoreDir:     restoreDir,
-		BackupFileName: b.FileName,
+		BackupFileName: b.Status.FileName,
 		NodeNameList:   nodeNames,
 		NodeIPList:     nodeIPs,
 		BackupFileSize: b.Status.BackupFileSize,
@@ -343,7 +343,7 @@ func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1
 	case bs.S3Storage:
 		actBackup = &k8s.ActBackup{
 			StoreType:       bp.StorageType,
-			BackupFileName:  b.FileName,
+			BackupFileName:  b.Status.FileName,
 			AccessKeyID:     bp.S3Config.AccessKeyID,
 			AccessKeySecret: bp.S3Config.AccessKeySecret,
 			Bucket:          bp.S3Config.Bucket,
@@ -352,7 +352,7 @@ func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1
 	case bs.FSStorage:
 		actBackup = &k8s.ActBackup{
 			StoreType:          bp.StorageType,
-			BackupFileName:     b.FileName,
+			BackupFileName:     b.Status.FileName,
 			BackupPointRootDir: bp.FsConfig.BackupRootDir,
 		}
 	}
@@ -362,4 +362,13 @@ func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1
 	}
 
 	return actBackup.GetStep(action), nil
+}
+
+func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) bool {
+	for _, item := range backups.Items {
+		if item.BackupPointName == name {
+			return true
+		}
+	}
+	return false
 }
