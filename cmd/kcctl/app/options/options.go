@@ -24,6 +24,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/subosito/gotenv"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
@@ -155,6 +157,10 @@ type OpLog struct {
 	Threshold int    `json:"threshold" yaml:"threshold,omitempty"`
 }
 
+type ImageProxy struct {
+	KcImageRepoMirror string `json:"kcImageRepoMirror" yaml:"kcImageRepoMirror,omitempty"`
+}
+
 type DeployConfig struct {
 	Config           string        `json:"-" yaml:"-"`
 	SSHConfig        *sshutils.SSH `json:"ssh" yaml:"ssh,omitempty"`
@@ -171,6 +177,7 @@ type DeployConfig struct {
 	JWTSecret        string        `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
 	MQ               *MQ           `json:"mq" yaml:"mq,omitempty"`
 	OpLog            *OpLog        `json:"opLog" yaml:"opLog,omitempty"`
+	ImageProxy       *ImageProxy   `json:"imageProxy" yaml:"imageProxy,omitempty"`
 }
 
 type Agents map[string][]string // key: region, value: ips
@@ -237,6 +244,9 @@ func NewDeployOptions() *DeployConfig {
 			Dir:       "/var/log/kc-agent",
 			Threshold: 1048576,
 		},
+		ImageProxy: &ImageProxy{
+			KcImageRepoMirror: getRepoMirror(),
+		},
 		AgentRegions: make(Agents),
 	}
 }
@@ -298,6 +308,15 @@ func (c *DeployConfig) Write() error {
 	return nil
 }
 
+// getRepoMirror env variables have a higher priority than .env file
+func getRepoMirror() string {
+	if mirror := os.Getenv("KC_IMAGE_REPO_MIRROR"); mirror != "" {
+		return mirror
+	}
+	_ = gotenv.Load("/etc/kc/kc.env")
+	return os.Getenv("KC_IMAGE_REPO_MIRROR")
+}
+
 func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.Config, "deploy-config", "c", c.Config, "Path to the config file to use for Deploy.")
 	flags.BoolVar(&c.Debug, "debug", c.Debug, "Deploy kc use debug mode")
@@ -324,6 +343,7 @@ func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&c.ConsolePort, "console-port", c.ConsolePort, "kc console port")
 	flags.StringVar(&c.OpLog.Dir, "oplog-dir", c.OpLog.Dir, "kc agent operation log dir")
 	flags.IntVar(&c.OpLog.Threshold, "oplog-threshold", c.OpLog.Threshold, "kc agent operation log single threshold")
+	flags.StringVar(&c.ImageProxy.KcImageRepoMirror, "kc-image-repo-mirror", c.ImageProxy.KcImageRepoMirror, "K8s image repository mirror")
 
 	AddFlagsToSSH(c.SSHConfig, flags)
 }

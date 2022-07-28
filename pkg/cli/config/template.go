@@ -284,6 +284,8 @@ backupStore:
   type: fs
   provider:
     rootdir: /opt/kc/backups
+imageProxy:
+  kcImageRepoMirror: {{.KcImageRepoMirror}}
 `
 
 const DockerDaemonTmpl = `

@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/simple/imageproxy"
+
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 
@@ -51,6 +53,7 @@ type Config struct {
 	LogOptions                *logger.Options     `json:"log,omitempty" yaml:"log,omitempty" mapstructure:"log"`
 	MQOptions                 *natsio.NatsOptions `json:"mq,omitempty" yaml:"mq,omitempty"  mapstructure:"mq"`
 	OpLogOptions              *oplog.Options      `json:"oplog,omitempty" yaml:"oplog,omitempty" mapstructure:"oplog"`
+	ImageProxyOptions         *imageproxy.Options `json:"imageProxy,omitempty" yaml:"imageProxy,omitempty" mapstructure:"imageProxy"`
 }
 
 func New() *Config {
@@ -61,6 +64,7 @@ func New() *Config {
 		MQOptions:                 natsio.NewOptions(),
 		DownloaderOptions:         downloader.NewOptions(),
 		OpLogOptions:              oplog.NewOptions(),
+		ImageProxyOptions:         imageproxy.NewOptions(),
 	}
 }
 

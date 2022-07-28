@@ -43,6 +43,7 @@ func (s *AgentOptions) Validate() []error {
 	errors = append(errors, s.GenericServerRunOptions.Validate()...)
 	errors = append(errors, s.LogOptions.Validate()...)
 	errors = append(errors, s.OpLogOptions.Validate()...)
+	errors = append(errors, s.ImageProxyOptions.Validate()...)
 	return errors
 }
 
@@ -52,6 +53,8 @@ func (s *AgentOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.LogOptions.AddFlags(fss.FlagSet("log"))
 	s.MQOptions.AddFlags(fss.FlagSet("mq"))
 	s.OpLogOptions.AddFlags(fss.FlagSet("oplog"))
+	s.ImageProxyOptions.AddFlags(fss.FlagSet("imageProxy"))
+
 	return fss
 }
 

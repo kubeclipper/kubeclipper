@@ -109,6 +109,7 @@ type KubeadmConfig struct {
 	ControlPlaneEndpoint string        `json:"controlPlaneEndpoint"`
 	CertSANs             []string      `json:"certSANs"`
 	LocalRegistry        string        `json:"localRegistry"`
+	Offline              bool          `json:"offline"`
 }
 
 type ControlPlane struct {
@@ -257,6 +258,11 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 
 	if stepper.Kubelet.RootDir == "" {
 		stepper.Kubelet.RootDir = KubeletDefaultDataDir
+	}
+	// local registry not filled and is in online mode, the default repo mirror proxy will be used
+	if !stepper.Offline && stepper.LocalRegistry == "" {
+		stepper.LocalRegistry = component.GetRepoMirror(ctx)
+		logger.Info("render kubernetes config, the default repo mirror proxy will be used", zap.String("local_registry", stepper.LocalRegistry))
 	}
 
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {

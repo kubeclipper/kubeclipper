@@ -43,6 +43,7 @@ func (s *Service) runTaskStep(ctx context.Context, payload *service.MsgPayload, 
 	ctx = component.WithOperationID(ctx, payload.OperationIdentity) // put operation ID into context
 	ctx = component.WithStepID(ctx, stepKey)                        // put step ID into context
 	ctx = component.WithOplog(ctx, s.oplog)                         // put operation log object into context
+	ctx = component.WithRepoMirror(ctx, s.repoMirror)
 
 	var entry string
 	// truncate step log file

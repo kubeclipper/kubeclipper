@@ -359,6 +359,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	stepper.ControlPlaneEndpoint = cpEndpoint
 	stepper.CertSANs = c.CertSANs
 	stepper.LocalRegistry = c.LocalRegistry
+	stepper.Offline = metadata.Offline
 
 	return stepper
 }
