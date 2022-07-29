@@ -2527,6 +2527,10 @@ func (h *handler) DescribeBackupPoint(request *restful.Request, response *restfu
 
 func (h *handler) ListBackupPoints(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
+	if q.Watch {
+		h.watchBackupPoints(request, response, q)
+		return
+	}
 	if clientrest.IsInformerRawQuery(request.Request) {
 		result, err := h.clusterOperator.ListBackupPoints(request.Request.Context(), q)
 		if err != nil {
@@ -2542,6 +2546,23 @@ func (h *handler) ListBackupPoints(request *restful.Request, response *restful.R
 		}
 		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 	}
+}
+
+func (h *handler) watchBackupPoints(req *restful.Request, resp *restful.Response, q *query.Query) {
+	timeout := time.Duration(0)
+	if q.TimeoutSeconds != nil {
+		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 {
+		timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
+	}
+
+	watcher, err := h.clusterOperator.WatchBackupPoints(req.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("BackupPoint"), req, resp, timeout)
 }
 
 func (h *handler) CreateBackupPoint(request *restful.Request, response *restful.Response) {
@@ -2641,6 +2662,10 @@ func (h *handler) DescribeCronBackup(request *restful.Request, response *restful
 
 func (h *handler) ListCronBackups(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
+	if q.Watch {
+		h.watchCronBackups(request, response, q)
+		return
+	}
 	if clientrest.IsInformerRawQuery(request.Request) {
 		result, err := h.clusterOperator.ListCronBackups(request.Request.Context(), q)
 		if err != nil {
@@ -2656,6 +2681,23 @@ func (h *handler) ListCronBackups(request *restful.Request, response *restful.Re
 		}
 		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 	}
+}
+
+func (h *handler) watchCronBackups(req *restful.Request, resp *restful.Response, q *query.Query) {
+	timeout := time.Duration(0)
+	if q.TimeoutSeconds != nil {
+		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 {
+		timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
+	}
+
+	watcher, err := h.clusterOperator.WatchCronBackups(req.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("CronBackup"), req, resp, timeout)
 }
 
 func (h *handler) CreateCronBackup(request *restful.Request, response *restful.Response) {

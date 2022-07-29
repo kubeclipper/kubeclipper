@@ -368,6 +368,14 @@ func (c *clusterOperator) ListCronBackups(ctx context.Context, query *query.Quer
 	return list.(*v1.CronBackupList), nil
 }
 
+func (c *clusterOperator) WatchBackupPoints(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, c.backupPointStorage, query)
+}
+
+func (c *clusterOperator) WatchCronBackups(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, c.cronBackupStorage, query)
+}
+
 func (c *clusterOperator) ListCronBackupEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
 	return models.ListExV2(ctx, c.cronBackupStorage, query, c.cronBackupFuzzyFilter, nil, nil)
 }
