@@ -280,51 +280,53 @@ func (l *CreateClusterOptions) transformNodeIP() error {
 }
 
 func (l *CreateClusterOptions) newCluster() *v1.Cluster {
+	annotations := map[string]string{}
+	if l.Offline {
+		annotations[common.AnnotationOffline] = ""
+	}
 	c := &v1.Cluster{
-		ClusterType: v1.ClusterKubeadm,
+		Provider: v1.ProviderSpec{
+			Name: v1.ClusterKubeadm,
+		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
 			APIVersion: "core.kubeclipper.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: l.Name,
+			Name:        l.Name,
+			Annotations: annotations,
 		},
-		Kubeadm: &v1.Kubeadm{
-			Description:       "",
-			Masters:           nil,
-			Workers:           nil,
-			KubernetesVersion: l.K8sVersion,
-			CertSANs:          nil,
-			LocalRegistry:     l.LocalRegistry,
-			ContainerRuntime:  v1.ContainerRuntime{},
-			Networking: v1.Networking{
-				ServiceSubnet: "10.96.0.0/16",
-				PodSubnet:     "172.25.0.0/24",
-				DNSDomain:     "cluster.local",
-			},
-			KubeComponents: v1.KubeComponents{
-				KubeProxy: v1.KubeProxy{IPvs: true},
-				Etcd:      v1.Etcd{},
-				CNI: v1.CNI{
-					LocalRegistry: l.LocalRegistry,
-					Type:          l.CNI,
-					PodIPv4CIDR:   "172.25.0.0/24",
-					PodIPv6CIDR:   "",
-					MTU:           1440,
-					Calico: v1.Calico{
-						IPv4AutoDetection: "first-found",
-						IPv6AutoDetection: "first-found",
-						Mode:              "Overlay-Vxlan-All",
-						DualStack:         false,
-						IPManger:          true,
-						Version:           "v3.21.2",
-					},
-				},
-			},
-			Components:    nil,
+
+		Masters:           nil,
+		Workers:           nil,
+		KubernetesVersion: l.K8sVersion,
+		CertSANs:          nil,
+		LocalRegistry:     l.LocalRegistry,
+		ContainerRuntime:  v1.ContainerRuntime{},
+		Networking: v1.Networking{
+			IPFamily:      v1.IPFamilyIPv4,
+			Services:      v1.NetworkRanges{CIDRBlocks: []string{"10.96.0.0/16"}},
+			Pods:          v1.NetworkRanges{CIDRBlocks: []string{"172.25.0.0/24"}},
+			DNSDomain:     "cluster.local",
+			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",
-			Offline:       l.Offline,
 		},
+
+		KubeProxy: v1.KubeProxy{},
+		Etcd:      v1.Etcd{},
+		CNI: v1.CNI{
+			LocalRegistry: l.LocalRegistry,
+			Type:          l.CNI,
+			Version:       "v3.21.2",
+			Calico: &v1.Calico{
+				IPv4AutoDetection: "first-found",
+				IPv6AutoDetection: "first-found",
+				Mode:              "Overlay-Vxlan-All",
+				IPManger:          true,
+				MTU:               1440,
+			},
+		},
+
 		Status: v1.ClusterStatus{},
 	}
 
@@ -358,30 +360,26 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Taints: nil,
 		})
 	}
-	c.Kubeadm.Masters = masters
-	c.Kubeadm.Workers = workers
+	c.Masters = masters
+	c.Workers = workers
 	var insecureRegistry []string
 	if l.LocalRegistry != "" {
 		insecureRegistry = []string{l.LocalRegistry}
 	}
 	switch l.CRI {
 	case "docker":
-		c.Kubeadm.ContainerRuntime = v1.ContainerRuntime{
-			Type: v1.CRIDocker,
-			Docker: v1.Docker{
-				Version:          l.CRIVersion,
-				InsecureRegistry: insecureRegistry,
-			},
+		c.ContainerRuntime = v1.ContainerRuntime{
+			Type:             v1.CRIDocker,
+			Version:          l.CRIVersion,
+			InsecureRegistry: insecureRegistry,
 		}
 	case "containerd":
 		fallthrough
 	default:
-		c.Kubeadm.ContainerRuntime = v1.ContainerRuntime{
-			Type: v1.CRIContainerd,
-			Containerd: v1.Containerd{
-				Version:          l.CRIVersion,
-				InsecureRegistry: insecureRegistry,
-			},
+		c.ContainerRuntime = v1.ContainerRuntime{
+			Type:             v1.CRIContainerd,
+			Version:          l.CRIVersion,
+			InsecureRegistry: insecureRegistry,
 		}
 	}
 	return c

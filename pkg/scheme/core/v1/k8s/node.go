@@ -56,7 +56,7 @@ func init() {
 
 type GenNode struct {
 	Nodes          component.NodeList `json:"nodes"`
-	Kubeadm        *v1.Kubeadm
+	Cluster        *v1.Cluster
 	installSteps   []v1.Step
 	uninstallSteps []v1.Step
 	upgradeSteps   []v1.Step
@@ -79,8 +79,8 @@ type Drain struct {
 }
 
 func (stepper *GenNode) Validate() error {
-	if stepper.Kubeadm == nil {
-		return fmt.Errorf("GenNode kubeadm object is empty")
+	if stepper == nil {
+		return fmt.Errorf("GenNode object is empty")
 	}
 
 	if stepper.Nodes == nil {
@@ -90,14 +90,14 @@ func (stepper *GenNode) Validate() error {
 	return nil
 }
 
-func (stepper *GenNode) InitStepper(metadata *component.ExtraMetadata, kubeadm *v1.Kubeadm, role string) *GenNode {
+func (stepper *GenNode) InitStepper(metadata *component.ExtraMetadata, cluster *v1.Cluster, role string) *GenNode {
 	switch role {
 	case NodeRoleMaster:
 		stepper.Nodes = append(stepper.Nodes, metadata.Masters...)
 	case NodeRoleWorker:
 		stepper.Nodes = append(stepper.Nodes, metadata.Workers...)
 	}
-	stepper.Kubeadm = kubeadm
+	stepper.Cluster = cluster
 	return stepper
 }
 
@@ -119,14 +119,14 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string
 		stepper.installSteps = append(stepper.installSteps, steps...)
 
 		joinCmd := JoinCmd{}
-		steps, err = joinCmd.InitStepper(stepper.Kubeadm).InstallSteps([]v1.StepNode{masters[0]})
+		steps, err = joinCmd.InitStepper(stepper.Cluster.ContainerRuntime.Type).InstallSteps([]v1.StepNode{masters[0]})
 		if err != nil {
 			return err
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
 
 		join := ClusterNode{}
-		steps, err = join.InitStepper(stepper.Kubeadm, metadata).InstallSteps(role, patchNodes)
+		steps, err = join.InitStepper(stepper.Cluster, metadata).InstallSteps(role, patchNodes)
 		if err != nil {
 			return err
 		}
@@ -155,14 +155,13 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string
 			doCommandRemoveStep("removeDockershimDataDir", patchNodes, DockershimDefaultDataDir),
 		)
 		heal := Health{}
-		proxy := &stepper.Kubeadm.KubeComponents.KubeProxy
-		steps, err = heal.InitStepper(stepper.Kubeadm).UninstallSteps(proxy, patchNodes...)
+		steps, err = heal.InitStepper().UninstallSteps(&stepper.Cluster.Networking, patchNodes...)
 		if err != nil {
 			return err
 		}
 		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 		// clean CNI config
-		steps, err = CleanCNI(&stepper.Kubeadm.KubeComponents.CNI, patchNodes)
+		steps, err = CleanCNI(&stepper.Cluster.CNI, patchNodes)
 		if err != nil {
 			return err
 		}
@@ -172,7 +171,8 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string
 			doCommandRemoveStep("removeKubernetesConfig", patchNodes, K8SDefaultConfigDir))
 		// clear worker /etc/hosts vip domain
 		// sed -i '/apiserver.cluster.local/d' /etc/hosts
-		apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", stepper.Kubeadm.Networking.DNSDomain)
+		apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local",
+			stepper.Cluster.Networking.DNSDomain)
 		stepper.uninstallSteps = append(stepper.uninstallSteps, v1.Step{
 			ID:         strutil.GetUUID(),
 			Name:       "clearVIPDomain",
@@ -204,8 +204,8 @@ func (stepper *GenNode) GetSteps(action v1.StepAction) []v1.Step {
 	return nil
 }
 
-func (stepper *JoinCmd) InitStepper(kubeadm *v1.Kubeadm) *JoinCmd {
-	stepper.ContainerRuntime = kubeadm.ContainerRuntime.Type.String()
+func (stepper *JoinCmd) InitStepper(criType string) *JoinCmd {
+	stepper.ContainerRuntime = criType
 	return stepper
 }
 
@@ -235,7 +235,7 @@ func (stepper *JoinCmd) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	}, nil
 }
 
-func (stepper *JoinCmd) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+func (stepper *JoinCmd) UninstallSteps() ([]v1.Step, error) {
 	return nil, fmt.Errorf("joinCmd no support uninstall steps")
 }
 

@@ -58,7 +58,7 @@ func init() {
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, clusterNode, version, component.TypeStep), &ClusterNode{}); err != nil {
 		panic(err)
 	}
-	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, cni, version, component.TypeTemplate), &CNI{}); err != nil {
+	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate), &CNIInfo{}); err != nil {
 		panic(err)
 	}
 	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, kubectlTerminal, version, component.TypeTemplate), &KubectlTerminal{}); err != nil {
@@ -80,7 +80,7 @@ var (
 	_ component.TemplateRender = (*KubeadmConfig)(nil)
 	_ component.StepRunnable   = (*ControlPlane)(nil)
 	_ component.StepRunnable   = (*ClusterNode)(nil)
-	_ component.TemplateRender = (*CNI)(nil)
+	_ component.TemplateRender = (*CNIInfo)(nil)
 	_ component.TemplateRender = (*KubectlTerminal)(nil)
 	_ component.StepRunnable   = (*Health)(nil)
 	_ component.StepRunnable   = (*Container)(nil)
@@ -101,7 +101,7 @@ type KubeadmConfig struct {
 	// https://v1-20.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-runtime
 	ContainerRuntime     string        `json:"containerRuntime"`
 	Etcd                 v1.Etcd       `json:"etcd"`
-	Network              v1.Networking `json:"networking"`
+	Networking           v1.Networking `json:"networking"`
 	KubeProxy            v1.KubeProxy  `json:"kubeProxy"`
 	Kubelet              v1.Kubelet    `json:"kubelet"`
 	ClusterName          string        `json:"clusterName"`
@@ -109,7 +109,6 @@ type KubeadmConfig struct {
 	ControlPlaneEndpoint string        `json:"controlPlaneEndpoint"`
 	CertSANs             []string      `json:"certSANs"`
 	LocalRegistry        string        `json:"localRegistry"`
-	WorkerNodeVip        string        `json:"workerNodeVip"`
 }
 
 type ControlPlane struct {
@@ -131,7 +130,12 @@ type ClusterNode struct {
 	EtcdDataPath        string
 }
 
-type CNI v1.CNI
+type CNIInfo struct {
+	CNI         v1.CNI
+	DualStack   bool
+	PodIPv4CIDR string
+	PodIPv6CIDR string
+}
 
 type Health struct{}
 
@@ -248,6 +252,8 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 		return err
 	}
 	stepper.ClusterConfigAPIVersion = apiVersion
+	stepper.Networking.Services.CIDRBlocks = []string{strings.Join(stepper.Networking.Services.CIDRBlocks, ",")}
+	stepper.Networking.Pods.CIDRBlocks = []string{strings.Join(stepper.Networking.Pods.CIDRBlocks, ",")}
 
 	if stepper.Kubelet.RootDir == "" {
 		stepper.Kubelet.RootDir = KubeletDefaultDataDir
@@ -574,20 +580,20 @@ func (stepper *ClusterNode) renderIPVSCarePod(w io.Writer) error {
 	return err
 }
 
-func (stepper *CNI) NewInstance() component.ObjectMeta {
-	return &CNI{}
+func (stepper *CNIInfo) NewInstance() component.ObjectMeta {
+	return &CNIInfo{}
 }
 
-func (stepper *CNI) Render(ctx context.Context, opts component.Options) error {
-	switch stepper.Type {
+func (stepper *CNIInfo) Render(ctx context.Context, opts component.Options) error {
+	switch stepper.CNI.Type {
 	case CniCalico:
 		return stepper.renderCalico(ctx, opts.DryRun)
 	default:
-		return fmt.Errorf("unsupported %s cni type", stepper.Type)
+		return fmt.Errorf("unsupported %s cni type", stepper.CNI.Type)
 	}
 }
 
-func (stepper *CNI) renderCalicoTo(w io.Writer) error {
+func (stepper *CNIInfo) renderCalicoTo(w io.Writer) error {
 	at := tmplutil.New()
 	calicoTemp, err := stepper.CalicoTemplate()
 	if err != nil {
@@ -599,17 +605,17 @@ func (stepper *CNI) renderCalicoTo(w io.Writer) error {
 	return nil
 }
 
-func (stepper *CNI) CalicoTemplate() (string, error) {
-	switch stepper.Calico.Version {
+func (stepper *CNIInfo) CalicoTemplate() (string, error) {
+	switch stepper.CNI.Version {
 	case "v3.11.2":
 		return calicoV3112, nil
 	case "v3.21.2":
 		return calicoV3212, nil
 	}
-	return "", fmt.Errorf("calico no support %s version", stepper.Calico.Version)
+	return "", fmt.Errorf("calico no support %s version", stepper.CNI.Version)
 }
 
-func (stepper *CNI) renderCalico(ctx context.Context, dryRun bool) error {
+func (stepper *CNIInfo) renderCalico(ctx context.Context, dryRun bool) error {
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
 		return err
 	}
@@ -729,21 +735,21 @@ type KubectlTerminal struct {
 	ImageRegistryAddr string
 }
 
-func (c *KubectlTerminal) NewInstance() component.ObjectMeta {
+func (stepper *KubectlTerminal) NewInstance() component.ObjectMeta {
 	return &KubectlTerminal{}
 }
 
-func (c *KubectlTerminal) renderTo(w io.Writer) error {
+func (stepper *KubectlTerminal) renderTo(w io.Writer) error {
 	at := tmplutil.New()
-	_, err := at.RenderTo(w, kubectlPodTemplate, c)
+	_, err := at.RenderTo(w, kubectlPodTemplate, stepper)
 	return err
 }
 
-func (c *KubectlTerminal) Render(ctx context.Context, opts component.Options) error {
+func (stepper *KubectlTerminal) Render(ctx context.Context, opts component.Options) error {
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
 		return err
 	}
 	manifestFile := filepath.Join(ManifestDir, "kc-kubectl.yaml")
 	return fileutil.WriteFileWithContext(ctx, manifestFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
-		c.renderTo, opts.DryRun)
+		stepper.renderTo, opts.DryRun)
 }

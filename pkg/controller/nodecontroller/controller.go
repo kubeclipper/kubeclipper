@@ -119,9 +119,9 @@ func (r *NodeReconciler) updateNodeRoleIfNotEqual(ctx context.Context, clu *v1.C
 	)
 	switch nodeRole {
 	case common.NodeRoleMaster:
-		nodes = sets.NewString(clu.Kubeadm.Masters.GetNodeIDs()...)
+		nodes = sets.NewString(clu.Masters.GetNodeIDs()...)
 	case common.NodeRoleWorker:
-		nodes = sets.NewString(clu.Kubeadm.Workers.GetNodeIDs()...)
+		nodes = sets.NewString(clu.Workers.GetNodeIDs()...)
 	default:
 		return fmt.Errorf("unsupported ")
 	}

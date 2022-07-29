@@ -31,9 +31,9 @@ etcd:
       quota-backend-bytes: '8589934592'
       snapshot-count: '5000'
 networking:
-  serviceSubnet: {{.Network.ServiceSubnet}}
-  podSubnet: {{.Network.PodSubnet}}
-  dnsDomain: {{.Network.DNSDomain}}
+  serviceSubnet: {{ range .Networking.Services.CIDRBlocks }}{{ . }}{{- end }}
+  podSubnet: {{ range .Networking.Pods.CIDRBlocks }}{{ . }}{{- end }}
+  dnsDomain: {{.Networking.DNSDomain}}
 kubernetesVersion: {{.KubernetesVersion}}
 controlPlaneEndpoint: {{.ControlPlaneEndpoint}}
 apiServer:
@@ -64,10 +64,10 @@ scheduler:
 ---
 kind: KubeProxyConfiguration
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
-mode: {{if .KubeProxy.IPvs}}ipvs{{else}}iptables{{end}}
-{{if .KubeProxy.IPvs}}{{if .WorkerNodeVip}}ipvs:
+mode: {{if eq .Networking.ProxyMode "ipvs"}}ipvs{{else}}iptables{{end}}
+{{if eq .Networking.ProxyMode "ipvs"}}{{if .Networking.WorkerNodeVip}}ipvs:
   excludeCIDRs:
-  - "{{.WorkerNodeVip}}/32"{{end}}{{end}}
+  - "{{.Networking.WorkerNodeVip}}/32"{{end}}{{end}}
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 authentication:
@@ -142,6 +142,7 @@ spec:
     name: lib-modules
 status: {}
 `
+
 const calicoV3112 = `---
 kind: ConfigMap
 apiVersion: v1
@@ -152,7 +153,7 @@ data:
  typha_service_name: "none"
  calico_backend: "bird"
 
- veth_mtu: "{{.MTU}}"
+ veth_mtu: "{{.CNI.Calico.MTU}}"
 
  cni_network_config: |-
    {
@@ -165,8 +166,8 @@ data:
          "datastore_type": "kubernetes",
          "nodename": "__KUBERNETES_NODE_NAME__",
          "mtu": __CNI_MTU__,
-         {{if .Calico.IPManger}}"ipam": {
-           {{if .Calico.DualStack }}
+         {{if .CNI.Calico.IPManger}}"ipam": {
+           {{if .DualStack }}
              "type": "calico-ipam",
              "assign_ipv4": "true",
              "assign_ipv6": "true"
@@ -615,7 +616,7 @@ spec:
      priorityClassName: system-node-critical
      initContainers:
        - name: upgrade-ipam
-         image: {{with .LocalRegistry}}{{.}}/{{end}}calico/cni:{{.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Calico.Version}}
          command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
          env:
            - name: KUBERNETES_NODE_NAME
@@ -635,7 +636,7 @@ spec:
          securityContext:
            privileged: true
        - name: install-cni
-         image: {{with .LocalRegistry}}{{.}}/{{end}}calico/cni:{{.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Calico.Version}}
          command: ["/install-cni.sh"]
          env:
            - name: CNI_CONF_NAME
@@ -664,7 +665,7 @@ spec:
          securityContext:
            privileged: true
        - name: flexvol-driver
-         image: {{with .LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.Calico.Version}}
+         image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Calico.Version}}
          volumeMounts:
          - name: flexvol-driver-host
            mountPath: /host/driver
@@ -672,7 +673,7 @@ spec:
            privileged: true
      containers:
        - name: calico-node
-         image: {{with .LocalRegistry}}{{.}}/{{end}}calico/node:{{.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Calico.Version}}
          env:
            - name: DATASTORE_TYPE
              value: "kubernetes"
@@ -692,8 +693,8 @@ spec:
            - name: IP
              value: "autodetect"
            - name: IP_AUTODETECTION_METHOD
-             value: "{{.Calico.IPv4AutoDetection}}"
-           {{if .Calico.DualStack}}
+             value: "{{.CNI.Calico.IPv4AutoDetection}}"
+           {{if .DualStack}}
            - name: IP6
              value: "autodetect"
            - name: CALICO_IPV6POOL_CIDR
@@ -736,7 +737,7 @@ spec:
            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
              value: "ACCEPT"
            - name: FELIX_IPV6SUPPORT
-             value: "{{.Calico.DualStack}}"
+             value: "{{.DualStack}}"
            - name: FELIX_LOGSEVERITYSCREEN
              value: "info"
            - name: FELIX_HEALTHENABLED
@@ -876,7 +877,7 @@ metadata:
 data:
   typha_service_name: "none"
   calico_backend: "bird"
-  veth_mtu: "{{.MTU}}"
+  veth_mtu: "{{.CNI.Calico.MTU}}"
   cni_network_config: |-
     {
       "name": "k8s-pod-network",
@@ -889,8 +890,8 @@ data:
           "datastore_type": "kubernetes",
           "nodename": "__KUBERNETES_NODE_NAME__",
           "mtu": __CNI_MTU__,
-         {{if .Calico.IPManger}}"ipam": {
-           {{if .Calico.DualStack }}
+         {{if .CNI.Calico.IPManger}}"ipam": {
+           {{if .DualStack }}
              "type": "calico-ipam",
              "assign_ipv4": "true",
              "assign_ipv6": "true"
@@ -4869,7 +4870,7 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
         - name: upgrade-ipam
-          image: {{with .LocalRegistry}}{{.}}/{{end}}calico/cni:{{.Calico.Version}}
+          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
           - configMapRef:
@@ -4893,7 +4894,7 @@ spec:
           securityContext:
             privileged: true
         - name: install-cni
-          image: {{with .LocalRegistry}}{{.}}/{{end}}calico/cni:{{.Calico.Version}}
+          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/install"]
           envFrom:
           - configMapRef:
@@ -4926,7 +4927,7 @@ spec:
           securityContext:
             privileged: true
         - name: flexvol-driver
-          image: {{with .LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.Calico.Version}}
+          image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
           volumeMounts:
           - name: flexvol-driver-host
             mountPath: /host/driver
@@ -4934,7 +4935,7 @@ spec:
             privileged: true
       containers:
         - name: calico-node
-          image: {{with .LocalRegistry}}{{.}}/{{end}}calico/node:{{.Calico.Version}}
+          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           envFrom:
           - configMapRef:
               name: kubernetes-services-endpoint
@@ -4958,25 +4959,25 @@ spec:
             - name: IP
               value: "autodetect"
             - name: IP_AUTODETECTION_METHOD
-              value: "{{.Calico.IPv4AutoDetection}}"
-            {{if .Calico.DualStack}}
+              value: "{{.CNI.Calico.IPv4AutoDetection}}"
+            {{if .DualStack}}
             - name: IP6
               value: "autodetect"
             - name: CALICO_IPV6POOL_CIDR
-              value: "{{.PodIPv6CIDR}}"
+              value: "{{.CNI.PodIPv6CIDR}}"
             - name: IP6_AUTODETECTION_METHOD
               value: "{{.Calico.IPv6AutoDetection}}"
             {{end}}
-            {{if eq .Calico.Mode "BGP"}}
+            {{if eq .CNI.Calico.Mode "BGP"}}
             - name: CALICO_IPV4POOL_IPIP
               value: "Never"
-            {{else if eq .Calico.Mode "Overlay-IPIP-All"}}
+            {{else if eq .CNI.Calico.Mode "Overlay-IPIP-All"}}
             - name: CALICO_IPV4POOL_IPIP
               value: "Always"
-            {{else if eq .Calico.Mode "Overlay-IPIP-Cross-Subnet"}}
+            {{else if eq .CNI.Calico.Mode "Overlay-IPIP-Cross-Subnet"}}
             - name: CALICO_IPV4POOL_IPIP
               value: "CrossSubnet"
-            {{else if eq .Calico.Mode "Overlay-Vxlan-All"}}
+            {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-All"}}
             - name: CALICO_IPV4POOL_IPIP
               value: "Never"
             - name: CALICO_IPV4POOL_VXLAN
@@ -5010,7 +5011,7 @@ spec:
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
               value: "ACCEPT"
             - name: FELIX_IPV6SUPPORT
-              value: "{{.Calico.DualStack}}"
+              value: "{{.DualStack}}"
             - name: FELIX_HEALTHENABLED
               value: "true"
           securityContext:
@@ -5145,7 +5146,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: {{with .LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.Calico.Version}}
+          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
           env:
             - name: ENABLED_CONTROLLERS
               value: node

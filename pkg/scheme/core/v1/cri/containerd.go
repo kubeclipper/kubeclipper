@@ -52,7 +52,7 @@ type ContainerdRunnable struct {
 	upgradeSteps   []v1.Step
 }
 
-func (runnable *ContainerdRunnable) InitStep(ctx context.Context, containerd *v1.Containerd, nodes []v1.StepNode) error {
+func (runnable *ContainerdRunnable) InitStep(ctx context.Context, containerd *v1.ContainerRuntime, nodes []v1.StepNode) error {
 	metadata := component.GetExtraMetadata(ctx)
 	runnable.Version = containerd.Version
 	runnable.Offline = metadata.Offline

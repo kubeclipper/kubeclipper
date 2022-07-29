@@ -30,9 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -44,6 +41,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sysutil"
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -139,22 +138,22 @@ type Recovery struct {
 
 type AfterRecovery struct{}
 
-func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, kubeadm *v1.Kubeadm) {
-	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", kubeadm.Networking.DNSDomain)
+func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, c *v1.Cluster) {
+	apiServerDomain := APIServerDomainPrefix +
+		strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 	cpEndpoint := fmt.Sprintf("%s:6443", apiServerDomain)
 	stepper.Kubeadm = &KubeadmConfig{
 		ClusterConfigAPIVersion: "",
-		ContainerRuntime:        kubeadm.ContainerRuntime.Type.String(),
-		Etcd:                    kubeadm.KubeComponents.Etcd,
-		Network:                 kubeadm.Networking,
-		KubeProxy:               kubeadm.KubeComponents.KubeProxy,
-		Kubelet:                 kubeadm.KubeComponents.Kubelet,
+		ContainerRuntime:        c.ContainerRuntime.Type,
+		Etcd:                    c.Etcd,
+		Networking:              c.Networking,
+		KubeProxy:               c.KubeProxy,
+		Kubelet:                 c.Kubelet,
 		ClusterName:             metadata.ClusterName,
-		KubernetesVersion:       kubeadm.KubernetesVersion,
+		KubernetesVersion:       c.KubernetesVersion,
 		ControlPlaneEndpoint:    cpEndpoint,
-		CertSANs:                kubeadm.CertSANs,
-		LocalRegistry:           kubeadm.LocalRegistry,
-		WorkerNodeVip:           kubeadm.WorkerNodeVip,
+		CertSANs:                c.CertSANs,
+		LocalRegistry:           c.LocalRegistry,
 	}
 	stepper.Offline = metadata.Offline
 	stepper.Version = metadata.KubeVersion

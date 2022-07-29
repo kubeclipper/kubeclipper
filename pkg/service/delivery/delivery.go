@@ -226,9 +226,9 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 	switch v := op.Labels[common.LabelOperationAction]; v {
 	case v1.OperationCreateCluster:
 		if op.Status.Status == v1.OperationStatusSuccessful {
-			clu.Status.Status = v1.ClusterStatusRunning
+			clu.Status.Phase = v1.ClusterRunning
 		} else {
-			clu.Status.Status = v1.ClusterStatusInstallFailed
+			clu.Status.Phase = v1.ClusterInstallFailed
 		}
 		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 			return err
@@ -236,9 +236,9 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 		return nil
 	case v1.OperationAddNodes:
 		if op.Status.Status == v1.OperationStatusSuccessful {
-			clu.Status.Status = v1.ClusterStatusRunning
+			clu.Status.Phase = v1.ClusterRunning
 		} else {
-			clu.Status.Status = v1.ClusterStatusUpdateFailed
+			clu.Status.Phase = v1.ClusterUpdateFailed
 		}
 		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 			return err
@@ -248,7 +248,7 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 		if op.Status.Status == v1.OperationStatusSuccessful {
 			return s.clusterOperator.DeleteCluster(context.TODO(), clu.Name)
 		}
-		clu.Status.Status = v1.ClusterStatusDeleteFailed
+		clu.Status.Phase = v1.ClusterTerminateFailed
 		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 			return err
 		}
@@ -275,11 +275,11 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 					Taints: nil,
 				}
 			}
-			removed = clu.Kubeadm.Workers.Intersect(removed...)
+			removed = clu.Workers.Intersect(removed...)
 			if len(removed) > 0 {
-				clu.Kubeadm.Workers = clu.Kubeadm.Workers.Complement(removed...)
+				clu.Workers = clu.Workers.Complement(removed...)
 			}
-			clu.Status.Status = v1.ClusterStatusRunning
+			clu.Status.Phase = v1.ClusterRunning
 			if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 				return err
 			}
@@ -292,37 +292,37 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 			}
 			return nil
 		}
-		clu.Status.Status = v1.ClusterStatusUpdateFailed
+		clu.Status.Phase = v1.ClusterUpdateFailed
 		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 			return err
 		}
 		return nil
 	case v1.OperationUpgradeCluster:
 		if op.Status.Status == v1.OperationStatusSuccessful {
-			clu.Status.Status = v1.ClusterStatusRunning
-			clu.Kubeadm.KubernetesVersion = op.Labels[common.LabelUpgradeVersion]
+			clu.Status.Phase = v1.ClusterRunning
+			clu.KubernetesVersion = op.Labels[common.LabelUpgradeVersion]
 		} else {
-			clu.Status.Status = v1.ClusterStatusUpgradeFailed
+			clu.Status.Phase = v1.ClusterUpgradeFailed
 		}
 		_, err := s.clusterOperator.UpdateCluster(context.TODO(), clu)
 		return err
 	case v1.OperationBackupCluster:
-		clu.Status.Status = v1.ClusterStatusRunning
+		clu.Status.Phase = v1.ClusterRunning
 		_, err := s.clusterOperator.UpdateCluster(context.TODO(), clu)
 		return err
 	case v1.OperationRecoverCluster:
 		if op.Status.Status == v1.OperationStatusSuccessful {
-			clu.Status.Status = v1.ClusterStatusRunning
+			clu.Status.Phase = v1.ClusterRunning
 		} else {
-			clu.Status.Status = v1.ClusterStatusRestoreFailed
+			clu.Status.Phase = v1.ClusterRestoreFailed
 		}
 		_, err := s.clusterOperator.UpdateCluster(context.TODO(), clu)
 		return err
 	case v1.OperationInstallComponents, v1.OperationUninstallComponents:
 		if op.Status.Status == v1.OperationStatusSuccessful {
-			clu.Status.Status = v1.ClusterStatusRunning
+			clu.Status.Phase = v1.ClusterRunning
 		} else {
-			clu.Status.Status = v1.ClusterStatusUpdateFailed
+			clu.Status.Phase = v1.ClusterUpdateFailed
 		}
 		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 			return err
@@ -330,9 +330,9 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 		return nil
 	case v1.OperationUpdateCertification:
 		if op.Status.Status == v1.OperationStatusSuccessful {
-			clu.Status.Status = v1.ClusterStatusRunning
+			clu.Status.Phase = v1.ClusterRunning
 		} else {
-			clu.Status.Status = v1.ClusterStatusUpdateFailed
+			clu.Status.Phase = v1.ClusterUpdateFailed
 		}
 		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
 			return err

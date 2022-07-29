@@ -188,7 +188,7 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 
 	// when the operation status is failed, set the backup status to error
 	if o != nil && o.Status.Status == v1.OperationStatusFailed {
-		if c.Status.Status == v1.ClusterStatusRestoreFailed {
+		if c.Status.Phase == v1.ClusterRestoreFailed {
 			b.Status.ClusterBackupStatus = v1.ClusterBackupAvailable
 		} else {
 			b.Status.ClusterBackupStatus = v1.ClusterBackupError
