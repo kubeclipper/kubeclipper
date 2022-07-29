@@ -104,7 +104,14 @@ const (
   Push offline resource packs
 
   You can push a .tar.gz file of the specified type
-  The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
+  The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.
+
+  Naming rules for offline packages: name-version-arch.tar.gz
+  Structure of the offline package: 
+	name/version/
+	name/version/arch/
+	name/version/arch/images.tar.gz
+	name/version/arch/manifest.json`
 	resourcePushExample = `
   # Push offline resource packs use ssh
   kcctl resource push --pk-file 'PK-FILE PATH' --pkg 'PKG NAME' --type 'TYPE'
@@ -156,7 +163,7 @@ func NewResourceOptions(streams options.IOStreams) *ResourceOptions {
 			User: "root",
 		},
 		deployConfig: options.NewDeployOptions(),
-		Arch:         "x86_64",
+		Arch:         "amd64",
 	}
 }
 
@@ -433,7 +440,7 @@ func (o *ResourceOptions) ResourcePush() error {
 			return err
 		}
 		if !strings.Contains(ec.StdOut(), fmt.Sprintf("%s/%s", version, arch)) {
-			return fmt.Errorf("package structure(%s) Non-standard. standard : 'version-name/arch-name/file-name' example: v4.0.2/x86_64/nfs-utils-1.3.0-0.68.el7.x86_64.rpm", ec.StdOut())
+			return fmt.Errorf("package structure(%s) Non-standard. standard : 'version/arch/file' example: v4.0.2/amd64/images.tar.gz", ec.StdOut())
 		}
 	}
 
@@ -471,7 +478,7 @@ func (o *ResourceOptions) ResourcePush() error {
 				return err
 			}
 			if !strings.Contains(ret.Stdout, fmt.Sprintf("%s/%s", version, arch)) {
-				return fmt.Errorf("package structure(%s) Non-standard. standard : 'version-name/arch-name/file-name' example: v4.0.2/x86_64/nfs-utils-1.3.0-0.68.el7.x86_64.rpm", ret.Stdout)
+				return fmt.Errorf("package structure(%s) Non-standard. standard : 'version/arch/file' example: v4.0.2/amd64/images.tar.gz", ret.Stdout)
 			}
 		}
 
@@ -486,7 +493,7 @@ func (o *ResourceOptions) ResourcePush() error {
 		}
 
 		// tar decompress new file
-		hook = fmt.Sprintf(`tar vxf %s -C %s/%s/`, filepath.Join(config.DefaultPkgPath, filepath.Base(o.Pkg)), o.deployConfig.StaticServerPath, name)
+		hook = fmt.Sprintf(`tar -zxvf %s -C %s`, filepath.Join(config.DefaultPkgPath, filepath.Base(o.Pkg)), o.deployConfig.StaticServerPath)
 		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, node, hook)
 		if err != nil {
 			logger.Errorf("node(%s) push resource failed: %s", node, err.Error())
@@ -564,7 +571,7 @@ func (o *ResourceOptions) ReadMetadata(node string) (*kc.ComponentMetas, error) 
 func (o *ResourceOptions) parsePackageName() (string, string, string, error) {
 	array := strings.Split(strings.ReplaceAll(filepath.Base(o.Pkg), ".tar.gz", ""), "-")
 	if len(array) != 3 {
-		return "", "", "", fmt.Errorf("package name '%s' Non-standard. example: 'docker-19.03.12-x86_64.tar.gz'", o.Pkg)
+		return "", "", "", fmt.Errorf("package name '%s' Non-standard. example: 'name-version-amd64.tar.gz'", o.Pkg)
 	}
 
 	return array[0], array[1], array[2], nil
