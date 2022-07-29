@@ -24,7 +24,7 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "base",
+			name: "set insecure registry",
 			fields: fields{
 				Base: Base{
 					Version:          "1.6.4",
@@ -33,9 +33,24 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 					InsecureRegistry: []string{"127.0.0.1:5000", "127.0.0.1:6000"},
 					Arch:             "amd64",
 				},
+				LocalRegistry: "",
+				KubeVersion:   "1.23.6",
+				PauseVersion:  "3.2",
+			},
+		},
+		{
+			name: "use local registry",
+			fields: fields{
+				Base: Base{
+					Version:          "1.6.4",
+					Offline:          true,
+					DataRootDir:      "/var/lib/containerd",
+					InsecureRegistry: []string{"127.0.0.1:5000"},
+					Arch:             "amd64",
+				},
 				LocalRegistry: "127.0.0.1:5000",
 				KubeVersion:   "1.23.6",
-				PauseVersion:  "127.0.0.1:5000/pause:3.2",
+				PauseVersion:  "3.2",
 			},
 		},
 	}

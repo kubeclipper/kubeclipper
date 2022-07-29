@@ -102,13 +102,8 @@ oom_score = 0
     stream_idle_timeout = "4h0m0s"
     enable_selinux = false
     selinux_category_range = 1024
-{{- $n := len .InsecureRegistry -}}
-{{- if gt $n 0}}
-    {{- range $index, $addr := .InsecureRegistry}}
-		{{- if eq $index 0}}
-    sandbox_image = "{{$addr}}/pause:{{$.PauseVersion}}"
-		{{- end}}
-    {{- end}}
+{{- if .LocalRegistry }}
+    sandbox_image = "{{.LocalRegistry}}/pause:{{$.PauseVersion}}"
 {{- else}}
     sandbox_image = "k8s.gcr.io/pause:{{.PauseVersion}}"
 {{- end}}
