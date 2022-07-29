@@ -83,7 +83,7 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentUnhealthy)
 		}
 		s.updateClusterCertification(clu.Name)
-		for _, com := range clu.Kubeadm.Components {
+		for _, com := range clu.Addons {
 			comp, ok := component.Load(fmt.Sprintf(component.RegisterFormat, com.Name, com.Version))
 			if !ok {
 				s.log.Warn("load component failed", zap.String("component", com.Name), zap.String("version", com.Version))
@@ -148,7 +148,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		s.log.Warn("get cluster failed when update cluster certification status, skip it", zap.String("cluster", clusterName))
 		return
 	}
-	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Kubeadm.Masters[0].ID, []string{"kubeadm", "certs", "check-expiration"}, 3*time.Minute)
+	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Masters[0].ID, []string{"kubeadm", "certs", "check-expiration"}, 3*time.Minute)
 	if err != nil {
 		s.log.Warn("get cluster failed when get cluster certification status, skip it", zap.String("cluster", clusterName))
 		return

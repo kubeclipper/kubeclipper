@@ -50,8 +50,8 @@ type PatchNodes struct {
 }
 
 type PatchComponents struct {
-	Uninstall  bool               `json:"uninstall"`
-	Components []corev1.Component `json:"components"`
+	Uninstall bool           `json:"uninstall"`
+	Addons    []corev1.Addon `json:"addons"`
 }
 
 var (
@@ -87,15 +87,15 @@ func (p *PatchNodes) makeWorkerCompare(cluster *corev1.Cluster) error {
 		// Add nodes to cluster.
 		// Check nodes in cluster already.
 		// Filter out nodes to be added.
-		p.Nodes = p.Nodes.Complement(cluster.Kubeadm.Workers...)
-		cluster.Kubeadm.Workers = append(cluster.Kubeadm.Workers, p.Nodes...)
+		p.Nodes = p.Nodes.Complement(cluster.Workers...)
+		cluster.Workers = append(cluster.Workers, p.Nodes...)
 	case NodesOperationRemove:
 		// Remove nodes from cluster.
 		// Filter out nodes in cluster already.
 		// Filter out nodes to be removed.
 		// TODO: if len(p.nodes)==0, should return error
-		p.Nodes = cluster.Kubeadm.Workers.Intersect(p.Nodes...)
-		cluster.Kubeadm.Workers = cluster.Kubeadm.Workers.Complement(p.Nodes...)
+		p.Nodes = cluster.Workers.Intersect(p.Nodes...)
+		cluster.Workers = cluster.Workers.Complement(p.Nodes...)
 	default:
 		return ErrInvalidNodesOperation
 	}
@@ -159,7 +159,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Labels[common.LabelOperationAction] = corev1.OperationAddNodes
 
 		// container runtime
-		steps, err := getCriStep(ctx, &cluster.Kubeadm.ContainerRuntime, action, stepNodes)
+		steps, err := getCriStep(ctx, &cluster.ContainerRuntime, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Steps = append(op.Steps, steps...)
 
 		// join component
-		steps, err = p.makeWorkerNodeSteps(&extra, cluster.Kubeadm, corev1.ActionInstall)
+		steps, err = p.makeWorkerNodeSteps(&extra, cluster, corev1.ActionInstall)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		action = corev1.ActionUninstall
 		op.Labels[common.LabelOperationAction] = corev1.OperationRemoveNodes
 
-		steps, err := p.makeWorkerNodeSteps(&extra, cluster.Kubeadm, corev1.ActionUninstall)
+		steps, err := p.makeWorkerNodeSteps(&extra, cluster, corev1.ActionUninstall)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +201,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Steps = append(op.Steps, steps...)
 
 		// container runtime
-		steps, err = getCriStep(ctx, &cluster.Kubeadm.ContainerRuntime, action, stepNodes)
+		steps, err = getCriStep(ctx, &cluster.ContainerRuntime, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +215,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 
 func (p *PatchNodes) getPackageSteps(cluster *corev1.Cluster, action corev1.StepAction, pNodes []corev1.StepNode) ([]corev1.Step, error) {
 	pack := &k8s.Package{}
-	pack = pack.InitStepper(cluster.Kubeadm)
+	pack = pack.InitStepper(cluster)
 
 	switch action {
 	case corev1.ActionInstall:
@@ -227,10 +227,10 @@ func (p *PatchNodes) getPackageSteps(cluster *corev1.Cluster, action corev1.Step
 	return nil, fmt.Errorf("packageSteps no support action: %s", action)
 }
 
-func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, kubeadm *corev1.Kubeadm, action corev1.StepAction) ([]corev1.Step, error) {
+func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, c *corev1.Cluster, action corev1.StepAction) ([]corev1.Step, error) {
 	role := p.Role.String()
 	gen := k8s.GenNode{}
-	err := gen.InitStepper(extra, kubeadm, role).MakeSteps(extra, role)
+	err := gen.InitStepper(extra, c, role).MakeSteps(extra, role)
 	if err != nil {
 		return nil, err
 	}
@@ -240,14 +240,14 @@ func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, kubeadm
 
 // checkComponent check whether the component is installed in the current cluster
 func (p *PatchComponents) checkComponents(cluster *corev1.Cluster) error {
-	for _, v := range p.Components {
+	for _, v := range p.Addons {
 		itf, ok := component.Load(fmt.Sprintf(component.RegisterFormat, v.Name, v.Version))
 		if !ok {
 			return fmt.Errorf("kubeclipper does not support %s-%s component", v.Name, v.Version)
 		}
 		meta := itf.GetComponentMeta(component.English)
 		var installed bool
-		for _, comp := range cluster.Kubeadm.Components {
+		for _, comp := range cluster.Addons {
 			if comp.Name == v.Name {
 				installed = true
 			}
@@ -262,9 +262,9 @@ func (p *PatchComponents) checkComponents(cluster *corev1.Cluster) error {
 		// add component and component is not unique, check whether component StorageClassName is equal
 		// TODO: Make validation logic specific to component configurations
 		if !p.Uninstall && installed && !meta.Unique {
-			var existedComps []corev1.Component
+			var existedComps []corev1.Addon
 			// components of the same type already exist in the collection cluster
-			for _, comp := range cluster.Kubeadm.Components {
+			for _, comp := range cluster.Addons {
 				if comp.Name == v.Name {
 					existedComps = append(existedComps, comp)
 				}
@@ -295,7 +295,7 @@ func (p *PatchComponents) checkComponents(cluster *corev1.Cluster) error {
 // addOrRemoveComponentFromCluster update cluster components slice
 func (p *PatchComponents) addOrRemoveComponentFromCluster(cluster *corev1.Cluster) (*corev1.Cluster, error) {
 	if p.Uninstall {
-		for _, v := range p.Components {
+		for _, v := range p.Addons {
 			itf, ok := component.Load(fmt.Sprintf(component.RegisterFormat, v.Name, v.Version))
 			if !ok {
 				return nil, fmt.Errorf("kubeclipper does not support %s-%s component", v.Name, v.Version)
@@ -305,7 +305,7 @@ func (p *PatchComponents) addOrRemoveComponentFromCluster(cluster *corev1.Cluste
 				return nil, fmt.Errorf("%s-%s component configuration resolution error: %s", v.Name, v.Version, err.Error())
 			}
 			currentNewComp, _ := currentCompMeta.(component.Interface)
-			for k, comp := range cluster.Kubeadm.Components {
+			for k, comp := range cluster.Addons {
 				existCompItf, _ := component.Load(fmt.Sprintf(component.RegisterFormat, comp.Name, comp.Version))
 				existCompMeta := existCompItf.NewInstance()
 				if err := json.Unmarshal(comp.Config.Raw, existCompMeta); err != nil {
@@ -313,13 +313,13 @@ func (p *PatchComponents) addOrRemoveComponentFromCluster(cluster *corev1.Cluste
 				}
 				existNewComp, _ := existCompMeta.(component.Interface)
 				if currentNewComp.GetInstanceName() == existNewComp.GetInstanceName() {
-					cluster.Kubeadm.Components = append(cluster.Kubeadm.Components[:k], cluster.Kubeadm.Components[k+1:]...)
+					cluster.Addons = append(cluster.Addons[:k], cluster.Addons[k+1:]...)
 				}
 			}
 		}
 		return cluster, nil
 	}
-	cluster.Kubeadm.Components = append(cluster.Kubeadm.Components, p.Components...)
+	cluster.Addons = append(cluster.Addons, p.Addons...)
 	return cluster, nil
 }
 

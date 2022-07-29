@@ -26,12 +26,11 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -40,16 +39,16 @@ const (
 	kubeadmConfig   = "kubeadmConfig"
 	controlPlane    = "controlPlane"
 	clusterNode     = "clusterNode"
-	cni             = "cni"
+	cniInfo         = "cniInfo"
 	health          = "health"
 	container       = "container"
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
 )
 
-type KubeadmRunnable v1.Kubeadm
+type Runnable v1.Cluster
 
-func (runnable *KubeadmRunnable) GetStep(ctx context.Context, action v1.StepAction) ([]v1.Step, error) {
+func (runnable *Runnable) GetStep(ctx context.Context, action v1.StepAction) ([]v1.Step, error) {
 	err := runnable.Validate()
 	if err != nil {
 		return nil, err
@@ -66,7 +65,7 @@ func (runnable *KubeadmRunnable) GetStep(ctx context.Context, action v1.StepActi
 	return nil, nil
 }
 
-func (runnable *KubeadmRunnable) Validate() error {
+func (runnable *Runnable) Validate() error {
 	if runnable == nil {
 		return fmt.Errorf("kubeadm object is empty")
 	}
@@ -76,15 +75,14 @@ func (runnable *KubeadmRunnable) Validate() error {
 	}
 
 	// check dualStack and ipv4
-	switch runnable.KubeComponents.CNI.Type {
+	switch runnable.CNI.Type {
 	case "calico":
-		if runnable.KubeComponents.CNI.Calico.DualStack &&
-			(runnable.KubeComponents.CNI.PodIPv4CIDR == "" || runnable.KubeComponents.CNI.PodIPv6CIDR == "") {
+		if runnable.Networking.IPFamily == v1.IPFamilyDualStack &&
+			len(runnable.Networking.Pods.CIDRBlocks) <= 1 {
 			return fmt.Errorf("ipv4 and ipv6 cidr are both required when calico dual-stack is on")
 		}
-		if !runnable.KubeComponents.CNI.Calico.DualStack &&
-			runnable.KubeComponents.CNI.PodIPv4CIDR == "" &&
-			runnable.KubeComponents.CNI.PodIPv6CIDR == "" {
+		if runnable.Networking.IPFamily != v1.IPFamilyDualStack &&
+			len(runnable.Networking.Pods.CIDRBlocks) == 0 {
 			return fmt.Errorf("calico ipv4 and ipv6 must have at least one")
 		}
 	}
@@ -92,17 +90,17 @@ func (runnable *KubeadmRunnable) Validate() error {
 	return nil
 }
 
-func (runnable *KubeadmRunnable) GetInstallSteps(ctx context.Context) ([]v1.Step, error) {
+func (runnable *Runnable) GetInstallSteps(ctx context.Context) ([]v1.Step, error) {
 	metadata := component.GetExtraMetadata(ctx)
 	return runnable.makeInstallSteps(&metadata)
 }
 
-func (runnable *KubeadmRunnable) GetUninstallSteps(ctx context.Context) ([]v1.Step, error) {
+func (runnable *Runnable) GetUninstallSteps(ctx context.Context) ([]v1.Step, error) {
 	metadata := component.GetExtraMetadata(ctx)
 	return runnable.makeUninstallSteps(&metadata)
 }
 
-func (runnable *KubeadmRunnable) GetUpgradeSteps(ctx context.Context) ([]v1.Step, error) {
+func (runnable *Runnable) GetUpgradeSteps(ctx context.Context) ([]v1.Step, error) {
 	metadata := component.GetExtraMetadata(ctx)
 	id := strutil.GetUUID()
 
@@ -118,7 +116,7 @@ func (runnable *KubeadmRunnable) GetUpgradeSteps(ctx context.Context) ([]v1.Step
 	}, nil
 }
 
-func (runnable *KubeadmRunnable) makeInstallSteps(metadata *component.ExtraMetadata) ([]v1.Step, error) {
+func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([]v1.Step, error) {
 	// 1. package download and install
 	// 2. print kubeadm config(template step type)
 	// 3. kubeadm init cluster
@@ -127,10 +125,9 @@ func (runnable *KubeadmRunnable) makeInstallSteps(metadata *component.ExtraMetad
 	// 6. patch label and taint(shell step type)
 	// 7. check cluster health
 	// 8. apply kubectl pod
-
+	c := v1.Cluster(*runnable)
 	nodes := utils.UnwrapNodeList(metadata.GetAllNodes())
 	masters := utils.UnwrapNodeList(metadata.Masters)
-	kubeadm := (*v1.Kubeadm)(runnable)
 
 	var installSteps []v1.Step
 	steps, err := EnvSetupSteps(nodes)
@@ -140,65 +137,65 @@ func (runnable *KubeadmRunnable) makeInstallSteps(metadata *component.ExtraMetad
 	installSteps = append(installSteps, steps...)
 
 	pack := Package{}
-	steps, err = pack.InitStepper(kubeadm).InstallSteps(nodes)
+	steps, err = pack.InitStepper(&c).InstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
 	kubeConf := KubeadmConfig{}
-	steps, err = kubeConf.InitStepper(kubeadm, metadata).InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = kubeConf.InitStepper(&c, metadata).InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
 	controlPlane := ControlPlane{}
-	steps, err = controlPlane.InitStepper(kubeadm).InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = controlPlane.InitStepper(&c).InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
-	if len(kubeadm.Masters) > 1 {
+	if len(runnable.Masters) > 1 {
 		cluNode := ClusterNode{}
-		steps, err = cluNode.InitStepper(kubeadm, metadata).InstallSteps(NodeRoleMaster, utils.UnwrapNodeList(metadata.Masters)[1:])
+		steps, err = cluNode.InitStepper(&c, metadata).InstallSteps(NodeRoleMaster, utils.UnwrapNodeList(metadata.Masters)[1:])
 		if err != nil {
 			return nil, err
 		}
 		installSteps = append(installSteps, steps...)
 	}
-	if len(kubeadm.Workers) > 0 {
+	if len(runnable.Workers) > 0 {
 		cluNode := ClusterNode{}
-		steps, err = cluNode.InitStepper(kubeadm, metadata).InstallSteps(NodeRoleWorker, utils.UnwrapNodeList(metadata.Workers))
+		steps, err = cluNode.InitStepper(&c, metadata).InstallSteps(NodeRoleWorker, utils.UnwrapNodeList(metadata.Workers))
 		if err != nil {
 			return nil, err
 		}
 		installSteps = append(installSteps, steps...)
 	}
 
-	c := CNI{}
-	steps, err = c.InitStepper(kubeadm).InstallSteps([]v1.StepNode{masters[0]})
+	cn := CNIInfo{}
+	steps, err = cn.InitStepper(&c.CNI, &c.Networking).InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
-	steps, err = PatchTaintAndLabelStep(kubeadm.Masters, kubeadm.Workers, metadata)
+	steps, err = PatchTaintAndLabelStep(runnable.Masters, runnable.Workers, metadata)
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
 	heal := Health{}
-	steps, err = heal.InitStepper(kubeadm).InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = heal.InitStepper().InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
 	kt := KubectlTerminal{}
-	steps, err = kt.InitStepper(kubeadm).InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = kt.InitStepper(&c).InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
@@ -206,18 +203,18 @@ func (runnable *KubeadmRunnable) makeInstallSteps(metadata *component.ExtraMetad
 	return installSteps, nil
 }
 
-func (runnable *KubeadmRunnable) makeUninstallSteps(metadata *component.ExtraMetadata) ([]v1.Step, error) {
+func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) ([]v1.Step, error) {
 	// TODO: need refactor
 
+	c := v1.Cluster(*runnable)
 	nodes := utils.UnwrapNodeList(metadata.GetAllNodes())
 	masters := utils.UnwrapNodeList(metadata.Masters)
-	kubeadm := (*v1.Kubeadm)(runnable)
 
 	var uninstallSteps []v1.Step
 
 	// clean cluster pv storage resource
 	controlPlane := ControlPlane{}
-	steps, err := controlPlane.InitStepper(kubeadm).UninstallSteps([]v1.StepNode{masters[0]})
+	steps, err := controlPlane.InitStepper(&c).UninstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
@@ -232,14 +229,14 @@ func (runnable *KubeadmRunnable) makeUninstallSteps(metadata *component.ExtraMet
 
 	// NOTE: clean container must after kubeadm reset,see #122450
 	container := Container{}
-	steps, err = container.InitStepper(kubeadm).UninstallSteps(nodes)
+	steps, err = container.InitStepper(c.ContainerRuntime.Type).UninstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	// remove Kubernetes all
-	steps, err = Clear(kubeadm, metadata)
+	steps, err = Clear(&c, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -247,15 +244,15 @@ func (runnable *KubeadmRunnable) makeUninstallSteps(metadata *component.ExtraMet
 
 	// remove configuration files and rpm packages already installed
 	pack := Package{}
-	steps, err = pack.InitStepper(kubeadm).UninstallSteps(nodes)
+	steps, err = pack.InitStepper(&c).UninstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	// clean virtual network interfaces
-	c := CNI{}
-	steps, err = c.InitStepper(kubeadm).UninstallSteps(nodes)
+	cn := CNIInfo{}
+	steps, err = cn.InitStepper(&c.CNI, &c.Networking).UninstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -263,21 +260,21 @@ func (runnable *KubeadmRunnable) makeUninstallSteps(metadata *component.ExtraMet
 
 	// remove kubeconfig
 	ctl := Kubectl{}
-	steps, err = ctl.InitStepper(kubeadm).UninstallSteps(masters)
+	steps, err = ctl.InitStepper().UninstallSteps(masters)
 	if err != nil {
 		return nil, err
 	}
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	heal := Health{}
-	steps, err = heal.InitStepper(kubeadm).UninstallSteps(&kubeadm.KubeComponents.KubeProxy, nodes...)
+	steps, err = heal.InitStepper().UninstallSteps(&runnable.Networking, nodes...)
 	if err != nil {
 		return nil, err
 	}
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	// remove hostname
-	steps, err = RemoveHostname(kubeadm, nodes)
+	steps, err = RemoveHostname(&c, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -286,12 +283,12 @@ func (runnable *KubeadmRunnable) makeUninstallSteps(metadata *component.ExtraMet
 	return uninstallSteps, nil
 }
 
-func (stepper *Package) InitStepper(kubeadm *v1.Kubeadm) *Package {
+func (stepper *Package) InitStepper(c *v1.Cluster) *Package {
 	stepper.Arch = ""
-	stepper.Offline = kubeadm.Offline
-	stepper.Version = kubeadm.KubernetesVersion
-	stepper.CriType = kubeadm.ContainerRuntime.Type.String()
-	stepper.LocalRegistry = kubeadm.LocalRegistry
+	stepper.Offline = c.Offline()
+	stepper.Version = c.KubernetesVersion
+	stepper.CriType = c.ContainerRuntime.Type
+	stepper.LocalRegistry = c.LocalRegistry
 	return stepper
 }
 
@@ -347,22 +344,21 @@ func (stepper *Package) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	}, nil
 }
 
-func (stepper *KubeadmConfig) InitStepper(kubeadm *v1.Kubeadm, metadata *component.ExtraMetadata) *KubeadmConfig {
-	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", kubeadm.Networking.DNSDomain)
+func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.ExtraMetadata) *KubeadmConfig {
+	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 	cpEndpoint := fmt.Sprintf("%s:6443", apiServerDomain)
 
 	stepper.ClusterConfigAPIVersion = ""
-	stepper.ContainerRuntime = kubeadm.ContainerRuntime.Type.String()
-	stepper.Etcd = kubeadm.KubeComponents.Etcd
-	stepper.Network = kubeadm.Networking
-	stepper.KubeProxy = kubeadm.KubeComponents.KubeProxy
-	stepper.Kubelet = kubeadm.KubeComponents.Kubelet
+	stepper.ContainerRuntime = c.ContainerRuntime.Type
+	stepper.Etcd = c.Etcd
+	stepper.Networking = c.Networking
+	stepper.KubeProxy = c.KubeProxy
+	stepper.Kubelet = c.Kubelet
 	stepper.ClusterName = metadata.ClusterName
-	stepper.KubernetesVersion = kubeadm.KubernetesVersion
+	stepper.KubernetesVersion = c.KubernetesVersion
 	stepper.ControlPlaneEndpoint = cpEndpoint
-	stepper.CertSANs = kubeadm.CertSANs
-	stepper.LocalRegistry = kubeadm.LocalRegistry
-	stepper.WorkerNodeVip = kubeadm.WorkerNodeVip
+	stepper.CertSANs = c.CertSANs
+	stepper.LocalRegistry = c.LocalRegistry
 
 	return stepper
 }
@@ -397,12 +393,13 @@ func (stepper *KubeadmConfig) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, er
 	return nil, nil
 }
 
-func (stepper *ControlPlane) InitStepper(kubeadm *v1.Kubeadm) *ControlPlane {
-	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", kubeadm.Networking.DNSDomain)
+func (stepper *ControlPlane) InitStepper(c *v1.Cluster) *ControlPlane {
+	apiServerDomain := APIServerDomainPrefix +
+		strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 
 	stepper.APIServerDomainName = apiServerDomain
-	stepper.EtcdDataPath = kubeadm.KubeComponents.Etcd.DataDir
-	stepper.ContainerRuntime = kubeadm.ContainerRuntime.Type.String()
+	stepper.EtcdDataPath = c.Etcd.DataDir
+	stepper.ContainerRuntime = c.ContainerRuntime.Type
 
 	return stepper
 }
@@ -458,16 +455,17 @@ func (stepper *ControlPlane) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, err
 	}, nil
 }
 
-func (stepper *ClusterNode) InitStepper(kubeadm *v1.Kubeadm, metadata *component.ExtraMetadata) *ClusterNode {
-	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", kubeadm.Networking.DNSDomain)
+func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.ExtraMetadata) *ClusterNode {
+	apiServerDomain := APIServerDomainPrefix +
+		strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 
 	stepper.NodeRole = ""
-	stepper.WorkerNodeVIP = kubeadm.WorkerNodeVip
+	stepper.WorkerNodeVIP = c.Networking.WorkerNodeVip
 	stepper.Masters = metadata.GetMasterNodeIP()
-	stepper.LocalRegistry = kubeadm.LocalRegistry
+	stepper.LocalRegistry = c.LocalRegistry
 	stepper.APIServerDomainName = apiServerDomain
 	stepper.JoinMasterIP = metadata.Masters[0].IPv4
-	stepper.EtcdDataPath = kubeadm.KubeComponents.Etcd.DataDir
+	stepper.EtcdDataPath = c.Etcd.DataDir
 
 	return stepper
 }
@@ -503,13 +501,21 @@ func (stepper *ClusterNode) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 	return nil, nil
 }
 
-func (stepper *CNI) InitStepper(kubeadm *v1.Kubeadm) *CNI {
-	c := CNI(kubeadm.KubeComponents.CNI)
-	*stepper = c
+func (stepper *CNIInfo) InitStepper(c *v1.CNI, networking *v1.Networking) *CNIInfo {
+	ipv6 := ""
+	if networking.IPFamily == v1.IPFamilyDualStack {
+		ipv6 = networking.Pods.CIDRBlocks[1]
+	}
+	stepper = &CNIInfo{
+		CNI:         *c,
+		DualStack:   networking.IPFamily == v1.IPFamilyDualStack,
+		PodIPv4CIDR: networking.Pods.CIDRBlocks[0],
+		PodIPv6CIDR: ipv6,
+	}
 	return stepper
 }
 
-func (stepper *CNI) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+func (stepper *CNIInfo) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	bytes, err := json.Marshal(stepper)
 	if err != nil {
 		return nil, err
@@ -527,7 +533,7 @@ func (stepper *CNI) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 				{
 					Type: v1.CommandTemplateRender,
 					Template: &v1.TemplateCommand{
-						Identity: fmt.Sprintf(component.RegisterTemplateKeyFormat, cni, version, component.TypeTemplate),
+						Identity: fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate),
 						Data:     bytes,
 					},
 				},
@@ -540,11 +546,11 @@ func (stepper *CNI) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	}, nil
 }
 
-func (stepper *CNI) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+func (stepper *CNIInfo) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	return nil, nil
 }
 
-func (stepper *Health) InitStepper(kubeadm *v1.Kubeadm) *Health {
+func (stepper *Health) InitStepper() *Health {
 	return stepper
 }
 
@@ -591,8 +597,8 @@ func (stepper *Health) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 		}}, nil
 }
 
-func (stepper *Health) UninstallSteps(proxy *v1.KubeProxy, nodes ...v1.StepNode) ([]v1.Step, error) {
-	if proxy.IPvs {
+func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNode) ([]v1.Step, error) {
+	if network.ProxyMode == "ipvs" {
 		// ipvs mode
 		var bytes []byte
 		bytes, err := json.Marshal(stepper)
@@ -721,8 +727,8 @@ func (stepper *Certification) InstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 	}, nil
 }
 
-func (stepper *Container) InitStepper(kubeadm *v1.Kubeadm) *Container {
-	stepper.CriType = kubeadm.ContainerRuntime.Type.String()
+func (stepper *Container) InitStepper(criType string) *Container {
+	stepper.CriType = criType
 	return stepper
 }
 
@@ -755,7 +761,7 @@ func (stepper *Container) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error)
 	}, nil
 }
 
-func (stepper *Kubectl) InitStepper(kubeadm *v1.Kubeadm) *Kubectl {
+func (stepper *Kubectl) InitStepper() *Kubectl {
 	return stepper
 }
 
@@ -918,7 +924,7 @@ func KubeadmReset(nodes []v1.StepNode) ([]v1.Step, error) {
 	}, nil
 }
 
-func Clear(kubeadm *v1.Kubeadm, metadata *component.ExtraMetadata) ([]v1.Step, error) {
+func Clear(c *v1.Cluster, metadata *component.ExtraMetadata) ([]v1.Step, error) {
 	var steps []v1.Step
 	nodes := utils.UnwrapNodeList(metadata.GetAllNodes())
 	masters := utils.UnwrapNodeList(metadata.Masters)
@@ -926,10 +932,10 @@ func Clear(kubeadm *v1.Kubeadm, metadata *component.ExtraMetadata) ([]v1.Step, e
 	// remove etcd data dir
 	steps = append(steps,
 		doCommandRemoveStep("clearDatabase", masters,
-			kubeadm.KubeComponents.Etcd.DataDir))
+			c.Etcd.DataDir))
 	kubeletDataDir := KubeletDefaultDataDir
-	if kubeadm.KubeComponents.Kubelet.RootDir != "" {
-		kubeletDataDir = kubeadm.KubeComponents.Kubelet.RootDir
+	if c.Kubelet.RootDir != "" {
+		kubeletDataDir = c.Kubelet.RootDir
 	}
 	steps = append(steps,
 		doCommandRemoveStep("removeKubeletDataDir", nodes, kubeletDataDir),
@@ -948,8 +954,9 @@ func Clear(kubeadm *v1.Kubeadm, metadata *component.ExtraMetadata) ([]v1.Step, e
 
 	// clear worker /etc/hosts vip domain
 	// sed -i '/apiserver.cluster.local/d' /etc/hosts
-	if len(kubeadm.Workers) > 0 {
-		apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", kubeadm.Networking.DNSDomain)
+	if len(c.Workers) > 0 {
+		apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local",
+			c.Networking.DNSDomain)
 		steps = append(steps, v1.Step{
 			ID:         strutil.GetUUID(),
 			Name:       "clearVIPDomain",
@@ -979,7 +986,7 @@ func CleanCNI(c *v1.CNI, nodes []v1.StepNode) ([]v1.Step, error) {
 	return nil, fmt.Errorf("no support cni type: %s", c.Type)
 }
 
-func ClearCalico(calico v1.Calico, nodes []v1.StepNode) []v1.Step {
+func ClearCalico(calico *v1.Calico, nodes []v1.StepNode) []v1.Step {
 	var steps []v1.Step
 
 	switch calico.Mode {
@@ -1020,9 +1027,10 @@ func ClearCalico(calico v1.Calico, nodes []v1.StepNode) []v1.Step {
 	return steps
 }
 
-func RemoveHostname(kubeadm *v1.Kubeadm, nodes []v1.StepNode) ([]v1.Step, error) {
+func RemoveHostname(c *v1.Cluster, nodes []v1.StepNode) ([]v1.Step, error) {
 	var steps []v1.Step
-	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", kubeadm.Networking.DNSDomain)
+	apiServerDomain := APIServerDomainPrefix +
+		strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 
 	steps = append(steps, v1.Step{
 		ID:         strutil.GetUUID(),
@@ -1044,14 +1052,14 @@ func RemoveHostname(kubeadm *v1.Kubeadm, nodes []v1.StepNode) ([]v1.Step, error)
 	return steps, nil
 }
 
-func (c *KubectlTerminal) InitStepper(kubeadm *v1.Kubeadm) *KubectlTerminal {
-	c.ImageRegistryAddr = kubeadm.LocalRegistry
-	return c
+func (stepper *KubectlTerminal) InitStepper(c *v1.Cluster) *KubectlTerminal {
+	stepper.ImageRegistryAddr = c.LocalRegistry
+	return stepper
 }
 
-func (c *KubectlTerminal) InstallSteps(stepMaster0 []v1.StepNode) ([]v1.Step, error) {
+func (stepper *KubectlTerminal) InstallSteps(stepMaster0 []v1.StepNode) ([]v1.Step, error) {
 	installSteps := make([]v1.Step, 0)
-	terminal, err := json.Marshal(c)
+	terminal, err := json.Marshal(stepper)
 	if err != nil {
 		return nil, err
 	}
@@ -1080,6 +1088,6 @@ func (c *KubectlTerminal) InstallSteps(stepMaster0 []v1.StepNode) ([]v1.Step, er
 	return installSteps, nil
 }
 
-func (c *KubectlTerminal) UninstallSteps() ([]v1.Step, error) {
-	return nil, nil
+func (stepper *KubectlTerminal) UninstallSteps() ([]v1.Step, error) {
+	return nil, fmt.Errorf("KubectlTerminal no support uninstall")
 }

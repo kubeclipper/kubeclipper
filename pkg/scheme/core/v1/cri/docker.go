@@ -48,13 +48,13 @@ type DockerRunnable struct {
 	upgradeSteps   []v1.Step
 }
 
-func (runnable *DockerRunnable) InitStep(ctx context.Context, docker *v1.Docker, nodes []v1.StepNode) error {
+func (runnable *DockerRunnable) InitStep(ctx context.Context, cri *v1.ContainerRuntime, nodes []v1.StepNode) error {
 	metadata := component.GetExtraMetadata(ctx)
 
-	runnable.Version = docker.Version
+	runnable.Version = cri.Version
 	runnable.Offline = metadata.Offline
-	runnable.DataRootDir = docker.DataRootDir
-	runnable.InsecureRegistry = docker.InsecureRegistry
+	runnable.DataRootDir = cri.DataRootDir
+	runnable.InsecureRegistry = cri.InsecureRegistry
 
 	runtimeBytes, err := json.Marshal(runnable)
 	if err != nil {

@@ -259,7 +259,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
-		c.Status.Status = v1.ClusterStatusUpdating
+		c.Status.Phase = v1.ClusterUpdating
 		if c, err = h.clusterOperator.UpdateCluster(ctx, c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -343,7 +343,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Labels[common.LabelOperationAction] = v1.OperationDeleteCluster
 	if !dryRun {
-		c.Status.Status = v1.ClusterStatusDeleting
+		c.Status.Phase = v1.ClusterTerminating
 		_, err = h.clusterOperator.UpdateCluster(request.Request.Context(), c)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -414,7 +414,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 
 	// TODO: make dry run path to etcd
 	if !dryRun {
-		c.Status.Status = v1.ClusterStatusInstalling
+		c.Status.Phase = v1.ClusterInstalling
 		_, err = h.clusterOperator.CreateCluster(context.TODO(), &c)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -505,7 +505,7 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 		common.LabelOperationAction: v1.OperationUpdateCertification,
 	}
 	op.Status.Status = v1.OperationStatusRunning
-	c.Status.Status = v1.ClusterStatusUpdating
+	c.Status.Phase = v1.ClusterUpdating
 	if !dryRun {
 		op, err = h.opOperator.CreateOperation(ctx, op)
 		if err != nil {
@@ -751,17 +751,17 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
 		ClusterName:   c.Name,
-		Offline:       c.Kubeadm.Offline,
-		LocalRegistry: c.Kubeadm.LocalRegistry,
-		CRI:           c.Kubeadm.ContainerRuntime.Type.String(),
-		KubeVersion:   c.Kubeadm.KubernetesVersion,
+		Offline:       c.Offline(),
+		LocalRegistry: c.LocalRegistry,
+		CRI:           c.ContainerRuntime.Type,
+		KubeVersion:   c.KubernetesVersion,
 	}
-	masters, err := h.getNodeInfo(ctx, c.Kubeadm.Masters)
+	masters, err := h.getNodeInfo(ctx, c.Masters)
 	if err != nil {
 		return nil, err
 	}
 	meta.Masters = append(meta.Masters, masters...)
-	workers, err := h.getNodeInfo(ctx, c.Kubeadm.Workers)
+	workers, err := h.getNodeInfo(ctx, c.Workers)
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +950,12 @@ func (h *handler) doOperation(ctx context.Context, op *v1.Operation, opts *servi
 }
 
 func (h *handler) createClusterCheck(ctx context.Context, c *v1.Cluster) error {
-	if len(c.Kubeadm.Masters) == 0 {
+	if c.Networking.IPFamily == v1.IPFamilyDualStack {
+		if len(c.Networking.Pods.CIDRBlocks) < 2 {
+			return fmt.Errorf("the cluster is enabled in dual-stack mode, requiring both ipv4 and ipv6")
+		}
+	}
+	if len(c.Masters) == 0 {
 		return fmt.Errorf("cluster must have one master node")
 	}
 
@@ -979,7 +984,7 @@ func (h *handler) createClusterCheck(ctx context.Context, c *v1.Cluster) error {
 		freeNodes.Insert(node.Name)
 	}
 	cluNodes := sets.NewString()
-	for _, node := range append(c.Kubeadm.Masters, c.Kubeadm.Workers...) {
+	for _, node := range append(c.Masters, c.Workers...) {
 		cluNodes.Insert(node.ID)
 	}
 
@@ -1092,9 +1097,9 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 
-	if c.Status.Status != v1.ClusterStatusRunning {
+	if c.Status.Phase != v1.ClusterRunning {
 		restplus.HandleInternalError(response, request, fmt.Errorf("cluster %s current is %s, can't back up",
-			c.Name, c.Status.Status))
+			c.Name, c.Status.Phase))
 		return
 	}
 
@@ -1125,14 +1130,14 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 	}
 
 	backup.Name = fmt.Sprintf("%s-%s", backup.Name, clusterName)
-	backup.Status.KubernetesVersion = c.Kubeadm.KubernetesVersion
+	backup.Status.KubernetesVersion = c.KubernetesVersion
 	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
 	// check preferred node in cluster
 	if backup.PreferredNode == "" {
-		backup.PreferredNode = c.Kubeadm.Masters[0].ID
+		backup.PreferredNode = c.Masters[0].ID
 	}
-	if len(c.Kubeadm.Masters.Intersect(v1.WorkerNode{
+	if len(c.Masters.Intersect(v1.WorkerNode{
 		ID: backup.PreferredNode,
 	})) == 0 {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("the node %s not a master node", backup.PreferredNode))
@@ -1162,7 +1167,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = backup.Name
-	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
+	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
 	// add backup
 	backup.Labels = make(map[string]string)
@@ -1190,7 +1195,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			return
 		}
 		// update cluster status to backing_up
-		c.Status.Status = v1.ClusterStatusBackingUp
+		c.Status.Phase = v1.ClusterBackingUp
 		if _, err = h.clusterOperator.UpdateCluster(context.TODO(), c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1241,7 +1246,7 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = b.Name
-	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
+	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
 
 	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
@@ -1427,7 +1432,7 @@ func (h *handler) RetryCluster(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		c.Status.Status = v1.ClusterStatusUpdating
+		c.Status.Phase = v1.ClusterUpdating
 		if _, err = h.clusterOperator.UpdateCluster(context.TODO(), c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1496,10 +1501,12 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 		}
 	}
 
-	switch c.Status.Status {
-	case v1.ClusterStatusRestoring, v1.ClusterStatusBackingUp, v1.ClusterStatusDeleting, v1.ClusterStatusUpdating, v1.ClusterStatusInstalling:
-		restplus.HandleInternalError(response, request, fmt.Errorf("cluster %s current is %s, can't recovery",
-			c.Name, c.Status.Conditions[0].OperationStatus))
+	switch c.Status.Phase {
+	case v1.ClusterRestoring, v1.ClusterBackingUp,
+		v1.ClusterTerminating, v1.ClusterUpdating, v1.ClusterInstalling:
+		restplus.HandleInternalError(response, request,
+			fmt.Errorf("cluster %s current is %s, can't recovery",
+				c.Name, c.Status.ComponentConditions[0].Status))
 		return
 	}
 
@@ -1507,7 +1514,7 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 	oName := uuid.New().String()
 
 	// update cluster status to recovering
-	c.Status.Status = v1.ClusterStatusRestoring
+	c.Status.Phase = v1.ClusterRestoring
 
 	// create operation
 	o := &v1.Operation{}
@@ -1517,7 +1524,7 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 	o.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultRecoveryTimeoutSec)
 	o.Labels[common.LabelClusterName] = c.Name
 	o.Labels[common.LabelRecoveryName] = rName
-	o.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
+	o.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 	o.Status.Status = v1.OperationStatusRunning
 
 	// add recovery
@@ -1602,7 +1609,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		action = v1.ActionUninstall
 		operationAction = v1.OperationUninstallComponents
 	}
-	op, err := h.parseOperationFromComponent(extraMeta, pcs.Components, clu, action)
+	op, err := h.parseOperationFromComponent(extraMeta, pcs.Addons, clu, action)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -1613,7 +1620,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		return
 	}
 	if !dryRun {
-		clu.Status.Status = v1.ClusterStatusUpdating
+		clu.Status.Phase = v1.ClusterUpdating
 		_, err = h.clusterOperator.UpdateCluster(context.TODO(), clu)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -1693,7 +1700,7 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 	extraMeta.KubeVersion = body.Version
 	extraMeta.LocalRegistry = body.LocalRegistry
 	upgradeComp := &k8s.Upgrade{}
-	upgradeComp.InitStepper(extraMeta, clu.Kubeadm)
+	upgradeComp.InitStepper(extraMeta, clu)
 	if err := upgradeComp.Validate(); err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
@@ -1714,7 +1721,7 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 
 	// TODO: make dry run path to etcd
 	if !dryRun {
-		clu.Status.Status = v1.ClusterStatusUpgrading
+		clu.Status.Phase = v1.ClusterUpgrading
 		_, err = h.clusterOperator.UpdateCluster(request.Request.Context(), clu)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -1745,16 +1752,17 @@ func (h *handler) ResetClusterStatus(request *restful.Request, response *restful
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	switch clu.Status.Status {
-	case v1.ClusterStatusUpdateFailed, v1.ClusterStatusInstallFailed,
-		v1.ClusterStatusUpgradeFailed, v1.ClusterStatusDeleteFailed,
-		v1.ClusterStatusUpgrading, v1.ClusterStatusUpdating,
-		v1.ClusterStatusBackingUp, v1.ClusterStatusRestoring, v1.ClusterStatusRestoreFailed:
+	switch clu.Status.Phase {
+	case v1.ClusterInstalling, v1.ClusterInstallFailed,
+		v1.ClusterUpdating, v1.ClusterUpdateFailed,
+		v1.ClusterUpgrading, v1.ClusterUpgradeFailed,
+		v1.ClusterBackingUp, v1.ClusterRestoring, v1.ClusterRestoreFailed,
+		v1.ClusterTerminating, v1.ClusterTerminateFailed:
 		if dryRun {
 			response.WriteHeader(http.StatusOK)
 			return
 		}
-		clu.Status.Status = v1.ClusterStatusRunning
+		clu.Status.Phase = v1.ClusterRunning
 		_, err := h.clusterOperator.UpdateCluster(request.Request.Context(), clu)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -1762,7 +1770,8 @@ func (h *handler) ResetClusterStatus(request *restful.Request, response *restful
 		}
 		response.WriteHeader(http.StatusOK)
 	default:
-		restplus.HandleBadRequest(response, request, fmt.Errorf("not supported reset %s status", clu.Status.Status))
+		restplus.HandleBadRequest(response, request,
+			fmt.Errorf("not supported reset %s status", clu.Status.Phase))
 		return
 	}
 }

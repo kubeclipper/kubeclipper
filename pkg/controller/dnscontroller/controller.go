@@ -157,7 +157,7 @@ func (r *DNSReconciler) syncConfigMap(ctx context.Context, log logger.Logging) e
 			return fmt.Errorf("get coredns svc failed: %s", err.Error())
 		}
 		domains := m[clu.Name]
-		corefile, err := renderCorefile(domains, svc.Spec.ClusterIP, clu.Kubeadm.Networking.DNSDomain)
+		corefile, err := renderCorefile(domains, svc.Spec.ClusterIP, clu.Networking.DNSDomain)
 		if err != nil {
 			return fmt.Errorf("failed to render corefile: %s", err.Error())
 		}

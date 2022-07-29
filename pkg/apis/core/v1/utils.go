@@ -48,14 +48,14 @@ func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepActio
 	switch c.Type {
 	case v1.CRIDocker:
 		r := cri.DockerRunnable{}
-		err := r.InitStep(ctx, &c.Docker, nodes)
+		err := r.InitStep(ctx, c, nodes)
 		if err != nil {
 			return nil, err
 		}
 		return r.GetActionSteps(action), nil
 	case v1.CRIContainerd:
 		r := cri.ContainerdRunnable{}
-		err := r.InitStep(ctx, &c.Containerd, nodes)
+		err := r.InitStep(ctx, c, nodes)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +65,7 @@ func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepActio
 }
 
 func getK8sSteps(ctx context.Context, c *v1.Cluster, action v1.StepAction) ([]v1.Step, error) {
-	runnable := k8s.KubeadmRunnable(*c.Kubeadm)
+	runnable := k8s.Runnable(*c)
 
 	return runnable.GetStep(ctx, action)
 }
@@ -101,7 +101,7 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	// Container runtime should be installed on all nodes.
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
 	stepNodes := utils.UnwrapNodeList(extraMetadata.GetAllNodes())
-	cSteps, err := getCriStep(ctx, &c.Kubeadm.ContainerRuntime, action, stepNodes)
+	cSteps, err := getCriStep(ctx, &c.ContainerRuntime, action, stepNodes)
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +112,13 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 		return nil, err
 	}
 
-	carr := make([]v1.Component, len(c.Kubeadm.Components))
+	carr := make([]v1.Addon, len(c.Addons))
 	if action == v1.ActionUninstall {
 		// do not need to delete the component logic when deleting a cluster, set carr nil
 		// reverse order of the components
 		// reverseComponents(carr)
 	} else {
-		copy(carr, c.Kubeadm.Components)
+		copy(carr, c.Addons)
 		steps = append(steps, cSteps...)
 		steps = append(steps, k8sSteps...)
 	}
@@ -217,13 +217,13 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 	meta := component.ExtraMetadata{
 		ClusterName: c.Name,
 	}
-	for _, node := range c.Kubeadm.Masters.GetNodeIDs() {
+	for _, node := range c.Masters.GetNodeIDs() {
 		meta.Masters = append(meta.Masters, component.Node{ID: node})
 	}
 	ctx := component.WithExtraMetadata(context.TODO(), meta)
 
 	f := k8s.FileDir{
-		EtcdDataDir:    c.Kubeadm.KubeComponents.Etcd.DataDir,
+		EtcdDataDir:    c.Etcd.DataDir,
 		ManifestsYaml:  k8s.KubeManifestsDir,
 		TmpEtcdDataDir: filepath.Join(restoreDir, "etcd"),
 		TmpStaticYaml:  filepath.Join(restoreDir, "manifests"),
@@ -263,7 +263,7 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 }
 
 // parseOperationFromComponent parse operation instance from component
-func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMetadata, components []v1.Component, c *v1.Cluster, action v1.StepAction) (*v1.Operation, error) {
+func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMetadata, addons []v1.Addon, c *v1.Cluster, action v1.StepAction) (*v1.Operation, error) {
 	var steps []v1.Step
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -273,7 +273,7 @@ func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMeta
 	}
 	// with extra meta data
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
-	for _, comp := range components {
+	for _, comp := range addons {
 		cInterface, ok := component.Load(fmt.Sprintf(component.RegisterFormat, comp.Name, comp.Version))
 		if !ok {
 			continue

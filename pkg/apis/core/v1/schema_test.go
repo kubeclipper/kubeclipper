@@ -40,47 +40,45 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "demo",
 		},
-		Kubeadm: &v1.Kubeadm{
-			Masters: v1.WorkerNodeList{
-				{
-					ID: "1e3ea00f-1403-46e5-a486-70e4cb29d541",
-				},
-				{
-					ID: "43ed594a-a76f-4370-a14d-551e7b6153de",
-				},
-				{
-					ID: "c7a91d86-cd53-4c3f-85b0-fbc657778067",
-				},
+
+		Masters: v1.WorkerNodeList{
+			{
+				ID: "1e3ea00f-1403-46e5-a486-70e4cb29d541",
 			},
-			Workers: v1.WorkerNodeList{
-				{
-					ID: "4cf1ad74-704c-4290-a523-e524e930245d",
-				},
-				{
-					ID: "ae4ba282-27f9-4a93-8fe9-63f786781d48",
-				},
+			{
+				ID: "43ed594a-a76f-4370-a14d-551e7b6153de",
 			},
-			ContainerRuntime: v1.ContainerRuntime{
-				Type: "docker",
-				Docker: v1.Docker{
-					Version:          "19.03.12",
-					DataRootDir:      "/var/lib/docker",
-					InsecureRegistry: nil,
-				},
-				Containerd: v1.Containerd{},
+			{
+				ID: "c7a91d86-cd53-4c3f-85b0-fbc657778067",
 			},
-			Components: components,
-			KubeComponents: v1.KubeComponents{
-				KubeProxy: v1.KubeProxy{},
-				Etcd:      v1.Etcd{},
-				CNI: v1.CNI{
-					LocalRegistry: "172.20.150.138:5000",
-					Type:          "calico",
-					PodIPv4CIDR:   "",
-					PodIPv6CIDR:   "",
-					MTU:           0,
-					Calico:        v1.Calico{},
-				},
+		},
+		Workers: v1.WorkerNodeList{
+			{
+				ID: "4cf1ad74-704c-4290-a523-e524e930245d",
+			},
+			{
+				ID: "ae4ba282-27f9-4a93-8fe9-63f786781d48",
+			},
+		},
+		ContainerRuntime: v1.ContainerRuntime{
+			Type:             "docker",
+			Version:          "19.03.12",
+			DataRootDir:      "/var/lib/docker",
+			InsecureRegistry: nil,
+		},
+		Addons:    addons,
+		KubeProxy: v1.KubeProxy{},
+		Etcd:      v1.Etcd{},
+		CNI: v1.CNI{
+			LocalRegistry: "172.20.150.138:5000",
+			Type:          "calico",
+			Version:       "v3.21.2",
+			Calico: &v1.Calico{
+				IPv4AutoDetection: "first-found",
+				IPv6AutoDetection: "first-found",
+				Mode:              "Overlay-Vxlan-All",
+				IPManger:          true,
+				MTU:               1440,
 			},
 		},
 	}
@@ -103,7 +101,7 @@ var (
 			ID: "ae4ba282-27f9-4a93-8fe9-63f786781d48",
 		},
 	}
-	components = []v1.Component{
+	addons = []v1.Addon{
 		{
 			Name:    "nfs-provisioner",
 			Version: "v1",
@@ -276,7 +274,7 @@ func Test_checkComponents(t *testing.T) {
 				cluster: c2,
 				pc: &PatchComponents{
 					Uninstall: true,
-					Components: []v1.Component{
+					Addons: []v1.Addon{
 						{
 							Name:    "nfs-provisioner",
 							Version: "v1",
@@ -292,7 +290,7 @@ func Test_checkComponents(t *testing.T) {
 				cluster: c2,
 				pc: &PatchComponents{
 					Uninstall: false,
-					Components: []v1.Component{
+					Addons: []v1.Addon{
 						{
 							Name:    "nfs-provisioner",
 							Version: "v1",
@@ -308,7 +306,7 @@ func Test_checkComponents(t *testing.T) {
 				cluster: c2,
 				pc: &PatchComponents{
 					Uninstall: false,
-					Components: []v1.Component{
+					Addons: []v1.Addon{
 						{
 							Name:    "testComponent",
 							Version: "v1",
@@ -336,7 +334,7 @@ func Test_addOrRemoveComponentFromCluster(t *testing.T) {
 	tests := []struct {
 		name string
 		arg  args
-		want []v1.Component
+		want []v1.Addon
 	}{
 		{
 			name: "test uninstall component",
@@ -344,7 +342,7 @@ func Test_addOrRemoveComponentFromCluster(t *testing.T) {
 				cluster: c2,
 				pc: &PatchComponents{
 					Uninstall: true,
-					Components: []v1.Component{
+					Addons: []v1.Addon{
 						{
 							Name:    "nfs-provisioner",
 							Version: "v1",
@@ -355,7 +353,7 @@ func Test_addOrRemoveComponentFromCluster(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.Component{},
+			want: []v1.Addon{},
 		},
 		{
 			name: "test install component",
@@ -363,7 +361,7 @@ func Test_addOrRemoveComponentFromCluster(t *testing.T) {
 				cluster: c2,
 				pc: &PatchComponents{
 					Uninstall: false,
-					Components: []v1.Component{
+					Addons: []v1.Addon{
 						{
 							Name:    "testComponent",
 							Version: "v1",
@@ -374,7 +372,7 @@ func Test_addOrRemoveComponentFromCluster(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.Component{
+			want: []v1.Addon{
 				{
 					Name:    "testComponent",
 					Version: "v1",
@@ -389,8 +387,8 @@ func Test_addOrRemoveComponentFromCluster(t *testing.T) {
 			if err != nil {
 				t.Errorf("addOrRemoveComponentFromCluster() error: %v", err)
 			}
-			if !reflect.DeepEqual(got.Kubeadm.Components, test.want) {
-				t.Errorf(" addOrRemoveComponentFromCluster() error: got %v, want %v", got.Kubeadm.Components, test.want)
+			if !reflect.DeepEqual(got.Addons, test.want) {
+				t.Errorf(" addOrRemoveComponentFromCluster() error: got %v, want %v", got.Addons, test.want)
 			}
 		})
 	}

@@ -162,25 +162,30 @@ func newRequestCreateCluster(masters, workers []string, registry, vip, svcSubnet
 	body := &v1.Cluster{
 		TypeMeta:   metav1.TypeMeta{Kind: "Cluster", APIVersion: "core.kubeclipper.io/v1"},
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("demo-create-cluster-%s", uuid.New().String()[:8])},
-		Kubeadm: &v1.Kubeadm{
-			Masters:           mNodes,
-			Workers:           nNodes,
-			KubernetesVersion: "v1.20.13",
-			CertSANs:          []string{},
-			LocalRegistry:     registry,
-			ContainerRuntime: v1.ContainerRuntime{Type: "docker",
-				Docker: v1.Docker{Version: "19.03.12", DataRootDir: "", InsecureRegistry: []string{registry}}},
-			Networking: v1.Networking{ServiceSubnet: svcSubnet, PodSubnet: podSubnet, DNSDomain: "cluster.local"},
-			KubeComponents: v1.KubeComponents{
-				KubeProxy: v1.KubeProxy{IPvs: true},
-				Etcd:      v1.Etcd{},
-				CNI: v1.CNI{LocalRegistry: registry, Type: "calico", PodIPv4CIDR: podSubnet, PodIPv6CIDR: "", MTU: 1440,
-					Calico: v1.Calico{IPv4AutoDetection: "first-found", IPv6AutoDetection: "first-found",
-						Mode: "Overlay-Vxlan-All", DualStack: false, IPManger: true, Version: "v3.11.2"}},
-			},
-			Components:    []v1.Component{},
+
+		Masters:           mNodes,
+		Workers:           nNodes,
+		KubernetesVersion: "v1.20.13",
+		CertSANs:          []string{},
+		LocalRegistry:     registry,
+		ContainerRuntime: v1.ContainerRuntime{Type: "docker",
+			Version: "19.03.12", DataRootDir: "", InsecureRegistry: []string{registry}},
+		Networking: v1.Networking{
+			IPFamily:      v1.IPFamilyIPv4,
+			Services:      v1.NetworkRanges{CIDRBlocks: []string{svcSubnet}},
+			Pods:          v1.NetworkRanges{CIDRBlocks: []string{podSubnet}},
+			DNSDomain:     "cluster.local",
+			ProxyMode:     "ipvs",
 			WorkerNodeVip: vip,
 		},
+
+		KubeProxy: v1.KubeProxy{},
+		Etcd:      v1.Etcd{DataDir: "/var/lib/etcd"},
+		CNI: v1.CNI{LocalRegistry: registry, Type: "calico", Version: "v3.11.2",
+			Calico: &v1.Calico{IPv4AutoDetection: "first-found", IPv6AutoDetection: "first-found",
+				Mode: "Overlay-Vxlan-All", IPManger: true, MTU: 1440}},
+
+		Addons: []v1.Addon{},
 	}
 	cBytes, err := json.Marshal(body)
 	framework.ExpectNoError(err, "failed to marshal origin create cluster data struct")

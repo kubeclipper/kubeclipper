@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -69,28 +68,28 @@ func RunCmdWithContext(ctx context.Context, dryRun bool, command string, args ..
 	}
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	// set Setpgid=true to create new process group.
-	ec.Cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	// kill all child process after context is done.
-	go func() {
-		select {
-		case <-ctx.Done():
-			// Send signal iff the process is in execution state
-			if ec.Cmd.Process == nil {
-				logger.Debug("the current command is not running", zap.String("cmd", ec.String()))
-				return
-			}
-			// If pid is less than -1, then sig is sent to every process in the process group whose ID is -pid.
-			// https://man7.org/linux/man-pages/man2/kill.2.html
-			err = syscall.Kill(-ec.Cmd.Process.Pid, syscall.SIGKILL)
-			if err != nil {
-				logger.Error("kill child process error", zap.String("cmd", ec.String()))
-				return
-			}
-			logger.Debug("run command timeout,killed all child process", zap.String("cmd", ec.String()))
-		case <-doneCh:
-		}
-	}()
+	//// set Setpgid=true to create new process group.
+	//ec.Cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	//// kill all child process after context is done.
+	//go func() {
+	//	select {
+	//	case <-ctx.Done():
+	//		// Send signal iff the process is in execution state
+	//		if ec.Cmd.Process == nil {
+	//			logger.Debug("the current command is not running", zap.String("cmd", ec.String()))
+	//			return
+	//		}
+	//		// If pid is less than -1, then sig is sent to every process in the process group whose ID is -pid.
+	//		// https://man7.org/linux/man-pages/man2/kill.2.html
+	//		err = syscall.Kill(-ec.Cmd.Process.Pid, syscall.SIGKILL)
+	//		if err != nil {
+	//			logger.Error("kill child process error", zap.String("cmd", ec.String()))
+	//			return
+	//		}
+	//		logger.Debug("run command timeout,killed all child process", zap.String("cmd", ec.String()))
+	//	case <-doneCh:
+	//	}
+	//}()
 	if err = ec.Run(); err != nil {
 		logger.Error("run command failed: "+err.Error(), zap.String("cmd", ec.String()))
 		return ec, err

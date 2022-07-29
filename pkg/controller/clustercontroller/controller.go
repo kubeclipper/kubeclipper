@@ -135,14 +135,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{}, r.syncClusterClient(ctx, log, clu)
 }
 
-func (r *ClusterReconciler) updateClusterNode(ctx context.Context, clu *v1.Cluster, del bool) error {
-	for _, item := range clu.Kubeadm.Workers {
-		if err := r.updateNodeRoleLabel(ctx, clu.Name, item.ID, common.NodeRoleWorker, del); err != nil {
+func (r *ClusterReconciler) updateClusterNode(ctx context.Context, c *v1.Cluster, del bool) error {
+	for _, item := range c.Workers {
+		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleWorker, del); err != nil {
 			return err
 		}
 	}
-	for _, item := range clu.Kubeadm.Masters {
-		if err := r.updateNodeRoleLabel(ctx, clu.Name, item.ID, common.NodeRoleMaster, del); err != nil {
+	for _, item := range c.Masters {
+		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleMaster, del); err != nil {
 			return err
 		}
 	}
@@ -183,23 +183,25 @@ func (r *ClusterReconciler) updateNodeRoleLabel(ctx context.Context, clusterName
 	return nil
 }
 
-func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Logging, clu *v1.Cluster) error {
-	if clu.Status.Status == v1.ClusterStatusInstalling || clu.Status.Status == v1.ClusterStatusInstallFailed {
+func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Logging, c *v1.Cluster) error {
+	if c.Status.Phase == v1.ClusterInstalling || c.Status.Phase == v1.ClusterInstallFailed {
 		return nil
 	}
 
-	node, err := r.NodeLister.Get(clu.Kubeadm.Masters[0].ID)
+	node, err := r.NodeLister.Get(c.Masters[0].ID)
 	if err != nil {
-		log.Error("get master node error", zap.String("node", clu.Kubeadm.Masters[0].ID), zap.String("cluster", clu.Name))
+		log.Error("get master node error",
+			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name))
 		return err
 	}
 
-	if _, exist := r.mgr.GetClusterClientSet(clu.Name); exist && clu.KubeConfig != nil {
+	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil {
 		log.Debug("clientset has been init")
 		return nil
 	}
 
-	token, err := r.CmdDelivery.DeliverCmd(ctx, clu.Kubeadm.Masters[0].ID, []string{"/bin/bash", "-c", `kubectl get secret $(kubectl get sa kc-server -n kube-system -o jsonpath={.secrets[0].name}) -n kube-system -o jsonpath={.data.token} | base64 -d`}, 3*time.Second)
+	token, err := r.CmdDelivery.DeliverCmd(ctx, c.Masters[0].ID,
+		[]string{"/bin/bash", "-c", `kubectl get secret $(kubectl get sa kc-server -n kube-system -o jsonpath={.secrets[0].name}) -n kube-system -o jsonpath={.data.token} | base64 -d`}, 3*time.Second)
 	if err != nil {
 		log.Error("get cluster service account token error", zap.Error(err))
 		return err
@@ -213,29 +215,31 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	//	logger.Error("get cluster service account token error", zap.String("cluster", name), zap.Error(err))
 	//	return err
 	// }
-	kubeconfig := getKubeConfig(clu.Name, fmt.Sprintf("https://%s:6443", node.Status.Ipv4DefaultIP), "kc-server", string(token))
-	clu.KubeConfig = []byte(kubeconfig)
-	_, err = r.ClusterWriter.UpdateCluster(ctx, clu)
+	kubeconfig := getKubeConfig(c.Name,
+		fmt.Sprintf("https://%s:6443", node.Status.Ipv4DefaultIP), "kc-server", string(token))
+	c.KubeConfig = []byte(kubeconfig)
+	_, err = r.ClusterWriter.UpdateCluster(ctx, c)
 	if err != nil {
-		log.Error("update kube config failed", zap.String("cluster", clu.Name), zap.Error(err))
+		log.Error("update kube config failed", zap.String("cluster", c.Name), zap.Error(err))
 		return err
 	}
 	clientConfig, err := clientcmd.NewClientConfigFromBytes([]byte(kubeconfig))
 	if err != nil {
-		log.Error("create cluster client config failed", zap.String("cluster", clu.Name), zap.Error(err))
+		log.Error("create cluster client config failed", zap.String("cluster", c.Name), zap.Error(err))
 		return err
 	}
 	clientcfg, err := clientConfig.ClientConfig()
 	if err != nil {
-		log.Error("get cluster kubeconfig client failed", zap.String("cluster", clu.Name), zap.Error(err))
+		log.Error("get cluster kubeconfig client failed",
+			zap.String("cluster", c.Name), zap.Error(err))
 		return err
 	}
 	clientset, err := kubernetes.NewForConfig(clientcfg)
 	if err != nil {
-		log.Error("create cluster clientset failed", zap.String("cluster", clu.Name), zap.Error(err))
+		log.Error("create cluster clientset failed", zap.String("cluster", c.Name), zap.Error(err))
 		return err
 	}
-	r.mgr.AddClusterClientSet(clu.Name, client.NewKubernetesClient(clientcfg, clientset))
+	r.mgr.AddClusterClientSet(c.Name, client.NewKubernetesClient(clientcfg, clientset))
 	return nil
 }
 

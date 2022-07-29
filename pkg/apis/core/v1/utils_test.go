@@ -41,67 +41,62 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "demo",
 		},
-		Kubeadm: &v1.Kubeadm{
-			Masters: v1.WorkerNodeList{
-				{
-					ID:     "1e3ea00f-1403-46e5-a486-70e4cb29d541",
-					Labels: map[string]string{common.LabelNodeRole: "master"},
-				},
-				{
-					ID:     "43ed594a-a76f-4370-a14d-551e7b6153de",
-					Labels: map[string]string{common.LabelNodeRole: "master"},
-				},
-				{
-					ID:     "c7a91d86-cd53-4c3f-85b0-fbc657778067",
-					Labels: map[string]string{common.LabelNodeRole: "master"},
-				},
+
+		Masters: v1.WorkerNodeList{
+			{
+				ID:     "1e3ea00f-1403-46e5-a486-70e4cb29d541",
+				Labels: map[string]string{common.LabelNodeRole: "master"},
 			},
-			Workers: v1.WorkerNodeList{
-				{
-					ID: "4cf1ad74-704c-4290-a523-e524e930245d",
-				},
-				{
-					ID: "ae4ba282-27f9-4a93-8fe9-63f786781d48",
-				},
+			{
+				ID:     "43ed594a-a76f-4370-a14d-551e7b6153de",
+				Labels: map[string]string{common.LabelNodeRole: "master"},
 			},
-			KubernetesVersion: "v1.18.6",
-			// ControlPlaneEndpoint: "172.18.94.114:6443",
-			CertSANs:      nil,
+			{
+				ID:     "c7a91d86-cd53-4c3f-85b0-fbc657778067",
+				Labels: map[string]string{common.LabelNodeRole: "master"},
+			},
+		},
+		Workers: v1.WorkerNodeList{
+			{
+				ID: "4cf1ad74-704c-4290-a523-e524e930245d",
+			},
+			{
+				ID: "ae4ba282-27f9-4a93-8fe9-63f786781d48",
+			},
+		},
+		KubernetesVersion: "v1.18.6",
+		// ControlPlaneEndpoint: "172.18.94.114:6443",
+		CertSANs:      nil,
+		LocalRegistry: "172.18.94.144:5000",
+		ContainerRuntime: v1.ContainerRuntime{
+			Type:             v1.CRIDocker,
+			Version:          "19.03.12",
+			DataRootDir:      "/var/lib/docker",
+			InsecureRegistry: []string{"172.18.94.144:5000"},
+		},
+		Networking: v1.Networking{
+			IPFamily:      v1.IPFamilyIPv4,
+			Services:      v1.NetworkRanges{CIDRBlocks: []string{"10.96.0.0/16"}},
+			Pods:          v1.NetworkRanges{CIDRBlocks: []string{"172.25.0.0/24"}},
+			DNSDomain:     "cluster.local",
+			ProxyMode:     "ipvs",
+			WorkerNodeVip: "169.254.169.100",
+		},
+
+		KubeProxy: v1.KubeProxy{},
+		Etcd: v1.Etcd{
+			DataDir: "/var/lib/etcd",
+		},
+		CNI: v1.CNI{
 			LocalRegistry: "172.18.94.144:5000",
-			ContainerRuntime: v1.ContainerRuntime{
-				Type: v1.CRIDocker,
-				Docker: v1.Docker{
-					Version:          "19.03.12",
-					InsecureRegistry: []string{"172.18.94.144:5000"},
-				},
-			},
-			Networking: v1.Networking{
-				ServiceSubnet: "10.96.0.0/16",
-				PodSubnet:     "172.25.0.0/24",
-				DNSDomain:     "cluster.local",
-			},
-			KubeComponents: v1.KubeComponents{
-				KubeProxy: v1.KubeProxy{
-					IPvs: true,
-				},
-				Etcd: v1.Etcd{
-					DataDir: "/var/lib/etcd",
-				},
-				CNI: v1.CNI{
-					LocalRegistry: "172.18.94.144:5000",
-					Type:          "calico",
-					PodIPv4CIDR:   "172.25.0.0/24",
-					PodIPv6CIDR:   "",
-					MTU:           1440,
-					Calico: v1.Calico{
-						IPv4AutoDetection: "first-found",
-						IPv6AutoDetection: "first-found",
-						Mode:              "Overlay-Vxlan-All",
-						DualStack:         false,
-						IPManger:          true,
-						Version:           "v3.11.2",
-					},
-				},
+			Type:          "calico",
+			Version:       "v3.11.2",
+			Calico: &v1.Calico{
+				IPv4AutoDetection: "first-found",
+				IPv6AutoDetection: "first-found",
+				Mode:              "Overlay-Vxlan-All",
+				IPManger:          true,
+				MTU:               1440,
 			},
 		},
 	}
@@ -195,7 +190,7 @@ func Test_parseOperationFromComponent(t *testing.T) {
 		action     v1.StepAction
 		meta       *component.ExtraMetadata
 		cluster    *v1.Cluster
-		components []v1.Component
+		components []v1.Addon
 	}
 	h := newHandler(nil, nil, nil, nil, nil)
 	nfs := nfsprovisioner.NFSProvisioner{
@@ -211,7 +206,7 @@ func Test_parseOperationFromComponent(t *testing.T) {
 		MountOptions:     nil,
 	}
 	nfsByte, _ := json.Marshal(nfs)
-	com := []v1.Component{
+	com := []v1.Addon{
 		{
 			Name:    "nfs-provisioner",
 			Version: "v1",

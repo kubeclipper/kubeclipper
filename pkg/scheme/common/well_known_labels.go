@@ -80,4 +80,5 @@ const (
 	// eg: name
 	AnnotationDisplayName = "kubeclipper.io/display-name"
 	AnnotationDescription = "kubeclipper.io/description"
+	AnnotationOffline     = "kubeclipper.io/offline"
 )
