@@ -223,9 +223,9 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
-	if c.Status.Status != v1.ClusterStatusRunning {
-		log.Warnf("the cluster is %v, create backup in next reconcile", c.Status.Status)
-		return fmt.Errorf("the cluster is %v, create backup in next reconcile", c.Status.Status)
+	if c.Status.Phase != v1.ClusterRunning {
+		log.Warnf("the cluster is %v, create backup in next reconcile", c.Status.Phase)
+		return nil
 	}
 
 	randNum := rand.String(5)
@@ -256,14 +256,14 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
-	backup.Status.KubernetesVersion = c.Kubeadm.KubernetesVersion
+	backup.Status.KubernetesVersion = c.KubernetesVersion
 	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
 	// check preferred node in cluster
 	if backup.PreferredNode == "" {
-		backup.PreferredNode = c.Kubeadm.Masters[0].ID
+		backup.PreferredNode = c.Masters[0].ID
 	}
-	if len(c.Kubeadm.Masters.Intersect(v1.WorkerNode{
+	if len(c.Masters.Intersect(v1.WorkerNode{
 		ID: backup.PreferredNode,
 	})) == 0 {
 		log.Errorf("the node %s not a master node", backup.PreferredNode)
@@ -290,7 +290,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	}
 
 	// update cluster status to backing_up
-	c.Status.Status = v1.ClusterStatusBackingUp
+	c.Status.Phase = v1.ClusterBackingUp
 
 	// create operation
 	op := &v1.Operation{}
@@ -300,7 +300,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = backup.Name
-	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
+	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
 	// add backup
 	backup.Labels = make(map[string]string)
@@ -445,7 +445,7 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = b.Name
-	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
+	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
 
 	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
