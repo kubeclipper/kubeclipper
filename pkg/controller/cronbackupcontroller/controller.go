@@ -70,98 +70,114 @@ type CronBackupReconciler struct {
 
 func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.FromContext(ctx)
-	cronBackups, err := r.CronBackupLister.List(labels.Everything())
+	cronBackup, err := r.CronBackupLister.Get(req.Name)
 	if err != nil {
-		log.Error("Failed to list cronBackups", zap.Error(err))
+		// cronBackup not found, possibly been deleted
+		// need to do the cleanup
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		log.Error("Failed to get cronBackup with name", zap.Error(err))
 		return ctrl.Result{}, err
 	}
 
-	for _, cronBackup := range cronBackups {
-		_, cErr := r.ClusterLister.Get(cronBackup.Spec.ClusterName)
-		if cErr != nil && !errors.IsNotFound(cErr) {
-			log.Warn("unexpected error, cronBackup should always has a cluster name label")
-			return ctrl.Result{}, cErr
-		}
+	_, cErr := r.ClusterLister.Get(cronBackup.Spec.ClusterName)
+	if cErr != nil && !errors.IsNotFound(cErr) {
+		log.Error("unexpected error, cronBackups require a cluster to be specified")
+		return ctrl.Result{}, cErr
+	}
 
-		if _, ok := cronBackup.Labels[common.LabelCronBackupDisable]; ok {
-			continue
-		}
+	if _, ok := cronBackup.Labels[common.LabelCronBackupDisable]; ok {
+		return ctrl.Result{}, nil
+	}
 
-		if cronBackup.Spec.RunAt != nil {
-			// the disposable cronBackup is done
-			if cronBackup.Status.LastSuccessfulTime == nil {
-				if time.Now().After(cronBackup.Spec.RunAt.Time) {
-					// delivery the create backup operation
-					err = r.createBackup(log, cronBackup)
-					if err != nil {
-						log.Error("Failed to delivery operation to create backup", zap.Error(err))
-						return ctrl.Result{}, err
-					}
-					cronBackup.Status.LastScheduleTime = cronBackup.Status.NextScheduleTime
-					cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
-					_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
-					if err != nil {
-						log.Error("Failed to update cronBackup", zap.Error(err))
-					}
-				}
-			}
-		}
-
-		if cronBackup.Spec.Schedule != "" {
-			// time to create backup
-			if after := time.Now().After(cronBackup.Status.NextScheduleTime.Time); after {
-				now := metav1.NewTime(time.Now())
+	now := metav1.NewTime(time.Now())
+	if cronBackup.Spec.RunAt != nil {
+		if cronBackup.Status.LastSuccessfulTime == nil {
+			if now.After(cronBackup.Spec.RunAt.Time) {
 				// delivery the create backup operation
 				err = r.createBackup(log, cronBackup)
 				if err != nil {
-					cronBackup.Status.LastScheduleTime = &now
 					log.Error("Failed to delivery operation to create backup", zap.Error(err))
-				} else {
-					cronBackup.Status.LastScheduleTime = &now
-					cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
+					return ctrl.Result{}, err
 				}
-				s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cronBackup.Spec.Schedule)
-				// update the next schedule time
-				nextRunAt := metav1.NewTime(s.Next(now.Time))
-				cronBackup.Status.NextScheduleTime = &nextRunAt
+				cronBackup.Status.LastScheduleTime = cronBackup.Status.NextScheduleTime
+				cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
+				_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
+				if err != nil {
+					log.Error("Failed to update cronBackup", zap.Error(err))
+				}
+				return ctrl.Result{}, nil
+			}
+			sub := cronBackup.Spec.RunAt.Sub(now.Time)
+			return ctrl.Result{
+				RequeueAfter: sub,
+			}, nil
+		}
+	}
+
+	if cronBackup.Spec.Schedule != "" {
+		// time to create backup
+		if after := now.After(cronBackup.Status.NextScheduleTime.Time); after {
+			// delivery the create backup operation
+			err = r.createBackup(log, cronBackup)
+			if err != nil {
+				cronBackup.Status.LastScheduleTime = &now
+				log.Error("Failed to delivery operation to create backup", zap.Error(err))
 				// update cronBackup
 				_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
 				if err != nil {
 					log.Error("Failed to update cronBackup", zap.Error(err))
 				}
+				return ctrl.Result{}, err
 			}
-		}
+			cronBackup.Status.LastScheduleTime = &now
+			cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
+			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cronBackup.Spec.Schedule)
+			// update the next schedule time
+			nextRunAt := metav1.NewTime(s.Next(now.Time))
+			cronBackup.Status.NextScheduleTime = &nextRunAt
+			// update cronBackup
+			_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
+			if err != nil {
+				log.Error("Failed to update cronBackup", zap.Error(err))
+			}
 
-		// keep the backup num within the maxNum
-		backupList, err := r.BackupLister.List(labels.Everything())
-		if err != nil {
-			log.Error("Failed to list backups of the cronBackup", zap.Error(err))
-			return ctrl.Result{}, err
-		}
-		backupsByCb := GroupBackupsByParent(backupList)
-		if len(backupsByCb[cronBackup.UID]) > cronBackup.Spec.MaxBackupNum {
-			// sort the backups by creation time
-			sort.Slice(backupsByCb[cronBackup.UID], func(i, j int) bool {
-				return backupsByCb[cronBackup.UID][i].CreationTimestamp.Time.Before(backupsByCb[cronBackup.UID][j].CreationTimestamp.Time)
-			})
-			sub := len(backupsByCb[cronBackup.UID]) - cronBackup.Spec.MaxBackupNum
-			for del := 0; del < sub; del++ {
-				if backupsByCb[cronBackup.UID][del].Status.ClusterBackupStatus != v1.ClusterBackupAvailable {
-					continue
-				}
-				err = r.BackupWriter.DeleteBackup(ctx, backupsByCb[cronBackup.UID][del].Name)
-				if err != nil {
-					log.Error("Failed to delete backup", zap.Error(err))
-					return ctrl.Result{}, err
-				}
-				// delivery the create backup operation
-				err = r.deleteBackup(log, backupsByCb[cronBackup.UID][del].Labels[common.LabelClusterName], backupsByCb[cronBackup.UID][del])
-				if err != nil {
-					log.Error("Failed to delivery operation to delete backup", zap.Error(err))
-					return ctrl.Result{}, err
+			// keep the backup num within the maxNum
+			backupList, err := r.BackupLister.List(labels.Everything())
+			if err != nil {
+				log.Error("Failed to list backups of the cronBackup", zap.Error(err))
+				return ctrl.Result{}, err
+			}
+			backupsByCb := GroupBackupsByParent(backupList)
+			if len(backupsByCb[cronBackup.UID]) > cronBackup.Spec.MaxBackupNum {
+				// sort the backups by creation time
+				sort.Slice(backupsByCb[cronBackup.UID], func(i, j int) bool {
+					return backupsByCb[cronBackup.UID][i].CreationTimestamp.Time.Before(backupsByCb[cronBackup.UID][j].CreationTimestamp.Time)
+				})
+				sub := len(backupsByCb[cronBackup.UID]) - cronBackup.Spec.MaxBackupNum
+				for del := 0; del < sub; del++ {
+					if backupsByCb[cronBackup.UID][del].Status.ClusterBackupStatus != v1.ClusterBackupAvailable {
+						continue
+					}
+					err = r.BackupWriter.DeleteBackup(ctx, backupsByCb[cronBackup.UID][del].Name)
+					if err != nil {
+						log.Error("Failed to delete backup", zap.Error(err))
+						return ctrl.Result{}, err
+					}
+					// delivery the create backup operation
+					err = r.deleteBackup(log, backupsByCb[cronBackup.UID][del].Labels[common.LabelClusterName], backupsByCb[cronBackup.UID][del])
+					if err != nil {
+						log.Error("Failed to delivery operation to delete backup", zap.Error(err))
+						return ctrl.Result{}, err
+					}
 				}
 			}
 		}
+		sub := cronBackup.Status.NextScheduleTime.Sub(now.Time)
+		return ctrl.Result{
+			RequeueAfter: sub,
+		}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -188,8 +204,8 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	trueVar := true
 	rfs := []metav1.OwnerReference{
 		{
-			APIVersion: cronBackup.APIVersion,
-			Kind:       cronBackup.Kind,
+			APIVersion: "core.kubeclipper.io/v1",
+			Kind:       "CronBackup",
 			Name:       cronBackup.Name,
 			UID:        cronBackup.UID,
 			Controller: &trueVar,
@@ -207,9 +223,9 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
-	if c.Status.Phase != v1.ClusterRunning {
-		log.Warnf("the cluster is %v, create backup in next reconcile", c.Status.Phase)
-		return nil
+	if c.Status.Status != v1.ClusterStatusRunning {
+		log.Warnf("the cluster is %v, create backup in next reconcile", c.Status.Status)
+		return fmt.Errorf("the cluster is %v, create backup in next reconcile", c.Status.Status)
 	}
 
 	randNum := rand.String(5)
@@ -240,14 +256,14 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
-	backup.Status.KubernetesVersion = c.KubernetesVersion
+	backup.Status.KubernetesVersion = c.Kubeadm.KubernetesVersion
 	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
 	// check preferred node in cluster
 	if backup.PreferredNode == "" {
-		backup.PreferredNode = c.Masters[0].ID
+		backup.PreferredNode = c.Kubeadm.Masters[0].ID
 	}
-	if len(c.Masters.Intersect(v1.WorkerNode{
+	if len(c.Kubeadm.Masters.Intersect(v1.WorkerNode{
 		ID: backup.PreferredNode,
 	})) == 0 {
 		log.Errorf("the node %s not a master node", backup.PreferredNode)
@@ -274,7 +290,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	}
 
 	// update cluster status to backing_up
-	c.Status.Phase = v1.ClusterBackingUp
+	c.Status.Status = v1.ClusterStatusBackingUp
 
 	// create operation
 	op := &v1.Operation{}
@@ -284,7 +300,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = backup.Name
-	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
+	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
 	// add backup
 	backup.Labels = make(map[string]string)
@@ -345,7 +361,6 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		log.Error("Failed to update cluster", zap.Error(err))
 		return err
 	}
-
 	// delivery the create backup operation
 	go func() {
 		err = r.CmdDelivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
@@ -430,7 +445,7 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = b.Name
-	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
+	op.Labels[common.LabelTopologyRegion] = c.Kubeadm.Masters[0].Labels[common.LabelTopologyRegion]
 	op.Status.Status = v1.OperationStatusRunning
 
 	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
