@@ -188,7 +188,7 @@ func NewRegistryOptions(streams options.IOStreams) *RegistryOptions {
 		DataRoot:       "/var/lib/docker",
 		RegistryVolume: "/opt/registry",
 		RegistryPort:   5000,
-		Arch:           "x86_64",
+		Arch:           "amd64",
 		Tag:            "",
 		Number:         0,
 	}
@@ -377,8 +377,8 @@ func (o *RegistryOptions) preCheck() bool {
 }
 
 func (o *RegistryOptions) Complete() error {
-	if o.Arch == "" || o.Arch == "amd64" {
-		o.Arch = "x86_64"
+	if o.Arch == "" {
+		o.Arch = "amd64"
 	}
 	return nil
 }
@@ -741,8 +741,7 @@ func (o *RegistryOptions) installDocker() error {
 		}
 		cmdList := []string{
 			// cp docker service file
-			fmt.Sprintf("tar vxf %s/kc/resource/docker/19.03.12/%s/docker.tgz -C /tmp/", config.DefaultPkgPath, o.Arch),
-			fmt.Sprintf("cp -r /tmp/docker/* /usr/bin/ && cp %s/kc/resource/docker/19.03.12/%s/docker.service /etc/systemd/system/docker.service", config.DefaultPkgPath, o.Arch),
+			fmt.Sprintf("tar -zxvf %s/kc/resource/docker/19.03.12/%s/configs.tar.gz -C /", config.DefaultPkgPath, o.Arch),
 			"mkdir -pv /etc/docker",
 			// write daemon.json
 			sshutils.WrapEcho(data, "/etc/docker/daemon.json"),
