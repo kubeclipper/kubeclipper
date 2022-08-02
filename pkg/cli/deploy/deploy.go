@@ -648,7 +648,6 @@ func (d *DeployOptions) getKcServerConfigTemplateContent(ip string) string {
 		data["MQClientCertPath"] = d.deployConfig.MQ.ClientCert
 		data["MQClientKeyPath"] = d.deployConfig.MQ.ClientKey
 	}
-
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, data); err != nil {
 		logger.Fatalf("template execute failed: %s", err.Error())
@@ -688,6 +687,7 @@ func (d *DeployOptions) getKcAgentConfigTemplateContent(region string) string {
 	}
 	data["OpLogDir"] = d.deployConfig.OpLog.Dir
 	data["OpLogThreshold"] = d.deployConfig.OpLog.Threshold
+	data["KcImageRepoMirror"] = d.deployConfig.ImageProxy.KcImageRepoMirror
 	var buffer bytes.Buffer
 	if err = tmpl.Execute(&buffer, data); err != nil {
 		logger.Fatalf("template execute failed: %s", err.Error())

@@ -616,7 +616,7 @@ spec:
      priorityClassName: system-node-critical
      initContainers:
        - name: upgrade-ipam
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
          command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
          env:
            - name: KUBERNETES_NODE_NAME
@@ -636,7 +636,7 @@ spec:
          securityContext:
            privileged: true
        - name: install-cni
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
          command: ["/install-cni.sh"]
          env:
            - name: CNI_CONF_NAME
@@ -665,7 +665,7 @@ spec:
          securityContext:
            privileged: true
        - name: flexvol-driver
-         image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Calico.Version}}
+         image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
          volumeMounts:
          - name: flexvol-driver-host
            mountPath: /host/driver
@@ -673,7 +673,7 @@ spec:
            privileged: true
      containers:
        - name: calico-node
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
          env:
            - name: DATASTORE_TYPE
              value: "kubernetes"
@@ -700,23 +700,23 @@ spec:
            - name: CALICO_IPV6POOL_CIDR
              value: "{{.PodIPv6CIDR}}"
            - name: IP6_AUTODETECTION_METHOD
-             value: "{{.Calico.IPv6AutoDetection}}"
+             value: "{{.CNI.Calico.IPv6AutoDetection}}"
            {{end}}
-           {{if eq .Calico.Mode "BGP"}}
+           {{if eq .CNI.Calico.Mode "BGP"}}
            - name: CALICO_IPV4POOL_IPIP
              value: "Never"
-           {{else if eq .Calico.Mode "Overlay-IPIP-All"}}
+           {{else if eq .CNI.Calico.Mode "Overlay-IPIP-All"}}
            - name: CALICO_IPV4POOL_IPIP
              value: "Always"
-           {{else if eq .Calico.Mode "Overlay-IPIP-Cross-Subnet"}}
+           {{else if eq .CNI.Calico.Mode "Overlay-IPIP-Cross-Subnet"}}
            - name: CALICO_IPV4POOL_IPIP
              value: "CrossSubnet"
-           {{else if eq .Calico.Mode "Overlay-Vxlan-All"}}
+           {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-All"}}
            - name: CALICO_IPV4POOL_IPIP
              value: "Never"
            - name: CALICO_IPV4POOL_VXLAN
              value: "Always"
-           {{else if eq .Calico.Mode "Overlay-Vxlan-Cross-Subnet"}}
+           {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-Cross-Subnet"}}
            - name: CALICO_IPV4POOL_IPIP
              value: "Never"
            - name: CALICO_IPV4POOL_VXLAN
@@ -852,7 +852,7 @@ spec:
      priorityClassName: system-cluster-critical
      containers:
        - name: calico-kube-controllers
-         image: {{with .LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.Calico.Version}}
+         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
          env:
            - name: ENABLED_CONTROLLERS
              value: node
@@ -4982,7 +4982,7 @@ spec:
               value: "Never"
             - name: CALICO_IPV4POOL_VXLAN
               value: "Always"
-            {{else if eq .Calico.Mode "Overlay-Vxlan-Cross-Subnet"}}
+            {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-Cross-Subnet"}}
             - name: CALICO_IPV4POOL_IPIP
               value: "Never"
             - name: CALICO_IPV4POOL_VXLAN

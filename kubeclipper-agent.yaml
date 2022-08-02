@@ -49,3 +49,5 @@ backupStore:
 #    accessKeySecret: secret
 #    ssl: true
 #    region: default
+imageProxy:
+  kcImageRepoMirror: ""

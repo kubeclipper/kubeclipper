@@ -331,6 +331,7 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(region string) string {
 	}
 	data["OpLogDir"] = c.deployConfig.OpLog.Dir
 	data["OpLogThreshold"] = c.deployConfig.OpLog.Threshold
+	data["KcImageRepoMirror"] = c.deployConfig.ImageProxy.KcImageRepoMirror
 	var buffer bytes.Buffer
 	if err = tmpl.Execute(&buffer, data); err != nil {
 		logger.Fatalf("template execute failed: %s", err.Error())

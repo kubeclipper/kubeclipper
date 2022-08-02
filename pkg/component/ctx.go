@@ -29,6 +29,7 @@ type (
 	stepKey      struct{}
 	oplogKey     struct{}
 	retryKey     struct{}
+	repoMirror   struct{}
 )
 
 type ExtraMetadata struct {
@@ -191,4 +192,15 @@ func GetRetry(ctx context.Context) bool {
 		return v.(bool)
 	}
 	return false
+}
+
+func WithRepoMirror(ctx context.Context, mirror string) context.Context {
+	return context.WithValue(ctx, repoMirror{}, mirror)
+}
+
+func GetRepoMirror(ctx context.Context) string {
+	if v := ctx.Value(repoMirror{}); v != nil {
+		return v.(string)
+	}
+	return ""
 }

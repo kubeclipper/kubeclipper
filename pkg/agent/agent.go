@@ -40,6 +40,7 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 		task.WithNodeStatusUpdateFrequency(s.Config.NodeStatusUpdateFrequency),
 		task.WithLeaseDurationSeconds(240),
 		task.WithOplog(opLog),
+		task.WithRepoMirror(s.Config.ImageProxyOptions.KcImageRepoMirror),
 	)
 	return s.taskService.PrepareRun(stopCh)
 }

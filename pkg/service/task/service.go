@@ -98,6 +98,7 @@ type Service struct {
 	latestLease *coordinationv1.Lease
 	oplog       component.OperationLogFile
 	backupStore bs.BackupStore
+	repoMirror  string
 }
 
 type ServiceOption func(*Service)
@@ -117,6 +118,12 @@ func WithOplog(ol component.OperationLogFile) ServiceOption {
 func WithBackupStore(backupStore bs.BackupStore) ServiceOption {
 	return func(s *Service) {
 		s.backupStore = backupStore
+	}
+}
+
+func WithRepoMirror(mirror string) ServiceOption {
+	return func(s *Service) {
+		s.repoMirror = mirror
 	}
 }
 
