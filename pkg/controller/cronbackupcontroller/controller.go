@@ -289,9 +289,6 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		}
 	}
 
-	// update cluster status to backing_up
-	c.Status.Phase = v1.ClusterBackingUp
-
 	// create operation
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -344,6 +341,24 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
+	nc, err := r.ClusterLister.Get(cronBackup.Spec.ClusterName)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			log.Error("Cluster is not found", zap.Error(err))
+			return err
+		}
+		log.Error("Failed to get cluster", zap.Error(err))
+		return err
+	}
+
+	if nc.Status.Phase != v1.ClusterRunning {
+		log.Warnf("the cluster is %v, create backup in next reconcile", c.Status.Phase)
+		return err
+	}
+
+	// update cluster status to backing_up
+	c.Status.Phase = v1.ClusterBackingUp
+
 	actBackupStep := actBackup.GetStep(v1.ActionInstall)
 	op.Steps = append(steps, actBackupStep...)
 	op, err = r.OperationWriter.CreateOperation(ctx, op)
@@ -356,15 +371,16 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		log.Error("Failed to create backup", zap.Error(err))
 		return err
 	}
+	_, err = r.ClusterWriter.UpdateCluster(context.TODO(), c)
+	if err != nil {
+		log.Error("Failed to update cluster", zap.Error(err))
+		return err
+	}
 	// delivery the create backup operation
 	go func() {
 		err = r.CmdDelivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
 		log.Error("Failed to delivery operation", zap.Error(err))
 	}()
-	_, err = r.ClusterWriter.UpdateCluster(context.TODO(), c)
-	if err != nil {
-		log.Error("Failed to update cluster", zap.Error(err))
-	}
 	return nil
 }
 
