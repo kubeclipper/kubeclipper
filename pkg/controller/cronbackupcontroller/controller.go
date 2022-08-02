@@ -225,7 +225,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 
 	if c.Status.Phase != v1.ClusterRunning {
 		log.Warnf("the cluster is %v, create backup in next reconcile", c.Status.Phase)
-		return nil
+		return err
 	}
 
 	randNum := rand.String(5)
@@ -356,16 +356,15 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		log.Error("Failed to create backup", zap.Error(err))
 		return err
 	}
-	_, err = r.ClusterWriter.UpdateCluster(context.TODO(), c)
-	if err != nil {
-		log.Error("Failed to update cluster", zap.Error(err))
-		return err
-	}
 	// delivery the create backup operation
 	go func() {
 		err = r.CmdDelivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
 		log.Error("Failed to delivery operation", zap.Error(err))
 	}()
+	_, err = r.ClusterWriter.UpdateCluster(context.TODO(), c)
+	if err != nil {
+		log.Error("Failed to update cluster", zap.Error(err))
+	}
 	return nil
 }
 
