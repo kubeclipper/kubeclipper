@@ -92,6 +92,7 @@ const (
 	OperationAddNodes            = "AddNodes"
 	OperationRemoveNodes         = "RemoveNodes"
 	OperationBackupCluster       = "BackupCluster"
+	OperationDeleteBackup        = "DeleteBackup"
 	OperationRecoverCluster      = "RecoveryCluster"
 	OperationInstallComponents   = "InstallComponents"
 	OperationUninstallComponents = "UninstallComponents"

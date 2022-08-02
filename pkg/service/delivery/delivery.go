@@ -310,6 +310,10 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 		clu.Status.Phase = v1.ClusterRunning
 		_, err := s.clusterOperator.UpdateCluster(context.TODO(), clu)
 		return err
+	case v1.OperationDeleteBackup:
+		clu.Status.Phase = v1.ClusterRunning
+		_, err := s.clusterOperator.UpdateCluster(context.TODO(), clu)
+		return err
 	case v1.OperationRecoverCluster:
 		if op.Status.Status == v1.OperationStatusSuccessful {
 			clu.Status.Phase = v1.ClusterRunning
