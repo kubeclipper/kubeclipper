@@ -1242,7 +1242,7 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
 	op.Labels = make(map[string]string)
-	op.Labels[common.LabelOperationAction] = v1.OperationBackupCluster
+	op.Labels[common.LabelOperationAction] = v1.OperationDeleteBackup
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = b.Name
