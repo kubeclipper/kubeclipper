@@ -58,6 +58,7 @@ type Service struct {
 	mqClient          natsio.Interface
 	NodeReportSubject string
 	AgentID           string
+	IPDetect          string
 	Region            string
 	AgentSubject      string
 	RegisterNode      bool
@@ -154,7 +155,7 @@ func defaultRepeatedHeartbeatFailure() {
 	logger.Debug("repeated heartbeat failure ...")
 }
 
-func NewService(agentID, region string, registerNode bool, natOpts *natsio.NatsOptions, opts ...ServiceOption) *Service {
+func NewService(agentID, region, ipDetectMethod string, registerNode bool, natOpts *natsio.NatsOptions, opts ...ServiceOption) *Service {
 	nc := natsio.NewNats(natOpts)
 	nc.SetReconnectHandler(defaultMQReconnectHandler)
 	nc.SetDisconnectErrHandler(defaultMQDisconnectHandler)
@@ -164,6 +165,7 @@ func NewService(agentID, region string, registerNode bool, natOpts *natsio.NatsO
 		mqClient:                   nc,
 		NodeReportSubject:          natOpts.Client.NodeReportSubject,
 		AgentID:                    agentID,
+		IPDetect:                   ipDetectMethod,
 		Region:                     region,
 		AgentSubject:               fmt.Sprintf(service.MsgSubjectFormat, agentID, natOpts.Client.SubjectSuffix),
 		RegisterNode:               registerNode,
@@ -204,7 +206,7 @@ func (s *Service) Close() {
 func (s *Service) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	var setters []func(n *v1.Node) error
 	setters = append(setters,
-		nodestatus.NodeAddress(),
+		nodestatus.NodeAddress(s.IPDetect),
 		nodestatus.MachineInfo(),
 		nodestatus.ReadyCondition(s.clock.Now, TODO, TODO, TODO))
 
@@ -223,9 +225,9 @@ func (s *Service) updateNodeStatus() error {
 	logger.Debugf("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
 		if err := s.tryUpdateNodeStatus(i); err != nil {
-			//if i > 0 && s.onRepeatedHeartbeatFailure != nil {
+			// if i > 0 && s.onRepeatedHeartbeatFailure != nil {
 			//	s.onRepeatedHeartbeatFailure()
-			//}
+			// }
 			logger.Error("Error updating node status, will retry", zap.Error(err))
 		} else {
 			return nil

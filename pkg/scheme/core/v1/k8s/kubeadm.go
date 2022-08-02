@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
+	"github.com/pkg/errors"
 	"github.com/txn2/txeh"
 	"go.uber.org/zap"
 
@@ -327,7 +329,11 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 	if err != nil {
 		return nil, err
 	}
-	ipnet, err := netutil.GetDefaultIP(true)
+	agentConfig, err := config.TryLoadFromDisk()
+	if err != nil {
+		return nil, errors.WithMessage(err, "load agent config")
+	}
+	ipnet, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +511,11 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		if err != nil {
 			return nil, err
 		}
-		ipnet, err := netutil.GetDefaultIP(true)
+		agentConfig, err := config.TryLoadFromDisk()
+		if err != nil {
+			return nil, errors.WithMessage(err, "load agent config")
+		}
+		ipnet, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
 		if err != nil {
 			return nil, err
 		}

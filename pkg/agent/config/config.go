@@ -47,6 +47,7 @@ const (
 type Config struct {
 	AgentID                   string              `json:"agentID,omitempty" yaml:"agentID"`
 	Region                    string              `json:"region,omitempty" yaml:"region"`
+	IPDetect                  string              `json:"ipDetect,omitempty" yaml:"ipDetect"`
 	RegisterNode              bool                `json:"registerNode,omitempty" yaml:"registerNode"`
 	NodeStatusUpdateFrequency time.Duration       `json:"nodeStatusUpdateFrequency,omitempty" yaml:"nodeStatusUpdateFrequency"`
 	DownloaderOptions         *downloader.Options `json:"downloader" yaml:"downloader" mapstructure:"downloader"`
@@ -107,7 +108,7 @@ func TryLoadFromDisk() (*Config, error) {
 	viper.AddConfigPath(defaultConfigurationPath)
 	// Load from current working directory, only used for debugging
 	viper.AddConfigPath(".")
-	//viper.SetConfigType("yaml")
+	// viper.SetConfigType("yaml")
 
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
@@ -118,6 +119,7 @@ func TryLoadFromDisk() (*Config, error) {
 	if err := viper.Unmarshal(conf); err != nil {
 		return nil, err
 	}
+	logger.Errorf("agent config load success,ip-detect:%s\n", conf.IPDetect)
 	return conf, nil
 }
 

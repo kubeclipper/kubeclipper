@@ -1,6 +1,3 @@
-//go:build !linux
-// +build !linux
-
 /*
  *
  *  * Copyright 2021 KubeClipper Authors.
@@ -19,16 +16,19 @@
  *
  */
 
-package netutil
+package autodetection
 
 import (
-	"net"
+	"fmt"
+	"testing"
 )
 
-func GetDefaultIP(ipv4 bool, method string) (net.IP, error) {
-	return net.IPv4zero, nil
-}
+func TestFilteredEnumeration(t *testing.T) {
+	enumeration, c, err := FilteredEnumeration(nil, nil, nil, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-func GetDefaultGateway(ipv4 bool) (net.IP, error) {
-	return net.IPv4zero, nil
+	fmt.Println(*enumeration)
+	fmt.Println(*c)
 }

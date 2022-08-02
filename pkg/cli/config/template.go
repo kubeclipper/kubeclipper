@@ -237,6 +237,7 @@ mq:
 `
 
 const KcAgentConfigTmpl = `agentID: {{.AgentID}}
+ipDetect: {{.IPDetect}}
 region: {{.Region}}
 registerNode: true
 nodeStatusUpdateFrequency: 1m

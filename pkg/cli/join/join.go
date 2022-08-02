@@ -30,6 +30,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
+
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/sudo"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
@@ -94,6 +96,7 @@ type JoinOptions struct {
 	agents      []string       // user input agents,maybe with region,need to parse.
 	agentRegion options.Agents // format agents
 	servers     []string
+	ipDetect    string
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -121,7 +124,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunJoinFunc())
 		},
 	}
-
+	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method,default is first-found.")
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))
@@ -147,6 +150,10 @@ func (c *JoinOptions) Complete() error {
 	if err := c.deployConfig.Complete(); err != nil {
 		return err
 	}
+	// overwrite by specify
+	if c.ipDetect != "" {
+		c.deployConfig.IPDetect = c.ipDetect
+	}
 
 	agents, err := BuildAgentRegion(c.agents, c.deployConfig.DefaultRegion)
 	utils.CheckErr(err)
@@ -156,6 +163,9 @@ func (c *JoinOptions) Complete() error {
 }
 
 func (c *JoinOptions) ValidateArgs() error {
+	if c.ipDetect != "" && !autodetection.CheckMethod(c.ipDetect) {
+		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
+	}
 	if len(c.agents) == 0 {
 		return fmt.Errorf("must specified at least one agent node")
 	}
@@ -302,6 +312,7 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(region string) string {
 
 	var data = make(map[string]interface{})
 	data["Region"] = region
+	data["IPDetect"] = c.deployConfig.IPDetect
 	data["AgentID"] = uuid.New().String()
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.StaticServerPort)
 	if c.deployConfig.Debug {

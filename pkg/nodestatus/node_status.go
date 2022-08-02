@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sysutil"
@@ -45,7 +47,8 @@ import (
 // Setters may partially mutate the node before returning an error.
 type Setter func(node *v1.Node) error
 
-func NodeAddress() Setter {
+func NodeAddress(ipDetectMethod string) Setter {
+	log.Println("ip detect method:", ipDetectMethod)
 	return func(node *v1.Node) error {
 		var nodeAddress []v1.NodeAddress
 		addresses, err := net.InterfaceAddrs()
@@ -61,7 +64,7 @@ func NodeAddress() Setter {
 			}
 		}
 		node.Status.Addresses = nodeAddress
-		ip, err := netutil.GetDefaultIP(true)
+		ip, err := netutil.GetDefaultIP(true, ipDetectMethod)
 		if err != nil {
 			return err
 		}
@@ -132,7 +135,7 @@ func ReadyCondition(
 		}
 		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory}
-		//requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
+		// requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
 		var missingCapacities []string
 		for _, capacity := range requiredCapacities {
 			if _, found := node.Status.Capacity[capacity]; !found {

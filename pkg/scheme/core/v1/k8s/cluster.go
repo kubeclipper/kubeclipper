@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -41,6 +42,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sysutil"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -438,7 +440,11 @@ func (stepper *ActBackup) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *ActBackup) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	ip, err := netutil.GetDefaultIP(true)
+	agentConfig, err := config.TryLoadFromDisk()
+	if err != nil {
+		return nil, errors.WithMessage(err, "load agent config")
+	}
+	ip, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
 	if err != nil {
 		logger.Errorf("get node ip failed: %s", err.Error())
 		return nil, err
@@ -884,7 +890,11 @@ func (stepper *Recovery) Recovering(ctx context.Context, opts component.Options)
 		logger.Errorf("get host info failed: %s", err.Error())
 		return nil, err
 	}
-	ip, err := netutil.GetDefaultIP(true)
+	agentConfig, err := config.TryLoadFromDisk()
+	if err != nil {
+		return nil, errors.WithMessage(err, "load agent config")
+	}
+	ip, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
 	if err != nil {
 		logger.Errorf("get node ip failed: %s", err.Error())
 		return nil, err
