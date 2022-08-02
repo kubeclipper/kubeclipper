@@ -1103,7 +1103,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 
-	b, err := h.clusterOperator.GetBackup(ctx, clusterName, backup.Name)
+	b, err := h.clusterOperator.GetBackup(ctx, clusterName, fmt.Sprintf("%s-%s", backup.Name, clusterName))
 	if err != nil && !apimachineryErrors.IsNotFound(err) {
 		restplus.HandleInternalError(response, request, err)
 		return
