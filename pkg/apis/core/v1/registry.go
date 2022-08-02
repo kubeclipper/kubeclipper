@@ -145,13 +145,13 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.GET("/clusters/{name}/certification").
-		To(h.ListCertifications).
+		To(h.GetKubeConfig).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("List certifications details").
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Certification{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.KubeConfig{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.PUT("/clusters/{name}/nodes").

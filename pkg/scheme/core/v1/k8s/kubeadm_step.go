@@ -20,22 +20,18 @@ package k8s
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/hashutil"
-
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -52,6 +48,26 @@ const (
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
 )
+
+var kubeConfigTemplate = `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: %s
+    server: https://%s:6443
+  name: %s
+contexts:
+- context:
+    cluster: %s
+    user: kubernetes-admin
+  name: kubernetes-admin@%s
+current-context: kubernetes-admin@%s
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data: %s
+    client-key-data: %s`
 
 type Runnable v1.Cluster
 
@@ -477,63 +493,17 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	return stepper
 }
 
-func GetCerts(nodeID string, ctx context.Context, deliveryCmd service.CmdDelivery) ([]v1.Certification, error) {
-	list := make([]v1.Certification, 0)
-	kubeConfigs := []string{"admin.conf", "controller-manager.conf", "scheduler.conf"}
-	certsList := certs.GetDefaultCerts()
-	for _, cert := range certsList {
-		path := filepath.Join(cert.Path, cert.BaseName+".crt")
-		content, err := deliveryCmd.DeliverCmd(ctx, nodeID, []string{"cat", path}, 3*time.Minute)
-		if err != nil {
-			logger.Errorf(" cat %s.crt error: %s ", cert.BaseName, err.Error())
-			return nil, err
-		}
-		hashPem, err := hashutil.EncryptPassword(string(content))
-		if err != nil {
-			return nil, err
-		}
-		crt, err := certs.DecodeCertPEM(content)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, v1.Certification{
-			Name:           cert.BaseName,
-			CAName:         cert.CAName,
-			Content:        hashPem,
-			ExpirationTime: crt[0].NotAfter.String(),
-		})
+func GetKubeConfig(ctx context.Context, name string, node component.Node, deliveryCmd service.CmdDelivery) (string, error) {
+	content, err := deliveryCmd.DeliverCmd(ctx, node.ID, []string{"cat", "~/.kube/config"}, 3*time.Minute)
+	if err != nil {
+		logger.Errorf(" cat kubeConfig error: %s", err.Error())
+		return "", err
 	}
-	for _, kubeConfig := range kubeConfigs {
-		path := filepath.Join("/etc/kubernetes/", kubeConfig)
-		content, err := deliveryCmd.DeliverCmd(ctx, nodeID, []string{"cat", path}, 3*time.Minute)
-		if err != nil {
-			logger.Errorf(" cat kubeConfig %s error: %s", kubeConfig, err.Error())
-			return nil, err
-		}
-		data, err := fileutil.GetSpecValueFromFile(content)
-		if err != nil {
-			return nil, err
-		}
-		pem, err := base64.StdEncoding.DecodeString(data)
-		if err != nil {
-			fmt.Println(" error: ", err)
-		}
-		hashPem, err := hashutil.EncryptPassword(string(pem))
-		if err != nil {
-			return nil, err
-		}
-		crt, err := certs.DecodeCertPEM(pem)
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, v1.Certification{
-			Name:           kubeConfig,
-			CAName:         "",
-			Content:        hashPem,
-			ExpirationTime: crt[0].NotAfter.String(),
-		})
-	}
-	return list, nil
+	clusterCert, _ := fileutil.GetSpecValueFromFile(content, "clusters.0.cluster.certificate-authority-data")
+	clientCert, _ := fileutil.GetSpecValueFromFile(content, "users.0.user.client-certificate-data")
+	clientKey, _ := fileutil.GetSpecValueFromFile(content, "users.0.user.client-key-data")
+	kubeConfig := fmt.Sprintf(kubeConfigTemplate, clusterCert, node.IPv4, name, name, name, name, clientCert, clientKey)
+	return kubeConfig, nil
 }
 
 func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1.Step, error) {

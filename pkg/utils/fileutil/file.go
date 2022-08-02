@@ -160,12 +160,12 @@ func Backup(filePath, dir string) (bakFile string, err error) {
 	return
 }
 
-func GetSpecValueFromFile(content []byte) (string, error) {
+func GetSpecValueFromFile(content []byte, key string) (string, error) {
 	viper.SetConfigType("yaml")
 	err := viper.ReadConfig(bytes.NewBuffer(content))
 	if err != nil {
 		return "", err
 	}
-	data := viper.GetString("users.0.user.client-certificate-data")
+	data := viper.GetString(key)
 	return data, nil
 }

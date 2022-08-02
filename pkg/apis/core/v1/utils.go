@@ -381,10 +381,10 @@ func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) boo
 	return false
 }
 
-func (h *handler) getCertificationList(extraMeta *component.ExtraMetadata) ([]v1.Certification, error) {
-	certsList, err := k8s.GetCerts(context.TODO(), extraMeta.Masters[0].ID, h.delivery)
+func (h *handler) getCertificationList(extraMeta *component.ExtraMetadata) (string, error) {
+	kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return certsList, nil
+	return kubeConfig, nil
 }
