@@ -22,10 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -494,7 +495,7 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 }
 
 func GetKubeConfig(ctx context.Context, name string, node component.Node, deliveryCmd service.CmdDelivery) (string, error) {
-	content, err := deliveryCmd.DeliverCmd(ctx, node.ID, []string{"cat", "~/.kube/config"}, 3*time.Minute)
+	content, err := deliveryCmd.DeliverCmd(ctx, node.ID, []string{"cat", "/etc/kubernetes/admin.conf"}, 3*time.Minute)
 	if err != nil {
 		logger.Errorf(" cat kubeConfig error: %s", err.Error())
 		return "", err
