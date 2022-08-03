@@ -322,16 +322,114 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	q := query.New()
-	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, c.Name)
-	backups, err := h.clusterOperator.ListBackupEx(request.Request.Context(), q)
+	// delete cronBackups before delete cluster
+	cronBackups, err := h.clusterOperator.ListCronBackups(request.Request.Context(), query.New())
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	if backups.TotalCount > 0 {
-		restplus.HandleInternalError(response, request, fmt.Errorf("before deleting the cluster, please delete the cluster backup file first"))
+	for _, cronBackup := range cronBackups.Items {
+		if cronBackup.Spec.ClusterName == c.Name {
+			// make the cronBackup disable
+			if _, ok := cronBackup.Labels[common.LabelCronBackupEnable]; ok {
+				delete(cronBackup.Labels, common.LabelCronBackupEnable)
+				cronBackup.Labels[common.LabelCronBackupDisable] = ""
+				_, err = h.clusterOperator.UpdateCronBackup(request.Request.Context(), &cronBackup)
+			}
+			// delete cronBackup
+			if err = h.clusterOperator.DeleteCronBackup(request.Request.Context(), cronBackup.Name); err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+		}
+	}
+
+	// delete backup before delete cluster
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, c.Name)
+	backups, err := h.clusterOperator.ListBackups(request.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
 		return
+	}
+	for _, backup := range backups.Items {
+		bp, err := h.clusterOperator.GetBackupPointEx(request.Request.Context(), c.Labels[common.LabelBackupPoint], "0")
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
+		if backup.PreferredNode != "" {
+			_, err = h.clusterOperator.GetNodeEx(request.Request.Context(), backup.PreferredNode, "0")
+			if err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+		}
+
+		// create operation
+		op := &v1.Operation{}
+		op.Name = uuid.New().String()
+		op.Labels = make(map[string]string)
+		op.Labels[common.LabelOperationAction] = v1.OperationDeleteBackup
+		op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
+		op.Labels[common.LabelClusterName] = c.Name
+		op.Labels[common.LabelBackupName] = backup.Name
+		op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
+		op.Status.Status = v1.OperationStatusRunning
+
+		if backup.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || backup.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
+			restplus.HandlerErrorWithCustomCode(response, request, http.StatusExpectationFailed, 417, "", fmt.Errorf("backup is %s now, can't delete", backup.Status.ClusterBackupStatus))
+			return
+		}
+
+		steps := make([]v1.Step, 0)
+		var actBackup *k8s.ActBackup
+		meta := component.ExtraMetadata{
+			ClusterName: c.Name,
+		}
+		meta.Masters = append(meta.Masters, component.Node{ID: backup.PreferredNode})
+		ctx := component.WithExtraMetadata(context.TODO(), meta)
+
+		switch bp.StorageType {
+		case bs.S3Storage:
+			actBackup = &k8s.ActBackup{
+				StoreType:       bp.StorageType,
+				BackupFileName:  backup.Status.FileName,
+				AccessKeyID:     bp.S3Config.AccessKeyID,
+				AccessKeySecret: bp.S3Config.AccessKeySecret,
+				Bucket:          bp.S3Config.Bucket,
+				Endpoint:        bp.S3Config.Endpoint,
+			}
+		case bs.FSStorage:
+			actBackup = &k8s.ActBackup{
+				StoreType:          bp.StorageType,
+				BackupFileName:     backup.Status.FileName,
+				BackupPointRootDir: bp.FsConfig.BackupRootDir,
+			}
+		}
+
+		if err = actBackup.InitSteps(ctx); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
+		actBackupStep := actBackup.GetStep(v1.ActionUninstall)
+		op.Steps = append(steps, actBackupStep...)
+		op, err = h.opOperator.CreateOperation(ctx, op)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
+		// delivery the delete backup operation
+		go h.delivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
+
+		// delete backup in etcd
+		if err = h.clusterOperator.DeleteBackup(request.Request.Context(), backup.Name); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
 	}
 
 	op, err := h.parseOperationFromCluster(extraMeta, c, v1.ActionUninstall)
