@@ -335,6 +335,10 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 				delete(cronBackup.Labels, common.LabelCronBackupEnable)
 				cronBackup.Labels[common.LabelCronBackupDisable] = ""
 				_, err = h.clusterOperator.UpdateCronBackup(request.Request.Context(), &cronBackup)
+				if err != nil {
+					restplus.HandleInternalError(response, request, err)
+					return
+				}
 			}
 			// delete cronBackup
 			if err = h.clusterOperator.DeleteCronBackup(request.Request.Context(), cronBackup.Name); err != nil {
@@ -423,7 +427,12 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		}
 
 		// delivery the delete backup operation
-		go h.delivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
+		go func() {
+			err = h.delivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
+			if err != nil {
+				logger.Errorf("delivery task error", zap.Error(err))
+			}
+		}()
 
 		// delete backup in etcd
 		if err = h.clusterOperator.DeleteBackup(request.Request.Context(), backup.Name); err != nil {
