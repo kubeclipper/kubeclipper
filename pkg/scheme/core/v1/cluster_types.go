@@ -166,15 +166,15 @@ func (c *Cluster) Complete() {
 	if c.Networking.ProxyMode == "" {
 		c.Networking.ProxyMode = "ipvs"
 	}
-	if c.Offline() {
-		c.CNI.LocalRegistry = c.LocalRegistry
-	}
 	if c.Etcd.DataDir == "" {
 		c.Etcd.DataDir = "/var/lib/etcd"
 	}
 	if c.Kubelet.RootDir == "" {
 		c.Kubelet.RootDir = "/var/lib/kubelet"
 	}
+	c.CNI.LocalRegistry = c.LocalRegistry
+	c.CNI.CriType = c.ContainerRuntime.Type
+	c.CNI.Offline = c.Offline()
 	matchCniVersion(c.KubernetesVersion, &c.CNI)
 }
 
@@ -251,6 +251,8 @@ type CNI struct {
 	LocalRegistry string `json:"localRegistry" optional:"true"`
 	Type          string `json:"type" enum:"calico"`
 	Version       string
+	CriType       string
+	Offline       bool
 	Calico        *Calico `json:"calico" optional:"true"`
 }
 
