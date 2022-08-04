@@ -25,7 +25,7 @@ import (
 )
 
 func Test_autoDetectCIDRFirstFound(t *testing.T) {
-	ipNet, err := autoDetectCIDRFirstFound(4)
+	ipNet, err := autoDetectCIDRFirstFound(IPv4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func Test_autoDetectCIDRFirstFound(t *testing.T) {
 }
 
 func Test_autoDetectCIDRByInterface(t *testing.T) {
-	ipNet, err := autoDetectCIDRByInterface(nil, 4)
+	ipNet, err := autoDetectCIDRByInterface(nil, IPv4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func Test_autoDetectCIDRByCIDR(t *testing.T) {
 		}
 		matches = append(matches, *cidr)
 	}
-	ipNet, err := autoDetectCIDRByCIDR(matches, 4)
+	ipNet, err := autoDetectCIDRByCIDR(matches, IPv4)
 	if err != nil {
 		t.Fatal(err)
 	}

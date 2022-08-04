@@ -323,7 +323,7 @@ func getRepoMirror() string {
 
 func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.Config, "deploy-config", "c", c.Config, "Path to the config file to use for Deploy.")
-	flags.StringVar(&c.IPDetect, "ip-detect", c.IPDetect, "Kc ip detect method,default is first-found.")
+	flags.StringVar(&c.IPDetect, "ip-detect", c.IPDetect, "Kc ip detect method.")
 	flags.BoolVar(&c.Debug, "debug", c.Debug, "Deploy kc use debug mode")
 	flags.StringVarP(&c.DefaultRegion, "region", "r", c.DefaultRegion, "Kc agent default region")
 	flags.IntVar(&c.ServerPort, "server-port", c.ServerPort, "Kc server port")

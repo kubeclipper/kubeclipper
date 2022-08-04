@@ -108,9 +108,9 @@ func convertInterface(i *net.Interface, version int) (*Interface, error) {
 
 func ipVersion(ip net.IP) int {
 	if ip.To4() != nil {
-		return 4
+		return IPv4
 	} else if len(ip) == net.IPv6len {
-		return 6
+		return IPv6
 	}
 	return 0
 }
@@ -120,8 +120,6 @@ func parseCIDR(c string) (*net.IP, *net.IPNet, error) {
 	if netIPNet == nil || e != nil {
 		return nil, nil, e
 	}
-	// ip := &IP{netIP}
-	// ipnet := &IPNet{*netIPNet}
 
 	// The base golang net library always uses a 4-byte IPv4 address in an
 	// IPv4 IPNet, so for uniformity in the returned types, make sure the

@@ -103,6 +103,7 @@ func NewJoinOptions(streams options.IOStreams) *JoinOptions {
 	return &JoinOptions{
 		IOStreams:    streams,
 		deployConfig: options.NewDeployOptions(),
+		ipDetect:     autodetection.MethodFirst,
 	}
 }
 
@@ -124,7 +125,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunJoinFunc())
 		},
 	}
-	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method,default is first-found.")
+	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method.")
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))

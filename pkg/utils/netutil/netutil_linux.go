@@ -31,9 +31,9 @@ import (
 )
 
 func GetDefaultIP(ipv4 bool, method string) (net.IP, error) {
-	version := 4
+	version := autodetection.IPv4
 	if !ipv4 {
-		version = 6
+		version = autodetection.IPv4
 	}
 	ipNet, err := autodetection.AutoDetectCIDR(method, version)
 	if err != nil {

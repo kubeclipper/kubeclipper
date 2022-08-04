@@ -36,6 +36,11 @@ const (
 	MethodCidr      = "cidr="
 )
 
+const (
+	IPv4 = 4
+	IPv6 = 6
+)
+
 func CheckMethod(method string) bool {
 	if method == "" || method == MethodFirst {
 		return true
