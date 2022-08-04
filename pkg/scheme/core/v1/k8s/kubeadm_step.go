@@ -517,37 +517,79 @@ func (stepper *CNIInfo) InitStepper(c *v1.CNI, networking *v1.Networking) *CNIIn
 }
 
 func (stepper *CNIInfo) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	var steps []v1.Step
 	bytes, err := json.Marshal(stepper)
 	if err != nil {
 		return nil, err
 	}
-
-	return []v1.Step{
-		{
-			ID:         strutil.GetUUID(),
-			Name:       "installCNI",
-			Timeout:    metav1.Duration{Duration: 1 * time.Minute},
-			ErrIgnore:  false,
-			RetryTimes: 1,
-			Nodes:      nodes,
-			Commands: []v1.Command{
-				{
-					Type: v1.CommandTemplateRender,
-					Template: &v1.TemplateCommand{
-						Identity: fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate),
-						Data:     bytes,
+	if stepper.CNI.Offline && stepper.CNI.LocalRegistry == "" {
+		steps = []v1.Step{
+			{
+				ID:         strutil.GetUUID(),
+				Name:       "cniImageLoader",
+				Timeout:    metav1.Duration{Duration: 5 * time.Minute},
+				ErrIgnore:  false,
+				RetryTimes: 1,
+				Nodes:      nodes,
+				Action:     v1.ActionInstall,
+				Commands: []v1.Command{
+					{
+						Type:          v1.CommandCustom,
+						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, cniInfo, version, component.TypeStep),
+						CustomCommand: bytes,
 					},
 				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"kubectl", "apply", "-f", filepath.Join(ManifestDir, "cni.yaml")},
+			},
+		}
+	}
+	return append(steps, v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       "installCNI",
+		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+		ErrIgnore:  false,
+		RetryTimes: 1,
+		Nodes:      nodes,
+		Commands: []v1.Command{
+			{
+				Type: v1.CommandTemplateRender,
+				Template: &v1.TemplateCommand{
+					Identity: fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate),
+					Data:     bytes,
 				},
 			},
+			{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"kubectl", "apply", "-f", filepath.Join(ManifestDir, "cni.yaml")},
+			},
 		},
-	}, nil
+	}), nil
 }
 
 func (stepper *CNIInfo) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	bytes, err := json.Marshal(stepper)
+	if err != nil {
+		return nil, err
+	}
+	if stepper.CNI.Offline && stepper.CNI.LocalRegistry == "" {
+		return []v1.Step{
+			{
+				ID:         strutil.GetUUID(),
+				Name:       "cniImageUninstaller",
+				Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+				ErrIgnore:  false,
+				RetryTimes: 1,
+				Nodes:      nodes,
+				Action:     v1.ActionUninstall,
+				Commands: []v1.Command{
+					{
+						Type:          v1.CommandCustom,
+						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, cniInfo, version, component.TypeStep),
+						CustomCommand: bytes,
+					},
+				},
+			},
+		}, nil
+	}
 	return nil, nil
 }
 

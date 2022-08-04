@@ -61,6 +61,9 @@ func init() {
 	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate), &CNIInfo{}); err != nil {
 		panic(err)
 	}
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, cniInfo, version, component.TypeStep), &CNIInfo{}); err != nil {
+		panic(err)
+	}
 	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, kubectlTerminal, version, component.TypeTemplate), &KubectlTerminal{}); err != nil {
 		panic(err)
 	}
@@ -85,6 +88,7 @@ var (
 	_ component.StepRunnable   = (*Health)(nil)
 	_ component.StepRunnable   = (*Container)(nil)
 	_ component.StepRunnable   = (*Kubectl)(nil)
+	_ component.StepRunnable   = (*CNIInfo)(nil)
 )
 
 type Package struct {
@@ -588,6 +592,34 @@ func (stepper *ClusterNode) renderIPVSCarePod(w io.Writer) error {
 
 func (stepper *CNIInfo) NewInstance() component.ObjectMeta {
 	return &CNIInfo{}
+}
+
+func (stepper *CNIInfo) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	instance, err := downloader.NewInstance(ctx, stepper.CNI.Type, stepper.CNI.Version, runtime.GOARCH, !stepper.CNI.Offline, opts.DryRun)
+	if err != nil {
+		return nil, err
+	}
+	dstFile, err := instance.DownloadImages()
+	if err != nil {
+		return nil, err
+	}
+	// load image package
+	if err = utils.LoadImage(ctx, opts.DryRun, dstFile, stepper.CNI.CriType); err == nil {
+		logger.Info("calico packages offline install successfully")
+	}
+
+	return nil, err
+}
+
+func (stepper *CNIInfo) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+	instance, err := downloader.NewInstance(ctx, stepper.CNI.Type, stepper.CNI.Version, runtime.GOARCH, !stepper.CNI.Offline, opts.DryRun)
+	if err != nil {
+		return nil, err
+	}
+	if err = instance.RemoveImages(); err != nil {
+		logger.Error("remove calico images compressed file failed", zap.Error(err))
+	}
+	return nil, nil
 }
 
 func (stepper *CNIInfo) Render(ctx context.Context, opts component.Options) error {
