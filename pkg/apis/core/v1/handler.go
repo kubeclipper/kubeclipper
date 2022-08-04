@@ -330,16 +330,6 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 	}
 	for _, cronBackup := range cronBackups.Items {
 		if cronBackup.Spec.ClusterName == c.Name {
-			// make the cronBackup disable
-			if _, ok := cronBackup.Labels[common.LabelCronBackupEnable]; ok {
-				delete(cronBackup.Labels, common.LabelCronBackupEnable)
-				cronBackup.Labels[common.LabelCronBackupDisable] = ""
-				_, err = h.clusterOperator.UpdateCronBackup(request.Request.Context(), &cronBackup)
-				if err != nil {
-					restplus.HandleInternalError(response, request, err)
-					return
-				}
-			}
 			// delete cronBackup
 			if err = h.clusterOperator.DeleteCronBackup(request.Request.Context(), cronBackup.Name); err != nil {
 				restplus.HandleInternalError(response, request, err)
@@ -382,7 +372,8 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 		op.Status.Status = v1.OperationStatusRunning
 
-		if backup.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || backup.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
+		// Ensure that all backups are created before deleting the cluster
+		if backup.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
 			restplus.HandlerErrorWithCustomCode(response, request, http.StatusExpectationFailed, 417, "", fmt.Errorf("backup is %s now, can't delete", backup.Status.ClusterBackupStatus))
 			return
 		}
