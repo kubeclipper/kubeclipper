@@ -26,32 +26,20 @@ import (
 	"net"
 
 	"github.com/vishvananda/netlink"
+
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 )
 
-func GetDefaultIP(ipv4 bool) (net.IP, error) {
-	family := netlink.FAMILY_V4
+func GetDefaultIP(ipv4 bool, method string) (net.IP, error) {
+	version := autodetection.IPv4
 	if !ipv4 {
-		family = netlink.FAMILY_V6
+		version = autodetection.IPv4
 	}
-	rl, err := netlink.RouteList(nil, family)
+	ipNet, err := autodetection.AutoDetectCIDR(method, version)
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range rl {
-		if r.Gw == nil {
-			continue
-		}
-		link, err := netlink.LinkByIndex(r.LinkIndex)
-		if err != nil {
-			return nil, err
-		}
-		addrs, err := netlink.AddrList(link, family)
-		if err != nil {
-			return nil, err
-		}
-		return addrs[0].IP, nil
-	}
-	return nil, errors.New("no default IP address")
+	return ipNet.IP, nil
 }
 
 func GetDefaultGateway(ipv4 bool) (ip net.IP, err error) {

@@ -22,7 +22,10 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/kubeclipper/kubeclipper/pkg/simple/imageproxy"
 
@@ -47,6 +50,7 @@ const (
 type Config struct {
 	AgentID                   string              `json:"agentID,omitempty" yaml:"agentID"`
 	Region                    string              `json:"region,omitempty" yaml:"region"`
+	IPDetect                  string              `json:"ipDetect,omitempty" yaml:"ipDetect"`
 	RegisterNode              bool                `json:"registerNode,omitempty" yaml:"registerNode"`
 	NodeStatusUpdateFrequency time.Duration       `json:"nodeStatusUpdateFrequency,omitempty" yaml:"nodeStatusUpdateFrequency"`
 	DownloaderOptions         *downloader.Options `json:"downloader" yaml:"downloader" mapstructure:"downloader"`
@@ -55,6 +59,12 @@ type Config struct {
 	OpLogOptions              *oplog.Options      `json:"oplog,omitempty" yaml:"oplog,omitempty" mapstructure:"oplog"`
 	ImageProxyOptions         *imageproxy.Options `json:"imageProxy,omitempty" yaml:"imageProxy,omitempty" mapstructure:"imageProxy"`
 }
+
+var (
+	config    *Config
+	once      sync.Once
+	configErr error
+)
 
 func New() *Config {
 	return &Config{
@@ -68,7 +78,7 @@ func New() *Config {
 	}
 }
 
-// convertToMap simply converts config to map[string]bool
+// ToMap convertToMap simply converts config to map[string]bool
 // to hide sensitive information
 func (conf *Config) ToMap() map[string]bool {
 	conf.stripEmptyOptions()
@@ -103,22 +113,28 @@ func (conf *Config) stripEmptyOptions() {
 }
 
 func TryLoadFromDisk() (*Config, error) {
-	viper.SetConfigName(defaultConfigurationName)
-	viper.AddConfigPath(defaultConfigurationPath)
-	// Load from current working directory, only used for debugging
-	viper.AddConfigPath(".")
-	//viper.SetConfigType("yaml")
+	once.Do(func() {
+		viper.SetConfigName(defaultConfigurationName)
+		viper.AddConfigPath(defaultConfigurationPath)
+		// Load from current working directory, only used for debugging
+		viper.AddConfigPath(".")
 
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
+		if configErr = viper.ReadInConfig(); configErr != nil {
+			logger.Error("read config fail", zap.Error(configErr))
+			return
+		}
+
+		config = New()
+		if configErr = viper.Unmarshal(config); configErr != nil {
+			logger.Error("unmarshal config fail", zap.Error(configErr))
+			return
+		}
+	})
+
+	if configErr != nil {
+		return nil, configErr
 	}
-
-	conf := New()
-
-	if err := viper.Unmarshal(conf); err != nil {
-		return nil, err
-	}
-	return conf, nil
+	return config, nil
 }
 
 func SetConfig(key string, value interface{}) {

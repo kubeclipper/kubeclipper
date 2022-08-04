@@ -33,6 +33,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 
 	"github.com/google/uuid"
@@ -166,7 +167,7 @@ func (d *DeployOptions) Complete() error {
 		d.deployConfig.EtcdConfig.ClientPort = allInOneEtcdClientPort
 		d.deployConfig.EtcdConfig.PeerPort = allInOneEtcdPeerPort
 		d.deployConfig.EtcdConfig.MetricsPort = allInOneEtcdMetricsPort
-		ip, err := netutil.GetDefaultIP(true)
+		ip, err := netutil.GetDefaultIP(true, d.deployConfig.IPDetect)
 		if err != nil {
 			return err
 		}
@@ -199,6 +200,9 @@ func (d *DeployOptions) Complete() error {
 }
 
 func (d *DeployOptions) ValidateArgs() error {
+	if d.deployConfig.IPDetect != "" && !autodetection.CheckMethod(d.deployConfig.IPDetect) {
+		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
+	}
 	if d.deployConfig.Pkg == "" {
 		return fmt.Errorf("--pkg must be specified")
 	}
@@ -668,6 +672,7 @@ func (d *DeployOptions) getKcAgentConfigTemplateContent(region string) string {
 	var data = make(map[string]interface{})
 	data["AgentID"] = uuid.New().String()
 	data["Region"] = region
+	data["IPDetect"] = d.deployConfig.IPDetect
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.StaticServerPort)
 	if d.deployConfig.Debug {
 		data["LogLevel"] = "debug"

@@ -39,7 +39,7 @@ func TestGetDefaultIP(t *testing.T) {
 		assert.FailNowf(t, "failed to exec ip r command", err.Error())
 	}
 	list := strings.Split(stdOutBuf.String(), " ")
-	ip, err := GetDefaultIP(true)
+	ip, err := GetDefaultIP(true, "")
 	if err != nil {
 		assert.FailNowf(t, "failed to get default IP", err.Error())
 	}

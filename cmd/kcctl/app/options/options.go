@@ -28,6 +28,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
+
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
@@ -167,6 +169,7 @@ type DeployConfig struct {
 	EtcdConfig       *Etcd         `json:"etcd" yaml:"etcd,omitempty"`
 	ServerIPs        []string      `json:"serverIPs" yaml:"serverIPs,omitempty"`
 	AgentRegions     Agents        `json:"agents" yaml:"agents,omitempty"`
+	IPDetect         string        `json:"ipDetect" yaml:"ipDetect,omitempty"`
 	Debug            bool          `json:"debug" yaml:"debug,omitempty"`
 	DefaultRegion    string        `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
 	ServerPort       int           `json:"serverPort" yaml:"serverPort,omitempty"`
@@ -229,6 +232,7 @@ func NewDeployOptions() *DeployConfig {
 			DataDir:     "/var/lib/kc-etcd",
 		},
 		Debug:            false,
+		IPDetect:         autodetection.MethodFirst,
 		DefaultRegion:    "default",
 		ServerPort:       8080,
 		StaticServerPort: 8081,
@@ -319,6 +323,7 @@ func getRepoMirror() string {
 
 func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&c.Config, "deploy-config", "c", c.Config, "Path to the config file to use for Deploy.")
+	flags.StringVar(&c.IPDetect, "ip-detect", c.IPDetect, "Kc ip detect method.")
 	flags.BoolVar(&c.Debug, "debug", c.Debug, "Deploy kc use debug mode")
 	flags.StringVarP(&c.DefaultRegion, "region", "r", c.DefaultRegion, "Kc agent default region")
 	flags.IntVar(&c.ServerPort, "server-port", c.ServerPort, "Kc server port")
