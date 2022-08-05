@@ -179,9 +179,9 @@ func (c *Cluster) Complete() {
 }
 
 type Certification struct {
-	Name           string `json:"name,omitempty"`
-	CAName         string `json:"caName"`
-	ExpirationTime string `json:"expirationTime,omitempty"`
+	Name           string      `json:"name,omitempty"`
+	CAName         string      `json:"caName"`
+	ExpirationTime metav1.Time `json:"expirationTime,omitempty"`
 }
 
 type ComponentStatus string

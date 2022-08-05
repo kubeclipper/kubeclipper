@@ -435,7 +435,7 @@ var Roles = []iamv1.GlobalRole{
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters/plugins", "clusters/nodes", "clusters/backups", "clusters/cronbackups", "clusters/certification"},
+				Resources: []string{"clusters/plugins", "clusters/nodes", "clusters/backups", "clusters/cronbackups", "clusters/certification", "clusters/kubeconfig"},
 				Verbs:     []string{"*"},
 			},
 			{

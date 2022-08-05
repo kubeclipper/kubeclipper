@@ -523,6 +523,28 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
+func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter(query.ParameterName)
+	ctx := request.Request.Context()
+	clu, err := h.clusterOperator.GetCluster(ctx, name)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	extraMeta, err := h.getClusterMetadata(ctx, clu)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	_, _ = response.Write([]byte(kubeConfig))
+}
+
 func (h *handler) ListNodes(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
 	if q.Watch {

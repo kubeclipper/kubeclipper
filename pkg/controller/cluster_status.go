@@ -36,6 +36,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -159,22 +160,31 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 	certification := make([]v1.Certification, 0)
 	for _, ca := range cas[1:4] {
 		crt := strings.Fields(ca)
+		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
+		if parErr != nil {
+			s.log.Warn("get cluster failed when get cluster ca expiration time", zap.String("cluster", clusterName))
+			return
+		}
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
 			CAName:         "",
-			ExpirationTime: strings.Join(crt[1:6], " "),
+			ExpirationTime: metav1.Time{Time: expire},
 		})
 	}
 	for _, cert := range crts[1:] {
 		crt := strings.Fields(cert)
+		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
+		if parErr != nil {
+			s.log.Warn("get cluster failed when get cluster cert expiration time", zap.String("cluster", clusterName))
+			return
+		}
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
 			CAName:         crt[7],
-			ExpirationTime: strings.Join(crt[1:6], " "),
+			ExpirationTime: metav1.Time{Time: expire},
 		})
 	}
 	clu.Status.Certifications = certification
-	logger.Infof(" clu.Status.Certifications lens : %d", len(clu.Status.Certifications))
 	if _, err = s.ClusterWriter.UpdateCluster(context.TODO(), clu); err != nil {
 		s.log.Warn("update cluster certification status failed", zap.String("cluster", clusterName), zap.Error(err))
 		return

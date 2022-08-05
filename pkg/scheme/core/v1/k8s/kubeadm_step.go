@@ -26,9 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -469,6 +473,31 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	stepper.EtcdDataPath = c.Etcd.DataDir
 
 	return stepper
+}
+
+func GetKubeConfig(ctx context.Context, name string, node component.Node, deliveryCmd service.CmdDelivery) (string, error) {
+	content, err := deliveryCmd.DeliverCmd(ctx, node.ID, []string{"cat", "/etc/kubernetes/admin.conf"}, 3*time.Minute)
+	if err != nil {
+		logger.Errorf(" cat kubeConfig error: %s", err.Error())
+		return "", err
+	}
+
+	cfg, err := clientcmd.NewClientConfigFromBytes(content)
+	if err != nil {
+		return "", err
+	}
+	kubeConfig, err := cfg.RawConfig()
+	if err != nil {
+		return "", err
+	}
+	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.IPv4)
+
+	config, err := clientcmd.Write(kubeConfig)
+	if err != nil {
+		return "", err
+	}
+
+	return string(config), nil
 }
 
 func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1.Step, error) {
