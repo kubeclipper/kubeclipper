@@ -407,12 +407,13 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		return err
 	}
 	if err = (&clustercontroller.ClusterReconciler{
-		CmdDelivery:     mgr.GetCmdDelivery(),
-		ClusterLister:   informerFactory.Core().V1().Clusters().Lister(),
-		NodeLister:      informerFactory.Core().V1().Nodes().Lister(),
-		NodeWriter:      clusterOperator,
-		ClusterWriter:   clusterOperator,
-		OperationWriter: opOperator,
+		CmdDelivery:      mgr.GetCmdDelivery(),
+		ClusterLister:    informerFactory.Core().V1().Clusters().Lister(),
+		NodeLister:       informerFactory.Core().V1().Nodes().Lister(),
+		NodeWriter:       clusterOperator,
+		ClusterWriter:    clusterOperator,
+		OperationWriter:  opOperator,
+		CronBackupWriter: clusterOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}

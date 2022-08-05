@@ -199,6 +199,7 @@ type CronBackupWriter interface {
 	CreateCronBackup(ctx context.Context, cronBackup *v1.CronBackup) (*v1.CronBackup, error)
 	UpdateCronBackup(ctx context.Context, cronBackup *v1.CronBackup) (*v1.CronBackup, error)
 	DeleteCronBackup(ctx context.Context, name string) error
+	DeleteCronBackupCollection(ctx context.Context, query *query.Query) error
 }
 
 type DNSReader interface {
