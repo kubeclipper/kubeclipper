@@ -250,14 +250,6 @@ func EncodeCertPEM(cert *x509.Certificate) []byte {
 	return pem.EncodeToMemory(&block)
 }
 
-func DecodeCertPEM(pem []byte) ([]*x509.Certificate, error) {
-	cert, err := certutil.ParseCertsPEM(pem)
-	if err != nil {
-		return nil, err
-	}
-	return cert, nil
-}
-
 // WriteKey stores the given key at the given location
 func WriteKey(pkiPath, name string, key crypto.Signer) error {
 	if key == nil {

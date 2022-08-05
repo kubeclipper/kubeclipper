@@ -22,10 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/client-go/tools/clientcmd"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/component"

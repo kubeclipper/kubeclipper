@@ -19,9 +19,10 @@
 package v1
 
 import (
-	"github.com/kubeclipper/kubeclipper/pkg/server/runtime"
-	"k8s.io/client-go/tools/clientcmd/api"
 	"net/http"
+
+	"github.com/kubeclipper/kubeclipper/pkg/server/runtime"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
@@ -152,7 +153,7 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), api.Config{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), clientcmdapi.Config{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.PUT("/clusters/{name}/nodes").
