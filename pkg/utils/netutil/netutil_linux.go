@@ -52,10 +52,9 @@ func GetDefaultGateway(ipv4 bool) (ip net.IP, err error) {
 		return nil, err
 	}
 	for _, r := range rl {
-		if r.Gw == nil {
-			continue
+		if r.Gw != nil && r.Dst == nil {
+			return r.Gw, nil
 		}
-		return r.Gw, nil
 	}
 	return nil, errors.New("no default gateway")
 }
