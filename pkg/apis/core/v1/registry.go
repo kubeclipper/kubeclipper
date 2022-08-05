@@ -19,6 +19,8 @@
 package v1
 
 import (
+	"github.com/kubeclipper/kubeclipper/pkg/server/runtime"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"net/http"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
@@ -30,14 +32,12 @@ import (
 
 	"github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/kubeclipper/kubeclipper/pkg/models"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/server/runtime"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var GroupVersion = schema.GroupVersion{Group: corev1.GroupName, Version: "v1"}
@@ -144,14 +144,15 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
-	webservice.Route(webservice.GET("/clusters/{name}/certification").
+	webservice.Route(webservice.GET("/clusters/{name}/kubeconfig").
 		To(h.GetKubeConfig).
+		Produces("text/plain", restful.MIME_JSON).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
-		Doc("List certifications details").
+		Doc("Get kubeconfig file").
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.KubeConfig{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), api.Config{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.PUT("/clusters/{name}/nodes").

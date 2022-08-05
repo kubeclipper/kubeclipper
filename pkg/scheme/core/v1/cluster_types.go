@@ -19,13 +19,11 @@
 package v1
 
 import (
-	"strings"
-	"time"
-
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"strings"
 )
 
 // +genclient
@@ -179,14 +177,10 @@ func (c *Cluster) Complete() {
 	matchCniVersion(c.KubernetesVersion, &c.CNI)
 }
 
-type KubeConfig struct {
-	KubeConfig string `json:"kubeconfig"`
-}
-
 type Certification struct {
-	Name           string    `json:"name,omitempty"`
-	CAName         string    `json:"caName"`
-	ExpirationTime time.Time `json:"expirationTime,omitempty"`
+	Name           string      `json:"name,omitempty"`
+	CAName         string      `json:"caName"`
+	ExpirationTime metav1.Time `json:"expirationTime,omitempty"`
 }
 
 type ComponentStatus string

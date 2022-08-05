@@ -536,13 +536,13 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	kubeConfig, err := h.getCertificationList(extraMeta)
+	kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
-	_ = response.WriteHeaderAndEntity(http.StatusOK, v1.KubeConfig{KubeConfig: kubeConfig})
+	_, _ = response.Write([]byte(kubeConfig))
 }
 
 func (h *handler) ListNodes(request *restful.Request, response *restful.Response) {

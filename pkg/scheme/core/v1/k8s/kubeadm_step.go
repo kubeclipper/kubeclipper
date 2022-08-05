@@ -22,11 +22,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/client-go/tools/clientcmd"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -49,26 +48,6 @@ const (
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
 )
-
-var kubeConfigTemplate = `apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: %s
-    server: https://%s:6443
-  name: %s
-contexts:
-- context:
-    cluster: %s
-    user: kubernetes-admin
-  name: kubernetes-admin@%s
-current-context: kubernetes-admin@%s
-kind: Config
-preferences: {}
-users:
-- name: kubernetes-admin
-  user:
-    client-certificate-data: %s
-    client-key-data: %s`
 
 type Runnable v1.Cluster
 
@@ -500,11 +479,23 @@ func GetKubeConfig(ctx context.Context, name string, node component.Node, delive
 		logger.Errorf(" cat kubeConfig error: %s", err.Error())
 		return "", err
 	}
-	clusterCert, _ := fileutil.GetSpecValueFromFile(content, "clusters.0.cluster.certificate-authority-data")
-	clientCert, _ := fileutil.GetSpecValueFromFile(content, "users.0.user.client-certificate-data")
-	clientKey, _ := fileutil.GetSpecValueFromFile(content, "users.0.user.client-key-data")
-	kubeConfig := fmt.Sprintf(kubeConfigTemplate, clusterCert, node.IPv4, name, name, name, name, clientCert, clientKey)
-	return kubeConfig, nil
+
+	cfg, err := clientcmd.NewClientConfigFromBytes(content)
+	if err != nil {
+		return "", err
+	}
+	kubeConfig, err := cfg.RawConfig()
+	if err != nil {
+		return "", err
+	}
+	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.IPv4)
+
+	config, err := clientcmd.Write(kubeConfig)
+	if err != nil {
+		return "", err
+	}
+
+	return string(config), nil
 }
 
 func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1.Step, error) {

@@ -36,6 +36,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -167,7 +168,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
 			CAName:         "",
-			ExpirationTime: expire,
+			ExpirationTime: metav1.Time{Time: expire},
 		})
 	}
 	for _, cert := range crts[1:] {
@@ -180,7 +181,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
 			CAName:         crt[7],
-			ExpirationTime: expire,
+			ExpirationTime: metav1.Time{Time: expire},
 		})
 	}
 	clu.Status.Certifications = certification
