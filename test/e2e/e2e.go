@@ -21,13 +21,12 @@ package e2e
 import (
 	"testing"
 
+	"github.com/kubeclipper/kubeclipper/test/framework"
+	"github.com/kubeclipper/kubeclipper/test/framework/ginkgowrapper"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/gomega"
-	"go.uber.org/zap"
-
-	"github.com/kubeclipper/kubeclipper/pkg/logger"
-	"github.com/kubeclipper/kubeclipper/test/framework/ginkgowrapper"
 )
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
@@ -47,6 +46,6 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 
 func RunE2ETests(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgowrapper.Fail)
-	logger.Info("Starting e2e run on Ginkgo node", zap.Int("node", config.GinkgoConfig.ParallelNode))
-	ginkgo.RunSpecs(t, "K8s-Installer e2e suite")
+	framework.Logf("Starting e2e run on Ginkgo %d node", config.GinkgoConfig.ParallelNode)
+	ginkgo.RunSpecs(t, "KubeClipper e2e suite")
 }
