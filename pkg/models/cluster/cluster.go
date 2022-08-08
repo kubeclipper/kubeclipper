@@ -407,6 +407,18 @@ func (c *clusterOperator) DeleteCronBackup(ctx context.Context, name string) err
 	return err
 }
 
+func (c *clusterOperator) DeleteCronBackupCollection(ctx context.Context, query *query.Query) error {
+	if _, err := c.cronBackupStorage.DeleteCollection(ctx, func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}, &metav1.DeleteOptions{}, &metainternalversion.ListOptions{
+		LabelSelector: query.GetLabelSelector(),
+		FieldSelector: query.GetFieldSelector(),
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
 // dns 相关
 
 func (c *clusterOperator) ListDomains(ctx context.Context, query *query.Query) (*v1.DomainList, error) {

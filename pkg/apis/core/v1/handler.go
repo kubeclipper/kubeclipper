@@ -32,6 +32,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	r "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
@@ -1151,7 +1152,8 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 
-	backup.Name = fmt.Sprintf("%s-%s", backup.Name, clusterName)
+	randNum := r.String(6)
+	backup.Name = fmt.Sprintf("%s-%s-%s", c.Name, clusterName, randNum)
 	backup.Status.KubernetesVersion = c.KubernetesVersion
 	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]

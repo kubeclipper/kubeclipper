@@ -228,7 +228,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		return err
 	}
 
-	randNum := rand.String(5)
+	randNum := rand.String(6)
 	backup.Name = fmt.Sprintf("%s-%s-%s", c.Name, cronBackup.Name, randNum)
 	b, err := r.BackupLister.Get(backup.Name)
 	if err != nil && !apimachineryErrors.IsNotFound(err) {

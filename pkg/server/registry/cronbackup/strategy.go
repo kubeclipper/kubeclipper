@@ -66,7 +66,9 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 }
 
 func SelectableFields(obj *v1.CronBackup) fields.Set {
-	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
+	return generic.AddObjectMetaFieldsSet(fields.Set{
+		"spec.clusterName": obj.Spec.ClusterName,
+	}, &obj.ObjectMeta, false)
 }
 
 func MatchCronBackup(label labels.Selector, field fields.Selector) storage.SelectionPredicate {

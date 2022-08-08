@@ -54,13 +54,14 @@ import (
 )
 
 type ClusterReconciler struct {
-	CmdDelivery     service.CmdDelivery
-	mgr             manager.Manager
-	ClusterLister   listerv1.ClusterLister
-	NodeLister      listerv1.NodeLister
-	NodeWriter      cluster.NodeWriter
-	ClusterWriter   cluster.ClusterWriter
-	OperationWriter operation.Writer
+	CmdDelivery      service.CmdDelivery
+	mgr              manager.Manager
+	ClusterLister    listerv1.ClusterLister
+	NodeLister       listerv1.NodeLister
+	NodeWriter       cluster.NodeWriter
+	ClusterWriter    cluster.ClusterWriter
+	OperationWriter  operation.Writer
+	CronBackupWriter cluster.CronBackupWriter
 }
 
 func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
@@ -111,6 +112,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			err = r.updateClusterNode(ctx, clu, true)
 			if err != nil {
 				log.Error("Failed to update cluster node", zap.Error(err))
+				return ctrl.Result{}, err
+			}
+			err = r.CronBackupWriter.DeleteCronBackupCollection(ctx, &query.Query{FieldSelector: fmt.Sprintf("spec.clusterName=%s", clu.Name)})
+			if err != nil {
+				log.Error("Failed to delete cronBackup", zap.Error(err))
 				return ctrl.Result{}, err
 			}
 			err = r.OperationWriter.DeleteOperationCollection(ctx, &query.Query{LabelSelector: fmt.Sprintf("%s=%s", common.LabelClusterName, clu.Name)})
