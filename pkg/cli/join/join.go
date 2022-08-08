@@ -142,8 +142,7 @@ func (c *JoinOptions) preCheck() bool {
 			return false
 		}
 	}
-
-	return true
+	return sudo.MultiNIC("ipDetect", c.deployConfig.SSHConfig, c.IOStreams, c.agentRegion.ListIP(), c.ipDetect)
 }
 
 func (c *JoinOptions) Complete() error {

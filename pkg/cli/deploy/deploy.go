@@ -370,6 +370,9 @@ func (d *DeployOptions) preCheck() bool {
 	if !sudo.PreCheck("sudo", d.deployConfig.SSHConfig, d.IOStreams, d.allNodes) {
 		return false
 	}
+	if !sudo.MultiNIC("ipDetect", d.deployConfig.SSHConfig, d.IOStreams, d.deployConfig.AgentRegions.ListIP(), d.deployConfig.IPDetect) {
+		return false
+	}
 	return true
 }
 
