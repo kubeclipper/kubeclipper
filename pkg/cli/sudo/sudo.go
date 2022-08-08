@@ -19,12 +19,16 @@
 package sudo
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
@@ -92,4 +96,68 @@ func PreCheck(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 
 	_, _ = streams.Out.Write([]byte("Ignore this error, still exec cmd? Please input (yes/no)"))
 	return utils.AskForConfirmation()
+}
+
+var (
+	errorMultiNIC = errors.New("node has multi nic bug not specify --ip-detect flag")
+)
+
+// MultiNIC check node has multi NIC but node specify ip-detect flag.
+func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, allNodes []string, ipDetect string) bool {
+	logger.Infof("============>%s PRECHECK ...", name)
+	if ipDetect != "" {
+		logger.Infof("============>%s PRECHECK OK!", name)
+		return true
+	}
+	// check iface list
+	// ifconfig|grep ": "|awk {'print $1'}|sed 's/://'
+	err := sshutils.CmdBatch(sshConfig, allNodes, `ip a|grep ": "|awk {'print $2'}|sed 's/://'`, func(result sshutils.Result, err error) error {
+		if err != nil {
+			if strings.Contains(err.Error(), "handshake failed: ssh: unable to authenticate, attempted methods [none password]") {
+				return fmt.Errorf("passwd or user error while ssh '%s@%s',please try again", result.User, result.Host)
+			}
+			return err
+		}
+		if result.ExitCode != 0 {
+			return fmt.Errorf("%s stderr:%s", result.Short(), result.Stderr)
+		}
+		ifaces := strings.Split(result.Stdout, "\n")
+		ifaces = sliceutil.RemoveString(ifaces, func(item string) bool {
+			return item == ""
+		})
+		rifcae := filterLogicIface(ifaces)
+
+		if len(rifcae) > 1 {
+			return errorMultiNIC
+		}
+		return nil
+	})
+
+	if err != nil {
+		logger.Error(err)
+		logger.Errorf("===========>%s PRECHECK FAILED!", name)
+		if err == errorMultiNIC {
+			_, _ = streams.Out.Write([]byte("node has multi nic,and --ip-detect flag not specified,default ip " +
+				"detect method is 'first-found',which maybe chose a wrong one,you can add --ip-detect flag to specify it." + "\n"))
+		}
+		_, _ = streams.Out.Write([]byte("Ignore this error, still exec cmd? Please input (yes/no)"))
+		return utils.AskForConfirmation()
+	}
+
+	logger.Infof("============>%s PRECHECK OK!", name)
+	return true
+}
+
+func filterLogicIface(ifcaes []string) []string {
+	if len(autodetection.DefaultInterfacesToExclude) == 0 {
+		return ifcaes
+	}
+	excludeRegexp, _ := regexp.Compile("(" + strings.Join(autodetection.DefaultInterfacesToExclude, ")|(") + ")")
+	ret := make([]string, 0, len(ifcaes))
+	for _, ifcae := range ifcaes {
+		if !excludeRegexp.MatchString(ifcae) {
+			ret = append(ret, ifcae)
+		}
+	}
+	return ret
 }

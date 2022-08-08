@@ -28,8 +28,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
-
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
@@ -232,7 +230,6 @@ func NewDeployOptions() *DeployConfig {
 			DataDir:     "/var/lib/kc-etcd",
 		},
 		Debug:            false,
-		IPDetect:         autodetection.MethodFirst,
 		DefaultRegion:    "default",
 		ServerPort:       8080,
 		StaticServerPort: 8081,
