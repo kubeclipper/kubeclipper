@@ -2745,7 +2745,7 @@ func (h *handler) CreateCronBackup(request *restful.Request, response *restful.R
 		nextRunAt := metav1.NewTime(s.Next(time.Now()))
 		cb.Status.NextScheduleTime = &nextRunAt
 	} else if cb.Spec.RunAt != nil {
-		if cb.Spec.RunAt.Time.Add(10 * time.Second).Before(time.Now()) {
+		if cb.Spec.RunAt.Time.Add(3 * time.Second).Before(time.Now()) {
 			restplus.HandleBadRequest(response, request, fmt.Errorf("the specified run time should be later than the current time"))
 			return
 		}
