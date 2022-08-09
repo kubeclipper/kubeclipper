@@ -706,7 +706,6 @@ func (d *DeployOptions) getKcAgentConfigTemplateContent(region string) string {
 func (d *DeployOptions) deployKcServer() {
 	cmdList := []string{
 		"mkdir -pv /etc/kubeclipper-server",
-		//sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/configs/*.json /etc/kubeclipper-server/", config.DefaultPkgPath)),
 		sshutils.WrapEcho(config.KcServerService, "/usr/lib/systemd/system/kc-server.service"),
 		fmt.Sprintf("mkdir -pv %s ", d.deployConfig.StaticServerPath),
 		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/resource/* %s/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
