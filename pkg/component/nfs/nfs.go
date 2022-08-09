@@ -29,6 +29,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/component/common"
+
 	"go.uber.org/zap"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -169,6 +171,13 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 	// when the component does not specify an ImageRepoMirror, the cluster LocalRegistry is inherited
 	if n.ImageRepoMirror == "" {
 		n.ImageRepoMirror = metadata.LocalRegistry
+	} else {
+		// set the component image repository to CRI insecure registry to avoid image pull failure
+		insecureRegistryStep, err := common.GetAddInsecureRegistry(metadata.Masters, metadata.CRI, n.ImageRepoMirror)
+		if err != nil {
+			return err
+		}
+		n.installSteps = append(n.installSteps, insecureRegistryStep)
 	}
 	if metadata.Offline && n.ImageRepoMirror == "" {
 		// TODO: arch is unnecessary, version can be configured
@@ -183,7 +192,7 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 		}
 		n.installSteps = append(n.installSteps, v1.Step{
 			ID:         strutil.GetUUID(),
-			Name:       "ImageLoader",
+			Name:       "imageLoader",
 			Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 			ErrIgnore:  false,
 			RetryTimes: 1,
