@@ -165,7 +165,7 @@ func (c *DrainOptions) preCheck() bool {
 	c.agents = sets.NewString(c.agents...).List()
 
 	for _, agent := range c.agents {
-		if !c.deployConfig.AgentRegions.Exists(agent) {
+		if !c.deployConfig.Agents.Exists(agent) {
 			logger.Errorf("agent %s is not in agent nodes", agent)
 			return false
 		}
@@ -250,7 +250,7 @@ func (c *DrainOptions) agentFilesAndData(node *v1.Node) error {
 	}
 
 	// 	3.rewrite deploy config
-	c.deployConfig.AgentRegions.Delete(node.Status.Ipv4DefaultIP)
+	c.deployConfig.Agents.Delete(node.Status.Ipv4DefaultIP)
 	err = c.deployConfig.Write()
 	if err != nil {
 		return errors.WithMessage(err, "rewrite deploy config")

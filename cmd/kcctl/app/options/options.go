@@ -25,14 +25,16 @@ import (
 	"path/filepath"
 
 	"github.com/subosito/gotenv"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
+
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/util/homedir"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 
@@ -161,12 +163,38 @@ type ImageProxy struct {
 	KcImageRepoMirror string `json:"kcImageRepoMirror" yaml:"kcImageRepoMirror,omitempty"`
 }
 
+type Agents map[string]Metadata // key:ip
+
+func (a Agents) ListIP() []string {
+	list := make([]string, 0, len(a))
+	for ip := range a {
+		list = append(list, ip)
+	}
+	return list
+}
+func (a Agents) Exists(ip string) bool {
+	_, ok := a[ip]
+	return ok
+}
+func (a Agents) Delete(ip string) {
+	delete(a, ip)
+}
+
+func (a Agents) Add(ip string, metadata Metadata) {
+	a[ip] = metadata
+}
+
+type Metadata struct {
+	Region string `json:"region" yaml:"region,omitempty"`
+	FIP    string `json:"fip" yaml:"fip,omitempty"`
+}
+
 type DeployConfig struct {
 	Config           string        `json:"-" yaml:"-"`
 	SSHConfig        *sshutils.SSH `json:"ssh" yaml:"ssh,omitempty"`
 	EtcdConfig       *Etcd         `json:"etcd" yaml:"etcd,omitempty"`
 	ServerIPs        []string      `json:"serverIPs" yaml:"serverIPs,omitempty"`
-	AgentRegions     Agents        `json:"agents" yaml:"agents,omitempty"`
+	Agents           Agents        `json:"agents" yaml:"agents,omitempty"`
 	IPDetect         string        `json:"ipDetect" yaml:"ipDetect,omitempty"`
 	Debug            bool          `json:"debug" yaml:"debug,omitempty"`
 	DefaultRegion    string        `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
@@ -181,9 +209,10 @@ type DeployConfig struct {
 	ImageProxy       *ImageProxy   `json:"imageProxy" yaml:"imageProxy,omitempty"`
 }
 
-type Agents map[string][]string // key: region, value: ips
+type AgentRegions map[string][]string // key: region, value: ips
+type FIPs map[string]string           // key: ip, value: fip
 
-func (a Agents) ListIP() []string {
+func (a AgentRegions) ListIP() []string {
 	set := sets.NewString()
 	for _, v := range a {
 		set.Insert(v...)
@@ -191,14 +220,14 @@ func (a Agents) ListIP() []string {
 	return set.List()
 }
 
-func (a Agents) Add(region, ip string) {
+func (a AgentRegions) Add(region, ip string) {
 	if a.Exists(ip) {
 		return
 	}
 	a[region] = append(a[region], ip)
 }
 
-func (a Agents) Delete(ip string) {
+func (a AgentRegions) Delete(ip string) {
 	for region := range a {
 		a[region] = sliceutil.RemoveString(a[region], func(item string) bool {
 			return item == ip
@@ -209,7 +238,7 @@ func (a Agents) Delete(ip string) {
 	}
 }
 
-func (a Agents) Exists(ip string) bool {
+func (a AgentRegions) Exists(ip string) bool {
 	for _, agents := range a {
 		if sliceutil.HasString(agents, ip) {
 			return true
@@ -220,6 +249,7 @@ func (a Agents) Exists(ip string) bool {
 
 func NewDeployOptions() *DeployConfig {
 	return &DeployConfig{
+		IPDetect: autodetection.MethodFirst,
 		SSHConfig: &sshutils.SSH{
 			User: "root",
 		},
@@ -248,7 +278,7 @@ func NewDeployOptions() *DeployConfig {
 		ImageProxy: &ImageProxy{
 			KcImageRepoMirror: getRepoMirror(),
 		},
-		AgentRegions: make(Agents),
+		Agents: make(Agents),
 	}
 }
 
@@ -276,7 +306,23 @@ func (c *DeployConfig) Complete() error {
 	if err != nil {
 		return err
 	}
-	return yaml.Unmarshal(bytes, c)
+	err = yaml.Unmarshal(bytes, c)
+	if err != nil {
+		return err
+	}
+	// fill default region
+	for ip := range c.Agents {
+		metadata := c.Agents[ip]
+		if metadata.Region == "" {
+			if c.DefaultRegion == "" {
+				return fmt.Errorf("one of region or defaultRegion must specify")
+			}
+			metadata.Region = c.DefaultRegion
+			c.Agents[ip] = metadata
+		}
+	}
+
+	return nil
 }
 
 // Omitempty use unmarshal+marshal to omit empty field.

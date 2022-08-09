@@ -238,7 +238,11 @@ mq:
 
 const KcAgentConfigTmpl = `agentID: {{.AgentID}}
 ipDetect: {{.IPDetect}}
-region: {{.Region}}
+metadata:
+  region: {{.Region}}
+{{- if .FIP}}
+  fip: {{.FIP}}
+{{- end}}
 registerNode: true
 nodeStatusUpdateFrequency: 1m
 downloader:

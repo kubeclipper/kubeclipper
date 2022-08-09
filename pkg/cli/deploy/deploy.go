@@ -100,6 +100,8 @@ const (
 
   # Deploy from config.
   kcctl deploy --deploy-config deploy-config.yaml
+  # Deploy and config fip to agent node.
+  kcctl deploy --server 172.20.149.198 --agent us-west-1:10.0.0.10 --agent us-west-2:20.0.0.11 --fip 10.0.0.10:172.20.149.199 --fip 20.0.0.11:172.20.149.200
 
   Please read 'kcctl deploy -h' get more deploy flags`
 	defaultPkg              = "https://oss.kubeclipper.io/release/kc-latest.tar.gz"
@@ -114,6 +116,7 @@ type DeployOptions struct {
 	allNodes     []string
 	servers      map[string]string
 	agents       []string // user input's agents,maybe with region,need to parse.
+	fips         []string // ip:fip
 }
 
 func NewDeployOptions(streams options.IOStreams) *DeployOptions {
@@ -145,6 +148,7 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
+	cmd.Flags().StringArrayVar(&o.fips, "fip", o.fips, "Kc agent ip and fip.")
 	o.deployConfig.AddFlags(cmd.Flags())
 
 	cmd.AddCommand(NewCmdDeployConfig(o))
@@ -176,15 +180,16 @@ func (d *DeployOptions) Complete() error {
 		d.agents = []string{ip.String()}
 	}
 
-	if d.deployConfig.Config == "" { // use flags if not specify config file
-		if d.deployConfig.AgentRegions, err = join.BuildAgentRegion(d.agents, d.deployConfig.DefaultRegion); err != nil {
+	// if specify config，ignore flags.
+	if d.deployConfig.Config == "" {
+		if d.deployConfig.Agents, err = join.BuildAgent(d.agents, d.fips, d.deployConfig.DefaultRegion); err != nil {
 			return err
 		}
 	}
 
 	d.allNodes = sets.NewString().
 		Insert(d.deployConfig.ServerIPs...).
-		Insert(d.deployConfig.AgentRegions.ListIP()...).
+		Insert(d.deployConfig.Agents.ListIP()...).
 		List()
 
 	if !d.deployConfig.MQ.External {
@@ -370,7 +375,7 @@ func (d *DeployOptions) preCheck() bool {
 	if !sudo.PreCheck("sudo", d.deployConfig.SSHConfig, d.IOStreams, d.allNodes) {
 		return false
 	}
-	if !sudo.MultiNIC("ipDetect", d.deployConfig.SSHConfig, d.IOStreams, d.deployConfig.AgentRegions.ListIP(), d.deployConfig.IPDetect) {
+	if !sudo.MultiNIC("ipDetect", d.deployConfig.SSHConfig, d.IOStreams, d.deployConfig.Agents.ListIP(), d.deployConfig.IPDetect) {
 		return false
 	}
 	return true
@@ -525,15 +530,15 @@ func (d DeployOptions) generateAndSendCerts() error {
 				return err
 			}
 			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.CA,
-				d.deployConfig.AgentRegions.ListIP(), filepath.Dir(d.deployConfig.MQ.CA), nil, nil); err != nil {
+				d.deployConfig.Agents.ListIP(), filepath.Dir(d.deployConfig.MQ.CA), nil, nil); err != nil {
 				return err
 			}
 			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.ClientCert,
-				d.deployConfig.AgentRegions.ListIP(), filepath.Dir(d.deployConfig.MQ.ClientCert), nil, nil); err != nil {
+				d.deployConfig.Agents.ListIP(), filepath.Dir(d.deployConfig.MQ.ClientCert), nil, nil); err != nil {
 				return err
 			}
 			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.ClientKey,
-				d.deployConfig.AgentRegions.ListIP(), filepath.Dir(d.deployConfig.MQ.ClientKey), nil, nil); err != nil {
+				d.deployConfig.Agents.ListIP(), filepath.Dir(d.deployConfig.MQ.ClientKey), nil, nil); err != nil {
 				return err
 			}
 		}
@@ -662,7 +667,7 @@ func (d *DeployOptions) getKcServerConfigTemplateContent(ip string) string {
 	return buffer.String()
 }
 
-func (d *DeployOptions) getKcAgentConfigTemplateContent(region string) string {
+func (d *DeployOptions) getKcAgentConfigTemplateContent(metadata options.Metadata) string {
 	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
 	if err != nil {
 		logger.Fatalf("template parse failed: %s", err.Error())
@@ -674,7 +679,8 @@ func (d *DeployOptions) getKcAgentConfigTemplateContent(region string) string {
 
 	var data = make(map[string]interface{})
 	data["AgentID"] = uuid.New().String()
-	data["Region"] = region
+	data["Region"] = metadata.Region
+	data["FIP"] = metadata.FIP
 	data["IPDetect"] = d.deployConfig.IPDetect
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.StaticServerPort)
 	if d.deployConfig.Debug {
@@ -751,23 +757,21 @@ func (d *DeployOptions) deployKcConsole() {
 }
 
 func (d *DeployOptions) deployKcAgent() {
-	for region, agents := range d.deployConfig.AgentRegions {
-		for _, agent := range agents {
-			agentConfig := d.getKcAgentConfigTemplateContent(region)
-			cmdList := []string{
-				sshutils.WrapEcho(config.KcAgentService, "/usr/lib/systemd/system/kc-agent.service"),
-				"mkdir -pv /etc/kubeclipper-agent",
-				sshutils.WrapEcho(agentConfig, "/etc/kubeclipper-agent/kubeclipper-agent.yaml"),
-				"systemctl daemon-reload && systemctl enable kc-agent --now",
+	for agent, metadata := range d.deployConfig.Agents {
+		agentConfig := d.getKcAgentConfigTemplateContent(metadata)
+		cmdList := []string{
+			sshutils.WrapEcho(config.KcAgentService, "/usr/lib/systemd/system/kc-agent.service"),
+			"mkdir -pv /etc/kubeclipper-agent",
+			sshutils.WrapEcho(agentConfig, "/etc/kubeclipper-agent/kubeclipper-agent.yaml"),
+			"systemctl daemon-reload && systemctl enable kc-agent --now",
+		}
+		for _, cmd := range cmdList {
+			ret, err := sshutils.SSHCmdWithSudo(d.deployConfig.SSHConfig, agent, cmd)
+			if err != nil {
+				logger.Fatalf("[%s]deploy kc agent failed due to %s", agent, err.Error())
 			}
-			for _, cmd := range cmdList {
-				ret, err := sshutils.SSHCmdWithSudo(d.deployConfig.SSHConfig, agent, cmd)
-				if err != nil {
-					logger.Fatalf("[%s]deploy kc agent failed due to %s", agent, err.Error())
-				}
-				if err = ret.Error(); err != nil {
-					logger.Fatalf("[%s]deploy kc agent failed due to %s", agent, err.Error())
-				}
+			if err = ret.Error(); err != nil {
+				logger.Fatalf("[%s]deploy kc agent failed due to %s", agent, err.Error())
 			}
 		}
 	}
@@ -824,14 +828,14 @@ func (d *DeployOptions) sendAgentCertAndKey(contents []certutils.Config, pki str
 	for _, content := range contents {
 		err := utils.SendPackageV2(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".key"),
-			d.deployConfig.AgentRegions.ListIP(),
+			d.deployConfig.Agents.ListIP(),
 			filepath.Join(options.DefaultKcAgentConfigPath, pki), nil, nil)
 		if err != nil {
 			return err
 		}
 		err = utils.SendPackageV2(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".crt"),
-			d.deployConfig.AgentRegions.ListIP(),
+			d.deployConfig.Agents.ListIP(),
 			filepath.Join(options.DefaultKcAgentConfigPath, pki), nil, nil)
 		if err != nil {
 			return err

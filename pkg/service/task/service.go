@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
-
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -206,6 +205,7 @@ func (s *Service) Close() {
 func (s *Service) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	var setters []func(n *v1.Node) error
 	setters = append(setters,
+		nodestatus.Metadata(),
 		nodestatus.NodeAddress(s.IPDetect),
 		nodestatus.MachineInfo(),
 		nodestatus.ReadyCondition(s.clock.Now, TODO, TODO, TODO))

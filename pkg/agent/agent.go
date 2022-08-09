@@ -36,7 +36,7 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	s.taskService = task.NewService(s.Config.AgentID, s.Config.Region, s.Config.IPDetect, s.Config.RegisterNode, s.Config.MQOptions,
+	s.taskService = task.NewService(s.Config.AgentID, s.Config.MetaData.Region, s.Config.IPDetect, s.Config.RegisterNode, s.Config.MQOptions,
 		task.WithNodeStatusUpdateFrequency(s.Config.NodeStatusUpdateFrequency),
 		task.WithLeaseDurationSeconds(240),
 		task.WithOplog(opLog),

@@ -27,6 +27,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sysutil"
@@ -73,6 +75,24 @@ func NodeAddress(ipDetectMethod string) Setter {
 			return err
 		}
 		node.Status.Ipv4DefaultIP, node.Status.Ipv4DefaultGw = ip.To4().String(), gw.To4().String()
+		return nil
+	}
+}
+
+func Metadata() Setter {
+	return func(node *v1.Node) error {
+		conf, err := config.TryLoadFromDisk()
+		if err != nil {
+			logger.Error("Error getting metadata", zap.Error(err))
+			return err
+		}
+		node.Labels[common.LabelTopologyRegion] = conf.MetaData.Region
+
+		if conf.MetaData.FIP != "" {
+			node.Labels[common.LabelMetadataFIP] = conf.MetaData.FIP
+		} else {
+			delete(node.Labels, common.LabelMetadataFIP)
+		}
 		return nil
 	}
 }
