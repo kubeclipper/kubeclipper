@@ -71,6 +71,14 @@ func IsNotFound(err error) bool {
 	return CodeForError(err) == 404
 }
 
+func IsInternalError(err error) bool {
+	return CodeForError(err) == 500
+}
+
+func IsTooManyRequests(err error) bool {
+	return CodeForError(err) == 429
+}
+
 func CodeForError(err error) int32 {
 	if err == nil {
 		return -1
