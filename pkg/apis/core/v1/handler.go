@@ -2793,16 +2793,28 @@ func (h *handler) UpdateCronBackup(req *restful.Request, resp *restful.Response)
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	// disposable performed backup cannot be edited
+
 	if cb.Spec.RunAt != nil {
-		if after := metav1.NewTime(time.Now()).After(cb.Status.LastSuccessfulTime.Time); after {
-			restplus.HandleInternalError(resp, req, err)
-			return
+		// disposable performed cron backup cannot be edited
+		if cb.Status.LastSuccessfulTime != nil {
+			if after := metav1.NewTime(time.Now()).After(cb.Status.LastSuccessfulTime.Time); after {
+				reason := fmt.Errorf("disposable performed cron backup cannot be edited")
+				restplus.HandlerErrorWithCustomCode(resp, req, http.StatusExpectationFailed, 417, "edit cron backup failed", reason)
+				return
+			}
 		}
 		ocb.Spec.RunAt = cb.Spec.RunAt
+		ocb.Status.NextScheduleTime = cb.Spec.RunAt
 	}
-	ocb.Labels[common.AnnotationDescription] = cb.Labels[common.AnnotationDescription]
-	ocb.Spec.Schedule = cb.Spec.Schedule
+
+	if cb.Spec.Schedule != "" {
+		ocb.Spec.Schedule = cb.Spec.Schedule
+		// update the next schedule time
+		s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cb.Spec.Schedule)
+		nextRunAt := metav1.NewTime(s.Next(time.Now()))
+		ocb.Status.NextScheduleTime = &nextRunAt
+	}
+
 	_, err = h.clusterOperator.UpdateCronBackup(req.Request.Context(), ocb)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
