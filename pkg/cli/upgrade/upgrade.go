@@ -2,15 +2,15 @@ package upgrade
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
+
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
-	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 	"github.com/spf13/cobra"
-	"path"
-	"path/filepath"
 )
 
 /*
@@ -171,7 +171,6 @@ func (o *UpgradeOptions) sendPackage() error {
 		config.DefaultPkgPath)
 	err := utils.SendPackageV2(o.deployConfig.SSHConfig, o.pkg, serviceMap[o.component], config.DefaultPkgPath, nil, &tar)
 	if err != nil {
-		logger.Infof(" send package error: ", err)
 		return err
 	}
 	return nil
