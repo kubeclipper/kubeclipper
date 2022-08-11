@@ -1153,7 +1153,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 	}
 
 	randNum := r.String(6)
-	backup.Name = fmt.Sprintf("%s-%s-%s", c.Name, clusterName, randNum)
+	backup.Name = fmt.Sprintf("%s-%s-%s", c.Name, backup.Name, randNum)
 	backup.Status.KubernetesVersion = c.KubernetesVersion
 	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
