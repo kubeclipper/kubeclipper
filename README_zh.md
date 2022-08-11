@@ -138,10 +138,35 @@ kcctl get cluster -o yaml|grep status -A5
 
 进入 Running 状态即表示集群安装完成,您可以使用 `kubectl get cs` 命令来查看集群健康状况。
 
+## 开发和调试
+
+1. fork repo and clone
+2. run etcd locally, usually use docker / podman to run etcd container
+   ```bash
+   export HostIP="Your-IP"
+   docker run -d \
+   --net host \
+   k8s.gcr.io/etcd:3.5.0-0 etcd \
+   --advertise-client-urls http://${HostIP}:2379 \
+   --initial-advertise-peer-urls http://${HostIP}:2380 \
+   --initial-cluster=infra0=http://${HostIP}:2380 \
+   --listen-client-urls http://${HostIP}:2379,http://127.0.0.1:2379 \
+   --listen-metrics-urls http://127.0.0.1:2381 \
+   --listen-peer-urls http://${HostIP}:2380 \
+   --name infra0 \
+   --snapshot-count=10000 \
+   --data-dir=/var/lib/etcd
+   ```
+3. 更新 `kubeclipper-server.yaml` 中 etcd 的配置
+4. `make build`
+5. `./dist/kubeclipper-server serve`
+
 ## Architecture
 
-<!-- TODO: 架构 -->
+![kc-arch1](docs/img/kc-arch.png)
+
+![kc-arch2](docs/img/kc-arch2.png)
 
 ## Contributing
 
-<!-- TODO: Contributing -->
+请参考 [Community](https://github.com/kubeclipper-labs/community) 的相关文档，参与我们
