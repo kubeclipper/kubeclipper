@@ -173,7 +173,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Steps = append(op.Steps, steps...)
 
 		// join component
-		steps, err = p.makeWorkerNodeSteps(&extra, cluster, corev1.ActionInstall)
+		steps, err = p.makeWorkerNodeSteps(&extra, cluster, stepNodes, corev1.ActionInstall)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		action = corev1.ActionUninstall
 		op.Labels[common.LabelOperationAction] = corev1.OperationRemoveNodes
 
-		steps, err := p.makeWorkerNodeSteps(&extra, cluster, corev1.ActionUninstall)
+		steps, err := p.makeWorkerNodeSteps(&extra, cluster, stepNodes, corev1.ActionUninstall)
 		if err != nil {
 			return nil, err
 		}
@@ -227,10 +227,10 @@ func (p *PatchNodes) getPackageSteps(cluster *corev1.Cluster, action corev1.Step
 	return nil, fmt.Errorf("packageSteps no support action: %s", action)
 }
 
-func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, c *corev1.Cluster, action corev1.StepAction) ([]corev1.Step, error) {
+func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, c *corev1.Cluster, patchNodes []corev1.StepNode, action corev1.StepAction) ([]corev1.Step, error) {
 	role := p.Role.String()
 	gen := k8s.GenNode{}
-	err := gen.InitStepper(extra, c, role).MakeSteps(extra, role)
+	err := gen.InitStepper(extra, c, role).MakeSteps(extra, patchNodes, role)
 	if err != nil {
 		return nil, err
 	}
