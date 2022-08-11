@@ -101,18 +101,23 @@ func (stepper *GenNode) InitStepper(metadata *component.ExtraMetadata, cluster *
 	return stepper
 }
 
-func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string) error {
+func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes []v1.StepNode, role string) error {
 	err := stepper.Validate()
 	if err != nil {
 		return err
 	}
-
-	patchNodes := utils.UnwrapNodeList(stepper.Nodes)
 	masters := utils.UnwrapNodeList(metadata.Masters)
 	// add node to cluster
 	if len(stepper.installSteps) == 0 {
 		// We should use kubeadm to create join token on the first control plane node.
 		steps, err := EnvSetupSteps(patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps...)
+
+		cn := CNIInfo{}
+		steps, err = cn.InitStepper(&stepper.Cluster.CNI, &stepper.Cluster.Networking).InstallSteps(patchNodes, nil, true)
 		if err != nil {
 			return err
 		}
@@ -135,7 +140,7 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string
 
 	if len(stepper.uninstallSteps) == 0 {
 		args := []string{"--ignore-daemonsets", "--delete-local-data"}
-		for _, node := range stepper.Nodes {
+		for _, node := range patchNodes {
 			d := &Drain{}
 			steps, err := d.InitStepper(node.Hostname, args).UninstallSteps([]v1.StepNode{masters[0]})
 			if err != nil {
@@ -160,7 +165,15 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, role string
 			return err
 		}
 		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
+
 		// clean CNI config
+		cn := CNIInfo{}
+		steps, err = cn.InitStepper(&stepper.Cluster.CNI, &stepper.Cluster.Networking).UninstallSteps(patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
+
 		steps, err = CleanCNI(&stepper.Cluster.CNI, patchNodes)
 		if err != nil {
 			return err

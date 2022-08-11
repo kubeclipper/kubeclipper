@@ -179,7 +179,7 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	}
 
 	cn := CNIInfo{}
-	steps, err = cn.InitStepper(&c.CNI, &c.Networking).InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = cn.InitStepper(&c.CNI, &c.Networking).InstallSteps(nodes, []v1.StepNode{masters[0]}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +545,7 @@ func (stepper *CNIInfo) InitStepper(c *v1.CNI, networking *v1.Networking) *CNIIn
 	return stepper
 }
 
-func (stepper *CNIInfo) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+func (stepper *CNIInfo) InstallSteps(allNodes, nodes []v1.StepNode, onlyLoad bool) ([]v1.Step, error) {
 	var steps []v1.Step
 	bytes, err := json.Marshal(stepper)
 	if err != nil {
@@ -559,7 +559,7 @@ func (stepper *CNIInfo) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 				Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 				ErrIgnore:  false,
 				RetryTimes: 1,
-				Nodes:      nodes,
+				Nodes:      allNodes,
 				Action:     v1.ActionInstall,
 				Commands: []v1.Command{
 					{
@@ -569,6 +569,10 @@ func (stepper *CNIInfo) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 					},
 				},
 			},
+		}
+		// load only images for some special scenarios, such as JoinNode
+		if onlyLoad {
+			return steps, nil
 		}
 	}
 	return append(steps, v1.Step{
