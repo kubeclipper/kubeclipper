@@ -141,7 +141,7 @@ kcctl get cluster -o yaml|grep status -A5
 ## 开发和调试
 
 1. fork repo and clone
-2. run etcd locally, usually use docker / podman to run etcd container
+2. 本地运行 etcd, 通常使用 docker / podman 启动 etcd 容器，启动命令参考如下
    ```bash
    export HostIP="Your-IP"
    docker run -d \
@@ -169,4 +169,4 @@ kcctl get cluster -o yaml|grep status -A5
 
 ## Contributing
 
-请参考 [Community](https://github.com/kubeclipper-labs/community) 的相关文档，参与我们
+请参考 [Community](https://github.com/kubeclipper-labs/community) 的相关文档，加入我们
