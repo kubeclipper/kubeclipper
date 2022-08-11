@@ -44,7 +44,7 @@ For users who are new to KubeClipper and want to get started quickly, it is reco
 
 ### Preparations
 
-KubeClipper itself does not take up too many resources, but in order to run Kubernetes better in the future,  it is recommended that the hardware configuration should not be lower than the minimum requirements.  
+KubeClipper itself does not take up too many resources, but in order to run Kubernetes better in the future,  it is recommended that the hardware configuration should not be lower than the minimum requirements.
 
 You only need to prepare a host with reference to the following requirements for machine hardware and operating system.
 
@@ -108,7 +108,7 @@ kcctl deploy --user root --pk-file $SSH_PRIVATE_KEY
 
 > You only need to provide a ssh user and ssh password or ssh private key to deploy KubeClipper.
 
-After you runn this command, kcctl will check your installation environment and enter the installation process, if the conditions are met. 
+After you runn this command, kcctl will check your installation environment and enter the installation process, if the conditions are met.
 
 After printing the KubeClipper banner, the installation is complete.
 
@@ -166,10 +166,35 @@ kcctl get cluster -o yaml|grep status -A5
 Once the cluster enter  the `Running` state , it means that the creation is complete. You can use `kubectl get cs` command to view the cluster status.
 
 
+## Development and Debugging
+
+1. fork repo and clone
+2. run etcd locally, usually use docker / podman to run etcd container
+   ```bash
+   export HostIP="Your-IP"
+   docker run -d \
+   --net host \
+   k8s.gcr.io/etcd:3.5.0-0 etcd \
+   --advertise-client-urls http://${HostIP}:2379 \
+   --initial-advertise-peer-urls http://${HostIP}:2380 \
+   --initial-cluster=infra0=http://${HostIP}:2380 \
+   --listen-client-urls http://${HostIP}:2379,http://127.0.0.1:2379 \
+   --listen-metrics-urls http://127.0.0.1:2381 \
+   --listen-peer-urls http://${HostIP}:2380 \
+   --name infra0 \
+   --snapshot-count=10000 \
+   --data-dir=/var/lib/etcd
+   ```
+3. change `kubeclipper-server.yaml` etcd.serverList to your locally etcd cluster
+4. `make build`
+5. `./dist/kubeclipper-server serve`
+
 ## Architecture
 
-<!-- TODO: 架构 -->
+![kc-arch1](docs/img/kc-arch.png)
+
+![kc-arch2](docs/img/kc-arch2.png)
 
 ## Contributing
 
-<!-- TODO: Contributing -->
+Please follow [Community](https://github.com/kubeclipper-labs/community) to join us.
