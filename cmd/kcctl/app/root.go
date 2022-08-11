@@ -19,6 +19,7 @@
 package app
 
 import (
+	"github.com/kubeclipper/kubeclipper/pkg/cli/upgrade"
 	"io"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/completion"
@@ -91,6 +92,7 @@ func NewKubeClipperCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(resource.NewCmdResource(ioStreams))
 	cmds.AddCommand(completion.NewCmdCompletion(ioStreams.Out))
 	cmds.AddCommand(proxy.NewCmdProxy(ioStreams))
+	cmds.AddCommand(upgrade.NewCmdUpgrade(ioStreams))
 
 	return cmds
 }
