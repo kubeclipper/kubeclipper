@@ -58,13 +58,6 @@ type InsecureRegistry struct {
 	CreateAt metav1.Time `json:"createAt,omitempty"`
 }
 
-type MetaResource struct {
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Arch    string `json:"arch"`
-}
-
 type WebTerminal struct {
 	PrivateKey string `json:"privateKey,omitempty"`
 	PublicKey  string `json:"publicKey,omitempty"`

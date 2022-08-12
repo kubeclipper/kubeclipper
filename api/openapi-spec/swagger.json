@@ -5,7 +5,7 @@
     "title": "KubeClipper",
     "contact": {
       "name": "KubeClipper",
-      "url": "github.com/kubeclipper-labs/kubeclipper"
+      "url": "https://github.com/kubeclipper-labs/kubeclipper"
     },
     "license": {
       "name": "Apache 2.0",
@@ -141,7 +141,10 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/models.PageableResponse"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/scheme.MetaResource"
+              }
             }
           },
           "404": {
@@ -1126,6 +1129,39 @@
             "description": "OK",
             "schema": {
               "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/clusters/{name}/kubeconfig": {
+      "get": {
+        "produces": [
+          "text/plain",
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Get kubeconfig file",
+        "operationId": "GetKubeConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.Config"
             }
           },
           "404": {
@@ -4047,6 +4083,257 @@
     }
   },
   "definitions": {
+    "api.AuthInfo": {
+      "required": [
+        "LocationOfOrigin"
+      ],
+      "properties": {
+        "LocationOfOrigin": {
+          "type": "string"
+        },
+        "act-as": {
+          "type": "string"
+        },
+        "act-as-groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "act-as-user-extra": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "auth-provider": {
+          "$ref": "#/definitions/api.AuthProviderConfig"
+        },
+        "client-certificate": {
+          "type": "string"
+        },
+        "client-certificate-data": {
+          "type": "string"
+        },
+        "client-key": {
+          "type": "string"
+        },
+        "client-key-data": {
+          "type": "string"
+        },
+        "exec": {
+          "$ref": "#/definitions/api.ExecConfig"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "password": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "tokenFile": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      }
+    },
+    "api.AuthProviderConfig": {
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "config": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "api.Cluster": {
+      "required": [
+        "LocationOfOrigin",
+        "server"
+      ],
+      "properties": {
+        "LocationOfOrigin": {
+          "type": "string"
+        },
+        "certificate-authority": {
+          "type": "string"
+        },
+        "certificate-authority-data": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "insecure-skip-tls-verify": {
+          "type": "boolean"
+        },
+        "proxy-url": {
+          "type": "string"
+        },
+        "server": {
+          "type": "string"
+        },
+        "tls-server-name": {
+          "type": "string"
+        }
+      }
+    },
+    "api.Config": {
+      "required": [
+        "preferences",
+        "clusters",
+        "users",
+        "contexts",
+        "current-context"
+      ],
+      "properties": {
+        "apiVersion": {
+          "type": "string"
+        },
+        "clusters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/api.Cluster"
+          }
+        },
+        "contexts": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/api.Context"
+          }
+        },
+        "current-context": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "preferences": {
+          "$ref": "#/definitions/api.Preferences"
+        },
+        "users": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/api.AuthInfo"
+          }
+        }
+      }
+    },
+    "api.Context": {
+      "required": [
+        "LocationOfOrigin",
+        "cluster",
+        "user"
+      ],
+      "properties": {
+        "LocationOfOrigin": {
+          "type": "string"
+        },
+        "cluster": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        }
+      }
+    },
+    "api.ExecConfig": {
+      "required": [
+        "command",
+        "args",
+        "env",
+        "provideClusterInfo",
+        "Config",
+        "InteractiveMode",
+        "StdinUnavailable",
+        "StdinUnavailableMessage"
+      ],
+      "properties": {
+        "Config": {
+          "$ref": "#/definitions/runtime.Object"
+        },
+        "InteractiveMode": {
+          "type": "string"
+        },
+        "StdinUnavailable": {
+          "type": "boolean"
+        },
+        "StdinUnavailableMessage": {
+          "type": "string"
+        },
+        "apiVersion": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "command": {
+          "type": "string"
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.ExecEnvVar"
+          }
+        },
+        "installHint": {
+          "type": "string"
+        },
+        "provideClusterInfo": {
+          "type": "boolean"
+        }
+      }
+    },
+    "api.ExecEnvVar": {
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "api.Preferences": {
+      "properties": {
+        "colors": {
+          "type": "boolean"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      }
+    },
     "auth.UserMFAProviders": {
       "properties": {
         "providers": {
@@ -4366,6 +4653,46 @@
         }
       }
     },
+    "scheme.MetaResource": {
+      "required": [
+        "type",
+        "name",
+        "version",
+        "arch"
+      ],
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.Addon": {
+      "required": [
+        "name",
+        "version",
+        "config"
+      ],
+      "properties": {
+        "config": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
     "v1.AttachedVolume": {
       "required": [
         "name",
@@ -4468,25 +4795,24 @@
     "v1.CNI": {
       "required": [
         "type",
-        "podIPv4CIDR",
-        "podIPv6CIDR",
-        "mtu"
+        "Version",
+        "CriType",
+        "Offline"
       ],
       "properties": {
+        "CriType": {
+          "type": "string"
+        },
+        "Offline": {
+          "type": "boolean"
+        },
+        "Version": {
+          "type": "string"
+        },
         "calico": {
           "$ref": "#/definitions/v1.Calico"
         },
         "localRegistry": {
-          "type": "string"
-        },
-        "mtu": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "podIPv4CIDR": {
-          "type": "string"
-        },
-        "podIPv6CIDR": {
           "type": "string"
         },
         "type": {
@@ -4502,7 +4828,7 @@
         "IPv4AutoDetection",
         "IPv6AutoDetection",
         "mode",
-        "version"
+        "mtu"
       ],
       "properties": {
         "IPManger": {
@@ -4526,9 +4852,6 @@
             "skip-interface=INTERFACE-REGEX"
           ]
         },
-        "dualStack": {
-          "type": "boolean"
-        },
         "mode": {
           "type": "string",
           "enum": [
@@ -4540,11 +4863,9 @@
             "overlay"
           ]
         },
-        "version": {
-          "type": "string",
-          "enum": [
-            "v3.11.2"
-          ]
+        "mtu": {
+          "type": "integer",
+          "format": "int32"
         }
       }
     },
@@ -4566,47 +4887,86 @@
     },
     "v1.Cluster": {
       "required": [
-        "type"
+        "masters",
+        "kubernetesVersion",
+        "networking",
+        "containerRuntime",
+        "cni"
       ],
       "properties": {
+        "addons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.Addon"
+          }
+        },
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
           "type": "string"
+        },
+        "certSANs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cni": {
+          "$ref": "#/definitions/v1.CNI"
+        },
+        "containerRuntime": {
+          "$ref": "#/definitions/v1.ContainerRuntime"
+        },
+        "description": {
+          "type": "string"
+        },
+        "etcd": {
+          "$ref": "#/definitions/v1.Etcd"
         },
         "kind": {
           "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
           "type": "string"
         },
-        "kubeadm": {
-          "$ref": "#/definitions/v1.Kubeadm"
-        },
-        "kubeconfig": {
+        "kubeConfig": {
           "type": "string"
+        },
+        "kubeProxy": {
+          "$ref": "#/definitions/v1.KubeProxy"
+        },
+        "kubelet": {
+          "$ref": "#/definitions/v1.Kubelet"
+        },
+        "kubernetesVersion": {
+          "type": "string",
+          "enum": [
+            "v1.20.13"
+          ]
+        },
+        "localRegistry": {
+          "type": "string"
+        },
+        "masters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.WorkerNode"
+          }
         },
         "metadata": {
           "$ref": "#/definitions/v1.ObjectMeta"
         },
+        "networking": {
+          "$ref": "#/definitions/v1.Networking"
+        },
+        "provider": {
+          "$ref": "#/definitions/v1.ProviderSpec"
+        },
         "status": {
           "$ref": "#/definitions/v1.ClusterStatus"
         },
-        "type": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.ClusterCondition": {
-      "properties": {
-        "operation": {
-          "type": "string"
-        },
-        "operationID": {
-          "type": "string"
-        },
-        "operationStatus": {
-          "type": "string"
-        },
-        "startAt": {
-          "type": "string"
+        "workers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.WorkerNode"
+          }
         }
       }
     },
@@ -4624,14 +4984,11 @@
             "$ref": "#/definitions/v1.ComponentConditions"
           }
         },
-        "conditions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.ClusterCondition"
-          }
-        },
-        "status": {
+        "phase": {
           "type": "string"
+        },
+        "versions": {
+          "$ref": "#/definitions/v1.ClusterVersionsStatus"
         }
       }
     },
@@ -4649,6 +5006,28 @@
           "type": "boolean"
         },
         "version": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.ClusterVersionsStatus": {
+      "required": [
+        "controlPlane",
+        "apiserver",
+        "controllerManager",
+        "scheduler"
+      ],
+      "properties": {
+        "apiserver": {
+          "type": "string"
+        },
+        "controlPlane": {
+          "type": "string"
+        },
+        "controllerManager": {
+          "type": "string"
+        },
+        "scheduler": {
           "type": "string"
         }
       }
@@ -4678,24 +5057,6 @@
         }
       }
     },
-    "v1.Component": {
-      "required": [
-        "name",
-        "version",
-        "config"
-      ],
-      "properties": {
-        "config": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "version": {
-          "type": "string"
-        }
-      }
-    },
     "v1.ComponentConditions": {
       "required": [
         "name",
@@ -4716,25 +5077,8 @@
     },
     "v1.ContainerRuntime": {
       "required": [
-        "containerRuntimeType"
+        "type"
       ],
-      "properties": {
-        "containerRuntimeType": {
-          "type": "string",
-          "enum": [
-            "docker",
-            "containerd"
-          ]
-        },
-        "containerd": {
-          "$ref": "#/definitions/v1.Containerd"
-        },
-        "docker": {
-          "$ref": "#/definitions/v1.Docker"
-        }
-      }
-    },
-    "v1.Containerd": {
       "properties": {
         "insecureRegistry": {
           "type": "array",
@@ -4744,6 +5088,13 @@
         },
         "rootDir": {
           "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "docker",
+            "containerd"
+          ]
         },
         "version": {
           "type": "string",
@@ -4804,25 +5155,6 @@
         },
         "NextScheduleTime": {
           "type": "string"
-        }
-      }
-    },
-    "v1.Docker": {
-      "properties": {
-        "insecureRegistry": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "rootDir": {
-          "type": "string"
-        },
-        "version": {
-          "type": "string",
-          "enum": [
-            "19.03.12"
-          ]
         }
       }
     },
@@ -5029,94 +5361,7 @@
         }
       }
     },
-    "v1.KubeComponents": {
-      "required": [
-        "cni"
-      ],
-      "properties": {
-        "cni": {
-          "$ref": "#/definitions/v1.CNI"
-        },
-        "etcd": {
-          "$ref": "#/definitions/v1.Etcd"
-        },
-        "kubeProxy": {
-          "$ref": "#/definitions/v1.KubeProxy"
-        },
-        "kubelet": {
-          "$ref": "#/definitions/v1.Kubelet"
-        }
-      }
-    },
-    "v1.KubeProxy": {
-      "properties": {
-        "ipvs": {
-          "type": "boolean"
-        }
-      }
-    },
-    "v1.Kubeadm": {
-      "required": [
-        "masters",
-        "kubernetesVersion",
-        "containerRuntime",
-        "networking",
-        "kubeComponents"
-      ],
-      "properties": {
-        "certSANs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "components": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.Component"
-          }
-        },
-        "containerRuntime": {
-          "$ref": "#/definitions/v1.ContainerRuntime"
-        },
-        "description": {
-          "type": "string"
-        },
-        "kubeComponents": {
-          "$ref": "#/definitions/v1.KubeComponents"
-        },
-        "kubernetesVersion": {
-          "type": "string",
-          "enum": [
-            "v1.20.13"
-          ]
-        },
-        "localRegistry": {
-          "type": "string"
-        },
-        "masters": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.WorkerNode"
-          }
-        },
-        "networking": {
-          "$ref": "#/definitions/v1.Networking"
-        },
-        "offline": {
-          "type": "boolean"
-        },
-        "workerNodeVip": {
-          "type": "string"
-        },
-        "workers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.WorkerNode"
-          }
-        }
-      }
-    },
+    "v1.KubeProxy": {},
     "v1.Kubelet": {
       "required": [
         "rootDir"
@@ -5182,20 +5427,43 @@
         }
       }
     },
+    "v1.NetworkRanges": {
+      "required": [
+        "cidrBlocks"
+      ],
+      "properties": {
+        "cidrBlocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "v1.Networking": {
       "required": [
-        "serviceSubnet",
-        "podSubnet",
-        "dnsDomain"
+        "services",
+        "pods",
+        "dnsDomain",
+        "proxyMode"
       ],
       "properties": {
         "dnsDomain": {
           "type": "string"
         },
-        "podSubnet": {
+        "ipFamily": {
           "type": "string"
         },
-        "serviceSubnet": {
+        "pods": {
+          "$ref": "#/definitions/v1.NetworkRanges"
+        },
+        "proxyMode": {
+          "type": "string"
+        },
+        "services": {
+          "$ref": "#/definitions/v1.NetworkRanges"
+        },
+        "workerNodeVip": {
           "type": "string"
         }
       }
@@ -5582,13 +5850,13 @@
     "v1.PatchComponents": {
       "required": [
         "uninstall",
-        "components"
+        "addons"
       ],
       "properties": {
-        "components": {
+        "addons": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/v1.Component"
+            "$ref": "#/definitions/v1.Addon"
           }
         },
         "uninstall": {
@@ -5657,6 +5925,16 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "v1.ProviderSpec": {
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
         }
       }
     },

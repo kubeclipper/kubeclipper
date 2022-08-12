@@ -26,13 +26,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kubeclipper/kubeclipper/pkg/scheme"
+
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/sudo"
@@ -398,7 +398,7 @@ func (o *ResourceOptions) filter(data []*kc.ComponentMetas) map[string]printer.R
 			Node: metas.Node,
 		}
 
-		for _, resource := range metas.ComponentMetaList {
+		for _, resource := range metas.Addons {
 			if o.Type != "" && resource.Type != o.Type {
 				continue
 			}
@@ -411,9 +411,9 @@ func (o *ResourceOptions) filter(data []*kc.ComponentMetas) map[string]printer.R
 			if o.Arch != "" && resource.Arch != o.Arch {
 				continue
 			}
-			n.ComponentMetaList = append(n.ComponentMetaList, resource)
+			n.PackageMetadata.Addons = append(n.PackageMetadata.Addons, resource)
 		}
-		n.TotalCount = len(n.ComponentMetaList)
+		n.TotalCount = len(n.PackageMetadata.Addons)
 		metaMap[n.Node] = n
 	}
 	return metaMap
@@ -451,9 +451,9 @@ func (o *ResourceOptions) ResourcePush() error {
 			return err
 		}
 
-		metas.AppendOnly(o.Type, name, version, arch)
+		metas.AddonsAppendOnly(o.Type, name, version, arch)
 
-		metaBytes, err := json.MarshalIndent(&metas.ComponentMetaList, "", "  ")
+		metaBytes, err := json.MarshalIndent(&metas.PackageMetadata, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -522,12 +522,12 @@ func (o *ResourceOptions) ResourceDelete() error {
 		if err != nil {
 			return err
 		}
-		exist := metas.Exist(o.Name, o.Version, o.Arch)
+		exist := metas.AddonsExist(o.Name, o.Version, o.Arch)
 		if !exist {
 			logger.Warnf("resource %s-%s-%s not exists", o.Name, o.Version, o.Arch)
 			return nil
 		}
-		err = metas.Delete(o.Name, o.Version, o.Arch)
+		err = metas.AddonsDelete(o.Name, o.Version, o.Arch)
 		if err != nil {
 			return err
 		}
@@ -562,8 +562,13 @@ func (o *ResourceOptions) ReadMetadata(node string) (*kc.ComponentMetas, error) 
 	if err != nil {
 		return nil, err
 	}
+	var pMetadata scheme.PackageMetadata
+	if err = json.Unmarshal([]byte(ret.Stdout), &pMetadata); err != nil {
+		return nil, err
+	}
+
 	var metas kc.ComponentMetas
-	err = json.Unmarshal([]byte(ret.Stdout), &metas.ComponentMetaList)
+	metas.PackageMetadata = pMetadata
 	metas.Node = node
 	return &metas, err
 }
@@ -621,16 +626,16 @@ func (o *ResourceOptions) listArch(toComplete string) []string {
 	return set.List()
 }
 
-func (o *ResourceOptions) resourceList() []v1.MetaResource {
+func (o *ResourceOptions) resourceList() []scheme.MetaResource {
 	utils.CheckErr(o.Complete())
 
-	list := make([]v1.MetaResource, 0)
+	list := make([]scheme.MetaResource, 0)
 	for _, node := range o.deployConfig.ServerIPs {
 		metas, err := o.ReadMetadata(node)
 		if err != nil {
 			continue
 		}
-		for _, v := range metas.ComponentMetaList {
+		for _, v := range metas.PackageMetadata.Addons {
 			if o.Type != "" && v.Type != o.Type {
 				continue
 			}
