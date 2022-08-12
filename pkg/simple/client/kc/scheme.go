@@ -198,35 +198,35 @@ func (n *RoleList) YAMLPrint() ([]byte, error) {
 }
 
 type ComponentMetas struct {
-	Node                     string `json:"-"`
-	scheme.ComponentMetaList `json:"items" description:"paging data"`
-	TotalCount               int `json:"totalCount,omitempty" description:"total count"`
+	Node                   string `json:"-"`
+	scheme.PackageMetadata `json:"items" description:"paging data"`
+	TotalCount             int `json:"totalCount,omitempty" description:"total count"`
 }
 
 func (n *ComponentMetas) JSONPrint() ([]byte, error) {
-	if len(n.ComponentMetaList) == 1 {
-		return printer.JSONPrinter(n.ComponentMetaList[0])
+	if len(n.PackageMetadata.Addons) == 1 {
+		return printer.JSONPrinter(n.PackageMetadata.Addons[0])
 	}
 	return printer.JSONPrinter(n)
 }
 
 func (n *ComponentMetas) YAMLPrint() ([]byte, error) {
-	if len(n.ComponentMetaList) == 1 {
-		return printer.YAMLPrinter(n.ComponentMetaList[0])
+	if len(n.PackageMetadata.Addons) == 1 {
+		return printer.YAMLPrinter(n.PackageMetadata.Addons[0])
 	}
 	return printer.YAMLPrinter(n)
 }
 
 func (n *ComponentMetas) TablePrint() ([]string, [][]string) {
-	n.ComponentMetaList.Sort()
+	n.PackageMetadata.AddonsSort()
 	headers := []string{n.Node, "type", "name", "version", "arch"}
 	var data [][]string
-	for index, resource := range n.ComponentMetaList {
+	for index, resource := range n.PackageMetadata.Addons {
 		data = append(data, []string{fmt.Sprintf("%d.", index+1), resource.Type, resource.Name, resource.Version, resource.Arch})
 	}
 	return headers, data
 }
 
 type ComponentMeta struct {
-	Items []v1.MetaResource `json:"items"`
+	Items []scheme.MetaResource `json:"items"`
 }

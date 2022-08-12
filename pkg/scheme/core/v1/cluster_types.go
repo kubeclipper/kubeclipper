@@ -19,8 +19,6 @@
 package v1
 
 import (
-	"strings"
-
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -135,31 +133,7 @@ func (c *Cluster) Offline() bool {
 	return false
 }
 
-var k8sMatchCniVersion = map[string]map[string]string{
-	"118": {"calico": "v3.11.2"},
-	"119": {"calico": "v3.11.2"},
-	"120": {"calico": "v3.21.2"},
-	"121": {"calico": "v3.21.2"},
-	"122": {"calico": "v3.21.2"},
-	"123": {"calico": "v3.21.2"},
-}
-
-func matchCniVersion(k8sVersion string, cni *CNI) {
-	if k8sVersion == "" || cni == nil {
-		return
-	}
-	k8sVersion = strings.ReplaceAll(k8sVersion, "v", "")
-	k8sVersion = strings.ReplaceAll(k8sVersion, ".", "")
-
-	k8sVersion = strings.Join(strings.Split(k8sVersion, "")[0:3], "")
-
-	switch cni.Type {
-	case "calico":
-		cni.Version = k8sMatchCniVersion[k8sVersion][cni.Type]
-	}
-}
-
-func (c *Cluster) Complete() {
+func (c *Cluster) Complete(cniVersion string) {
 	if c.Provider.Name == "" {
 		c.Provider.Name = ClusterKubeadm
 	}
@@ -175,7 +149,7 @@ func (c *Cluster) Complete() {
 	c.CNI.LocalRegistry = c.LocalRegistry
 	c.CNI.CriType = c.ContainerRuntime.Type
 	c.CNI.Offline = c.Offline()
-	matchCniVersion(c.KubernetesVersion, &c.CNI)
+	c.CNI.Version = cniVersion
 }
 
 type Certification struct {

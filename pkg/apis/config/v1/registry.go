@@ -21,9 +21,9 @@ package v1
 import (
 	"net/http"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme"
 
-	"github.com/kubeclipper/kubeclipper/pkg/models"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/errors"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
@@ -100,7 +100,7 @@ func AddToContainer(c *restful.Container, platformOperator platform.Operator, co
 		Param(webservice.QueryParameter("online", "online or offline resource").
 			Required(false).
 			DefaultValue("false")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), []scheme.MetaResource{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.GET("/template").

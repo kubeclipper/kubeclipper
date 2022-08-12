@@ -21,6 +21,8 @@ package v1
 import (
 	"net/http"
 
+	"github.com/kubeclipper/kubeclipper/pkg/server/config"
+
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/kubeclipper/kubeclipper/pkg/server/runtime"
@@ -901,9 +903,9 @@ func SetupWebService(h *handler) *restful.WebService {
 	return webservice
 }
 
-func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator,
+func AddToContainer(c *restful.Container, cfg *config.Config, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator,
 	leaseOperator lease.Operator, delivery service.IDelivery) error {
-	h := newHandler(clusterOperator, op, leaseOperator, platform, delivery)
+	h := newHandler(cfg, clusterOperator, op, leaseOperator, platform, delivery)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

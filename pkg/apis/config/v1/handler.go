@@ -21,6 +21,8 @@ package v1
 import (
 	"net/http"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models"
+
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +37,6 @@ import (
 
 	"github.com/emicklei/go-restful"
 
-	"github.com/kubeclipper/kubeclipper/pkg/models"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 )
@@ -54,24 +55,15 @@ func newHandler(operator platform.Operator, config *serverconfig.Config) *handle
 
 func (h *handler) ListOfflineResource(request *restful.Request, response *restful.Response) {
 	online := query.GetBoolValueWithDefault(request, "online", false)
-	var (
-		metas = scheme.ComponentMetaList{}
-		err   error
-	)
-	if online {
-		err = metas.ReadFromCloud(true)
-	} else {
-		err = metas.ReadFile(h.serverConfig.StaticServerOptions.Path, true)
-	}
-
-	if err != nil {
+	metas := scheme.PackageMetadata{}
+	if err := metas.ReadMetadata(online, h.serverConfig.StaticServerOptions.Path); err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-
-	items := make([]interface{}, 0, len(metas))
-	for i := range metas {
-		items = append(items, metas[i])
+	addons := metas.Addons
+	items := make([]interface{}, 0, len(addons))
+	for i := range addons {
+		items = append(items, addons[i])
 	}
 	result := models.PageableResponse{
 		Items:      items,
