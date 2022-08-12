@@ -47,19 +47,28 @@ jobs:
           tar -zcvf kc-darwin-amd64.tar.gz darwin_amd64/
           tar -zcvf kc-darwin-arm64.tar.gz darwin_arm64/
           popd
-      - name: Generate Release file
-        run: echo ${{ github.sha }} > Release.txt
+      - name: Setup ossutil
+        uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint: ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_SECRET }}
+          #sts-token: "sts_token"
+      - name: Upload to oss
+        run: |
+          ossutil cp -rf dist/kc-linux-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
+          ossutil cp -rf dist/kc-linux-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
+          ossutil cp -rf dist/kc-darwin-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
+          ossutil cp -rf dist/kc-darwin-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
 
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            Release.txt
             dist/kc-linux-arm64.tar.gz
             dist/kc-linux-amd64.tar.gz
             dist/kc-darwin-amd64.tar.gz
             dist/kc-darwin-arm64.tar.gz
-          body_path: ${{ github.workspace }}/CHANGELOG/CHANGELOG-${{ steps.extract_tag.outputs.version }}.md
           # note you'll typically need to create a personal access token
           # with permissions to create releases in the other repo
           token: ${{ secrets.GH_TOKEN }}
