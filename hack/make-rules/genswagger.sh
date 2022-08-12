@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 # 暂时 workaround
-# 生成swagger需要在 go-restful 里注册所有的路由，这部分代码在 k8s的 sdk 里,它会去连 etcd
+# 生成 swagger 需要在 go-restful 里注册所有的路由，这部分代码在 k8s 的 sdk 里,它会去连 etcd
 # TODO: 更新 hack/gen-swagger/main.go, 复写注册路由的逻辑, 避免连接 etcd
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..

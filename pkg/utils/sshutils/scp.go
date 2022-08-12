@@ -326,7 +326,7 @@ func (ss *SSH) CopyLocalToRemote(host, localPath, remotePath string) {
 	}
 }
 
-// ssh session is a problem, 复用ssh链接
+// ssh session is a problem, 复用 ssh 链接
 func (ss *SSH) copyLocalDirToRemote(host string, sshClient *ssh.Client, sftpClient *sftp.Client, localPath, remotePath string) {
 	localFiles, err := ioutil.ReadDir(localPath)
 	if err != nil {

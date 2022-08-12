@@ -25,7 +25,7 @@ func initI18nForComponentMeta() error {
 		{
 			ID:      "nfs.metaTitle",
 			English: "NFS Setting",
-			Chinese: "NFS设置",
+			Chinese: "NFS 设置",
 		},
 		{
 			ID:      "nfs.serverAddr",
@@ -69,8 +69,8 @@ func initI18nForComponentMeta() error {
 		},
 		{
 			ID:      "nfs.imageRepoMirror",
-			English: "Nfs Image Repository Mirror",
-			Chinese: "Nfs镜像仓库代理",
+			English: "NFS Image Repository Mirror",
+			Chinese: "NFS 镜像仓库代理",
 		},
 	})
 }
