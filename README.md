@@ -74,7 +74,7 @@ You can download the latest version of kcctl directly with the following command
 
 ```bash
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | sh -
-# in china, use can add cn env, we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
+# in china, you can add cn env, we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn sh -
 ```
 
