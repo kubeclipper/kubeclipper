@@ -123,6 +123,8 @@ kcctl deploy --user root --pk-file $SSH_PRIVATE_KEY
 
 ```bash
 kcctl login -H http://localhost  -u admin -p Thinkbig1
+# 如果你在中国， 你可以在安装时使用 cn  环境变量, 此时我们会使用 registry.aliyuncs.com/google_containers 代替 k8s.gcr.io
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn sh -
 ```
 然后使用以下命令创建 k8s 集群:
 ```bash
