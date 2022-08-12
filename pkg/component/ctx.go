@@ -37,7 +37,7 @@ type ExtraMetadata struct {
 	// Offline 代表是在线还是离线安装
 	// LocalRegistry:
 	//    在线安装时可以填其他地址，默认是 docker.io
-	//    离线安装时可以填镜像来源，不填则使用http分发方式
+	//    离线安装时可以填镜像来源，不填则使用 http 分发方式
 	Masters       NodeList
 	Workers       NodeList
 	Offline       bool

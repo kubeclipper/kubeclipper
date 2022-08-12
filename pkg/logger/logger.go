@@ -83,7 +83,7 @@ func ApplyZapLoggerWithOptions(opts *Options) {
 	zl := zap.New(core)
 	if level == zapcore.DebugLevel {
 		// caller skip set 1
-		// 使得DEBUG模式下caller的值为调用当前package的代码路径
+		// 使得 DEBUG 模式下 caller 的值为调用当前 package 的代码路径
 		zl = zl.WithOptions(zap.AddCaller(), zap.AddCallerSkip(1), zap.AddStacktrace(zapcore.ErrorLevel))
 	} else {
 		zl = zl.WithOptions(zap.AddStacktrace(zapcore.FatalLevel))
