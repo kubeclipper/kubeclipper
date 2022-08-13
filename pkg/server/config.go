@@ -371,6 +371,11 @@ var Roles = []iamv1.GlobalRole{
 				Resources: []string{"terminal.key"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"templates"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
 		},
 	},
 	{
