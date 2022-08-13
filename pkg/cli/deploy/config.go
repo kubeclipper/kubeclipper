@@ -104,7 +104,7 @@ agents:
 #jwtSecret: ""
 
 # deploy resource package,support url or file absolute path.
-#pkg: https://github.com/kubeclipper/kubeclipper/release/kc-minimal.tar.gz
+#pkg: https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
 pkg: /tmp/kc-minimal.tar.gz
 
 # mq config,support internal or external mq.

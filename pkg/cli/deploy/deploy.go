@@ -86,23 +86,23 @@ const (
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg kc-minimal.tar.gz
 
   # Deploy env use remove http/https resource server
-  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg https://github.com/kubeclipper/kubeclipper/release/kc-minimal.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
 
   # Deploy env with many agent node in same region.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124  --pk-file ~/.ssh/id_rsa --pkg https://github.com/kubeclipper/kubeclipper/release/kc-minimal.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124  --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
 
   # Deploy env with many agent node in different region.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 --pk-file ~/.ssh/id_rsa --pkg https://github.com/kubeclipper/kubeclipper/release/kc-minimal.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
 
   # Deploy env with many agent node which has orderly ip.
   # this will add 10 agent,1.1.1.1, 1.1.1.2, ... 1.1.1.10.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://github.com/kubeclipper/kubeclipper/release/kc-minimal.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
 
   # Deploy from config.
   kcctl deploy --deploy-config deploy-config.yaml
 
   Please read 'kcctl deploy -h' get more deploy flags`
-	defaultPkg              = "https://oss.kubeclipper.io/release/kc-latest.tar.gz"
+	defaultPkg              = "https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz"
 	allInOneEtcdClientPort  = 12379
 	allInOneEtcdPeerPort    = 12380
 	allInOneEtcdMetricsPort = 12381
