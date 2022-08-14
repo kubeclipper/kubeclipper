@@ -51,8 +51,7 @@ You only need to prepare a host with reference to the following requirements for
 #### Hardware recommended configuration
 
 - Make sure your machine meets the minimum hardware requirements: CPU >= 2 cores, RAM >= 2GB.
-
-- Operating System: CentOS 7.x / Ubuntu18.04、20.04.
+- Operating System: CentOS 7.x / Ubuntu 18.04 / Ubuntu 20.04.
 
 #### Node requirements
 
@@ -74,7 +73,7 @@ You can download the latest version of kcctl directly with the following command
 
 ```bash
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | sh -
-# in china, you can add cn env, we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
+# In China, you can add cn env, we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn sh -
 ```
 
@@ -85,8 +84,6 @@ Check if the installation is successful with the following command:
 ```bash
 kcctl version
 ```
-
-
 
 #### Get Started with Installation
 
@@ -125,8 +122,6 @@ After printing the KubeClipper banner, the installation is complete.
                                  |_|   |_|
 ```
 
-
-
 ### Login Console
 
 When deployed successfully, you can open a browser and visit `http://$IP ` to enter the KubeClipper console.
@@ -136,8 +131,6 @@ When deployed successfully, you can open a browser and visit `http://$IP ` to en
  You can log in with the default account and password `admin / Thinkbig1 `.
 
 > You may need to configure port forwarding rules and open ports in security groups for external users to access the console.
-
-
 
 ### Create a k8s cluster
 
@@ -166,7 +159,6 @@ kcctl get cluster -o yaml|grep status -A5
 > You can also enter the console to view real-time logs.
 
 Once the cluster enter  the `Running` state , it means that the creation is complete. You can use `kubectl get cs` command to view the cluster status.
-
 
 ## Development and Debugging
 
