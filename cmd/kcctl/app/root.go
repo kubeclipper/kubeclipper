@@ -19,8 +19,9 @@
 package app
 
 import (
-	"github.com/kubeclipper/kubeclipper/pkg/cli/upgrade"
 	"io"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/upgrade"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/completion"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/proxy"
