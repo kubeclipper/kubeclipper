@@ -21,10 +21,14 @@ package clustercontroller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 
@@ -77,9 +81,37 @@ func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informer
 	if err = c.Watch(source.NewKindWithCache(&v1.Cluster{}, cache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
+	if err = c.Watch(source.NewKindWithCache(&v1.Node{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsForCluster)); err != nil {
+		return err
+	}
+
 	r.mgr = mgr
 	mgr.AddRunnable(c)
 	return nil
+}
+
+func (r *ClusterReconciler) findObjectsForCluster(objNode client.Object) []reconcile.Request {
+	// node deleted,ignore event
+	if !objNode.GetDeletionTimestamp().IsZero() {
+		return []reconcile.Request{}
+	}
+
+	node, err := r.NodeLister.Get(objNode.GetName())
+	if err != nil {
+		return []reconcile.Request{}
+	}
+	fip := node.Labels[common.LabelMetadataFloatIP]
+	role := node.Labels[common.LabelNodeRole]
+	// if master node has fip, maybe we need update the cluster's kubeconfig.
+	if fip != "" && role == string(common.NodeRoleMaster) {
+		clusterName := node.Labels[common.LabelClusterName]
+		return []reconcile.Request{
+			{NamespacedName: types.NamespacedName{
+				Name: clusterName,
+			}},
+		}
+	}
+	return []reconcile.Request{}
 }
 
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -200,8 +232,15 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name))
 		return err
 	}
+	fip := node.Labels[common.LabelMetadataFloatIP]
+	nodeIP := node.Status.Ipv4DefaultIP
+	if fip != "" {
+		nodeIP = fip
+	}
 
-	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil {
+	// no fip or kubeconfig already used fip, do nothing.
+	// else we need use fip to generate a new kubeconfig.
+	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil && strings.Contains(string(c.KubeConfig), nodeIP) {
 		log.Debug("clientset has been init")
 		return nil
 	}
@@ -221,8 +260,7 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	//	logger.Error("get cluster service account token error", zap.String("cluster", name), zap.Error(err))
 	//	return err
 	// }
-	kubeconfig := getKubeConfig(c.Name,
-		fmt.Sprintf("https://%s:6443", node.Status.Ipv4DefaultIP), "kc-server", string(token))
+	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s:6443", nodeIP), "kc-server", string(token))
 	c.KubeConfig = []byte(kubeconfig)
 	_, err = r.ClusterWriter.UpdateCluster(ctx, c)
 	if err != nil {

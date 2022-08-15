@@ -79,12 +79,17 @@ serverIPs:
 
 # kubeclipper agent node's ip list.
 # if you don't specify agent node,can use 'kcctl join' command to join after deploy.
-# use region to group ips.
+# you can specify metadata for per node.
 agents:
-  #us-west:
-  #- 192.168.10.10
-  #us-east:
-  #- 192.168.11.11
+  # with full metadata
+  #192.168.10.10:
+     #region: us-west
+     #fip: 172.20.150.199
+  # with region metadata
+  #192.168.10.11:
+     #region: us-west
+  # without metadata
+  #192.168.10.12:
 
 # run kubeclipper in debug mode.
 #debug: false

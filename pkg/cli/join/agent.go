@@ -20,18 +20,21 @@ package join
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 )
 
-func BuildAgentRegion(agentRegions []string, defaultRegion string) (options.Agents, error) {
-	m := make(options.Agents)
+func BuildAgentRegion(agentRegions []string, defaultRegion string) (options.AgentRegions, error) {
+	m := make(options.AgentRegions)
 	for _, agentRegion := range agentRegions {
 		var region, agentStr string
 		// region:agent
@@ -51,6 +54,57 @@ func BuildAgentRegion(agentRegions []string, defaultRegion string) (options.Agen
 				return nil, err
 			}
 			m[region] = append(m[region], ips...)
+		}
+	}
+	return m, nil
+}
+
+// BuildFIP parse ip and fip.
+func BuildFIP(fips []string) (options.FIPs, error) {
+	m := make(options.FIPs)
+
+	// ip:fip
+	for _, str := range fips {
+		// spilt by :
+		split := strings.Split(str, ":")
+		if len(split) != 2 {
+			return nil, fmt.Errorf("invalid fip %s", str)
+		}
+		ipStr := split[0]
+		fip := split[1]
+		if ip := net.ParseIP(ipStr); ip == nil {
+			return nil, fmt.Errorf("invalid ip %s", ipStr)
+		}
+		if ip := net.ParseIP(fip); ip == nil {
+			return nil, fmt.Errorf("invalid fip %s", fip)
+		}
+		if oldFip, ok := m[ipStr]; ok {
+			logger.Warnf("config %s repeat, %s already bind to %s", str, oldFip, ipStr)
+		}
+		m[ipStr] = fip
+	}
+	return m, nil
+}
+
+func BuildAgent(agentRegions, fips []string, defaultRegion string) (options.Agents, error) {
+	ipRegions, err := BuildAgentRegion(agentRegions, defaultRegion)
+	if err != nil {
+		return nil, errors.WithMessage(err, "parse region")
+	}
+	ipFIPs, err := BuildFIP(fips)
+	if err != nil {
+		return nil, errors.WithMessage(err, "parse fip")
+	}
+
+	var m = make(options.Agents)
+	for region, ips := range ipRegions {
+		for _, ip := range ips {
+			agent := options.Metadata{Region: region}
+			fip, ok := ipFIPs[ip]
+			if ok {
+				agent.FloatIP = fip
+			}
+			m[ip] = agent
 		}
 	}
 	return m, nil

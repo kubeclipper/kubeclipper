@@ -55,7 +55,7 @@ func TestBuildAgentRegion(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    options.Agents
+		want    options.AgentRegions
 		wantErr bool
 	}{
 		{"1", args{agentRegions: []string{"192.168.1.1"}, defaultRegion: "default"},
@@ -79,5 +79,74 @@ func TestBuildAgentRegion(t *testing.T) {
 				t.Errorf("BuildAgentRegion() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildFIP(t *testing.T) {
+	type args struct {
+		fips []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    options.FIPs
+		wantErr bool
+	}{
+		{
+			name: "1",
+			args: args{fips: []string{
+				"192.168.1.1:1.1.1.1",
+				"192.168.1.2:2.2.2.2",
+				"192.168.1.3:3.3.3.3"}},
+			want: options.FIPs{
+				"192.168.1.1": "1.1.1.1",
+				"192.168.1.2": "2.2.2.2",
+				"192.168.1.3": "3.3.3.3"},
+			wantErr: false,
+		},
+		{
+			name: "2",
+			args: args{fips: []string{
+				"192.168.1.3:3.3.3.333"}},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := BuildFIP(tt.args.fips)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("BuildFIP() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("BuildFIP() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildAgent(t *testing.T) {
+	agentRegions := []string{
+		"us-west-1:192.168.1.1,192.168.1.2,192.168.1.3-192.168.1.4"}
+	fips := []string{
+		"192.168.1.1:1.1.1.1",
+		"192.168.1.2:2.2.2.2",
+		"192.168.1.3:3.3.3.3",
+	}
+	defaultRegion := "default"
+	want := options.Agents{
+		"192.168.1.1": options.Metadata{Region: "us-west-1", FloatIP: "1.1.1.1"},
+		"192.168.1.2": options.Metadata{Region: "us-west-1", FloatIP: "2.2.2.2"},
+		"192.168.1.3": options.Metadata{Region: "us-west-1", FloatIP: "3.3.3.3"},
+		"192.168.1.4": options.Metadata{Region: "us-west-1"},
+	}
+	agent, err := BuildAgent(agentRegions, fips, defaultRegion)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(agent, want) {
+		t.Fatalf("got: %#v want: %#v", agent, want)
 	}
 }

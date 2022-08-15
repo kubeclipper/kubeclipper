@@ -97,7 +97,7 @@ func NewCmdClean(streams options.IOStreams) *cobra.Command {
 func (c *CleanOptions) Complete() error {
 	c.allNodes = sets.NewString().
 		Insert(c.deployConfig.ServerIPs...).
-		Insert(c.deployConfig.AgentRegions.ListIP()...).
+		Insert(c.deployConfig.Agents.ListIP()...).
 		List()
 	return c.deployConfig.Complete()
 }
@@ -121,7 +121,7 @@ func (c *CleanOptions) RunClean() {
 }
 
 func (c *CleanOptions) cleanKcAgent() {
-	if len(c.deployConfig.AgentRegions.ListIP()) == 0 {
+	if len(c.deployConfig.Agents.ListIP()) == 0 {
 		logger.V(2).Info("no kubeclipper agent need to be cleaned")
 		return
 	}
@@ -134,7 +134,7 @@ func (c *CleanOptions) cleanKcAgent() {
 		"systemctl reset-failed kc-agent || true",
 	}
 	for _, cmd := range cmdList {
-		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.AgentRegions.ListIP(), cmd, sshutils.DefaultWalk)
+		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.Agents.ListIP(), cmd, sshutils.DefaultWalk)
 		if err != nil {
 			logger.V(2).Error(err)
 		}

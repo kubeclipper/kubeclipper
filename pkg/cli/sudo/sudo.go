@@ -105,7 +105,7 @@ var (
 // MultiNIC check node has multi NIC but node specify ip-detect flag.
 func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, allNodes []string, ipDetect string) bool {
 	logger.Infof("============>%s PRECHECK ...", name)
-	if ipDetect != "" {
+	if ipDetect != "" && ipDetect != autodetection.MethodFirst {
 		logger.Infof("============>%s PRECHECK OK!", name)
 		return true
 	}
