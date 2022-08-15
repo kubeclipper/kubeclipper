@@ -61,8 +61,8 @@ type Config struct {
 }
 
 type MetaData struct {
-	Region string `json:"region,omitempty" yaml:"region,omitempty"`
-	FIP    string `json:"fip,omitempty" yaml:"fip,omitempty"`
+	Region  string `json:"region,omitempty" yaml:"region,omitempty"`
+	FloatIP string `json:"floatIP,omitempty" yaml:"floatIP,omitempty"`
 }
 
 var (

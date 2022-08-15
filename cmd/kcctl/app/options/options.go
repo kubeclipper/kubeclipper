@@ -185,8 +185,8 @@ func (a Agents) Add(ip string, metadata Metadata) {
 }
 
 type Metadata struct {
-	Region string `json:"region" yaml:"region,omitempty"`
-	FIP    string `json:"fip" yaml:"fip,omitempty"`
+	Region  string `json:"region" yaml:"region,omitempty"`
+	FloatIP string `json:"floatIP" yaml:"floatIP,omitempty"`
 }
 
 type DeployConfig struct {

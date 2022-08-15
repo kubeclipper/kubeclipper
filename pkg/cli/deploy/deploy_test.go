@@ -61,8 +61,8 @@ func TestDeployOptions_getKcAgentConfigTemplateContent(t *testing.T) {
 		"192.168.234.5": "master3",
 	}
 	metadata := options.Metadata{
-		Region: d.deployConfig.DefaultRegion,
-		FIP:    "1.1.1.1",
+		Region:  d.deployConfig.DefaultRegion,
+		FloatIP: "1.1.1.1",
 	}
 	for range d.deployConfig.ServerIPs {
 		t.Log(d.getKcAgentConfigTemplateContent(metadata))

@@ -240,8 +240,8 @@ const KcAgentConfigTmpl = `agentID: {{.AgentID}}
 ipDetect: {{.IPDetect}}
 metadata:
   region: {{.Region}}
-{{- if .FIP}}
-  fip: {{.FIP}}
+{{- if .FloatIP}}
+  floatIP: {{.FloatIP}}
 {{- end}}
 registerNode: true
 nodeStatusUpdateFrequency: 1m

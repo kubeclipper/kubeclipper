@@ -136,9 +136,9 @@ func TestBuildAgent(t *testing.T) {
 	}
 	defaultRegion := "default"
 	want := options.Agents{
-		"192.168.1.1": options.Metadata{Region: "us-west-1", FIP: "1.1.1.1"},
-		"192.168.1.2": options.Metadata{Region: "us-west-1", FIP: "2.2.2.2"},
-		"192.168.1.3": options.Metadata{Region: "us-west-1", FIP: "3.3.3.3"},
+		"192.168.1.1": options.Metadata{Region: "us-west-1", FloatIP: "1.1.1.1"},
+		"192.168.1.2": options.Metadata{Region: "us-west-1", FloatIP: "2.2.2.2"},
+		"192.168.1.3": options.Metadata{Region: "us-west-1", FloatIP: "3.3.3.3"},
 		"192.168.1.4": options.Metadata{Region: "us-west-1"},
 	}
 	agent, err := BuildAgent(agentRegions, fips, defaultRegion)

@@ -100,7 +100,7 @@ func (r *ClusterReconciler) findObjectsForCluster(objNode client.Object) []recon
 	if err != nil {
 		return []reconcile.Request{}
 	}
-	fip := node.Labels[common.LabelMetadataFIP]
+	fip := node.Labels[common.LabelMetadataFloatIP]
 	role := node.Labels[common.LabelNodeRole]
 	// if master node has fip, maybe we need update the cluster's kubeconfig.
 	if fip != "" && role == string(common.NodeRoleMaster) {
@@ -232,7 +232,7 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name))
 		return err
 	}
-	fip := node.Labels[common.LabelMetadataFIP]
+	fip := node.Labels[common.LabelMetadataFloatIP]
 	nodeIP := node.Status.Ipv4DefaultIP
 	if fip != "" {
 		nodeIP = fip

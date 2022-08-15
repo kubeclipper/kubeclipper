@@ -680,7 +680,7 @@ func (d *DeployOptions) getKcAgentConfigTemplateContent(metadata options.Metadat
 	var data = make(map[string]interface{})
 	data["AgentID"] = uuid.New().String()
 	data["Region"] = metadata.Region
-	data["FIP"] = metadata.FIP
+	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = d.deployConfig.IPDetect
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.StaticServerPort)
 	if d.deployConfig.Debug {

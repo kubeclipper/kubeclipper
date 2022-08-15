@@ -42,7 +42,7 @@ const (
 	LabelBackupPoint       = "kubeclipper.io/backupPoint"
 	LabelCronBackupDisable = "kubeclipper.io/cronBackupDisable"
 	LabelCronBackupEnable  = "kubeclipper.io/cronBackupEnable"
-	LabelMetadataFIP       = "metadata.kubeclipper.io/fip"
+	LabelMetadataFloatIP   = "metadata.kubeclipper.io/floatIP"
 )
 
 const (

@@ -102,7 +102,7 @@ func BuildAgent(agentRegions, fips []string, defaultRegion string) (options.Agen
 			agent := options.Metadata{Region: region}
 			fip, ok := ipFIPs[ip]
 			if ok {
-				agent.FIP = fip
+				agent.FloatIP = fip
 			}
 			m[ip] = agent
 		}

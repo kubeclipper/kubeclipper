@@ -96,7 +96,7 @@ type JoinOptions struct {
 	deployConfig *options.DeployConfig
 
 	agents     []string // user input agents,maybe with region,need to parse.
-	fips       []string // fip:ip
+	floatIPs   []string // format: ip:floatIP,e.g. 192.168.10.11:172.20.149.199
 	servers    []string
 	ipDetect   string
 	parseAgent options.Agents
@@ -130,7 +130,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method.")
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
-	cmd.Flags().StringArrayVar(&o.fips, "fip", o.fips, "Kc agent ip and fip.")
+	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))
 	return cmd
@@ -159,7 +159,7 @@ func (c *JoinOptions) Complete() error {
 		c.deployConfig.IPDetect = c.ipDetect
 	}
 	var err error
-	if c.parseAgent, err = BuildAgent(c.agents, c.fips, c.deployConfig.DefaultRegion); err != nil {
+	if c.parseAgent, err = BuildAgent(c.agents, c.floatIPs, c.deployConfig.DefaultRegion); err != nil {
 		return err
 	}
 	c.servers = sets.NewString(c.servers...).List()
@@ -313,7 +313,7 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata)
 
 	var data = make(map[string]interface{})
 	data["Region"] = metadata.Region
-	data["FIP"] = metadata.FIP
+	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = c.deployConfig.IPDetect
 	data["AgentID"] = uuid.New().String()
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.StaticServerPort)

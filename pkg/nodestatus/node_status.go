@@ -88,10 +88,10 @@ func Metadata() Setter {
 		}
 		node.Labels[common.LabelTopologyRegion] = conf.MetaData.Region
 
-		if conf.MetaData.FIP != "" {
-			node.Labels[common.LabelMetadataFIP] = conf.MetaData.FIP
+		if conf.MetaData.FloatIP != "" {
+			node.Labels[common.LabelMetadataFloatIP] = conf.MetaData.FloatIP
 		} else {
-			delete(node.Labels, common.LabelMetadataFIP)
+			delete(node.Labels, common.LabelMetadataFloatIP)
 		}
 		return nil
 	}
