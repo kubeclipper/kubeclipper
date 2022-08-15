@@ -136,7 +136,7 @@ func (o *UpgradeOptions) Validate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("server node must be even number")
 	}
 	o.serverIPs = o.deployConfig.ServerIPs
-	o.agentIPs = o.deployConfig.AgentRegions.ListIP()
+	o.agentIPs = o.deployConfig.Agents.ListIP()
 	serviceMap[options.UpgradeServer] = o.serverIPs
 	serviceMap[options.UpgradeAll] = append(o.serverIPs, o.agentIPs...)
 	serviceMap[options.UpgradeEtcd] = o.serverIPs
