@@ -1,0 +1,10 @@
+serverIP: 172.20.148.199
+defaultMQPort: 9889
+defaultStaticServerPort: 8081
+config:
+  - name: agent1
+    tunnels:
+      - localPort: 16443
+        remoteAddress: 192.168.10.11:6443
+      - localPort: 10022
+        remoteAddress: 192.168.10.11:22
