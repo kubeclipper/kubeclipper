@@ -36,6 +36,54 @@
 
 ## Features
 
+<details>
+  <summary><b>✨ Create Cluster</b></summary>
+  <ul>
+    <li>Supports online deployment, proxy deployment, offline deployment</li>
+    <li>Frequently-used mirror repository management</li>
+    <li>Create clusters / install plugins from templates</li>
+    <li>Supports multi-version K8S and CRI deployments</li>
+    <li>NFS storage support</li>
+  </ul>
+</details>
+
+<details>
+  <summary><b>☸️ Cluster Management</b></summary>
+  <ul>
+    <li>Multi-region, multi-cluster management</li>
+    <li>Access to cluster kubectl web console</li>
+    <li>Real-time logs during cluster operations</li>
+    <li>Edit clusters (metadata, etc.)</li>
+    <li>Deleting clusters</li>
+    <li>Adding / removing cluster nodes</li>
+    <li>Retry from breakpoint after creation failure</li>
+    <li>Cluster backup and restore, scheduled backups</li>
+    <li>Cluster version upgrade</li>
+    <li>Save entire cluster / individual plugins as templates</li>
+    <li>Cluster backup storage management</li>
+  </ul>
+</details>
+
+<details>
+  <summary><b>🌐 Region & Node Management</b></summary>
+  <ul>
+    <li>Adding agent nodes and specifying regions (kcctl)</li>
+    <li>Node status management</li>
+    <li>Connect node terminal</li>
+    <li>Node enable/disable</li>
+    <li>View the list of nodes and clusters under a region</li> 
+  </ul>
+</details>
+
+<details>
+  <summary><b>🚪 Access control</b></summary>
+  <ul>
+    <li>User and role management</li>
+    <li>Custom Role Management</li>
+    <li>OIDC intergate</li>
+  </ul>
+</details>
+
 <!-- TODO: 功能列表 -->
 
 ## Quick Start
