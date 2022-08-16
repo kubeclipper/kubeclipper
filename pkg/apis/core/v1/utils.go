@@ -37,12 +37,12 @@ import (
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 )
 
-/*func reverseComponents(components []v1.Component) {
+func reverseComponents(components []v1.Addon) {
 	length := len(components)
 	for i := 0; i < length/2; i++ {
 		components[i], components[length-(i+1)] = components[length-(i+1)], components[i]
 	}
-}*/
+}
 
 func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepAction, nodes []v1.StepNode) ([]v1.Step, error) {
 	switch c.Type {
@@ -99,7 +99,6 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	}
 
 	// Container runtime should be installed on all nodes.
-	extraMetadata.AddonUninstallExtra = true
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
 	stepNodes := utils.UnwrapNodeList(extraMetadata.GetAllNodes())
 	cSteps, err := getCriStep(ctx, &c.ContainerRuntime, action, stepNodes)
@@ -117,12 +116,7 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	copy(carr, c.Addons)
 	if action == v1.ActionUninstall {
 		// reverse order of the addons
-		var temp v1.Addon
-		for i := 0; i < len(carr)/2; i++ {
-			temp = carr[i]
-			carr[i] = carr[len(carr)-1-i]
-			carr[len(carr)-1-i] = temp
-		}
+		reverseComponents(carr)
 	} else {
 		steps = append(steps, cSteps...)
 		steps = append(steps, k8sSteps...)
