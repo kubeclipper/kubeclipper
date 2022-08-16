@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	v1core "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -133,7 +134,9 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 			cronBackup.Status.LastScheduleTime = &now
 			cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
-			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cronBackup.Spec.Schedule)
+
+			schedule := v1core.ParseSchedule(cronBackup.Spec.Schedule)
+			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
 			// update the next schedule time
 			nextRunAt := metav1.NewTime(s.Next(now.Time))
 			cronBackup.Status.NextScheduleTime = &nextRunAt
