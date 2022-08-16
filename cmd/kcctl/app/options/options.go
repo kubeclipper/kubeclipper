@@ -73,13 +73,15 @@ const (
 	DefaultRegion = "default"
 
 	// EtcdCa          = "etcd-ca"   //ca
-	Ca              = "ca"
-	EtcdPeer        = "etcd-peer" // peer
-	EtcdServer      = "etcd"      // server
-	EtcdKcClient    = "kc-server-etcd-client"
-	EtcdHealthCheck = "kube-etcd-healthcheck-client" // healthcheck-client
-	NatsIOClient    = "kc-server-nats-client"
-	NatsIOServer    = "kc-server-nats-server"
+	Ca               = "ca"
+	EtcdPeer         = "etcd-peer" // peer
+	EtcdServer       = "etcd"      // server
+	EtcdKcClient     = "kc-server-etcd-client"
+	EtcdHealthCheck  = "kube-etcd-healthcheck-client" // healthcheck-client
+	NatsIOClient     = "kc-server-nats-client"
+	NatsIOServer     = "kc-server-nats-server"
+	NatsAltNameProxy = "proxy.kubeclipper.io" // add nats server SAN for agent proxy
+
 )
 
 var AssumeYes bool
@@ -184,9 +186,17 @@ func (a Agents) Add(ip string, metadata Metadata) {
 	a[ip] = metadata
 }
 
+// Metadata user custom node info,region will use by filter,use label,others use annotation.
 type Metadata struct {
 	Region  string `json:"region" yaml:"region,omitempty"`
 	FloatIP string `json:"floatIP" yaml:"floatIP,omitempty"`
+
+	// proxy server for proxy kc-server(mq and static server)
+	ProxyServer string `json:"proxyServer" yaml:"proxyServer,omitempty"`
+	// address for server to access k8s apiserver
+	ProxyAPIServer string `json:"proxyAPIServer" yaml:"proxyAPIServer,omitempty"`
+	// address for server to access node's ssh
+	ProxySSH string `json:"proxySSH" yaml:"proxySSH,omitempty"`
 }
 
 type DeployConfig struct {

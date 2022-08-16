@@ -21,6 +21,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/kubeclipper/kubeclipper/pkg/proxy"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
 
 	"github.com/google/uuid"
@@ -70,6 +71,8 @@ func completionOptions(s *options.AgentOptions) (*options.AgentOptions, error) {
 		}
 		return nil, fmt.Errorf("error parsing configuration file %s", err)
 	}
+	proxy.ReplaceByProxy(conf)
+
 	s = &options.AgentOptions{
 		GenericServerRunOptions: s.GenericServerRunOptions,
 		Config:                  conf,

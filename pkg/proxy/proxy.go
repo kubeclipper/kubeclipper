@@ -123,7 +123,7 @@ func forward(conn net.Conn, remoteAddr string) {
 		return
 	}
 	defer client.Close()
-	logger.Debugf("Forwarding from %v to %v\n", conn.LocalAddr(), client.RemoteAddr())
+	logger.Infof("Forwarding from %v to %v\n", conn.LocalAddr(), client.RemoteAddr())
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -131,14 +131,14 @@ func forward(conn net.Conn, remoteAddr string) {
 		defer wg.Done()
 		_, err = io.Copy(client, conn)
 		if err != nil {
-			logger.Errorf("forward %s copy err:", remoteAddr, err)
+			logger.Errorf("forward %s copy err:%v", remoteAddr, err)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		_, err = io.Copy(conn, client)
 		if err != nil {
-			logger.Errorf("forward %s copy err:", remoteAddr, err)
+			logger.Errorf("forward %s copy err:%v", remoteAddr, err)
 		}
 	}()
 	wg.Wait()

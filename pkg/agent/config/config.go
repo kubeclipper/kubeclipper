@@ -27,6 +27,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
+
 	"github.com/kubeclipper/kubeclipper/pkg/simple/imageproxy"
 
 	"github.com/spf13/viper"
@@ -49,7 +51,7 @@ const (
 // Config defines everything needed for apiserver to deal with external services
 type Config struct {
 	AgentID                   string              `json:"agentID,omitempty" yaml:"agentID"`
-	MetaData                  MetaData            `json:"metadata,omitempty" yaml:"metadata"`
+	Metadata                  options.Metadata    `json:"metadata,omitempty" yaml:"metadata"`
 	IPDetect                  string              `json:"ipDetect,omitempty" yaml:"ipDetect"`
 	RegisterNode              bool                `json:"registerNode,omitempty" yaml:"registerNode"`
 	NodeStatusUpdateFrequency time.Duration       `json:"nodeStatusUpdateFrequency,omitempty" yaml:"nodeStatusUpdateFrequency"`
@@ -58,11 +60,6 @@ type Config struct {
 	MQOptions                 *natsio.NatsOptions `json:"mq,omitempty" yaml:"mq,omitempty"  mapstructure:"mq"`
 	OpLogOptions              *oplog.Options      `json:"oplog,omitempty" yaml:"oplog,omitempty" mapstructure:"oplog"`
 	ImageProxyOptions         *imageproxy.Options `json:"imageProxy,omitempty" yaml:"imageProxy,omitempty" mapstructure:"imageProxy"`
-}
-
-type MetaData struct {
-	Region  string `json:"region,omitempty" yaml:"region,omitempty"`
-	FloatIP string `json:"floatIP,omitempty" yaml:"floatIP,omitempty"`
 }
 
 var (

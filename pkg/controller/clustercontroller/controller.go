@@ -100,7 +100,7 @@ func (r *ClusterReconciler) findObjectsForCluster(objNode client.Object) []recon
 	if err != nil {
 		return []reconcile.Request{}
 	}
-	fip := node.Labels[common.LabelMetadataFloatIP]
+	fip := node.Annotations[common.AnnotationMetadataFloatIP]
 	role := node.Labels[common.LabelNodeRole]
 	// if master node has fip, maybe we need update the cluster's kubeconfig.
 	if fip != "" && role == string(common.NodeRoleMaster) {
@@ -232,15 +232,20 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name))
 		return err
 	}
-	fip := node.Labels[common.LabelMetadataFloatIP]
-	nodeIP := node.Status.Ipv4DefaultIP
-	if fip != "" {
-		nodeIP = fip
-	}
 
-	// no fip or kubeconfig already used fip, do nothing.
-	// else we need use fip to generate a new kubeconfig.
-	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil && strings.Contains(string(c.KubeConfig), nodeIP) {
+	// there is 3 ip maybe used in kubeconfig,sort by priority: proxyServer > floatIP > defaultIP
+	proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
+	floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
+	apiServer := node.Status.Ipv4DefaultIP + ":6443"
+	if floatIP != "" {
+		apiServer = floatIP + ":6443"
+	}
+	if proxyAPIServer != "" {
+		apiServer = proxyAPIServer
+	}
+	// kubeconfig already used same ip, do nothing.
+	// else we need use current ip to generate a new kubeconfig.
+	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil && strings.Contains(string(c.KubeConfig), apiServer) {
 		log.Debug("clientset has been init")
 		return nil
 	}
@@ -260,7 +265,7 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	//	logger.Error("get cluster service account token error", zap.String("cluster", name), zap.Error(err))
 	//	return err
 	// }
-	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s:6443", nodeIP), "kc-server", string(token))
+	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s", apiServer), "kc-server", string(token))
 	c.KubeConfig = []byte(kubeconfig)
 	_, err = r.ClusterWriter.UpdateCluster(ctx, c)
 	if err != nil {
