@@ -38,13 +38,14 @@ type ExtraMetadata struct {
 	// LocalRegistry:
 	//    在线安装时可以填其他地址，默认是 docker.io
 	//    离线安装时可以填镜像来源，不填则使用 http 分发方式
-	Masters       NodeList
-	Workers       NodeList
-	Offline       bool
-	LocalRegistry string
-	CRI           string
-	ClusterName   string
-	KubeVersion   string
+	Masters             NodeList
+	Workers             NodeList
+	Offline             bool
+	LocalRegistry       string
+	CRI                 string
+	ClusterName         string
+	KubeVersion         string
+	AddonUninstallExtra bool
 }
 
 type Node struct {

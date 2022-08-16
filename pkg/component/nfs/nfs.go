@@ -268,6 +268,10 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 	}...)
 
 	// uninstall
+	if metadata.AddonUninstallExtra {
+		return nil
+	}
+
 	n.uninstallSteps = []v1.Step{
 		rs,
 		{

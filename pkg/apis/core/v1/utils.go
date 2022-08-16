@@ -99,6 +99,7 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	}
 
 	// Container runtime should be installed on all nodes.
+	extraMetadata.AddonUninstallExtra = true
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
 	stepNodes := utils.UnwrapNodeList(extraMetadata.GetAllNodes())
 	cSteps, err := getCriStep(ctx, &c.ContainerRuntime, action, stepNodes)
@@ -113,12 +114,16 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	}
 
 	carr := make([]v1.Addon, len(c.Addons))
+	copy(carr, c.Addons)
 	if action == v1.ActionUninstall {
-		// do not need to delete the component logic when deleting a cluster, set carr nil
-		// reverse order of the components
-		// reverseComponents(carr)
+		// reverse order of the addons
+		var temp v1.Addon
+		for i := 0; i < len(carr)/2; i++ {
+			temp = carr[i]
+			carr[i] = carr[len(carr)-1-i]
+			carr[len(carr)-1-i] = temp
+		}
 	} else {
-		copy(carr, c.Addons)
 		steps = append(steps, cSteps...)
 		steps = append(steps, k8sSteps...)
 	}
