@@ -37,12 +37,12 @@ import (
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 )
 
-/*func reverseComponents(components []v1.Component) {
+func reverseComponents(components []v1.Addon) {
 	length := len(components)
 	for i := 0; i < length/2; i++ {
 		components[i], components[length-(i+1)] = components[length-(i+1)], components[i]
 	}
-}*/
+}
 
 func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepAction, nodes []v1.StepNode) ([]v1.Step, error) {
 	switch c.Type {
@@ -113,12 +113,11 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	}
 
 	carr := make([]v1.Addon, len(c.Addons))
+	copy(carr, c.Addons)
 	if action == v1.ActionUninstall {
-		// do not need to delete the component logic when deleting a cluster, set carr nil
-		// reverse order of the components
-		// reverseComponents(carr)
+		// reverse order of the addons
+		reverseComponents(carr)
 	} else {
-		copy(carr, c.Addons)
 		steps = append(steps, cSteps...)
 		steps = append(steps, k8sSteps...)
 	}

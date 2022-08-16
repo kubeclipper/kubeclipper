@@ -331,7 +331,7 @@ func (stepper *Package) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	return []v1.Step{
 		{
 			ID:         strutil.GetUUID(),
-			Name:       "installPackages",
+			Name:       "unInstallPackages",
 			Timeout:    metav1.Duration{Duration: 10 * time.Minute},
 			ErrIgnore:  false,
 			RetryTimes: 1,

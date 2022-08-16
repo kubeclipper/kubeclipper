@@ -45,6 +45,7 @@ type ExtraMetadata struct {
 	CRI           string
 	ClusterName   string
 	KubeVersion   string
+	OperationType string
 }
 
 type Node struct {

@@ -339,7 +339,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		restplus.HandleInternalError(response, request, fmt.Errorf("before deleting the cluster, please delete the cluster backup file first"))
 		return
 	}
-
+	extraMeta.OperationType = v1.OperationDeleteCluster
 	op, err := h.parseOperationFromCluster(extraMeta, c, v1.ActionUninstall)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
@@ -421,6 +421,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	cniVersion := packageMetadata.FindK8sMatchCniVersion(c.KubernetesVersion, c.CNI.Type)
 	c.Complete(cniVersion)
 
+	extraMeta.OperationType = v1.OperationCreateCluster
 	op, err := h.parseOperationFromCluster(extraMeta, &c, v1.ActionInstall)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
