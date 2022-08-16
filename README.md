@@ -80,11 +80,9 @@
   <ul>
     <li>User and role management</li>
     <li>Custom Role Management</li>
-    <li>OIDC intergate</li>
+    <li>OIDC integrate</li>
   </ul>
 </details>
-
-<!-- TODO: 功能列表 -->
 
 ## Quick Start
 
