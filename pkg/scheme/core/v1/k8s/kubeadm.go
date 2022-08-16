@@ -657,8 +657,12 @@ func (stepper *CNIInfo) CalicoTemplate() (string, error) {
 	switch stepper.CNI.Version {
 	case "v3.11.2":
 		return calicoV3112, nil
+	case "v3.16.10":
+		return calicoV31610, nil
 	case "v3.21.2":
 		return calicoV3212, nil
+	case "v3.22.4":
+		return calicoV3224, nil
 	}
 	return "", fmt.Errorf("calico no support %s version", stepper.CNI.Version)
 }
