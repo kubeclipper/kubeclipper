@@ -274,7 +274,7 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 			{
 				ID:         strutil.GetUUID(),
 				Name:       "removeNFSProvisioner",
-				Timeout:    metav1.Duration{Duration: 3 * time.Second},
+				Timeout:    metav1.Duration{Duration: 10 * time.Minute},
 				ErrIgnore:  true,
 				RetryTimes: 1,
 				Nodes:      stepMaster0,
