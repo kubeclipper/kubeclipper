@@ -269,6 +269,6 @@ func (h *handler) callback(req *restful.Request, response *restful.Response) {
 		restplus.HandleUnauthorized(response, req, err)
 		return
 	}
-	// TODO: recored login
+	go h.recordLogin(authenticated.GetName(), iamv1.OAuthLogin, provider, netutil.GetRequestIP(req.Request), req.Request.UserAgent(), nil)
 	_ = response.WriteEntity(result)
 }
