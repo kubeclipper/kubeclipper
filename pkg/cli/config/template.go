@@ -148,6 +148,23 @@ KillMode=process
 [Install]
 WantedBy=multi-user.target`
 
+const KcProxyService = `# /usr/lib/systemd/system/kc-proxy.service
+[Unit]
+Description=kc-proxy
+
+[Service]
+Environment="HOME=/root"
+Type=simple
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/kubeclipper-proxy serve
+ExecReload=/bin/kill -HUP
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target`
+
 const KcServerConfigTmpl = `generic:
   bindAddress: {{.ServerAddress}}
   insecurePort: {{.ServerPort}}

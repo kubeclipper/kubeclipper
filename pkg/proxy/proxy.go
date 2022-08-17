@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 
 	"github.com/pkg/errors"
 
@@ -116,30 +115,23 @@ func startProxy(t config.Tunnel) error {
 }
 
 func forward(conn net.Conn, remoteAddr string) {
-	defer conn.Close()
 	client, err := net.Dial("tcp", remoteAddr)
 	if err != nil {
 		logger.Errorf("dail %s err:%v", remoteAddr, err)
 		return
 	}
-	defer client.Close()
 	logger.Infof("Forwarding from %v to %v\n", conn.LocalAddr(), client.RemoteAddr())
 
-	var wg sync.WaitGroup
-	wg.Add(2)
 	go func() {
-		defer wg.Done()
-		_, err = io.Copy(client, conn)
-		if err != nil {
-			logger.Errorf("forward %s copy err:%v", remoteAddr, err)
-		}
+		defer func() {
+			client.Close()
+		}()
+		_, _ = io.Copy(client, conn)
 	}()
 	go func() {
-		defer wg.Done()
-		_, err = io.Copy(conn, client)
-		if err != nil {
-			logger.Errorf("forward %s copy err:%v", remoteAddr, err)
-		}
+		defer func() {
+			conn.Close()
+		}()
+		_, _ = io.Copy(conn, client)
 	}()
-	wg.Wait()
 }
