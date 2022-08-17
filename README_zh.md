@@ -35,7 +35,53 @@
 
 ## Features
 
-<!-- TODO: 功能列表 -->
+<details>
+  <summary><b>✨ 创建集群</b></summary>
+  <ul>
+  <li>支持在线部署、代理部署、离线部署</li>
+  <li>管理常用镜像仓库</li>
+  <li>从模版创建集群/安装插件</li>
+  <li>支持多版本 K8S、CRI 部署</li>
+  <li>NFS 存储支持</li>
+  </ul>
+</details>
+
+<details>
+  <summary><b>☸️ 集群管理</b></summary>
+  <ul>
+  <li>多区域、多集群管理</li>
+  <li>访问集群 kubectl web console</li>
+  <li>查看集群安装过程中的实时日志</li>
+  <li>编辑集群（元数据等）</li>
+  <li>删除集群</li>
+  <li>添加/移除节点</li>
+  <li>创建失败后从断点重试</li>
+  <li>集群备份/还原、定时备份</li>
+  <li>集群版本升级</li>
+  <li>整个集群 / 单个插件保存为模版</li>
+  <li>集群备份存储位置管理</li>
+  </ul>
+</details>
+
+<details>
+  <summary><b>🌐 区域 / 节点管理</b></summary>
+  <ul>
+  <li>添加 agent 节点并指定区域（kcctl）</li>
+  <li>节点状态管理</li>
+  <li>连接节点终端</li>
+  <li>节点启用/禁用</li>
+  <li>查看区域下节点和集群列表</li>
+  </ul>
+</details>
+
+<details>
+  <summary><b>🚪 访问控制</b></summary>
+  <ul>
+  <li>用户和角色管理</li>
+  <li>自定义角色管理</li>
+  <li>OIDC 集成</li>
+  </ul>
+</details>
 
 ## Quick Start
 
