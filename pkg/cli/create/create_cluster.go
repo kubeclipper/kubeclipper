@@ -408,7 +408,7 @@ func (l *CreateClusterOptions) componentVersions(component, toComplete string) [
 		return nil
 	}
 	set := sets.NewString()
-	for _, resource := range metas.Items {
+	for _, resource := range metas.Addons {
 		if resource.Name == component && strings.HasPrefix(resource.Version, toComplete) {
 			set.Insert(resource.Version)
 		}

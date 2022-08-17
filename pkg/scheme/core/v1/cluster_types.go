@@ -133,7 +133,7 @@ func (c *Cluster) Offline() bool {
 	return false
 }
 
-func (c *Cluster) Complete(cniVersion string) {
+func (c *Cluster) Complete() {
 	if c.Provider.Name == "" {
 		c.Provider.Name = ClusterKubeadm
 	}
@@ -149,7 +149,6 @@ func (c *Cluster) Complete(cniVersion string) {
 	c.CNI.LocalRegistry = c.LocalRegistry
 	c.CNI.CriType = c.ContainerRuntime.Type
 	c.CNI.Offline = c.Offline()
-	c.CNI.Version = cniVersion
 }
 
 type Certification struct {
