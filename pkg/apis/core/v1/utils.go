@@ -132,11 +132,8 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 			return nil, err
 		}
 		newComp, _ := compMeta.(component.Interface)
-		// worker around  delete cluster
-		if action == v1.ActionInstall {
-			if err := h.initComponentExtraCluster(ctx, newComp); err != nil {
-				return nil, err
-			}
+		if err := h.initComponentExtraCluster(ctx, newComp); err != nil {
+			return nil, err
 		}
 		if err := newComp.Validate(); err != nil {
 			return nil, err
