@@ -94,6 +94,14 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	now := metav1.NewTime(time.Now())
 	if cronBackup.Spec.RunAt != nil {
+		// first created cron backup, update next schedule time
+		if cronBackup.Status.NextScheduleTime == nil {
+			cronBackup.Status.NextScheduleTime = cronBackup.Spec.RunAt
+			_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
+			if err != nil {
+				log.Error("Failed to update cronBackup", zap.Error(err))
+			}
+		}
 		if cronBackup.Status.LastSuccessfulTime == nil {
 			if now.After(cronBackup.Spec.RunAt.Time) {
 				// delivery the create backup operation
@@ -118,6 +126,18 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if cronBackup.Spec.Schedule != "" {
+		// first created cron backup, update next schedule time
+		if cronBackup.Status.NextScheduleTime == nil {
+			schedule := v1core.ParseSchedule(cronBackup.Spec.Schedule)
+			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
+			// update the next schedule time
+			nextRunAt := metav1.NewTime(s.Next(time.Now()))
+			cronBackup.Status.NextScheduleTime = &nextRunAt
+			_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
+			if err != nil {
+				log.Error("Failed to update cronBackup", zap.Error(err))
+			}
+		}
 		// time to create backup
 		if after := now.After(cronBackup.Status.NextScheduleTime.Time); after {
 			// delivery the create backup operation
