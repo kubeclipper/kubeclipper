@@ -22,11 +22,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"strings"
-	"time"
-
 	"github.com/google/uuid"
+	"path/filepath"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 
@@ -385,23 +382,4 @@ func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) boo
 		}
 	}
 	return false
-}
-
-func ParseSchedule(schedule string) string {
-	year := time.Now().Year()
-	arr := strings.Split(schedule, " ")
-	if arr[2] == "L" {
-		switch time.Now().Month() {
-		case 1, 3, 5, 7, 8, 10, 12:
-			return strings.Replace(schedule, "L", "31", 1)
-		case 4, 6, 9, 11:
-			return strings.Replace(schedule, "L", "30", 1)
-		case 2:
-			if (year%4 == 0 && year%100 != 0) || year%400 == 0 {
-				return strings.Replace(schedule, "L", "28", 1)
-			}
-			return strings.Replace(schedule, "L", "29", 1)
-		}
-	}
-	return schedule
 }
