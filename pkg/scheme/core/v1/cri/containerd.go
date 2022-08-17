@@ -37,15 +37,17 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+	"github.com/pelletier/go-toml"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ContainerdRunnable struct {
 	Base
-	LocalRegistry string `json:"localRegistry"`
-	KubeVersion   string `json:"kubeVersion"`
-	PauseVersion  string `json:"pauseVersion"`
+	RegistryConfigDir string `json:"registryConfigDir"`
+	LocalRegistry     string `json:"localRegistry"`
+	KubeVersion       string `json:"kubeVersion"`
+	PauseVersion      string `json:"pauseVersion"`
 
 	installSteps   []v1.Step
 	uninstallSteps []v1.Step
@@ -65,7 +67,7 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, containerd *v1
 		return err
 	}
 
-	//nodes := utils.UnwrapNodeList(metadata.GetAllNodes())
+	// nodes := utils.UnwrapNodeList(metadata.GetAllNodes())
 	if len(runnable.installSteps) == 0 {
 		runnable.installSteps = []v1.Step{
 			{
@@ -219,7 +221,10 @@ func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, d
 	if err := os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
 		return err
 	}
-	return fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, runnable.renderTo, dryRun)
+	if err := fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, runnable.renderTo, dryRun); err != nil {
+		return err
+	}
+	return runnable.renderRegistryConfig(dryRun)
 }
 
 func (runnable *ContainerdRunnable) enableContainerdService(ctx context.Context, dryRun bool) error {
@@ -255,4 +260,167 @@ func (runnable *ContainerdRunnable) renderTo(w io.Writer) error {
 	at := tmplutil.New()
 	_, err := at.RenderTo(w, configTomlTemplate, runnable)
 	return err
+}
+
+func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+	configDir := containerdDefaultRegistryConfigDir
+	if runnable.RegistryConfigDir != "" {
+		configDir = runnable.RegistryConfigDir
+	}
+	regCfgs := make([]ContainerdRegistry, 0, len(runnable.InsecureRegistry)+1)
+
+	for _, regHost := range runnable.InsecureRegistry {
+		regCfgs = append(regCfgs, ContainerdRegistry{
+			Server: regHost,
+			Hosts: []ContainerdHost{
+				{
+					Host:         regHost,
+					Capabilities: []string{CapabilityPull, CapabilityResolve},
+					SkipVerify:   true,
+				},
+			},
+		},
+		)
+	}
+
+	if runnable.LocalRegistry != "" {
+		regCfgs = append(
+			regCfgs,
+			ContainerdRegistry{
+				Server: runnable.LocalRegistry,
+				Hosts: []ContainerdHost{
+					{
+						Host:         runnable.LocalRegistry,
+						Capabilities: []string{CapabilityPull, CapabilityResolve},
+						SkipVerify:   true,
+					},
+				},
+			},
+		)
+	}
+
+	for _, cfg := range regCfgs {
+		if err := cfg.renderConfigs(configDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+const (
+	CapabilityPull    = "pull"
+	CapabilityPush    = "push"
+	CapabilityResolve = "resolve"
+)
+
+type ContainerdHost struct {
+	Host         string
+	Capabilities []string
+	SkipVerify   bool
+	CA           []byte
+}
+
+type ContainerdRegistry struct {
+	Server string // not contain scheme, example: docker.io
+	Hosts  []ContainerdHost
+}
+
+// generate hosts.toml and ca file
+func (h *ContainerdRegistry) renderConfigs(dir string) error {
+	hostDir := filepath.Join(dir, h.Server)
+	err := os.MkdirAll(hostDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	c := HostFile{
+		Server:      h.Server,
+		HostConfigs: make(map[string]HostFileConfig),
+	}
+	for _, host := range h.Hosts {
+		var (
+			caFile     = ""
+			skipVerify *bool
+		)
+		if host.SkipVerify {
+			b := host.SkipVerify
+			skipVerify = &b
+		}
+		if len(host.CA) > 0 {
+			caFile = filepath.Join(hostDir, fmt.Sprintf("%s.pem", host.Host))
+			if err = os.WriteFile(caFile, host.CA, 0666); err != nil {
+				return err
+			}
+		}
+		hc := HostFileConfig{
+			Capabilities: host.Capabilities,
+			SkipVerify:   skipVerify,
+		}
+		if caFile != "" {
+			hc.CACert = caFile
+		}
+		c.HostConfigs[fmt.Sprintf("https://%s", host.Host)] = hc
+
+		// support http scheme
+		if skipVerify != nil && *skipVerify {
+			c.HostConfigs[fmt.Sprintf("http://%s", host.Host)] = HostFileConfig{
+				Capabilities: host.Capabilities,
+			}
+		}
+	}
+	f, err := os.Create(filepath.Join(hostDir, "hosts.toml"))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return toml.NewEncoder(f).Encode(c)
+}
+
+type HostFileConfig struct {
+	// Capabilities determine what operations a host is
+	// capable of performing. Allowed values
+	//  - pull
+	//  - resolve
+	//  - push
+	Capabilities []string `toml:"capabilities,omitempty"`
+
+	// CACert are the public key certificates for TLS
+	// Accepted types
+	// - string - Single file with certificate(s)
+	// - []string - Multiple files with certificates
+	CACert interface{} `toml:"ca,omitempty,omitempty"`
+
+	// Client keypair(s) for TLS with client authentication
+	// Accepted types
+	// - string - Single file with public and private keys
+	// - []string - Multiple files with public and private keys
+	// - [][2]string - Multiple keypairs with public and private keys in separate files
+	Client interface{} `toml:"client,omitempty"`
+
+	// SkipVerify skips verification of the server's certificate chain
+	// and host name. This should only be used for testing or in
+	// combination with other methods of verifying connections.
+	SkipVerify *bool `toml:"skip_verify,omitempty"`
+
+	// Header are additional header files to send to the server
+	Header map[string]interface{} `toml:"header,omitempty"`
+
+	// OverridePath indicates the API root endpoint is defined in the URL
+	// path rather than by the API specification.
+	// This may be used with non-compliant OCI registries to override the
+	// API root endpoint.
+	OverridePath bool `toml:"override_path,omitempty"`
+
+	// TODO: Credentials: helper? name? username? alternate domain? token?
+}
+
+type HostFile struct {
+	// Server specifies the default server. When `host` is
+	// also specified, those hosts are tried first.
+	Server string `toml:"server"`
+	// HostConfigs store the per-host configuration
+	HostConfigs map[string]HostFileConfig `toml:"host"`
 }
