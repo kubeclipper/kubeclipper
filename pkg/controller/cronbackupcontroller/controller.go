@@ -101,7 +101,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err != nil {
 				log.Error("Failed to update cronBackup", zap.Error(err))
 			}
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 		if cronBackup.Status.LastSuccessfulTime == nil {
 			if now.After(cronBackup.Spec.RunAt.Time) {
@@ -138,7 +138,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err != nil {
 				log.Error("Failed to update cronBackup", zap.Error(err))
 			}
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 		// time to create backup
 		if after := now.After(cronBackup.Status.NextScheduleTime.Time); after {
