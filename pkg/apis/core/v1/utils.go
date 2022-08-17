@@ -22,9 +22,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-
 	"github.com/google/uuid"
+	"path/filepath"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 

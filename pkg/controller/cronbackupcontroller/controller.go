@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -93,6 +94,15 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	now := metav1.NewTime(time.Now())
 	if cronBackup.Spec.RunAt != nil {
+		// first created cron backup, update next schedule time
+		if cronBackup.Status.NextScheduleTime == nil {
+			cronBackup.Status.NextScheduleTime = cronBackup.Spec.RunAt
+			_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
+			if err != nil {
+				log.Error("Failed to update cronBackup", zap.Error(err))
+			}
+			return ctrl.Result{}, err
+		}
 		if cronBackup.Status.LastSuccessfulTime == nil {
 			if now.After(cronBackup.Spec.RunAt.Time) {
 				// delivery the create backup operation
@@ -117,6 +127,19 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if cronBackup.Spec.Schedule != "" {
+		// first created cron backup, update next schedule time
+		if cronBackup.Status.NextScheduleTime == nil {
+			schedule := parseSchedule(cronBackup.Spec.Schedule)
+			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
+			// update the next schedule time
+			nextRunAt := metav1.NewTime(s.Next(time.Now()))
+			cronBackup.Status.NextScheduleTime = &nextRunAt
+			_, err = r.CronBackupWriter.UpdateCronBackup(ctx, cronBackup)
+			if err != nil {
+				log.Error("Failed to update cronBackup", zap.Error(err))
+			}
+			return ctrl.Result{}, err
+		}
 		// time to create backup
 		if after := now.After(cronBackup.Status.NextScheduleTime.Time); after {
 			// delivery the create backup operation
@@ -133,7 +156,9 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 			cronBackup.Status.LastScheduleTime = &now
 			cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
-			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cronBackup.Spec.Schedule)
+
+			schedule := parseSchedule(cronBackup.Spec.Schedule)
+			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
 			// update the next schedule time
 			nextRunAt := metav1.NewTime(s.Next(now.Time))
 			cronBackup.Status.NextScheduleTime = &nextRunAt
@@ -512,4 +537,23 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 		log.Error("Failed to delivery operation", zap.Error(err))
 	}()
 	return nil
+}
+
+func parseSchedule(schedule string) string {
+	year := time.Now().Year()
+	arr := strings.Split(schedule, " ")
+	if arr[2] == "L" {
+		switch time.Now().Month() {
+		case 1, 3, 5, 7, 8, 10, 12:
+			return strings.Replace(schedule, "L", "31", 1)
+		case 4, 6, 9, 11:
+			return strings.Replace(schedule, "L", "30", 1)
+		case 2:
+			if (year%4 == 0 && year%100 != 0) || year%400 == 0 {
+				return strings.Replace(schedule, "L", "28", 1)
+			}
+			return strings.Replace(schedule, "L", "29", 1)
+		}
+	}
+	return schedule
 }
