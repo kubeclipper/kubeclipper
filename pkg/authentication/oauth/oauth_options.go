@@ -61,6 +61,9 @@ type Token struct {
 
 	// ExpiresIn is the optional expiration second of the access token.
 	ExpiresIn int `json:"expires_in,omitempty"`
+
+	// RfreshExpiresIn is the optional expiration second of the refresh token.
+	RefreshExpiresIn int `json:"refresh_expires_in,omitempty"`
 }
 
 type Options struct {

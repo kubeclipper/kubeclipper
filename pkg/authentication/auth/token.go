@@ -71,10 +71,11 @@ func (t *tokenOperator) IssueTo(user user.Info) (*oauth.Token, error) {
 	}
 
 	result := &oauth.Token{
-		AccessToken:  accessToken,
-		TokenType:    "Bearer",
-		RefreshToken: refreshToken,
-		ExpiresIn:    int(accessTokenExpiresIn.Seconds()),
+		AccessToken:      accessToken,
+		TokenType:        "Bearer",
+		RefreshToken:     refreshToken,
+		ExpiresIn:        int(accessTokenExpiresIn.Seconds()),
+		RefreshExpiresIn: int(refreshTokenExpiresIn.Seconds()),
 	}
 
 	if !t.options.MultipleLogin {
