@@ -37,7 +37,7 @@ openapi:
 
 .PHONY:test
 test:
-	go test -race ./pkg/... -coverprofile=coverage.out -covermode=atomic
+	go test -tags=kc_default -race ./pkg/... -coverprofile=coverage.out -covermode=atomic
 
 .PHONY: format-deps checkfmt fmt goimports vet lint
 format-deps:
@@ -60,7 +60,7 @@ vet:
 	go vet ./pkg/... ./cmd/...
 
 lint:
-	golangci-lint run --timeout 5m
+	golangci-lint run --build-tags kc_default --timeout 5m
 
 
 .PHONY: cli cleancli cli-serve
