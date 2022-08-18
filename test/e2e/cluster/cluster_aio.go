@@ -135,3 +135,35 @@ func initAIOCluster(clusterName, nodeID string) *corev1.Cluster {
 		},
 	}
 }
+
+type initfunc func(clusterName, nodeID string) *corev1.Cluster
+
+func createClusterBeforeEach(f *framework.Framework, initial initfunc) (*kc.ClustersList, error) {
+	ginkgo.By("Check that there are enough available nodes")
+	nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
+		Pagination:    query.NoPagination(),
+		LabelSelector: "!kubeclipper.io/nodeRole",
+	})
+	framework.ExpectNoError(err)
+	if len(nodes.Items) == 0 {
+		framework.Failf("Not enough nodes to test")
+		return nil, err
+	}
+
+	ginkgo.By("create aio cluster")
+	clus, err := f.Client.CreateCluster(context.TODO(), initial("cluster-aio", nodes.Items[0].Name))
+	framework.ExpectNoError(err)
+	if len(clus.Items) == 0 {
+		framework.Failf("unexpected problem, cluster not be nil at this time")
+		return nil, err
+	}
+
+	ginkgo.By("check cluster status is running")
+	err = cluster.WaitForClusterRunning(f.Client, clus.Items[0].Name, f.Timeouts.ClusterInstall)
+	framework.ExpectNoError(err)
+
+	ginkgo.By("wait for cluster is healthy")
+	err = cluster.WaitForClusterHealthy(f.Client, clus.Items[0].Name, f.Timeouts.ClusterInstallShort)
+	framework.ExpectNoError(err)
+	return clus, nil
+}
