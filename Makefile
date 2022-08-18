@@ -30,10 +30,10 @@ build-cli:
 	KUBE_VERBOSE=2 bash hack/make-rules/build.sh cmd/kcctl
 
 build-e2e:
-	go test -c -ldflags "-s -w" -o dist/e2e.test ./test/e2e
+	go test -tags=kc_default -c -ldflags "-s -w" -o dist/e2e.test ./test/e2e
 
 openapi:
-	go run ./tools/doc-gen/main.go
+	go run -tags=kc_default ./tools/doc-gen/main.go
 
 .PHONY:test
 test:
@@ -57,7 +57,7 @@ goimports:
 	@hack/update-goimports.sh
 
 vet:
-	go vet ./pkg/... ./cmd/...
+	go vet -tags=kc_default ./pkg/... ./cmd/...
 
 lint:
 	golangci-lint run --build-tags kc_default --timeout 5m
@@ -65,7 +65,7 @@ lint:
 
 .PHONY: cli cleancli cli-serve
 cli: cleancli
-	go run ./tools/kcctldocs-gen/main.go
+	go run -tags=kc_default ./tools/kcctldocs-gen/main.go
 	docker run -v $(shell pwd)/tools/kcctldocs-gen/generators/includes:/source -v $(shell pwd)/tools/kcctldocs-gen/generators/build:/build -v $(shell pwd)/tools/kcctldocs-gen/generators/:/manifest brianpursley/brodocs:latest
 
 cleancli:
