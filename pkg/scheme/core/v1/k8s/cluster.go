@@ -230,6 +230,10 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, upgradePackage, version, component.TypeStep),
 					CustomCommand: masterDownload,
 				},
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"chmod", "+x", "/usr/bin/kubelet-pre-start.sh", "/usr/bin/kubelet", "/usr/bin/kubeadm", "/usr/bin/kubectl", "/usr/bin/conntrack"},
+				},
 			},
 			RetryTimes: 1,
 		}}
@@ -252,6 +256,10 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 					Type:          v1.CommandCustom,
 					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, upgradePackage, version, component.TypeStep),
 					CustomCommand: workerDownload,
+				},
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"chmod", "+x", "/usr/bin/kubelet-pre-start.sh", "/usr/bin/kubelet", "/usr/bin/kubeadm", "/usr/bin/kubectl", "/usr/bin/conntrack"},
 				},
 			},
 			RetryTimes: 1,
