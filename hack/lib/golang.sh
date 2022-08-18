@@ -155,7 +155,7 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
 
-  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-} TAGS=${GOTAGS-}"
 
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
@@ -175,7 +175,7 @@ kube::golang::build_binaries_for_platform() {
       #-gcflags "${gogcflags:-}"
       #-asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
-      #-tags "${gotags:-}"
+      -tags "${GOTAGS:-kc_default}"
     )
     V=2 kube::log::info "build with disable cgo..."
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
@@ -187,7 +187,7 @@ kube::golang::build_binaries_for_platform() {
       #-gcflags "${gogcflags:-}"
       #-asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
-      #-tags "${gotags:-}"
+      -tags "${GOTAGS:-kc_default}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
