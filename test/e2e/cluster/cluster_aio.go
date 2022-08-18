@@ -20,6 +20,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +53,7 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
-			LabelSelector: "!kubeclipper.io/nodeRole",
+			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeRole),
 		})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {

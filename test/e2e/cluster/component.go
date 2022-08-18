@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-
 	v1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	nfsprovisioner "github.com/kubeclipper/kubeclipper/pkg/component/nfs"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -39,13 +38,16 @@ var _ = SIGDescribe("[Slow] [Serial] Install component", func() {
 
 	ginkgo.It("install nfs component and ensure component is available", func() {
 		ginkgo.By(" start install nfs")
-		clus, err := f.Client.InstallOrUninstallComponent(context.TODO(), clu.Name, initComponent(false))
+		_, err := f.Client.InstallOrUninstallComponent(context.TODO(), clu.Name, initComponent(false))
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" check nfs component condition ")
-		// TODO: add nfs healthy condition check
 		err = cluster.WaitForClusterRunning(f.Client, clu.Name, f.Timeouts.ClusterInstall)
-		if err != nil || !(clus.Items[0].Addons[0].Name == "nfs-provisioner") {
+		framework.ExpectNoError(err)
+
+		clus, err := f.Client.DescribeCluster(context.TODO(), clu.Name)
+		framework.ExpectNoError(err)
+		if !(clus.Items[0].Addons[0].Name == "nfs-provisioner") {
 			framework.ExpectNoError(errors.New("component install failed"))
 		}
 	})
