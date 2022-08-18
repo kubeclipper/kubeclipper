@@ -24,15 +24,18 @@ import (
 	"fmt"
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
+	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 const (
 	listNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
 	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
+	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
+	backupPath        = "/api/core.kubeclipper.io/v1/backups"
+	backupPonitPath   = "/api/core.kubeclipper.io/v1/backuppoints"
 	usersPath         = "/api/iam.kubeclipper.io/v1/users"
 	rolesPath         = "/api/iam.kubeclipper.io/v1/roles"
 	platformPath      = "/api/config.kubeclipper.io/v1/template"
@@ -246,4 +249,95 @@ func (cli *Client) GetComponentMeta(ctx context.Context) (*ComponentMeta, error)
 	v := ComponentMeta{}
 	err = json.NewDecoder(serverResp.body).Decode(&v)
 	return &v, err
+}
+
+func (cli *Client) InstallOrUninstallComponent(ctx context.Context, cluName string, component *corev1.PatchComponents) (*ClustersList, error) {
+	url := fmt.Sprintf(componentPath, cluName)
+	resp, err := cli.patch(ctx, url, nil, component, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	clu := v1.Cluster{}
+	err = json.NewDecoder(resp.body).Decode(&clu)
+	clusters := &ClustersList{
+		Items: []v1.Cluster{clu},
+	}
+	return clusters, err
+}
+
+func (cli *Client) ListBackupsWithCluster(ctx context.Context, clusterName string) (*BackupList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/backups", clustersPath, clusterName), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	backups := BackupList{}
+	err = json.NewDecoder(serverResp.body).Decode(&backups)
+	return &backups, err
+}
+
+func (cli *Client) DescribeBackup(ctx context.Context, backupName string) (*BackupList, error) {
+	resp, err := cli.get(ctx, fmt.Sprintf("%s/%s", backupPath, backupName), nil, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	bp := v1.Backup{}
+	err = json.NewDecoder(resp.body).Decode(&bp)
+	backups := BackupList{
+		Items: []v1.Backup{bp},
+	}
+	return &backups, err
+}
+
+func (cli *Client) CreateBackup(ctx context.Context, cluName string, backup *v1.Backup) (*BackupList, error) {
+	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/backups", clustersPath, cluName), nil, backup, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	bp := v1.Backup{}
+	err = json.NewDecoder(resp.body).Decode(&bp)
+	backups := BackupList{
+		Items: []v1.Backup{bp},
+	}
+	return &backups, err
+}
+
+func (cli *Client) DeleteBackup(ctx context.Context, cluName, backupName string) error {
+	resp, err := cli.delete(ctx, fmt.Sprintf("%s/%s/%s/%s", clustersPath, cluName, "backups", backupName), nil, nil)
+	defer ensureReaderClosed(resp)
+	return err
+}
+
+func (cli *Client) CreateBackupPoint(ctx context.Context, point *v1.BackupPoint) (*BackupPointList, error) {
+	resp, err := cli.post(ctx, backupPonitPath, nil, point, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	bp := v1.BackupPoint{}
+	err = json.NewDecoder(resp.body).Decode(&bp)
+	backupPonits := BackupPointList{
+		Items: []v1.BackupPoint{bp},
+	}
+	return &backupPonits, err
+}
+
+func (cli *Client) DeleteBackupPoint(ctx context.Context, name string) error {
+	resp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", backupPonitPath, name), nil, nil)
+	defer ensureReaderClosed(resp)
+	return err
+}
+
+func (cli *Client) CreateRecovery(ctx context.Context, cluName string, recovery *v1.Recovery) (*v1.Recovery, error) {
+	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, cluName, "recovery"), nil, recovery, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	r := &v1.Recovery{}
+	err = json.NewDecoder(resp.body).Decode(r)
+	return r, err
 }

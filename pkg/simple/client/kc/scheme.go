@@ -230,3 +230,13 @@ func (n *ComponentMetas) TablePrint() ([]string, [][]string) {
 type ComponentMeta struct {
 	Items []scheme.MetaResource `json:"items"`
 }
+
+type BackupList struct {
+	Items      []v1.Backup `json:"items" description:"paging data"`
+	TotalCount int         `json:"totalCount,omitempty" description:"total count"`
+}
+
+type BackupPointList struct {
+	Items      []v1.BackupPoint `json:"items" description:"paging data"`
+	TotalCount int              `json:"totalCount,omitempty" description:"total count"`
+}

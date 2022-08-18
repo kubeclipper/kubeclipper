@@ -80,6 +80,14 @@ func (cli *Client) get(ctx context.Context, path string, query url.Values, heade
 	return cli.sendRequest(ctx, "GET", path, query, nil, headers)
 }
 
+func (cli *Client) patch(ctx context.Context, path string, query url.Values, obj interface{}, headers map[string][]string) (serverResponse, error) {
+	body, headers, err := encodeBody(obj, headers)
+	if err != nil {
+		return serverResponse{}, err
+	}
+	return cli.sendRequest(ctx, "PATCH", path, query, body, headers)
+}
+
 // post sends an http request to the docker API using the method POST with a specific Go context.
 func (cli *Client) post(ctx context.Context, path string, query url.Values, obj interface{}, headers map[string][]string) (serverResponse, error) {
 	body, headers, err := encodeBody(obj, headers)
