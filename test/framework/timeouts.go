@@ -7,12 +7,7 @@ const (
 	clusterInstall      = 15 * time.Minute
 	clusterInstallShort = 5 * time.Minute
 	clusterDelete       = 10 * time.Minute
-	componentInstall    = 5 * time.Minute
-	componentUninstall  = 5 * time.Minute
-	//backupCreate        = 3 * time.Minute
-	//backupDelete        = 3 * time.Minute
-	//recoveryCreate      = 3 * time.Minute
-	//recoveryDelete      = 3 * time.Minute
+	commonTimeout       = 5 * time.Minute
 )
 
 // TimeoutContext contains timeout settings for several actions.
@@ -28,8 +23,7 @@ type TimeoutContext struct {
 	// ClusterDelete is how long to wait for the cluster to be deleted.
 	ClusterDelete time.Duration
 
-	ComponentInstall   time.Duration
-	ComponentUninstall time.Duration
+	CommonTimeout time.Duration
 }
 
 // NewTimeoutContextWithDefaults returns a TimeoutContext with default values.
@@ -38,7 +32,6 @@ func NewTimeoutContextWithDefaults() *TimeoutContext {
 		ClusterInstall:      clusterInstall,
 		ClusterInstallShort: clusterInstallShort,
 		ClusterDelete:       clusterDelete,
-		ComponentInstall:    componentInstall,
-		ComponentUninstall:  componentUninstall,
+		CommonTimeout:       commonTimeout,
 	}
 }

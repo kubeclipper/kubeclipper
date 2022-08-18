@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
@@ -21,7 +22,8 @@ var _ = SIGDescribe("[Slow] [Serial] Recovery", func() {
 		err := f.Client.DeleteBackup(context.TODO(), clu.Name, bp.Name)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for backup to be deleted")
-		err = cluster.WaitForBackupNotFound(f.Client, clu.Name, bp.Name, f.Timeouts.ComponentInstall)
+		err = cluster.WaitForBackupNotFound(f.Client, clu.Name, bp.Name, f.Timeouts.CommonTimeout)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("delete aio cluster")
 		err = f.Client.DeleteCluster(context.TODO(), clu.Name)
@@ -32,10 +34,10 @@ var _ = SIGDescribe("[Slow] [Serial] Recovery", func() {
 
 		ginkgo.By(" delete backup-point ")
 		err = f.Client.DeleteBackupPoint(context.TODO(), bpPoint.Name)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.BeforeEach(func() {
-		//创建一个备份点
 		ginkgo.By(" create backup point ")
 		backupPoints, err := f.Client.CreateBackupPoint(context.TODO(), initBackUpPoint())
 		framework.ExpectNoError(err)
@@ -44,23 +46,21 @@ var _ = SIGDescribe("[Slow] [Serial] Recovery", func() {
 		}
 		bpPoint = backupPoints.Items[0].DeepCopy()
 
-		//创建一个集群
 		clus, err := createClusterBeforeEach(f, initClusterWithBackupPoint)
 		framework.ExpectNoError(err)
 		clu = clus.Items[0].DeepCopy()
 
-		//获取备份节点
 		ginkgo.By(" get cluster node for backup ")
 		nodes, err := f.Client.DescribeNode(context.TODO(), clu.Masters[0].ID)
 		framework.ExpectNoError(err)
-		//创建备份
+
 		ginkgo.By(" create backup ")
 		backups, err := f.Client.CreateBackup(context.TODO(), clu.Name, initBackup(&nodes.Items[0]))
 		framework.ExpectNoError(err)
 		bp = backups.Items[0].DeepCopy()
-		// 检查是否备份成功
+
 		ginkgo.By(" check if the backup was available ")
-		err = cluster.WaitForBackupAvailable(f.Client, clu.Name, backupName, f.Timeouts.ComponentInstall)
+		err = cluster.WaitForBackupAvailable(f.Client, clu.Name, backupName, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 	})
 
@@ -69,7 +69,7 @@ var _ = SIGDescribe("[Slow] [Serial] Recovery", func() {
 		_, err := f.Client.CreateRecovery(context.TODO(), clu.Name, initRecovery(backupName))
 		framework.ExpectError(err)
 		ginkgo.By(" check recovery successful")
-		err = cluster.WaitForRecovery(f.Client, clu.Name, f.Timeouts.ComponentInstall)
+		err = cluster.WaitForRecovery(f.Client, clu.Name, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 	})
 })

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
 	v1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	nfsprovisioner "github.com/kubeclipper/kubeclipper/pkg/component/nfs"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -40,8 +41,9 @@ var _ = SIGDescribe("[Slow] [Serial] Install component", func() {
 		ginkgo.By(" start install nfs")
 		clus, err := f.Client.InstallOrUninstallComponent(context.TODO(), clu.Name, initComponent(false))
 		framework.ExpectNoError(err)
-		// 检查组件健康状况
+
 		ginkgo.By(" check nfs component condition ")
+		// TODO: add nfs healthy condition check
 		err = cluster.WaitForClusterRunning(f.Client, clu.Name, f.Timeouts.ClusterInstall)
 		if err != nil || !(clus.Items[0].Addons[0].Name == "nfs-provisioner") {
 			framework.ExpectNoError(errors.New("component install failed"))
@@ -58,9 +60,6 @@ var _ = SIGDescribe("[Slow] [Serial] Uninstall component", func() {
 	f.AddAfterEach("cleanup aio", func(f *framework.Framework, failed bool) {
 		ginkgo.By("delete aio cluster")
 		err := f.Client.DeleteCluster(context.TODO(), clu.Name)
-		if err != nil {
-			ginkgo.By(" fffffffff-add after each delete failed-fffffffff ")
-		}
 		framework.ExpectNoError(err)
 
 		ginkgo.By("waiting for cluster to be deleted")
@@ -75,7 +74,7 @@ var _ = SIGDescribe("[Slow] [Serial] Uninstall component", func() {
 		clus, err := createClusterBeforeEach(f, initClusterWithPlugin)
 		framework.ExpectNoError(err)
 		if len(clus.Items) == 0 {
-			framework.ExpectNoError(errors.New(" ***** create cluster nil ***** "))
+			framework.Failf("unexpected problem, cluster not be nil at this time")
 		}
 		clu = clus.Items[0].DeepCopy()
 	})
@@ -88,7 +87,7 @@ var _ = SIGDescribe("[Slow] [Serial] Uninstall component", func() {
 			framework.Failf("unexpected problem, cluster not be nil at this time")
 		}
 		ginkgo.By(" waiting for component uninstalled ")
-		err = cluster.WaitForComponentNotFound(f.Client, clu.Name, f.Timeouts.ComponentUninstall)
+		err = cluster.WaitForComponentNotFound(f.Client, clu.Name, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 	})
 
