@@ -69,7 +69,6 @@ const (
 	DefaultNatsPKIPath        = "pki/nats"
 	DefaultKcServerConfigPath = "/etc/kubeclipper-server"
 	DefaultKcAgentConfigPath  = "/etc/kubeclipper-agent"
-	DefaultUpgradePkg         = "http://tarballs.99cloud.com.cn/kubeclipper/release.github/kc-latest.tar.gz"
 
 	DefaultRegion = "default"
 
@@ -97,7 +96,6 @@ const (
 	ResourceCluster = "cluster"
 	ResourceUser    = "user"
 	ResourceRole    = "role"
-	UpgradeEtcd     = "etcd"
 	UpgradeAgent    = "agent"
 	UpgradeServer   = "server"
 	UpgradeConsole  = "console"

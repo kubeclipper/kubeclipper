@@ -1,9 +1,15 @@
 package upgrade
 
 import (
+	"context"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -12,7 +18,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
@@ -40,19 +45,19 @@ const (
   kcctl upgrade all --pkg xxx
 
   # Upgrade agent of kubeclipper platform use your own pkg
-  kcctl upgrade agent --pkg xxx
-
-  # Upgrade agent kubeclipper platform use binary pkg
-  kcctl upgrade agent --pkg xxx --binary`
+  kcctl upgrade agent --pkg xxx`
 )
 
 var (
-	serviceMap = make(map[string][]string)
+	serviceMap    = make(map[string][]string)
+	allowedOnline = sets.NewString("master", "latest")
+	onlinePkg     = "https://oss.kubeclipper.io/kc/%s/%s"
 )
 
 type BaseOptions struct {
 	deployConfig *options.DeployConfig
 	CliOpts      *options.CliOptions
+	client       *kc.Client
 	SSHConfig    *sshutils.SSH
 	options.IOStreams
 }
@@ -60,10 +65,9 @@ type BaseOptions struct {
 type UpgradeOptions struct {
 	BaseOptions
 	pkg       string
-	online    bool
+	online    string
 	component string
 	pkgDir    string
-	pkgName   string
 	serverIPs []string
 	agentIPs  []string
 }
@@ -71,14 +75,14 @@ type UpgradeOptions struct {
 func NewUpgradeOptions(stream options.IOStreams) *UpgradeOptions {
 	return &UpgradeOptions{
 		BaseOptions: BaseOptions{
-			CliOpts: nil,
+			CliOpts: options.NewCliOptions(),
+			client:  nil,
 			SSHConfig: &sshutils.SSH{
 				User: "root",
 			},
 			IOStreams:    stream,
 			deployConfig: options.NewDeployOptions(),
 		},
-		online: false,
 	}
 }
 
@@ -93,13 +97,14 @@ func NewCmdUpgrade(stream options.IOStreams) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
 			utils.CheckErr(o.Validate(cmd, args))
+			utils.CheckErr(o.checkPkgStructure())
 			utils.CheckErr(o.RunUpgrade())
 		},
 	}
-
+	//TODO: add binary pkg upgrade
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "deploy-config file path.")
 	cmd.Flags().StringVar(&o.pkg, "pkg", o.pkg, "new pkg path.")
-	cmd.Flags().BoolVar(&o.online, "online", o.online, "use online upgrade pkg.")
+	cmd.Flags().StringVar(&o.online, "online", o.online, "input version e.g: v1.12.1 or master、latest")
 	options.AddFlagsToSSH(o.deployConfig.SSHConfig, cmd.Flags())
 
 	return cmd
@@ -112,6 +117,14 @@ func (o *UpgradeOptions) Complete() error {
 	if o.deployConfig.ServerIPs == nil {
 		return fmt.Errorf("server node can't be empty, please check deploy-config file")
 	}
+	if err := o.CliOpts.Complete(); err != nil {
+		return err
+	}
+	c, err := o.CliOpts.ToRawConfig().ToKcClient()
+	if err != nil {
+		return err
+	}
+	o.client = c
 	return nil
 }
 
@@ -121,15 +134,13 @@ func (o *UpgradeOptions) Validate(cmd *cobra.Command, args []string) error {
 	}
 	o.component = args[0]
 
-	o.pkgName = strings.ReplaceAll(filepath.Base(o.pkg), ".tar.gz", "")
-	o.pkgDir = filepath.Join(config.DefaultPkgPath, o.pkgName, "bin")
-
-	if o.online {
-		o.pkg = options.DefaultUpgradePkg
-	}
-
-	if fileutil.IsDir(o.pkg) {
-		return fmt.Errorf("--pkg can't be a directory")
+	if o.online != "" {
+		if err := o.checkVersion(); err != nil {
+			return err
+		}
+		o.pkgDir = filepath.Join(config.DefaultPkgPath, "kc")
+	} else {
+		o.pkgDir = filepath.Join(config.DefaultPkgPath, strings.ReplaceAll(filepath.Base(o.pkg), ".tar.gz", ""))
 	}
 
 	if len(o.deployConfig.ServerIPs)%2 == 0 {
@@ -139,35 +150,71 @@ func (o *UpgradeOptions) Validate(cmd *cobra.Command, args []string) error {
 	o.agentIPs = o.deployConfig.Agents.ListIP()
 	serviceMap[options.UpgradeServer] = o.serverIPs
 	serviceMap[options.UpgradeAll] = append(o.serverIPs, o.agentIPs...)
-	serviceMap[options.UpgradeEtcd] = o.serverIPs
 	serviceMap[options.UpgradeConsole] = o.serverIPs
 	serviceMap[options.UpgradeAgent] = o.agentIPs
 
 	if _, ok := serviceMap[o.component]; !ok {
-		return utils.UsageErrorf(cmd, "unsupported upgrade component, support [ agent | server | etcd | console ] now")
+		return utils.UsageErrorf(cmd, "unsupported upgrade component, support [ agent | server | console ] now")
 	}
 
 	return nil
 }
 
+func (o *UpgradeOptions) checkVersion() error {
+	role := "^[v]([1-9]\\d|[1-9])(.([1-9]\\d|\\d)){2}$"
+	m, err := regexp.Compile(role)
+	if err != nil {
+		return err
+	}
+
+	versionInfo, err := o.client.Version(context.TODO())
+	if err != nil {
+		return err
+	}
+	platforms := strings.Split(versionInfo.Platform, "/")
+
+	if ok := m.MatchString(o.online); ok {
+		// 与当前对比，不能往老版本升级
+		// 应该是 git 版本  gitversion: v1.1.0-2+93c50dc822cdc
+		v := strings.Split(versionInfo.GitVersion[1:], "-")
+		current, _ := strconv.Atoi(strings.Join(strings.Split(v[0], "."), ""))
+		version, _ := strconv.Atoi(strings.Join(strings.Split(o.online[1:], "."), ""))
+		if current > version {
+			return fmt.Errorf(" input version is lower than the current version ")
+		}
+	} else if !allowedOnline.Has(o.online) {
+		return fmt.Errorf("wrong version (%s),there is no this branch ", o.online)
+	}
+
+	//TODO: check for version compatibility issues
+
+	o.pkg = fmt.Sprintf(onlinePkg, o.online, fmt.Sprintf("kc-%s-%s", platforms[0], platforms[1]))
+
+	return nil
+}
+
 func (o *UpgradeOptions) checkPkgStructure() error {
+	if _, ok := httputil.IsURL(o.pkg); ok {
+		return nil
+	}
 	cmd, err := cmdutil.RunCmd(false, "tar", "-tf", o.pkg)
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(cmd.StdOut(), fmt.Sprintf("%s/bin", o.pkgName)) {
-		return fmt.Errorf("package structure(%s) Non-standard. standard : 'packake/bin' example: kc/bin/kcctl", cmd.StdOut())
+	name := filepath.Base(o.pkgDir)
+	//TODO: upgrade single component with offline + local package condition
+	if !strings.Contains(cmd.StdOut(), fmt.Sprintf("%s/bin", name)) {
+		return fmt.Errorf("package structure:\n%s\nNon-standard. standard : 'packake/bin' example: kc/bin/kcctl", cmd.StdOut())
 	}
 	if o.component == options.UpgradeAll || o.component == options.UpgradeConsole {
-		if !strings.Contains(cmd.StdOut(), fmt.Sprintf("%s/kc-console", o.pkgName)) {
-			return fmt.Errorf("package structure(%s) Non-standard. standard : 'packake/kc-console' example: kc/kc-console/... ", cmd.StdOut())
+		if !strings.Contains(cmd.StdOut(), fmt.Sprintf("%s/kc-console", name)) {
+			return fmt.Errorf("package structure:\n%s\nNon-standard. standard : 'packake/kc-console' example: kc/kc-console/... ", cmd.StdOut())
 		}
 	}
 	return nil
 }
 
 func (o *UpgradeOptions) RunUpgrade() error {
-	utils.CheckErr(o.checkPkgStructure())
 	err := o.sendPackage()
 	if err != nil {
 		return err
@@ -232,21 +279,18 @@ func (o *UpgradeOptions) replaceService(comp string) error {
 func (o *UpgradeOptions) copyAndBackup(component string) (cp, backup string) {
 	switch component {
 	case options.UpgradeAgent:
-		cp = fmt.Sprintf("cp -rf %s/kubeclipper-agent /usr/local/bin/", o.pkgDir)
-		backup = "cp /usr/local/bin/kubeclipper-agent /tmp/kubeclipper/bin"
+		cp = fmt.Sprintf("cp -rf %s/bin/kubeclipper-agent /usr/local/bin/kubeclipper-agent", o.pkgDir)
+		backup = "cp /usr/local/bin/kubeclipper-agent /tmp/kubeclipper/bin/kubeclipper-agent"
 	case options.UpgradeServer:
-		cp = fmt.Sprintf("cp -rf %s/kubeclipper-server /usr/local/bin/", o.pkgDir)
-		backup = "cp /usr/local/bin/kubeclipper-server /tmp/kubeclipper/bin"
-	case options.UpgradeEtcd:
-		cp = fmt.Sprintf("cp -rf %s/etcd* /usr/local/bin/", o.pkgDir)
-		backup = "cp /usr/local/bin/etcd* /tmp/kubeclipper/bin"
+		cp = fmt.Sprintf("cp -rf %s/bin/kubeclipper-server /usr/local/bin/kubeclipper-server", o.pkgDir)
+		backup = "cp /usr/local/bin/kubeclipper-server /tmp/kubeclipper/bin/kubeclipper-serve"
 	case options.UpgradeConsole:
 		cp = sshutils.Combine([]string{
-			fmt.Sprintf("cp -f %s/caddy /usr/local/bin/", o.pkgDir),
-			fmt.Sprintf("cp -rf %s/%s/kc-console/* /etc/kc-console/dist/", config.DefaultPkgPath, o.pkgName),
+			fmt.Sprintf("cp -f %s/bin/caddy /usr/local/bin/caddy", o.pkgDir),
+			fmt.Sprintf("cp -rf %s/kc-console/* /etc/kc-console/dist/", o.pkgDir),
 		})
 		backup = sshutils.Combine([]string{
-			"cp -rf /usr/local/bin/caddy /tmp/kubeclipper/bin",
+			"cp -rf /usr/local/bin/caddy /tmp/kubeclipper/bin/caddy",
 			"cp -rf /etc/kc-console /tmp/kubeclipper/kc-console",
 		})
 	}
