@@ -27,30 +27,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
-/*
-create kubeclipper resource
-
-Usage:
-  kcctl create -f FILENAME
-  kcctl create [command]
-
-Examples:
-TODO..
-
-Available Commands:
-  cluster     create kubeclipper cluster resource
-  role        create kubeclipper role resource
-  user        create kubeclipper role resource
-
-Flags:
-  -c, --config string     Path to the config file to use for CLI requests.
-  -f, --filename string   use resource file to create
-  -h, --help              help for create
-  -o, --output string     Output format either: json,yaml,table (default "table")
-
-Use "kcctl create [command] --help" for more information about a command.
-*/
-
 const (
 	longDescription = `
   Create specified resource
@@ -94,8 +70,8 @@ func NewCmdCreate(streams options.IOStreams) *cobra.Command {
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete(o.CliOpts))
-			//utils.CheckErr(o.ValidateArgs(cmd, args))
-			//utils.CheckErr(o.RunGet())
+			// utils.CheckErr(o.ValidateArgs(cmd, args))
+			// utils.CheckErr(o.RunGet())
 		},
 	}
 	cmd.Flags().StringVarP(&o.Filename, "filename", "f", "", "use resource file to create")

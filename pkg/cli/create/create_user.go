@@ -22,50 +22,29 @@ import (
 	"context"
 	"strings"
 
-	"github.com/kubeclipper/kubeclipper/pkg/logger"
-	"github.com/kubeclipper/kubeclipper/pkg/query"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
-
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 )
 
-/*
-create kubeclipper user resource
-
-Usage:
-  kcctl create user
-
-Examples:
-TODO..
-
-Flags:
-  -c, --config string         Path to the config file to use for CLI requests.
-      --description string    user description
-      --display-name string   user display name
-      --email string          user email address
-  -h, --help                  help for user
-      --name string           user name
-  -o, --output string         Output format either: json,yaml,table (default "table")
-      --password string       user password
-      --phone string          user phone number
-      --role string           user role
-*/
-
 const (
 	userLongDescription = `
   Create user using command line`
 	createUserExample = `
   # Create user with required parameters
-  kcctl create user --name 'NAME' --role 'ROLE' --password 'PWD' --phone 'PHONE' --email 'EMAIL'
+  kcctl create user --name simple-user --role=platform-view --password 123456 --phone 10086 --email simple@example.com
 
   # Create user with all parameters
-  kcctl create user --name 'NAME' --role 'ROLE' --password 'PWD' --phone 'PHONE' --email 'EMAIL' --description '' --display-name ''
+  kcctl create user --name full-user --role=platform-view --password 123456 --phone 10010 --email full@example.com --description 'a full info user' --display-name 'full'
 
   Please read 'kcctl create user -h' get more create user flags.`
 )
@@ -105,13 +84,13 @@ func NewCmdCreateUser(streams options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunCreate())
 		},
 	}
-	cmd.Flags().StringVar(&o.Name, "name", "", "user name")            //
-	cmd.Flags().StringVar(&o.Role, "role", "", "user role")            //
-	cmd.Flags().StringVar(&o.Email, "email", "", "user email address") //
+	cmd.Flags().StringVar(&o.Name, "name", "", "user name")
+	cmd.Flags().StringVar(&o.Role, "role", "", "user role")
+	cmd.Flags().StringVar(&o.Email, "email", "", "user email address")
 	cmd.Flags().StringVar(&o.Description, "description", "", "user description")
 	cmd.Flags().StringVar(&o.DisplayName, "display-name", "", "user display name")
-	cmd.Flags().StringVar(&o.Password, "password", "", "user password") //
-	cmd.Flags().StringVar(&o.Phone, "phone", "", "user phone number")   //
+	cmd.Flags().StringVar(&o.Password, "password", "", "user password")
+	cmd.Flags().StringVar(&o.Phone, "phone", "", "user phone number")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -176,7 +155,7 @@ func (l *CreateUserOptions) newUser() *v1.User {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: l.Name,
 			Annotations: map[string]string{
-				"iam.kubeclipper.io/role": l.Role,
+				common.RoleAnnotation: l.Role,
 			},
 		},
 		Spec: v1.UserSpec{

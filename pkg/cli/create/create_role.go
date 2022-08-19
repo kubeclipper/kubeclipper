@@ -56,16 +56,15 @@ Flags:
 
 const (
 	roleLongDescription = `
-  Create role using command line
-
-  Role's default name is ''.`
+  Create role using command line`
 	createRoleExample = `
-  # Create role with default name
-  kcctl create role --rules 'RULES'
+  # Create role has permission to view cluster
+  kcctl create role --name cluster_viewer --rules=role-template-view-clusters
 
-  # Create role using specified name
-  kcctl create role --name 'test' --rules 'RULES'
-
+  # Create role has permission to view cluster and user
+  kcctl create role --name viewer --rules=role-template-view-clusters  --rules=role-template-view-users
+  
+  You can use cmd kcctl get role --selector=kubeclipper.io/role-template=true to query rules.
   Please read 'kcctl create role -h' get more create role flags.`
 )
 
