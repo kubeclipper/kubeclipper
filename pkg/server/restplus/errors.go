@@ -21,13 +21,12 @@ package restplus
 import (
 	"net/http"
 
+	"github.com/emicklei/go-restful"
 	"go.uber.org/zap"
-
-	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	apiError "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/kubeclipper/kubeclipper/pkg/errors"
-
-	"github.com/emicklei/go-restful"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
 )
 
 func HandleInternalError(response *restful.Response, req *restful.Request, err error) {
@@ -79,4 +78,17 @@ func HandlerCrash() {
 	if r := recover(); r != nil {
 		logger.Error("handler crash", zap.Any("recover_for", r))
 	}
+}
+
+func HandleError(response *restful.Response, req *restful.Request, err error) {
+	var statusCode int
+	switch t := err.(type) {
+	case apiError.APIStatus:
+		statusCode = int(t.Status().Code)
+	case restful.ServiceError:
+		statusCode = t.Code
+	default:
+		statusCode = http.StatusInternalServerError
+	}
+	handle(statusCode, response, req, statusCode, http.StatusText(statusCode), err)
 }
