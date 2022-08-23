@@ -194,7 +194,7 @@ version = 2
       key_model = "node"
 
     [plugins."io.containerd.grpc.v1.cri".registry]
-      config_path = ""
+      config_path = "{{.RegistryConfigDir}}"
 
       [plugins."io.containerd.grpc.v1.cri".registry.auths]
 
