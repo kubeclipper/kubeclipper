@@ -190,21 +190,23 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 			CriType: stepper.Kubeadm.ContainerRuntime,
 			Offline: extraMetadata.Offline,
 		},
-		DownloadImage: true,
+		DownloadImage: false,
 	}
-
-	// 升级时使用的镜像仓库有效且不与创建集群时使用的镜像仓库相等时，使用新的镜像仓库渲染 kubeadm 配置文件
-	// TODO: 升级时镜像仓库更新，需要更新 docker, containerd 的配置
+	// master node only in this case will the image package be pulled
+	if extraMetadata.Offline && stepper.Kubeadm.LocalRegistry == "" && stepper.LocalRegistry == "" {
+		packageDownload.DownloadImage = true
+	}
+	// When the mirror repository used for the upgrade is valid and not equal to the one used for the cluster creation,
+	// the kubeadm configuration file is rendered with the new mirror repository.
+	// TODO: During the upgrade, if the image repository changes, synchronize the changes to the docker and containerd configurations
 	if stepper.LocalRegistry != "" && stepper.Kubeadm.LocalRegistry != stepper.LocalRegistry {
 		stepper.Kubeadm.LocalRegistry = stepper.LocalRegistry
-		// 当从私有镜像仓库拉取镜像的时候，不需要提前拉取镜像
-		packageDownload.DownloadImage = false
 	}
 	masterDownload, err := json.Marshal(packageDownload)
 	if err != nil {
 		return err
 	}
-	// worker 节点所有情况下均不需要拉取镜像
+	// worker node in all cases, you do not need to pull the image
 	packageDownload.DownloadImage = false
 	workerDownload, err := json.Marshal(packageDownload)
 	if err != nil {
