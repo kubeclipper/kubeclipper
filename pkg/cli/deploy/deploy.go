@@ -74,7 +74,7 @@ const (
   Now only support offline install, so the --pkg parameter must be valid`
 	deployExample = `
   # Deploy All-In-One use local host, etcd port will be set automatically. (client-12379 | peer-12380 | metrics-12381)
-  kcctl deploy --pk-file ~/.ssh/id_rsa
+  kcctl deploy
 
   # Deploy AIO env and change etcd port
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --passwd 'YOUR-SSH-PASSWORD' --pkg kc-minimal.tar.gz --etcd-port 12379 --etcd-peer-port 12380 --etcd-metric-port 12381
@@ -117,6 +117,7 @@ type DeployOptions struct {
 	servers      map[string]string
 	agents       []string // user input's agents,maybe with region,need to parse.
 	fips         []string // ip:fip
+	aio          bool
 }
 
 func NewDeployOptions(streams options.IOStreams) *DeployOptions {
@@ -163,7 +164,7 @@ func (d *DeployOptions) Complete() error {
 	}
 	// if both the server and agent are empty, set the all-in-one environment
 	if d.deployConfig.ServerIPs == nil && d.agents == nil {
-		// TODO: Replace it with the official address
+		d.aio = true
 		if d.deployConfig.Pkg == "" {
 			d.deployConfig.Pkg = defaultPkg
 		}
@@ -201,6 +202,10 @@ func (d *DeployOptions) Complete() error {
 		}
 	}
 
+	if d.aio {
+		logger.Infof("run in aio mode.")
+	}
+
 	return nil
 }
 
@@ -211,7 +216,7 @@ func (d *DeployOptions) ValidateArgs() error {
 	if d.deployConfig.Pkg == "" {
 		return fmt.Errorf("--pkg must be specified")
 	}
-	if d.deployConfig.SSHConfig.PkFile == "" && d.deployConfig.SSHConfig.Password == "" {
+	if !d.aio && d.deployConfig.SSHConfig.PkFile == "" && d.deployConfig.SSHConfig.Password == "" {
 		return fmt.Errorf("one of --pk-file or --passwd must be specified")
 	}
 	if len(d.deployConfig.ServerIPs) == 0 {
@@ -241,11 +246,11 @@ func (d *DeployOptions) ValidateArgs() error {
 
 func (d *DeployOptions) preRun() {
 	for _, sip := range d.deployConfig.ServerIPs {
-		name := utils.GetRemoteHostName(d.deployConfig.SSHConfig, sip)
-		if name == "" {
-			logger.Fatal("get remote hostname failed")
+		hostname, err := sshutils.GetRemoteHostName(d.deployConfig.SSHConfig, sip)
+		if err != nil {
+			logger.Fatalf("get remote hostname failed,err:%v", err)
 		}
-		d.servers[sip] = name
+		d.servers[sip] = hostname
 	}
 	res, _ := password.Generate(24, 5, 0, false, true)
 	d.deployConfig.JWTSecret = res
@@ -263,11 +268,11 @@ var (
 	precheckKcServerFunc              = generateCommonPreCheckFunc("kc-server")
 	precheckKcAgentFunc               = generateCommonPreCheckFunc("kc-agent")
 	precheckNtpFunc      precheckFunc = func(sshConfig *sshutils.SSH, host string) error {
-		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "systemctl --all --type service --state running | grep -Fq -e chronyd -e ntpd")
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "systemctl --all --type service --state running | grep -e chronyd -e ntpd|wc -l")
 		if err != nil {
 			return err
 		}
-		if ret.ExitCode != 0 {
+		if ret.StdoutToString("") == "0" {
 			err = fmt.Errorf("chronyd or ntpd service not running, may cause service internal error")
 		}
 		return err
@@ -276,12 +281,12 @@ var (
 
 func generateCommonPreCheckFunc(name string) precheckFunc {
 	return func(sshConfig *sshutils.SSH, host string) error {
-		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, fmt.Sprintf("systemctl --all --type service | grep -Fq %s", name))
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, fmt.Sprintf("systemctl --all --type service | grep %s | wc -l", name))
 		logger.V(2).Infof("exit code %d, err %v", ret.ExitCode, err)
 		if err != nil {
 			return err
 		}
-		if ret.ExitCode == 0 {
+		if ret.StdoutToString("") != "0" {
 			err = fmt.Errorf("%s service exist, please clean old environment", name)
 		}
 		return err
@@ -329,7 +334,11 @@ func (d *DeployOptions) precheckTimeLag() bool {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			output := d.deployConfig.SSHConfig.CmdToString(host, "date +%s", "")
+			ret, err := sshutils.SSHCmd(d.deployConfig.SSHConfig, host, "date +%s")
+			if err != nil {
+				logger.Fatal("get timestamp failed", err)
+			}
+			output := ret.StdoutToString("")
 			ts, err := strconv.ParseInt(output, 10, 64)
 			if err != nil {
 				logger.Fatal("get timestamp failed", err)
@@ -396,28 +405,6 @@ func (d *DeployOptions) RunDeploy() error {
 	d.removeTempFile()
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 	return nil
-}
-
-// check node kc-etcd/kc-server/kc-agent service already exists
-func (d *DeployOptions) check() []error {
-	var errs []error
-	// check node kc-etcd/kc-server service already exists
-	for node := range d.servers {
-		res := d.deployConfig.SSHConfig.CmdToString(node, "systemctl status kc-etcd | grep Active && systemctl status kc-server | grep Active", "")
-		if strings.Contains(res, "active (running)") {
-			errs = append(errs, fmt.Errorf(`node %s kc-etcd/kc-server service already exists\n`, node))
-		}
-	}
-
-	// check node kc-agent service already exists
-	for _, node := range d.allNodes {
-		res := d.deployConfig.SSHConfig.CmdToString(node, "systemctl status kc-agent | grep Active", "")
-		if strings.Contains(res, "active (running)") {
-			errs = append(errs, fmt.Errorf(`node %s kc-agent service already exists\n`, node))
-		}
-	}
-
-	return errs
 }
 
 func (d *DeployOptions) sendPackage() {
@@ -813,7 +800,7 @@ func (d *DeployOptions) dumpConfig() {
 	if err = utils.WriteToFile(options.DefaultDeployConfigPath, b); err != nil {
 		logger.Fatalf("dump config to %s failed due to %s", options.DefaultDeployConfigPath, err.Error())
 	}
-	logger.V(2).Info("dump config to %s", options.DefaultDeployConfigPath)
+	logger.V(2).Infof("dump config to %s", options.DefaultDeployConfigPath)
 }
 
 func (d *DeployOptions) sendCertAndKey(contents []certutils.Config, pki string) error {

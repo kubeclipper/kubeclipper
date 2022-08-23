@@ -48,7 +48,6 @@ func IsFileExist(filepath string) (bool, error) {
 
 func CmdToString(name string, arg ...string) (Result, error) {
 	var ret Result
-	logger.Infof("exec cmd is %s %v: ", name, arg)
 	cmd := exec.Command(name, arg[:]...)
 	ret.PrintCmd = cmd.String()
 	cmd.Stdin = os.Stdin
@@ -63,8 +62,46 @@ func CmdToString(name string, arg ...string) (Result, error) {
 	return ret, nil
 }
 
+func RunCmdAsSSH(cmdStr string) (Result, error) {
+	var ret Result
+
+	user := Whoami()
+	ec := exec.Command("sh", []string{"-c", cmdStr}...)
+	ec.Stdin = os.Stdin
+	var bout, berr bytes.Buffer
+	ec.Stdout, ec.Stderr = &bout, &berr
+	err := ec.Run()
+	ret = Result{
+		User:     user,
+		Host:     "localhost",
+		Cmd:      ec.String(),
+		PrintCmd: ec.String(),
+		Stdout:   bout.String(),
+		Stderr:   berr.String(),
+	}
+	logger.V(2).Info(ret.Short())
+	if err != nil {
+		ok, exitCode := ExtraExitCode(err)
+		if !ok {
+			return ret, err
+		}
+		// with exitCode,ignore error
+		ret.ExitCode = exitCode
+		return ret, nil
+	}
+	return ret, nil
+}
+
+func Whoami() string {
+	result, err := CmdToString("whoami")
+	if err != nil {
+		return ""
+	}
+	return result.StdoutToString("")
+}
+
 func Cmd(name string, arg ...string) {
-	logger.Infof("exec cmd is %s %v: ", name, arg)
+	logger.Infof("exec cmd is %s %v", name, arg)
 	cmd := exec.Command(name, arg[:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr

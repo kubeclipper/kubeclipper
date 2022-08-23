@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/proxy/config"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
 func parseTunnel(tunnelsStr []string) ([]tunnel, error) {
@@ -48,9 +48,9 @@ func (d *ProxyOptions) generateProxyConfig() *config.Config {
 	}
 
 	for agentIP, tunnels := range m {
-		name := utils.GetRemoteHostName(d.deployConfig.SSHConfig, agentIP)
+		hostname, _ := sshutils.GetRemoteHostName(d.deployConfig.SSHConfig, agentIP)
 		agentConfig := config.AgentConfig{
-			Name:    name,
+			Name:    hostname,
 			Tunnels: make([]config.Tunnel, 0, len(tunnels)),
 		}
 		for _, v := range tunnels {

@@ -127,6 +127,15 @@ func (ss *SSH) Copy(host, localFilePath, remoteFilePath string) error {
 	if err = ret.Error(); err != nil {
 		return err
 	}
+	// if need run as exec,change to use scp cmd.
+	if SSHToCmd(ss, host) {
+		ret, err = CmdToString("scp", localFilePath, remoteFilePath)
+		if err != nil {
+			return err
+		}
+		return ret.Error()
+	}
+
 	sftpClient, err := ss.sftpConnect(host)
 	if err != nil {
 		logger.Fatalf("[%s]sftp conn failed: %s", host, err)
@@ -196,6 +205,16 @@ func (ss *SSH) download(host, localFilePath, remoteFilePath string) error {
 	if err = ret.Error(); err != nil {
 		return err
 	}
+
+	// if need run as exec,change to use scp cmd.
+	if SSHToCmd(ss, host) {
+		ret, err = CmdToString("scp", remoteFilePath, localFilePath)
+		if err != nil {
+			return err
+		}
+		return ret.Error()
+	}
+
 	sftpClient, err := ss.sftpConnect(host)
 	if err != nil {
 		logger.Fatalf("[%s]sftp conn failed: %s", host, err)
