@@ -96,6 +96,7 @@ const (
 	ResourceCluster = "cluster"
 	ResourceUser    = "user"
 	ResourceRole    = "role"
+	UpgradeKcctl    = "kcctl"
 	UpgradeAgent    = "agent"
 	UpgradeServer   = "server"
 	UpgradeConsole  = "console"
