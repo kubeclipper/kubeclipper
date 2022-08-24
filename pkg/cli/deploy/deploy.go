@@ -567,6 +567,7 @@ func (d *DeployOptions) getEtcdTemplateContent(ip string) string {
 	if err != nil {
 		logger.Fatalf("template parse failed: %s", err.Error())
 	}
+	isFloatIP, _ := sshutils.IsFloatIP(d.deployConfig.SSHConfig, ip)
 	var initialCluster []string
 	for k, v := range d.servers {
 		initialCluster = append(initialCluster, fmt.Sprintf("%s=https://%s:%d", v, k, d.deployConfig.EtcdConfig.PeerPort))
@@ -580,9 +581,15 @@ func (d *DeployOptions) getEtcdTemplateContent(ip string) string {
 	data["InitialCluster"] = strings.Join(initialCluster, ",")
 	data["ClusterToken"] = "kc-etcd-cluster"
 	data["ServerCertKeyPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.key", options.EtcdServer))
-	data["ClientURLs"] = fmt.Sprintf("https://127.0.0.1:%d,https://%s:%d", d.deployConfig.EtcdConfig.ClientPort, ip, d.deployConfig.EtcdConfig.ClientPort)
+	if isFloatIP {
+		// if user specify a float ip,we replace to listen 0.0.0.0
+		data["PeerURLs"] = fmt.Sprintf("https://0.0.0.0:%d", d.deployConfig.EtcdConfig.PeerPort)
+		data["ClientURLs"] = fmt.Sprintf("https://0.0.0.0:%d", d.deployConfig.EtcdConfig.ClientPort)
+	} else {
+		data["ClientURLs"] = fmt.Sprintf("https://127.0.0.1:%d,https://%s:%d", d.deployConfig.EtcdConfig.ClientPort, ip, d.deployConfig.EtcdConfig.ClientPort)
+		data["PeerURLs"] = fmt.Sprintf("https://%s:%d", ip, d.deployConfig.EtcdConfig.PeerPort)
+	}
 	data["MetricsURLs"] = fmt.Sprintf("http://127.0.0.1:%d", d.deployConfig.EtcdConfig.MetricsPort)
-	data["PeerURLs"] = fmt.Sprintf("https://%s:%d", ip, d.deployConfig.EtcdConfig.PeerPort)
 	data["PeerCertPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.crt", options.EtcdPeer))
 	data["PeerCertKeyPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.key", options.EtcdPeer))
 	data["CaPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultCaPath, fmt.Sprintf("%s.crt", options.Ca))
@@ -645,7 +652,13 @@ func (d *DeployOptions) getKcServerConfigTemplateContent(ip string) string {
 	data["MQServerEndpoints"] = mqServerEndpoints
 	data["MQTLS"] = d.deployConfig.MQ.TLS
 	if !d.deployConfig.MQ.External {
-		data["MQServerAddress"] = ip
+		isFloatIP, _ := sshutils.IsFloatIP(d.deployConfig.SSHConfig, ip)
+		if isFloatIP {
+			// if user specify a float ip,we replace to listen 0.0.0.0
+			data["MQServerAddress"] = "0.0.0.0"
+		} else {
+			data["MQServerAddress"] = ip
+		}
 		data["MQServerPort"] = d.deployConfig.MQ.Port
 		data["MQClusterPort"] = d.deployConfig.MQ.ClusterPort
 		data["LeaderHost"] = fmt.Sprintf("%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.MQ.ClusterPort)
