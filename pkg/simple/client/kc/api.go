@@ -23,8 +23,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+
+	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"

@@ -66,7 +66,7 @@ func NewCmdVersion(streams options.IOStreams) *cobra.Command {
 		Long:    longDescription,
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			//return RunVersion(v.Out, cmd)
+			// return RunVersion(v.Out, cmd)
 			utils.CheckErr(v.Complete(v.cliOpts))
 			utils.CheckErr(v.RunVersion())
 		},
@@ -85,7 +85,7 @@ func (v *VersionOptions) Complete(opts *options.CliOptions) error {
 	if err := opts.Complete(); err != nil {
 		return nil
 	}
-	c, err := opts.ToRawConfig().ToKcClient()
+	c, err := kc.FromConfig(opts.ToRawConfig())
 	if err != nil {
 		return nil
 	}

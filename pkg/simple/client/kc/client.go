@@ -22,6 +22,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 )
 
 const (
@@ -34,6 +36,14 @@ type Client struct {
 	bearerToken string
 	basePath    string
 	scheme      string
+}
+
+func FromConfig(c config.Config) (*Client, error) {
+	ctx := c.Contexts[c.CurrentContext]
+
+	return NewClientWithOpts(WithHost(c.Servers[ctx.Server].Server),
+		WithScheme("http"),
+		WithBearerAuth(c.AuthInfos[ctx.AuthInfo].Token))
 }
 
 func NewClientWithOpts(opts ...Opt) (*Client, error) {

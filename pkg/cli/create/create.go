@@ -94,8 +94,8 @@ func NewCmdCreate(streams options.IOStreams) *cobra.Command {
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete(o.CliOpts))
-			//utils.CheckErr(o.ValidateArgs(cmd, args))
-			//utils.CheckErr(o.RunGet())
+			// utils.CheckErr(o.ValidateArgs(cmd, args))
+			// utils.CheckErr(o.RunGet())
 		},
 	}
 	cmd.Flags().StringVarP(&o.Filename, "filename", "f", "", "use resource file to create")
@@ -112,7 +112,7 @@ func (l *CreateOptions) Complete(opts *options.CliOptions) error {
 	if err := opts.Complete(); err != nil {
 		return err
 	}
-	c, err := opts.ToRawConfig().ToKcClient()
+	c, err := kc.FromConfig(opts.ToRawConfig())
 	if err != nil {
 		return err
 	}

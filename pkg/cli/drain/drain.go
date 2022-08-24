@@ -143,7 +143,7 @@ func (c *DrainOptions) Complete() error {
 	if err = c.cliOpts.Complete(); err != nil {
 		return err
 	}
-	c.client, err = c.cliOpts.ToRawConfig().ToKcClient()
+	c.client, err = kc.FromConfig(c.cliOpts.ToRawConfig())
 
 	return err
 }

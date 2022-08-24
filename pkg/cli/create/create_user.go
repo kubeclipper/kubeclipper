@@ -130,7 +130,7 @@ func (l *CreateUserOptions) Complete(opts *options.CliOptions) error {
 	if err := opts.Complete(); err != nil {
 		return err
 	}
-	c, err := opts.ToRawConfig().ToKcClient()
+	c, err := kc.FromConfig(opts.ToRawConfig())
 	if err != nil {
 		return err
 	}
