@@ -48,22 +48,19 @@ import (
 
 const (
 	clusterLongDescription = `
-  Create cluster using command line
-
-  Cluster's default name is 'demo'.
-  The offline flag is 'online' by default.
-  The untaint-master flag is FALSE by default.
-  The cri flag is 'containerd' by defualt.
-  The cni flag is 'calico' by default.`
+  Create cluster using command line`
 	createClusterExample = `
   # Create cluster offline. The default value of offline is true, so it can be omitted.
   kcctl create cluster --name demo --master 192.168.10.123
 
   # Create cluster online
-  kcctl create cluster --name demo --master 192.168.10.123 --offline false --local-registry 'REGISTRY-ADDRESS'
+  kcctl create cluster --name demo --master 192.168.10.123 --offline false --local-registry 192.168.10.123:5000
 
   # Create cluster with taint manage
-  kcctl create cluster --name demo --master 192.168.10.123 --untaint-master true
+  kcctl create cluster --name demo --master 192.168.10.123 --untaint-master
+
+  # Create cluster with worker.
+  kcctl create cluster --name demo --master 192.168.10.123 --worker 192.168.10.124
 
   Please read 'kcctl create cluster -h' get more create cluster flags.`
 )
@@ -133,10 +130,10 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	o.PrintFlags.AddFlags(cmd)
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("master", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return o.listNode(toComplete, o.Masters), cobra.ShellCompDirectiveNoFileComp
+		return o.listNode(toComplete, append(o.Masters, o.Workers...)), cobra.ShellCompDirectiveNoFileComp
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("worker", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return o.listNode(toComplete, o.Workers), cobra.ShellCompDirectiveNoFileComp
+		return o.listNode(toComplete, append(o.Masters, o.Workers...)), cobra.ShellCompDirectiveNoFileComp
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("local-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listRegistry(toComplete), cobra.ShellCompDirectiveNoFileComp

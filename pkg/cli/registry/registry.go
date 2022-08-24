@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -46,43 +47,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
-/*
-kubeclipper deploy registry
-
-Usage:
-  kcctl registry deploy
-  kcctl registry clean
-
-Examples:
-  kcctl registry deploy --help
-  kcctl registry clean --help
-
-  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz
-  kcctl registry deploy --user root --passwd 123456 --node 10.0.0.111 --pkg kc.tar.gz
-  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz --registry-port 5000
-  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz --registry-volume /opt/registry --data-root /var/lib/docker
-
-  kcctl registry clean --pk-file key --node 10.0.0.111
-  kcctl registry clean --pk-file key --node 10.0.0.111 --remove-docker true
-  kcctl registry clean --user root --passwd 123456 --node 10.0.0.111
-  kcctl registry clean --pk-file key --node 10.0.0.111 --force true
-  kcctl registry clean --pk-file key --node 10.0.0.111 --registry-volume /opt/registry --data-root /var/lib/docker
-  kcctl registry clean --pk-file key --node 10.0.0.111 --registry-volume /opt/registry --data-root /var/lib/docker --force true
-
-  kcctl registry push --pk-file key --node 10.0.0.111 --registry-port 5000 --images-pkg images.tar.gz
-
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type repository
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type repository --number 6
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type image --name caas4/cephcsi
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type image --name caas4/cephcsi --number 6
-
-  kcctl registry delete --pk-file key --node 10.0.0.111 --registry-port 5000 --name caas4/cephcsi --tag v3.4.0
-
-
-Flags:
-  -h, --help                   help for registry
-*/
-
 const (
 	longDescription = `
   Docker registry operation.
@@ -94,21 +58,24 @@ const (
   kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz
   # Clean docker registry
   kcctl registry clean --pk-file key --node 10.0.0.111
-  # Push docker registry
-  kcctl registry push --pk-file key --node 10.0.0.111 --registry-port 5000 --images-pkg images.tar.gz
+  # Push docker image to registry
+  kcctl registry push --pk-file key --node 10.0.0.111 --images-pkg images.tar.gz
   # List docker registry
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type repository
-  # Delete docker registry
-  kcctl registry delete --node 10.0.0.111 --registry-port 5000 --name caas4/cephcsi
+  kcctl registry list --node 10.0.0.111  --type repository
+  # Delete docker image
+  kcctl registry delete --node 10.0.0.111  --name etcd --tag 1.5.1-0
 
   Please read 'kcctl registry -h' get more registry flags.`
 	deployLongDescription = `
-  Deploy docker registry by flags.`
+  Deploy docker registry.`
 	deployExample = `
   # Deploy docker registry
   kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz
-  # Deploy docker registry by options
-  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz --registry-volume /opt/registry --data-root /var/lib/docker
+  # Deploy docker registry specify data directory
+  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz --registry-volume /opt/myregistry --data-root /var/lib/mydocker
+  # Deploy docker registry specify port
+  # If you used custom port,then must specify it in push、list cmd.
+  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz --registry-port 6666
 
   Please read 'kcctl registry deploy -h' get more registry deploy flags.`
 	cleanLongDescription = `
@@ -116,33 +83,37 @@ const (
 	cleanExample = `
   # Clean docker registry
   kcctl registry clean --pk-file key --node 10.0.0.111
+  # Clean docker registry, specify data directory.
+  # If you used custom data directory when deploy,then must specify it in this cmd to clear data.
+  kcctl registry clean --pk-file key --node 10.0.0.111 --registry-volume /opt/registry --data-root /var/lib/docker
   # Clean docker registry and uninstall docker
-  kcctl registry clean --pk-file key --node 10.0.0.111 --remove-docker true
+  kcctl registry clean --pk-file key --node 10.0.0.111 --remove-docker
   # Forced to clean docker registry
-  kcctl registry clean --pk-file key --node 10.0.0.111 --registry-volume /opt/registry --data-root /var/lib/docker --force true
+  kcctl registry clean --pk-file key --node 10.0.0.111  --force
 
   Please read 'kcctl registry clean -h' get more registry clean flags.`
 	pushLongDescription = `
   Push docker image by flags.`
 	pushExample = `
-  # Push a Docker image
-  kcctl registry push --pk-file key --node 10.0.0.111 --registry-port 5000 --images-pkg images.tar.gz
+  # Push a docker image to registry
+  # You can use docker save > xxx to generate image pkg
+  kcctl registry push --pk-file key --node 10.0.0.111  --images-pkg images.tar.gz
 
   Please read 'kcctl registry push -h' get more registry push flags.`
 	listLongDescription = `
-  Lists docker repositories by flags.`
+  Lists docker repositories or images by flags.`
 	listExample = `
   # Lists docker repositories
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type repository
-  # Lists docker images and specifies the number of returns
-  kcctl registry list --node 10.0.0.111 --registry-port 5000 --type image --number 6
+  kcctl registry list --node 10.0.0.111  --type repository
+  # Lists docker images
+  kcctl registry list --node 10.0.0.111  --type image --name etcd 
 
   Please read 'kcctl registry list -h' get more registry list flags.`
 	deleteLongDescription = `
-  Delete the docker registry by flags.`
+  Delete the docker image by name and tag.`
 	deleteExample = `
-  # Delete docker registry
-  kcctl registry delete --pk-file key --node 10.0.0.111 --registry-port 5000 --name caas4/cephcsi --tag v3.4.0
+  # Delete docker image
+  kcctl registry delete --pk-file key --node 10.0.0.111  --name etcd --tag 3.5.1-0
 
   Please read 'kcctl registry delete -h' get more registry delete flags.`
 )
@@ -225,7 +196,7 @@ func NewCmdRegistryDeploy(o *RegistryOptions) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
 			utils.CheckErr(o.ValidateArgsDeploy())
-			if !o.preCheck() {
+			if !o.sudoPreCheck() {
 				return
 			}
 			utils.CheckErr(o.Install())
@@ -256,7 +227,7 @@ func NewCmdRegistryClean(o *RegistryOptions) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
 			utils.CheckErr(o.ValidateArgs())
-			if !o.preCheck() {
+			if !o.sudoPreCheck() {
 				return
 			}
 			utils.CheckErr(o.Uninstall())
@@ -285,7 +256,7 @@ func NewCmdRegistryPush(o *RegistryOptions) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
 			utils.CheckErr(o.ValidateArgsPush())
-			if !o.preCheck() {
+			if !o.healthPreCheck() || !o.sudoPreCheck() {
 				return
 			}
 			utils.CheckErr(o.Push())
@@ -294,7 +265,7 @@ func NewCmdRegistryPush(o *RegistryOptions) *cobra.Command {
 
 	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
 	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node.")
-	cmd.Flags().StringVar(&o.Pkg, "images-pkg", o.Pkg, "docker images pkg.")
+	cmd.Flags().StringVar(&o.Pkg, "images-pkg", o.Pkg, "docker images pkg,use `docker save $containerIDs > images.tar && gzip -f images.tar` to generate images.tar.gz")
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "set registry container port")
 
 	utils.CheckErr(cmd.MarkFlagRequired("node"))
@@ -313,6 +284,9 @@ func NewCmdRegistryList(o *RegistryOptions) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
 			utils.CheckErr(o.ValidateArgsList())
+			if !o.healthPreCheck() {
+				return
+			}
 			utils.CheckErr(o.List())
 		},
 	}
@@ -338,7 +312,7 @@ func NewCmdRegistryList(o *RegistryOptions) *cobra.Command {
 
 func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "delete (--pk-file <file path>) (--node <node>) (--name <name>) (--registry-port <registry-port>) (--tag <tag>) [flags]delete (--pk-file <file path>) (--node <node>) (--name <name>) (--registry-port <registry-port>) (--tag <tag>) [flags]",
+		Use:                   "delete (--pk-file <file path>) (--node <node>) (--name <name>) (--tag <tag>) [flags]delete (--pk-file <file path>) (--node <node>) (--name <name>)  (--tag <tag>) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "registry delete image",
 		Long:                  deleteLongDescription,
@@ -346,7 +320,7 @@ func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
 			utils.CheckErr(o.ValidateArgsDelete(cmd))
-			if !o.preCheck() {
+			if !o.sudoPreCheck() {
 				return
 			}
 			utils.CheckErr(o.Delete())
@@ -355,7 +329,6 @@ func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 
 	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
 	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node.")
-	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "set registry container port")
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "image name")
 	cmd.Flags().StringVar(&o.Tag, "tag", o.Tag, "image tag")
 
@@ -372,7 +345,11 @@ func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 	return cmd
 }
 
-func (o *RegistryOptions) preCheck() bool {
+func (o *RegistryOptions) healthPreCheck() bool {
+	return o.healthz()
+}
+
+func (o *RegistryOptions) sudoPreCheck() bool {
 	return sudo.PreCheck("sudo", o.SSHConfig, o.IOStreams, []string{o.Node})
 }
 
@@ -616,14 +593,11 @@ func (o *RegistryOptions) killDocker() error {
 func (o *RegistryOptions) Push() error {
 	// send image pkg
 	imagesPkg := filepath.Join(config.DefaultPkgPath, filepath.Base(o.Pkg))
-	hook := fmt.Sprintf("gzip -df %s", imagesPkg)
-	err := utils.SendPackageV2(o.SSHConfig, o.Pkg, []string{o.Node}, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackageV2(o.SSHConfig, o.Pkg, []string{o.Node}, config.DefaultPkgPath, nil, nil)
 	if err != nil {
 		return err
 	}
-	index := strings.LastIndex(imagesPkg, ".gz")
-	pkg := imagesPkg[0:index]
-	hook = fmt.Sprintf("docker load -i %s && rm -rf %s", pkg, pkg)
+	hook := fmt.Sprintf("docker load -i %s && rm -rf %s", imagesPkg, imagesPkg)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, hook)
 	if err != nil {
 		return err
@@ -680,6 +654,26 @@ func (o *RegistryOptions) listRepositories() error {
 	return o.PrintFlags.Print(repository, o.IOStreams.Out)
 }
 
+// healthz check is the node or port ok
+func (o *RegistryOptions) healthz() bool {
+	url := fmt.Sprintf("http://%s:%d/v2", o.Node, o.RegistryPort)
+	_, code, respErr := httputil.CommonRequest(url, "GET", nil, nil, nil)
+	if respErr != nil {
+		logger.Error("health check failed,err:", respErr)
+		// if request failed and port is default，print a hit for user to specify registry-port
+		if isConnectErr(respErr) && o.RegistryPort == NewRegistryOptions(o.IOStreams).RegistryPort {
+			logger.Infof("connect failed, maybe the default registry port(%v) is wrong,if you used custom port when deploy,you can used --registry-port to specify it", o.RegistryPort)
+		}
+		return false
+	}
+	logger.V(2).Infof("registry health check,http code is:%v", code)
+	return code == http.StatusOK
+}
+
+func isConnectErr(err error) bool {
+	return strings.Contains(err.Error(), "connect: connection refused")
+}
+
 func (o *RegistryOptions) listImages() error {
 	url := fmt.Sprintf("http://%s:%d/v2/%s/tags/list", o.Node, o.RegistryPort, o.Name)
 	resp, code, respErr := httputil.CommonRequest(url, "GET", nil, nil, nil)
@@ -729,33 +723,33 @@ func (o *RegistryOptions) processPackage() error {
 
 func (o *RegistryOptions) installDocker() error {
 	// install docker, if not exist
-	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, "docker ps")
+	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, `systemctl status docker|grep "active (running)"|wc -l`)
 	if err != nil {
 		return err
 	}
-	if strings.Contains(ret.Stderr, "command not found") ||
-		strings.Contains(ret.Stderr, "Is the docker daemon running") {
-		data, err := o.getDaemonTemplateContent()
+	if ret.StdoutToString("") != "0" { // if already exist,do nothing.
+		return nil
+	}
+	data, err := o.getDaemonTemplateContent()
+	if err != nil {
+		return err
+	}
+	cmdList := []string{
+		// cp docker service file
+		fmt.Sprintf("tar -zxvf %s/kc/resource/docker/19.03.12/%s/configs.tar.gz -C /", config.DefaultPkgPath, o.Arch),
+		"mkdir -pv /etc/docker",
+		// write daemon.json
+		sshutils.WrapEcho(data, "/etc/docker/daemon.json"),
+		// start docker
+		"systemctl daemon-reload && systemctl enable docker --now",
+	}
+	for _, cmd := range cmdList {
+		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
 		if err != nil {
 			return err
 		}
-		cmdList := []string{
-			// cp docker service file
-			fmt.Sprintf("tar -zxvf %s/kc/resource/docker/19.03.12/%s/configs.tar.gz -C /", config.DefaultPkgPath, o.Arch),
-			"mkdir -pv /etc/docker",
-			// write daemon.json
-			sshutils.WrapEcho(data, "/etc/docker/daemon.json"),
-			// start docker
-			"systemctl daemon-reload && systemctl enable docker --now",
-		}
-		for _, cmd := range cmdList {
-			ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
-			if err != nil {
-				return err
-			}
-			if err = ret.Error(); err != nil {
-				return err
-			}
+		if err = ret.Error(); err != nil {
+			return err
 		}
 	}
 
@@ -830,67 +824,40 @@ func (o *RegistryOptions) removePkg() error {
 }
 
 func (o *RegistryOptions) push() error {
+	// if image has organization,just retag to 'ip:port/',e.g. kubeclipper/kubectl:latest
+	// if image without organization,infact it has default organization library,so we retag to 'ip:port/library/',e.g. nginx:latest,
+	// we use `/` to distinguish them.
+
+	// image re-tag 'ip:port/library/'
 	err := o.specialTag()
 	if err != nil {
 		return err
 	}
 	// image re-tag 'ip:port/'
-	retag := fmt.Sprintf(`docker images | grep / | grep -v k8s.gcr.io | grep -v %s:%d | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort, o.Node, o.RegistryPort)
-	logger.V(3).Info("push retag:", retag)
-	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, retag)
+	err = o.normalTag()
 	if err != nil {
 		return err
-	}
-	if err = ret.Error(); err != nil {
-		return err
-	}
-	logger.V(4).Info("push retag out:", ret.Stdout)
-	split := strings.Split(ret.Stdout, "\n")
-	logger.V(4).Info("push retag cmd count:", len(split))
-	logger.V(4).Info("push retag cmd list:", split)
-	for _, cmd := range split {
-		if cmd == "" {
-			continue
-		}
-		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
-		if err != nil {
-			return err
-		}
-		if err = ret.Error(); err != nil {
-			return err
-		}
 	}
 
-	//  image push
-	push := fmt.Sprintf(`docker images | grep %s:%d | awk '{print "docker push "$1":"$2}'`, o.Node, o.RegistryPort)
-	logger.V(3).Info("docker push hook:", push)
-	ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, push)
+	//  docker push
+	err = o.pushImage()
 	if err != nil {
 		return err
-	}
-	if err = ret.Error(); err != nil {
-		return err
-	}
-	logger.V(4).Info("docker push out:", ret.Stdout)
-	split = strings.Split(ret.Stdout, "\n")
-	logger.V(4).Info("docker push cmd count:", len(split))
-	logger.V(4).Info("docker push cmd list:", split)
-	for _, cmd := range split {
-		if cmd == "" {
-			continue
-		}
-		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
-		if err != nil {
-			return err
-		}
-		if err = ret.Error(); err != nil {
-			return err
-		}
 	}
 
 	// docker rmi images
+	err = o.removeImage()
+	if err != nil {
+		return err
+	}
+
+	logger.Info("image push successfully")
+	return nil
+}
+
+func (o *RegistryOptions) removeImage() error {
 	rmi := `docker images | awk '{print $1":"$2}' | grep -v registry | grep -v REPOSITORY`
-	ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, rmi)
+	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, rmi)
 	if err != nil {
 		logger.Warnf("docker remove image error: %s", err.Error())
 	}
@@ -898,7 +865,7 @@ func (o *RegistryOptions) push() error {
 		logger.Warnf("docker remove image error: %s", err.Error())
 	}
 	logger.V(4).Info("docker rmi out", ret.Stdout)
-	split = strings.Split(ret.Stdout, "\n")
+	split := strings.Split(ret.Stdout, "\n")
 	logger.V(4).Info("docker rmi cmd count:", len(split))
 	logger.V(4).Info("docker rmi cmd list:", split)
 	for _, cmd := range split {
@@ -913,15 +880,71 @@ func (o *RegistryOptions) push() error {
 			return err
 		}
 	}
+	return nil
+}
 
-	logger.Info("image push successfully")
+func (o *RegistryOptions) pushImage() error {
+	push := fmt.Sprintf(`docker images | grep %s:%d | awk '{print "docker push "$1":"$2}'`, o.Node, o.RegistryPort)
+	logger.V(3).Info("docker push hook:", push)
+	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, push)
+	if err != nil {
+		return err
+	}
+	if err = ret.Error(); err != nil {
+		return err
+	}
+	logger.V(4).Info("docker push out:", ret.Stdout)
+	split := strings.Split(ret.Stdout, "\n")
+	logger.V(4).Info("docker push cmd count:", len(split))
+	logger.V(4).Info("docker push cmd list:", split)
+	for _, cmd := range split {
+		if cmd == "" {
+			continue
+		}
+		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
+		if err != nil {
+			return err
+		}
+		if err = ret.Error(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *RegistryOptions) normalTag() error {
+	retag := fmt.Sprintf(`docker images | grep / | grep -v k8s.gcr.io | grep -v %s:%d | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort, o.Node, o.RegistryPort)
+	logger.V(3).Info("normalTag hook:", retag)
+	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, retag)
+	if err != nil {
+		return err
+	}
+	if err = ret.Error(); err != nil {
+		return err
+	}
+	logger.V(4).Info("normalTag out:", ret.Stdout)
+	split := strings.Split(ret.Stdout, "\n")
+	logger.V(4).Info("normalTag cmd count:", len(split))
+	logger.V(4).Info("normalTag cmd list:", split)
+	for _, cmd := range split {
+		if cmd == "" {
+			continue
+		}
+		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
+		if err != nil {
+			return err
+		}
+		if err = ret.Error(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (o *RegistryOptions) specialTag() error {
 	// add 'ip:port/library'
-	dockerTag := fmt.Sprintf(`docker images | grep -v registry | grep / | grep -v k8s.gcr.io | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/library/"$1":"$2}'`, o.Node, o.RegistryPort)
-	logger.V(3).Info("dockerTag hook:", dockerTag)
+	dockerTag := fmt.Sprintf(`docker images | grep -v registry | grep -v / | grep -v k8s.gcr.io | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/library/"$1":"$2}'`, o.Node, o.RegistryPort)
+	logger.V(3).Info("specialTag hook:", dockerTag)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, dockerTag)
 	if err != nil {
 		return err
@@ -929,10 +952,10 @@ func (o *RegistryOptions) specialTag() error {
 	if err = ret.Error(); err != nil {
 		return err
 	}
-	logger.V(4).Info("dockerTag out:", ret.Stdout)
+	logger.V(4).Info("specialTag out:", ret.Stdout)
 	split := strings.Split(ret.Stdout, "\n")
-	logger.V(4).Info("dockerTag cmd count:", len(split))
-	logger.V(4).Info("dockerTag cmd list:", split)
+	logger.V(4).Info("specialTag cmd count:", len(split))
+	logger.V(4).Info("specialTag cmd list:", split)
 	for _, cmd := range split {
 		if cmd == "" {
 			continue
