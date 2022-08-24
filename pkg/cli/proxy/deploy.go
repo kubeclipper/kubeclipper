@@ -25,6 +25,8 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
+
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	proxyConfig "github.com/kubeclipper/kubeclipper/pkg/proxy/config"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
@@ -110,10 +112,7 @@ func (d *ProxyOptions) Complete() error {
 	if err != nil {
 		return err
 	}
-	logger.Info("tunnels:", d.tunnels)
 	d.config = d.generateProxyConfig()
-	logger.Info("c.config:", d.config)
-	logger.Info("c.config len:", len(d.config.Config))
 	return nil
 }
 
@@ -134,6 +133,13 @@ func (d *ProxyOptions) RunDeploy() error {
 	d.sendPackage()
 	d.deployProxy()
 	d.removeTempFile()
+	if !sliceutil.HasString(d.deployConfig.Proxys, d.proxy) {
+		d.deployConfig.Proxys = append(d.deployConfig.Proxys, d.proxy)
+		err := d.deployConfig.Write()
+		if err != nil {
+			return err
+		}
+	}
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 	return nil
 }

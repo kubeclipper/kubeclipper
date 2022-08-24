@@ -148,7 +148,7 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
-	cmd.Flags().StringArrayVar(&o.fips, "fip", o.fips, "Kc agent ip and fip.")
+	cmd.Flags().StringArrayVar(&o.fips, "float-ip", o.fips, "Kc agent ip and float ip.")
 	o.deployConfig.AddFlags(cmd.Flags())
 
 	cmd.AddCommand(NewCmdDeployConfig(o))

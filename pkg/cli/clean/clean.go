@@ -113,6 +113,7 @@ func (c *CleanOptions) preCheck() bool {
 func (c *CleanOptions) RunClean() {
 	if c.cleanAll {
 		c.cleanKcAgent()
+		c.cleanKcProxy()
 		c.cleanKcServer()
 		c.cleanKcConsole()
 		c.cleanBinaries()
@@ -135,6 +136,26 @@ func (c *CleanOptions) cleanKcAgent() {
 	}
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.Agents.ListIP(), cmd, sshutils.DefaultWalk)
+		if err != nil {
+			logger.V(2).Error(err)
+		}
+	}
+}
+
+func (c *CleanOptions) cleanKcProxy() {
+	if len(c.deployConfig.Proxys) == 0 {
+		logger.V(2).Info("no kubeclipper proxy need to be cleaned")
+		return
+	}
+
+	cmdList := []string{
+		"systemctl disable kc-proxy --now",
+		"rm -rf /usr/lib/systemd/system/kc-proxy.service",
+		"rm -rf /etc/kubeclipper-proxy",
+		"systemctl reset-failed kc-proxy || true",
+	}
+	for _, cmd := range cmdList {
+		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.Proxys, cmd, sshutils.DefaultWalk)
 		if err != nil {
 			logger.V(2).Error(err)
 		}

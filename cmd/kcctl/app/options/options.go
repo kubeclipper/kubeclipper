@@ -205,6 +205,7 @@ type DeployConfig struct {
 	EtcdConfig       *Etcd         `json:"etcd" yaml:"etcd,omitempty"`
 	ServerIPs        []string      `json:"serverIPs" yaml:"serverIPs,omitempty"`
 	Agents           Agents        `json:"agents" yaml:"agents,omitempty"`
+	Proxys           []string      `json:"proxys" yaml:"proxys,omitempty"`
 	IPDetect         string        `json:"ipDetect" yaml:"ipDetect,omitempty"`
 	Debug            bool          `json:"debug" yaml:"debug,omitempty"`
 	DefaultRegion    string        `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
