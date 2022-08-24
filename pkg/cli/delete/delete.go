@@ -34,26 +34,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
-/*
-delete kubeclipper resource
-
-Usage:
-  kcctl delete [command]
-
-Examples:
-TODO..
-
-Available Commands:
-  cluster     delete kubeclipper cluster resource
-  role        delete kubeclipper role resource
-  user        delete kubeclipper user resource
-
-Flags:
-  -h, --help              help for delete
-
-Use "kcctl delete [command] --help" for more information about a command.
-*/
-
 const (
 	longDescription = `
   Delete kubeclipper resources.

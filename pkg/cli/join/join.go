@@ -41,21 +41,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 )
 
-/*
-join kubeclipper agent node
-
-Usage:
-  kcctl join
-
-Examples:
-  kcctl join --agent=1.1.1.1 --deploy-config=~/.kc/deploy-config.yaml
-  kcctl join --agent=1.1.1.1 --agent=2.2.2.2 --deploy-config=~/.kc/deploy-config.yaml
-
-Flags:
-      --deploy-config string   kcctl deploy config path (default "~/.kc/deploy-config.yaml")
-  -h, --help                   help for join
-*/
-
 const (
 	longDescription = `
   Add Server and Agent nodes on kubeclipper platform.

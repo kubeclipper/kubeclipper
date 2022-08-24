@@ -45,25 +45,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
-/*
-kubeclipper operation resource
-
-Usage:
-  kcctl resource list
-  kcctl resource push
-  kcctl resource delete
-
-Examples:
-  kcctl resource list --deploy-config /root/.kc/deploy-config.yaml --pk-file ssh-key
-
-  kcctl resource push --deploy-config /root/.kc/deploy-config.yaml --pk-file key --pkg docker-19.03.12-x86_64.tar.gz --type cri
-
-  kcctl resource delete --deploy-config /root/.kc/deploy-config.yaml --pk-file key --name docker --version 19.03.12 --arch x86_64
-
-Flags:
-  -h, --help                   help for registry
-*/
-
 const (
 	longDescription = `
   Offline resource operation.
@@ -84,13 +65,13 @@ const (
   You can list, push, or delete offline resource packs.
   The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
 	resourceListExample = `
-  # List offline resource use ssh
+  # List offline resource with default ssh user(root)
   kcctl resource list --pk-file 'PK-FILE PATH'
 
-  # List offline resource use deploy password
-  kcctl resource list --passwd 'DEPLOY PASSWORD'
+  # List offline resource use ssh password
+  kcctl resource list --passwd 'SSH PASSWORD'
 
-  # List offline resource use deploy user, default user is root
+  # List offline resource specify ssh user, default user is root
   kcctl resource list --user 'USER' --pk-file 'PK-FILE PATH'
 
   # List offline resource use specified output format
@@ -113,11 +94,13 @@ const (
 	name/version/arch/images.tar.gz
 	name/version/arch/manifest.json`
 	resourcePushExample = `
-  # Push offline resource packs use ssh
-  kcctl resource push --pk-file 'PK-FILE PATH' --pkg 'PKG NAME' --type 'TYPE'
+  # Push k8s offline resource packs use ssh
+  kcctl resource push --pk-file 'PK-FILE PATH' --pkg /root/k8s-v1.23.6-amd64.tar.gz --type k8s  
+  # Push docker offline resource packs
+  kcctl resource push --pk-file 'PK-FILE PATH' --pkg /root/docker-19.03.12-amd64.tar.gz --type cri
 
   # Push offline resource packs use specified deploy file
-  kcctl resource push --deploy-config 'DEPLOY FILE PATH' --pk-file 'PK-FILE PATH' --pkg 'PKG NAME' --type 'TYPE'
+  kcctl resource push --deploy-config 'DEPLOY FILE PATH' --pk-file 'PK-FILE PATH' --pkg /root/nfs-v4.0.2-amd64.tar.gz --type csi
 
   Please read 'kcctl resource push -h' get more resource push flags`
 	deleteLongDescription = `
@@ -128,10 +111,10 @@ const (
   The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
 	resourceDeleteExample = `
   # Delete offline resource packs use ssh
-  kcctl resource delete --pk-file 'PK-FILE PATH' --name 'NAME' --version 'VERSION' --arch 'ARCH'
+  kcctl resource delete --pk-file 'PK-FILE PATH' --name k8s --version v1.23.6 --arch amd64
 
   # Delete offline resource packs use specified deploy file
-  kcctl resource delete --deploy-config 'DEPLOY FILE PATH' --pk-file 'PK-FILE PATH' --name 'NAME' --version 'VERSION' --arch 'ARCH'
+  kcctl resource delete --deploy-config 'DEPLOY FILE PATH' --pk-file 'PK-FILE PATH' --name nfs --version v4.0.2 --arch amd64
 
   Please read 'kcctl resource delete -h' get more resource delete flags`
 )
