@@ -125,7 +125,7 @@ func (o *UpgradeOptions) Complete() error {
 	if err := o.CliOpts.Complete(); err != nil {
 		return err
 	}
-	c, err := o.CliOpts.ToRawConfig().ToKcClient()
+	c, err := kc.FromConfig(o.CliOpts.ToRawConfig())
 	if err != nil {
 		return err
 	}
