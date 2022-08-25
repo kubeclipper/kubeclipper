@@ -29,6 +29,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pelletier/go-toml"
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -37,9 +41,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
-	"github.com/pelletier/go-toml"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ContainerdRunnable struct {
@@ -213,6 +214,9 @@ func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) string
 
 func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, dryRun bool) error {
 	// local registry not filled and is in online mode, the default repo mirror proxy will be used
+	if runnable.RegistryConfigDir == "" {
+		runnable.RegistryConfigDir = containerdDefaultRegistryConfigDir
+	}
 	if !runnable.Offline && runnable.LocalRegistry == "" {
 		runnable.LocalRegistry = component.GetRepoMirror(ctx)
 		logger.Info("render containerd config, the default repo mirror proxy will be used", zap.String("local_registry", runnable.LocalRegistry))
@@ -266,10 +270,6 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 	if dryRun {
 		return nil
 	}
-	configDir := containerdDefaultRegistryConfigDir
-	if runnable.RegistryConfigDir != "" {
-		configDir = runnable.RegistryConfigDir
-	}
 	regCfgs := make([]ContainerdRegistry, 0, len(runnable.InsecureRegistry)+1)
 
 	for _, regHost := range runnable.InsecureRegistry {
@@ -303,7 +303,7 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 	}
 
 	for _, cfg := range regCfgs {
-		if err := cfg.renderConfigs(configDir); err != nil {
+		if err := cfg.renderConfigs(runnable.RegistryConfigDir); err != nil {
 			return err
 		}
 	}
