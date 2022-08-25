@@ -22,8 +22,6 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v2"
-
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
 const (
@@ -70,12 +68,4 @@ func TryLoadFromFile(path string) (*Config, error) {
 	}
 
 	return cfg, nil
-}
-
-func (c Config) ToKcClient() (*kc.Client, error) {
-	ctx := c.Contexts[c.CurrentContext]
-
-	return kc.NewClientWithOpts(kc.WithHost(c.Servers[ctx.Server].Server),
-		kc.WithScheme("http"),
-		kc.WithBearerAuth(c.AuthInfos[ctx.AuthInfo].Token))
 }

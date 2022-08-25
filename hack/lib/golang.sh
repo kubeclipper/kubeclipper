@@ -7,6 +7,7 @@ kube::golang::server_targets() {
   local targets=(
     cmd/kubeclipper-server
     cmd/kubeclipper-agent
+    cmd/kubeclipper-proxy
     cmd/kcctl
     test/e2e
     vendor/github.com/onsi/ginkgo/ginkgo
@@ -28,6 +29,7 @@ readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 readonly KUBE_STATIC_LIBRARIES=(
   kubeclipper-server
   kubeclipper-agent
+  kubeclipper-proxy
   kcctl
   e2e.test
 )

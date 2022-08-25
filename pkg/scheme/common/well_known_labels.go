@@ -42,7 +42,6 @@ const (
 	LabelBackupPoint       = "kubeclipper.io/backupPoint"
 	LabelCronBackupDisable = "kubeclipper.io/cronBackupDisable"
 	LabelCronBackupEnable  = "kubeclipper.io/cronBackupEnable"
-	LabelMetadataFloatIP   = "metadata.kubeclipper.io/floatIP"
 )
 
 const (
@@ -54,6 +53,11 @@ const (
 	RegoOverrideAnnotation     = "kubeclipper.io/rego-override"
 	RoleAnnotation             = "iam.kubeclipper.io/role"
 	AnnotationInternal         = "kubeclipper.io/internal"
+
+	AnnotationMetadataFloatIP        = "metadata.kubeclipper.io/floatIP"
+	AnnotationMetadataProxyServer    = "metadata.kubeclipper.io/proxyServer"
+	AnnotationMetadataProxyAPIServer = "metadata.kubeclipper.io/proxyAPIServer"
+	AnnotationMetadataProxySSH       = "metadata.kubeclipper.io/proxySSH"
 )
 
 type NodeRole string // master/worker/ingress(worker)

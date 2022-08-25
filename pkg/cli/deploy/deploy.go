@@ -148,7 +148,7 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
-	cmd.Flags().StringArrayVar(&o.fips, "fip", o.fips, "Kc agent ip and fip.")
+	cmd.Flags().StringArrayVar(&o.fips, "float-ip", o.fips, "Kc agent ip and float ip.")
 	o.deployConfig.AddFlags(cmd.Flags())
 
 	cmd.AddCommand(NewCmdDeployConfig(o))
@@ -454,7 +454,7 @@ func (d DeployOptions) generateAndSendCerts() error {
 		natsCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
 		natsCommonNameUsages[options.NatsIOClient] = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 		natsCommonNameUsages[options.NatsIOServer] = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
-		natsCert = certList(options.DefaultNatsPKIPath, options.Ca, append(altNames, d.deployConfig.ServerIPs...), natsCommonNameUsages)
+		natsCert = certList(options.DefaultNatsPKIPath, options.Ca, append(append(altNames, d.deployConfig.ServerIPs...), options.NatsAltNameProxy), natsCommonNameUsages)
 		certs = append(certs, natsCert...)
 	}
 

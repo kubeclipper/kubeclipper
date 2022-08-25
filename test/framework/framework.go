@@ -59,7 +59,7 @@ func NewFramework(baseName string, kcClient *kc.Client) *Framework {
 		Timeouts: NewTimeoutContextWithDefaults(),
 	}
 
-	//f.AddAfterEach("dumpLogs", func(f *Framework, failed bool) {
+	// f.AddAfterEach("dumpLogs", func(f *Framework, failed bool) {
 	//	if !failed {
 	//		return
 	//	}
@@ -67,7 +67,7 @@ func NewFramework(baseName string, kcClient *kc.Client) *Framework {
 	//		return
 	//	}
 	//	// TODO: dump logs
-	//})
+	// })
 
 	ginkgo.BeforeEach(f.BeforeEach)
 	ginkgo.AfterEach(f.AfterEach)
@@ -99,7 +99,7 @@ func (f *Framework) BeforeEach() {
 		ginkgo.By("Creating a KubeClipper client")
 		cfg, err := cliconfig.TryLoadFromFile(filepath.Join(homedir.HomeDir(), ".kc", "config"))
 		ExpectNoError(err)
-		f.Client, err = cfg.ToKcClient()
+		f.Client, err = kc.FromConfig(*cfg)
 		ExpectNoError(err)
 	}
 	// Check f.client is work

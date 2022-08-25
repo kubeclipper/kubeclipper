@@ -86,13 +86,36 @@ func Metadata() Setter {
 			logger.Error("Error getting metadata", zap.Error(err))
 			return err
 		}
-		node.Labels[common.LabelTopologyRegion] = conf.MetaData.Region
 
-		if conf.MetaData.FloatIP != "" {
-			node.Labels[common.LabelMetadataFloatIP] = conf.MetaData.FloatIP
-		} else {
-			delete(node.Labels, common.LabelMetadataFloatIP)
+		node.Labels[common.LabelTopologyRegion] = conf.Metadata.Region
+
+		if node.Annotations == nil {
+			node.Annotations = make(map[string]string)
 		}
+		if conf.Metadata.FloatIP != "" {
+			node.Annotations[common.AnnotationMetadataFloatIP] = conf.Metadata.FloatIP
+		} else {
+			delete(node.Annotations, common.AnnotationMetadataFloatIP)
+		}
+
+		if conf.Metadata.ProxyServer != "" {
+			node.Annotations[common.AnnotationMetadataProxyServer] = conf.Metadata.ProxyServer
+		} else {
+			delete(node.Annotations, common.AnnotationMetadataProxyServer)
+		}
+
+		if conf.Metadata.ProxyAPIServer != "" {
+			node.Annotations[common.AnnotationMetadataProxyAPIServer] = conf.Metadata.ProxyAPIServer
+		} else {
+			delete(node.Annotations, common.AnnotationMetadataProxyAPIServer)
+		}
+
+		if conf.Metadata.ProxySSH != "" {
+			node.Annotations[common.AnnotationMetadataProxySSH] = conf.Metadata.ProxySSH
+		} else {
+			delete(node.Annotations, common.AnnotationMetadataProxySSH)
+		}
+
 		return nil
 	}
 }
