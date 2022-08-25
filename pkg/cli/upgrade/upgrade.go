@@ -46,7 +46,7 @@ const (
   # Upgrade agent of kubeclipper platform use your own pkg
   kcctl upgrade agent --pkg xxx
 
-  # Upgrade agent of kubeclipper platform use your own binary pkg
+  # Upgrade agent of kubeclipper platform use your own binary file
   kcctl upgrade agent --pkg xxx --binary`
 )
 
@@ -94,9 +94,9 @@ func NewUpgradeOptions(stream options.IOStreams) *UpgradeOptions {
 func NewCmdUpgrade(stream options.IOStreams) *cobra.Command {
 	o := NewUpgradeOptions(stream)
 	cmd := &cobra.Command{
-		Use:                   "upgrade",
+		Use:                   "upgrade ( component ) ( --pkg [--binary] )|( --online --version ) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 "upgrade kubeclipper components",
+		Short:                 "upgrade kubeclipper platform or components",
 		Long:                  longDescription,
 		Example:               upgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -105,12 +105,11 @@ func NewCmdUpgrade(stream options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunUpgrade())
 		},
 	}
-	//TODO: add binary pkg upgrade
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "deploy-config file path.")
-	cmd.Flags().StringVar(&o.pkg, "pkg", o.pkg, "new pkg path.")
-	cmd.Flags().BoolVar(&o.binary, "binary", o.binary, "upgrade with binary package")
+	cmd.Flags().StringVar(&o.pkg, "pkg", o.pkg, "Path to the package used for the upgrade")
+	cmd.Flags().BoolVar(&o.binary, "binary", o.binary, "Upgrade with the specified binary file")
 	cmd.Flags().BoolVar(&o.online, "online", o.online, "upgrade with online package")
-	cmd.Flags().StringVar(&o.version, "version", o.version, "input version e.g: v1.12.1 or master、latest")
+	cmd.Flags().StringVar(&o.version, "version", o.version, "input version or branch name. e.g: v1.12.1 or master、latest")
 	options.AddFlagsToSSH(o.deployConfig.SSHConfig, cmd.Flags())
 
 	return cmd
@@ -142,7 +141,8 @@ func (o *UpgradeOptions) Validate(cmd *cobra.Command, args []string) error {
 
 	if o.online && o.binary {
 		return fmt.Errorf("cannot use binary for online upgrade")
-	} else if o.online {
+	}
+	if o.online {
 		if err := o.checkVersion(); err != nil {
 			return err
 		}
@@ -209,10 +209,8 @@ func (o *UpgradeOptions) checkVersion() error {
 		if current > version {
 			return fmt.Errorf(" input version is lower than the current version ")
 		}
-	} else if !ok {
+	} else if !ok && !allowedOnline.Has(o.version) {
 		return fmt.Errorf("wrong version format")
-	} else if !allowedOnline.Has(o.version) {
-		return fmt.Errorf("wrong version (%s),there is no this branch ", o.version)
 	}
 	o.pkg = fmt.Sprintf(onlinePkg, o.version, o.arch)
 
@@ -260,39 +258,39 @@ func (o *UpgradeOptions) replaceAllService() error {
 }
 
 func (o *UpgradeOptions) replaceService(comp string) error {
-	cp, backup := o.copyAndBackup(comp)
-	cmds := []string{
-		"mkdir -p /tmp/kubeclipper",
-		fmt.Sprintf("systemctl stop kc-%s", comp),
-		backup,
-		cp,
-		fmt.Sprintf("systemctl start kc-%s", comp),
-	}
+	cmds := o.replaceServiceCmds(comp)
+	cmds = append([]string{"mkdir -p /tmp/kubeclipper"}, cmds...)
 	for _, cmd := range cmds {
 		err := sshutils.CmdBatchWithSudo(o.deployConfig.SSHConfig, serviceMap[comp], sshutils.WrapSh(cmd), sshutils.DefaultWalk)
-		if err != nil && strings.Contains(err.Error(), "kc-kcctl.service") {
-			continue
-		} else if err != nil {
+		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (o *UpgradeOptions) copyAndBackup(component string) (cp, backup string) {
+func (o *UpgradeOptions) replaceServiceCmds(component string) []string {
+	cmds := make([]string, 0)
 	switch component {
 	case options.UpgradeKcctl:
-		cp = "cp -rf /tmp/kc/kcctl /usr/local/bin/kcctl"
-		backup = "cp /usr/local/bin/kcctl /tmp/kubeclipper/kcctl"
-	case options.UpgradeAgent:
-		cp = "cp -rf /tmp/kc/kubeclipper-agent /usr/local/bin/kubeclipper-agent"
-		backup = "cp /usr/local/bin/kubeclipper-agent /tmp/kubeclipper/kubeclipper-agent"
-	case options.UpgradeServer:
-		cp = "cp -rf /tmp/kc/kubeclipper-server /usr/local/bin/kubeclipper-server"
-		backup = "cp /usr/local/bin/kubeclipper-server /tmp/kubeclipper/kubeclipper-serve"
+		cmds = append(cmds, []string{
+			"cp /usr/local/bin/kcctl /tmp/kubeclipper/kcctl",
+			"cp -rf /tmp/kc/kcctl /usr/local/bin/kcctl",
+		}...)
 	case options.UpgradeConsole:
-		cp = "cp -rf /tmp/kc/kc-console/* /etc/kc-console/dist/"
-		backup = "cp -rf /etc/kc-console /tmp/kubeclipper/"
+		cmds = append(cmds, []string{
+			"systemctl stop kc-console",
+			"cp -rf /etc/kc-console /tmp/kubeclipper/",
+			"cp -rf /tmp/kc/kc-console/* /etc/kc-console/dist/",
+			"systemctl start kc-console",
+		}...)
+	default:
+		cmds = append(cmds, []string{
+			fmt.Sprintf("systemctl stop kc-%s", component),
+			fmt.Sprintf("cp /usr/local/bin/kubeclipper-%s /tmp/kubeclipper/kubeclipper-%s", component, component),
+			fmt.Sprintf("cp -rf /tmp/kc/kubeclipper-%s /usr/local/bin/kubeclipper-%s", component, component),
+			fmt.Sprintf("systemctl start kc-%s", component),
+		}...)
 	}
-	return
+	return cmds
 }
