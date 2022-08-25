@@ -2,9 +2,15 @@ package cri
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContainerdRunnable_renderTo(t *testing.T) {
@@ -74,4 +80,54 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 			t.Log(w.String())
 		})
 	}
+}
+
+func TestContainerdRegistryRender(t *testing.T) {
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		require.NoError(t, err)
+	}
+	defer os.RemoveAll(dir)
+
+	r := ContainerdRegistry{
+		Server: "docker.io",
+		Hosts: []ContainerdHost{
+			{
+				Host:         "local1.registry.com",
+				Capabilities: []string{CapabilityPull, CapabilityPull},
+				SkipVerify:   true,
+			},
+			{
+				Host:         "local2.registry.com",
+				Capabilities: []string{CapabilityPull, CapabilityPull},
+				CA:           []byte("ca data"),
+			},
+		},
+	}
+	err = r.renderConfigs(dir)
+	require.NoError(t, err)
+
+	cafile := filepath.Join(dir, "docker.io", "local2.registry.com.pem")
+	ca, err := os.ReadFile(cafile)
+	require.NoError(t, err)
+	assert.Equal(t, "ca data", string(ca))
+	exp := fmt.Sprintf(`server = "docker.io"
+
+[host]
+
+  [host."http://local1.registry.com"]
+    capabilities = ["pull", "pull"]
+
+  [host."https://local1.registry.com"]
+    capabilities = ["pull", "pull"]
+    skip_verify = true
+
+  [host."https://local2.registry.com"]
+    ca = "%s"
+    capabilities = ["pull", "pull"]
+`, strings.ReplaceAll(cafile, `\`, `\\`))
+
+	hostConfig, err := os.ReadFile(filepath.Join(dir, "docker.io", "hosts.toml"))
+	require.NoError(t, err)
+	assert.Equal(t, exp, string(hostConfig))
 }

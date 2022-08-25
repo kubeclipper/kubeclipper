@@ -41,15 +41,16 @@ const (
 )
 
 const (
-	//dockerDefaultVersion    = "20.10.13"
+	// dockerDefaultVersion    = "20.10.13"
 	dockerDefaultConfigDir = "/etc/docker"
 	dockerDefaultDataDir   = "/var/lib/docker"
-	//dockerDefaultSystemdDir = "/etc/systemd/system"
+	// dockerDefaultSystemdDir = "/etc/systemd/system"
 	dockerDefaultCriDir = "/etc/containerd"
 
-	//containerdDefaultVersion    = "1.6.4"
-	containerdDefaultConfigDir = "/etc/containerd"
-	//containerdDefaultSystemdDir = "/etc/systemd/system"
+	// containerdDefaultVersion    = "1.6.4"
+	containerdDefaultConfigDir         = "/etc/containerd"
+	containerdDefaultRegistryConfigDir = "/etc/containerd/certs.d"
+	// containerdDefaultSystemdDir = "/etc/systemd/system"
 	containerdDefaultDataDir = "/var/lib/containerd"
 )
 
