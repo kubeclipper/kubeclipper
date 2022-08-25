@@ -3,14 +3,15 @@ package upgrade
 import (
 	"context"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/spf13/cobra"
 
@@ -281,16 +282,16 @@ func (o *UpgradeOptions) replaceService(comp string) error {
 func (o *UpgradeOptions) copyAndBackup(component string) (cp, backup string) {
 	switch component {
 	case options.UpgradeKcctl:
-		cp = fmt.Sprintf("cp -rf /tmp/kc/kcctl /usr/local/bin/kcctl")
+		cp = "cp -rf /tmp/kc/kcctl /usr/local/bin/kcctl"
 		backup = "cp /usr/local/bin/kcctl /tmp/kubeclipper/kcctl"
 	case options.UpgradeAgent:
-		cp = fmt.Sprintf("cp -rf /tmp/kc/kubeclipper-agent /usr/local/bin/kubeclipper-agent")
+		cp = "cp -rf /tmp/kc/kubeclipper-agent /usr/local/bin/kubeclipper-agent"
 		backup = "cp /usr/local/bin/kubeclipper-agent /tmp/kubeclipper/kubeclipper-agent"
 	case options.UpgradeServer:
-		cp = fmt.Sprintf("cp -rf /tmp/kc/kubeclipper-server /usr/local/bin/kubeclipper-server")
+		cp = "cp -rf /tmp/kc/kubeclipper-server /usr/local/bin/kubeclipper-server"
 		backup = "cp /usr/local/bin/kubeclipper-server /tmp/kubeclipper/kubeclipper-serve"
 	case options.UpgradeConsole:
-		cp = fmt.Sprintf("cp -rf /tmp/kc/kc-console/* /etc/kc-console/dist/")
+		cp = "cp -rf /tmp/kc/kc-console/* /etc/kc-console/dist/"
 		backup = "cp -rf /etc/kc-console /tmp/kubeclipper/"
 	}
 	return
