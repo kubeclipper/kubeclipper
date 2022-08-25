@@ -21,7 +21,9 @@ package v1
 import (
 	"net/http"
 
-	"github.com/kubeclipper/kubeclipper/pkg/models"
+	"k8s.io/component-base/version"
+
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 
@@ -60,14 +62,9 @@ func (h *handler) ListOfflineResource(request *restful.Request, response *restfu
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	addons := metas.Addons
-	items := make([]interface{}, 0, len(addons))
-	for i := range addons {
-		items = append(items, addons[i])
-	}
-	result := models.PageableResponse{
-		Items:      items,
-		TotalCount: len(items),
+	result := kc.ComponentMeta{
+		Rules:  metas.GetK8sVersionControlRules(version.Get().GitVersion),
+		Addons: metas.Addons,
 	}
 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, result)

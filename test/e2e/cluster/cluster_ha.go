@@ -4,15 +4,17 @@ import (
 	"context"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/onsi/ginkgo"
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
-	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("[Slow] [Serial] HA", func() {

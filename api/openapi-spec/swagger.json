@@ -141,10 +141,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/scheme.MetaResource"
-              }
+              "$ref": "#/definitions/kc.ComponentMeta"
             }
           },
           "404": {
@@ -4531,6 +4528,29 @@
         }
       }
     },
+    "kc.ComponentMeta": {
+      "required": [
+        "rules",
+        "addons"
+      ],
+      "properties": {
+        "addons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/scheme.MetaResource"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/kc.ComponentMeta.rules"
+          }
+        }
+      }
+    },
+    "kc.ComponentMeta.rules": {
+      "type": "object"
+    },
     "map[string]bool": {
       "type": "object",
       "additionalProperties": {
@@ -4594,6 +4614,10 @@
           "type": "string"
         },
         "expires_in": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "refresh_expires_in": {
           "type": "integer",
           "format": "int32"
         },

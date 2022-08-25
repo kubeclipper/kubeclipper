@@ -283,7 +283,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
-	if err = corev1.AddToContainer(s.container, s.Config, clusterOperator, opOperator, platformOperator, leaseOperator, deliverySvc); err != nil {
+	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, deliverySvc); err != nil {
 		return err
 	}
 	staticResourceSvc, err := staticresource.NewService(s.Config.StaticServerOptions)

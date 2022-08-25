@@ -30,9 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/scheme"
-	"github.com/kubeclipper/kubeclipper/pkg/server/config"
-
 	"github.com/robfig/cron/v3"
 
 	r "k8s.io/apimachinery/pkg/util/rand"
@@ -86,7 +83,6 @@ import (
 )
 
 type handler struct {
-	cfg              *config.Config
 	clusterOperator  cluster.Operator
 	leaseOperator    lease.Operator
 	opOperator       operation.Operator
@@ -106,10 +102,9 @@ var (
 	ErrNodesRegionDifferent = errors.New("nodes belongs to different region")
 )
 
-func newHandler(cfg *config.Config, clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
+func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
 	platform platform.Operator, delivery service.IDelivery) *handler {
 	return &handler{
-		cfg:              cfg,
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
 		opOperator:       op,
@@ -409,17 +404,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-
-	// TODO:
-	// 1. API (/api/config.kubeclipper.io/v1/componentmeta) will be updated to return version linkage data for front-end interconnection.
-	// 2. Version verification of kubernetes and its components will be added.
-	packageMetadata := scheme.PackageMetadata{}
-	if err = packageMetadata.ReadMetadata(!c.Offline(), h.cfg.StaticServerOptions.Path); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-	cniVersion := packageMetadata.FindK8sMatchCniVersion(c.KubernetesVersion, c.CNI.Type)
-	c.Complete(cniVersion)
+	c.Complete()
 
 	extraMeta.OperationType = v1.OperationCreateCluster
 	op, err := h.parseOperationFromCluster(extraMeta, &c, v1.ActionInstall)

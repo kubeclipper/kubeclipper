@@ -228,7 +228,8 @@ func (n *ComponentMetas) TablePrint() ([]string, [][]string) {
 }
 
 type ComponentMeta struct {
-	Items []scheme.MetaResource `json:"items"`
+	Rules  []map[string]interface{} `json:"rules"`
+	Addons []scheme.MetaResource    `json:"addons"`
 }
 
 type BackupList struct {
