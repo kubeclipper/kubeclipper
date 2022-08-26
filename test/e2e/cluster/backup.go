@@ -50,7 +50,7 @@ var _ = SIGDescribe("[Slow] [Serial] Backup", func() {
 		framework.ExpectNoError(err)
 		bpPoint = backupPoints.Items[0].DeepCopy()
 
-		clus, err := createClusterBeforeEach(f, initClusterWithBackupPoint)
+		clus, err := createClusterBeforeEach(f, "cluster-aio", initClusterWithBackupPoint)
 		framework.ExpectNoError(err)
 		clu = clus.Items[0].DeepCopy()
 	})
@@ -101,7 +101,7 @@ func initBackUpPoint() *corev1.BackupPoint {
 	}
 }
 
-func initClusterWithBackupPoint(clusterName, nodeID string) *corev1.Cluster {
+func initClusterWithBackupPoint(clusterName string, nodeID []string) *corev1.Cluster {
 	return &corev1.Cluster{
 		Provider: corev1.ProviderSpec{
 			Name: corev1.ClusterKubeadm,
@@ -121,7 +121,7 @@ func initClusterWithBackupPoint(clusterName, nodeID string) *corev1.Cluster {
 		},
 		Masters: corev1.WorkerNodeList{
 			{
-				ID: nodeID,
+				ID: nodeID[0],
 			},
 		},
 		Workers:           nil,

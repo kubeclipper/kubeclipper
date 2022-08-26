@@ -1,30 +1,13 @@
-/*
- *
- *  * Copyright 2021 KubeClipper Authors.
- *  *
- *  * Licensed under the Apache License, Version 2.0 (the "License");
- *  * you may not use this file except in compliance with the License.
- *  * You may obtain a copy of the License at
- *  *
- *  *     http://www.apache.org/licenses/LICENSE-2.0
- *  *
- *  * Unless required by applicable law or agreed to in writing, software
- *  * distributed under the License is distributed on an "AS IS" BASIS,
- *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  * See the License for the specific language governing permissions and
- *  * limitations under the License.
- *
- */
-
 package cluster
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	apiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -33,59 +16,96 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
 )
 
-var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
+var _ = SIGDescribe("[Slow] [Serial] Add a node to the cluster", func() {
 	f := framework.NewDefaultFramework("aio")
+	nodeID := ""
+	clu := &corev1.Cluster{}
 
-	var nodeID []string
-	clusterName := "e2e-aio"
-
-	f.AddAfterEach("cleanup aio", func(f *framework.Framework, failed bool) {
+	f.AddAfterEach("cleanup add node test aio cluster", func(f *framework.Framework, failed bool) {
 		ginkgo.By("delete aio cluster")
-		err := f.Client.DeleteCluster(context.TODO(), clusterName)
+		err := f.Client.DeleteCluster(context.TODO(), clu.Name)
 		framework.ExpectNoError(err)
-
 		ginkgo.By("waiting for cluster to be deleted")
-		err = cluster.WaitForClusterNotFound(f.Client, clusterName, f.Timeouts.ClusterDelete)
+		err = cluster.WaitForClusterNotFound(f.Client, clu.Name, f.Timeouts.ClusterDelete)
 		framework.ExpectNoError(err)
+	})
+
+	ginkgo.BeforeEach(func() {
+		clus, err := createClusterBeforeEach(f, "cluster-aio", initAIOCluster)
+		framework.ExpectNoError(err)
+		clu = clus.Items[0].DeepCopy()
 	})
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
-			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeRole),
+			LabelSelector: "!kubeclipper.io/nodeRole",
 		})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
 			framework.Failf("Not enough nodes to test")
 		}
-		for _, node := range nodes.Items {
-			nodeID = append(nodeID, node.Name)
-		}
+		nodeID = nodes.Items[0].Name
 	})
 
-	ginkgo.It("should create a AIO minimal kubernetes cluster and ensure cluster is running.", func() {
-		ginkgo.By("create aio cluster")
-
-		clus, err := f.Client.CreateCluster(context.TODO(), initAIOCluster(clusterName, nodeID))
+	ginkgo.It("add a node to the cluster and ensure the node is added", func() {
+		ginkgo.By("add node")
+		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(apiv1.NodesOperationAdd, nodeID), clu.Name)
 		framework.ExpectNoError(err)
-
-		if len(clus.Items) == 0 {
-			framework.Failf("unexpected problem, cluster not be nil at this time")
-		}
 
 		ginkgo.By("check cluster status is running")
-		err = cluster.WaitForClusterRunning(f.Client, clusterName, f.Timeouts.ClusterInstall)
+		err = cluster.WaitForClusterRunning(f.Client, clu.Name, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("wait for cluster is healthy")
-		err = cluster.WaitForClusterHealthy(f.Client, clusterName, f.Timeouts.ClusterInstallShort)
+		ginkgo.By("check node is added")
+		clus, err := f.Client.DescribeCluster(context.TODO(), clu.Name)
 		framework.ExpectNoError(err)
+		if !(clus.Items[0].Workers[0].ID == nodeID) {
+			framework.ExpectNoError(errors.New("add node to cluster failed"))
+		}
 	})
 })
 
-func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
-	// TODO: make version be parameter
+var _ = SIGDescribe("[Slow] [Serial] Remove a node from the cluster", func() {
+	f := framework.NewDefaultFramework("ha")
+	clu := &corev1.Cluster{}
+
+	f.AddAfterEach("cleanup remove node test ha cluster", func(f *framework.Framework, failed bool) {
+		ginkgo.By("delete ha cluster")
+		err := f.Client.DeleteCluster(context.TODO(), clu.Name)
+		framework.ExpectNoError(err)
+		ginkgo.By("waiting for cluster to be deleted")
+		err = cluster.WaitForClusterNotFound(f.Client, clu.Name, f.Timeouts.ClusterDelete)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.BeforeEach(func() {
+		ginkgo.By("create a cluster with a worker node")
+		clus, err := createClusterWithWorkerNodeBeforeEach(f, "cluster-ha", initClusterWithWorkNode)
+		framework.ExpectNoError(err)
+		clu = clus.Items[0].DeepCopy()
+	})
+
+	ginkgo.It("remove a node from the cluster and ensure the node is removed", func() {
+		ginkgo.By("remove node")
+		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(apiv1.NodesOperationRemove, clu.Workers[0].ID), clu.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("check cluster status is running")
+		err = cluster.WaitForClusterRunning(f.Client, clu.Name, f.Timeouts.ClusterInstall)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("check node is removed")
+		clus, err := f.Client.DescribeCluster(context.TODO(), clu.Name)
+		framework.ExpectNoError(err)
+		if len(clus.Items[0].Workers) != 0 {
+			framework.ExpectNoError(errors.New("remove node failed"))
+		}
+	})
+})
+
+func initClusterWithWorkNode(clusterName string, nodeID []string) *corev1.Cluster {
 	return &corev1.Cluster{
 		Provider: corev1.ProviderSpec{
 			Name: corev1.ClusterKubeadm,
@@ -105,7 +125,11 @@ func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 				ID: nodeID[0],
 			},
 		},
-		Workers:           nil,
+		Workers: corev1.WorkerNodeList{
+			{
+				ID: nodeID[1],
+			},
+		},
 		KubernetesVersion: "v1.23.6",
 		CertSANs:          nil,
 		LocalRegistry:     "",
@@ -121,7 +145,6 @@ func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",
 		},
-
 		KubeProxy: corev1.KubeProxy{},
 		Etcd:      corev1.Etcd{},
 		CNI: corev1.CNI{
@@ -139,9 +162,19 @@ func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 	}
 }
 
-type initfunc func(clusterName string, nodeID []string) *corev1.Cluster
+func initPatchNode(operation, node string) *apiv1.PatchNodes {
+	return &apiv1.PatchNodes{
+		Operation: apiv1.NodesPatchOperation(operation),
+		Role:      "worker",
+		Nodes: corev1.WorkerNodeList{
+			{
+				ID: node,
+			},
+		},
+	}
+}
 
-func createClusterBeforeEach(f *framework.Framework, clusterName string, initial initfunc) (*kc.ClustersList, error) {
+func createClusterWithWorkerNodeBeforeEach(f *framework.Framework, clusterName string, initial initfunc) (*kc.ClustersList, error) {
 	var nodeID []string
 	ginkgo.By("Check that there are enough available nodes")
 	nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
@@ -149,7 +182,7 @@ func createClusterBeforeEach(f *framework.Framework, clusterName string, initial
 		LabelSelector: "!kubeclipper.io/nodeRole",
 	})
 	framework.ExpectNoError(err)
-	if len(nodes.Items) == 0 {
+	if len(nodes.Items) < 2 {
 		framework.Failf("Not enough nodes to test")
 		return nil, err
 	}
@@ -157,7 +190,7 @@ func createClusterBeforeEach(f *framework.Framework, clusterName string, initial
 		nodeID = append(nodeID, node.Name)
 	}
 
-	ginkgo.By("create aio cluster")
+	ginkgo.By("create cluster")
 	clus, err := f.Client.CreateCluster(context.TODO(), initial(clusterName, nodeID))
 	framework.ExpectNoError(err)
 	if len(clus.Items) == 0 {

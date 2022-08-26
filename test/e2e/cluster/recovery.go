@@ -47,7 +47,7 @@ var _ = SIGDescribe("[Slow] [Serial] Recovery", func() {
 		}
 		bpPoint = backupPoints.Items[0].DeepCopy()
 
-		clus, err := createClusterBeforeEach(f, initClusterWithBackupPoint)
+		clus, err := createClusterBeforeEach(f, "cluster-aio", initClusterWithBackupPoint)
 		framework.ExpectNoError(err)
 		clu = clus.Items[0].DeepCopy()
 
