@@ -50,7 +50,6 @@ const (
   kcctl clean
   kcctl clean --config ~/.kc/deploy-config.yaml
 
-
   # Specify the deploy-config.yaml path
   kcctl clean --config ~/.kc/deploy-config.yaml -A
 

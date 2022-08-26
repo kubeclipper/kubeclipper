@@ -52,6 +52,7 @@ const (
 	loginExample = `
   # Login to the kubeclipper server
   kcctl login --host http://127.0.0.1 --username root
+
   # Login to the kubeclipper server via passwd by cli
   kcctl login --host http://127.0.0.1 --username root --password xxx
 

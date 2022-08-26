@@ -52,11 +52,14 @@ const (
   Currently, You can push, delete, and list offline resource packs.`
 	resourceExample = `
   # List offline resource packs
-  kcctl resource list (--pk-file | --pk-passwd | --passwd) [flags]
+  kcctl resource list
+
   # Push offline resource packs
-  kcctl push (--pk-file <file path> | --pk-passwd <pwd> | --passwd <pwd>) (--pkg <file name>) [flags]
+  kcctl resource push --pkg /root/docker-19.03.12-amd64.tar.gz --type cri
+
   # Delete offline resource packs
-  delete (--pk-file <file path> | --pk-passwd <pwd> | --passwd <pwd>) (--name <pkg-name>) (--version <pkg-version>) (--arch <pkg-arch>) [flags]
+  kcctl resource delete --name k8s --version v1.23.6 --arch amd64
+
 
   Please read 'kcctl resource -h' get more resource flags.`
 	listLongDescription = `
@@ -65,20 +68,14 @@ const (
   You can list, push, or delete offline resource packs.
   The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
 	resourceListExample = `
-  # List offline resource with default ssh user(root)
-  kcctl resource list --pk-file 'PK-FILE PATH'
-
-  # List offline resource use ssh password
-  kcctl resource list --passwd 'SSH PASSWORD'
-
-  # List offline resource specify ssh user, default user is root
-  kcctl resource list --user 'USER' --pk-file 'PK-FILE PATH'
+  # List offline resource
+  kcctl resource list 
 
   # List offline resource use specified output format
-  kcctl resource list --pk-file 'PK-FILE PATH' --output 'YAML|TABLE|JSON'
+  kcctl resource list  --output 'YAML|TABLE|JSON'
 
   # List offline resource use specified deploy file
-  kcctl resource list --deploy-config 'FILE PATH' --pk-file 'PK-FILE PATH'
+  kcctl resource list --deploy-config /root/.kc/deploy-config.yaml
 
   Please read 'kcctl resource list -h' get more resource list flags`
 	pushLongDescription = `
@@ -94,13 +91,14 @@ const (
 	name/version/arch/images.tar.gz
 	name/version/arch/manifest.json`
 	resourcePushExample = `
-  # Push k8s offline resource packs use ssh
-  kcctl resource push --pk-file 'PK-FILE PATH' --pkg /root/k8s-v1.23.6-amd64.tar.gz --type k8s  
-  # Push docker offline resource packs
-  kcctl resource push --pk-file 'PK-FILE PATH' --pkg /root/docker-19.03.12-amd64.tar.gz --type cri
+  # Push k8s offline resource k8s
+  kcctl resource push --pkg /root/k8s-v1.23.6-amd64.tar.gz --type k8s  
 
-  # Push offline resource packs use specified deploy file
-  kcctl resource push --deploy-config 'DEPLOY FILE PATH' --pk-file 'PK-FILE PATH' --pkg /root/nfs-v4.0.2-amd64.tar.gz --type csi
+  # Push docker offline resource csi
+  kcctl resource push --pkg /root/docker-19.03.12-amd64.tar.gz --type cri
+
+  # Push offline resource packs nfs use specified deploy file
+  kcctl resource push --deploy-config /root/.kc/deploy-config.yaml  --pkg /root/nfs-v4.0.2-amd64.tar.gz --type csi
 
   Please read 'kcctl resource push -h' get more resource push flags`
 	deleteLongDescription = `
@@ -110,11 +108,8 @@ const (
   You need to specify the name, type, arch of offline packages before deleting.
   The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
 	resourceDeleteExample = `
-  # Delete offline resource packs use ssh
-  kcctl resource delete --pk-file 'PK-FILE PATH' --name k8s --version v1.23.6 --arch amd64
-
-  # Delete offline resource packs use specified deploy file
-  kcctl resource delete --deploy-config 'DEPLOY FILE PATH' --pk-file 'PK-FILE PATH' --name nfs --version v4.0.2 --arch amd64
+  # Delete offline resource packs
+  kcctl resource delete --name k8s --version v1.23.6 --arch amd64
 
   Please read 'kcctl resource delete -h' get more resource delete flags`
 )
@@ -122,7 +117,6 @@ const (
 type ResourceOptions struct {
 	options.IOStreams
 	PrintFlags   *printer.PrintFlags
-	SSHConfig    *sshutils.SSH
 	DeployConfig string
 	deployConfig *options.DeployConfig
 
@@ -140,11 +134,8 @@ type ResourceOptions struct {
 
 func NewResourceOptions(streams options.IOStreams) *ResourceOptions {
 	return &ResourceOptions{
-		IOStreams:  streams,
-		PrintFlags: printer.NewPrintFlags(),
-		SSHConfig: &sshutils.SSH{
-			User: "root",
-		},
+		IOStreams:    streams,
+		PrintFlags:   printer.NewPrintFlags(),
 		deployConfig: options.NewDeployOptions(),
 		Arch:         "amd64",
 	}
@@ -155,7 +146,7 @@ func NewCmdResource(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "resource",
 		DisableFlagsInUseLine: true,
-		Short:                 "offline resource operation",
+		Short:                 "Offline resource operation",
 		Long:                  longDescription,
 		Example:               resourceExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -174,7 +165,7 @@ func NewCmdResource(streams options.IOStreams) *cobra.Command {
 
 func NewCmdResourceList(o *ResourceOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "list (--pk-file | --pk-passwd | --passwd) [flags]",
+		Use:                   "list  [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "offline resource list",
 		Long:                  listLongDescription,
@@ -187,7 +178,6 @@ func NewCmdResourceList(o *ResourceOptions) *cobra.Command {
 		},
 	}
 
-	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, "offline resource type.")
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "offline resource name.")
@@ -212,12 +202,12 @@ func NewCmdResourceList(o *ResourceOptions) *cobra.Command {
 }
 
 func (o *ResourceOptions) preCheck() bool {
-	return sudo.PreCheck("sudo", o.SSHConfig, o.IOStreams, o.deployConfig.ServerIPs)
+	return sudo.PreCheck("sudo", o.deployConfig.SSHConfig, o.IOStreams, o.deployConfig.ServerIPs)
 }
 
 func NewCmdResourcePush(o *ResourceOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "push (--pk-file <file path> | --pk-passwd <pwd> | --passwd <pwd>) (--pkg <file name>) [flags]",
+		Use:                   "push (--pkg <file name>) (--type <resource type>) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "offline resource push",
 		Long:                  pushLongDescription,
@@ -233,7 +223,6 @@ func NewCmdResourcePush(o *ResourceOptions) *cobra.Command {
 		},
 	}
 
-	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, "offline resource type.")
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "docker service and images pkg.")
 	cmd.Flags().StringVar(&o.DeployConfig, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
@@ -249,7 +238,7 @@ func NewCmdResourcePush(o *ResourceOptions) *cobra.Command {
 
 func NewCmdResourceDelete(o *ResourceOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "delete (--pk-file <file path> | --pk-passwd <pwd> | --passwd <pwd>) (--name <pkg-name>) (--version <pkg-version>) (--arch <pkg-arch>) [flags]",
+		Use:                   "delete (--name <pkg-name>) (--version <pkg-version>) (--arch <pkg-arch>) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "offline resource delete",
 		Long:                  deleteLongDescription,
@@ -265,7 +254,6 @@ func NewCmdResourceDelete(o *ResourceOptions) *cobra.Command {
 		},
 	}
 
-	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "offline resource name.")
 	cmd.Flags().StringVar(&o.Version, "version", o.Name, "offline resource version.")
 	cmd.Flags().StringVar(&o.Arch, "arch", o.Arch, "offline resource arch.")
@@ -297,8 +285,8 @@ func (o *ResourceOptions) ValidateArgs(cmd *cobra.Command) error {
 	if o.deployConfig.Config == "" {
 		return utils.UsageErrorf(cmd, "the deploy-config.yaml file path is required")
 	}
-	if o.SSHConfig.PkFile == "" && o.SSHConfig.Password == "" {
-		return utils.UsageErrorf(cmd, "one of --pk-file or --passwd must be specified")
+	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)
 	}
 	return nil
 }
@@ -313,8 +301,8 @@ func (o *ResourceOptions) ValidateArgsPush(cmd *cobra.Command) error {
 	if o.deployConfig.Config == "" {
 		return utils.UsageErrorf(cmd, "--deploy-config must be specified")
 	}
-	if o.SSHConfig.PkFile == "" && o.SSHConfig.Password == "" {
-		return utils.UsageErrorf(cmd, "one of --pk-file or --passwd must be specified")
+	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)
 	}
 	return nil
 }
@@ -332,8 +320,8 @@ func (o *ResourceOptions) ValidateArgsDelete(cmd *cobra.Command) error {
 	if o.deployConfig.Config == "" {
 		return utils.UsageErrorf(cmd, "--deploy-config is required")
 	}
-	if o.SSHConfig.PkFile == "" && o.SSHConfig.Password == "" {
-		return utils.UsageErrorf(cmd, "one of --pk-file or --passwd must be specified")
+	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)
 	}
 	return nil
 }
@@ -448,14 +436,14 @@ func (o *ResourceOptions) ResourcePush() error {
 
 		// send pkg
 		hook := fmt.Sprintf(`cd %s && rm -rf $(tar tf %s | awk -F\/ '{print $1}' | uniq | sed '/^$/d')`, config.DefaultPkgPath, filepath.Base(o.Pkg))
-		err = utils.SendPackageV2(o.SSHConfig, o.Pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
+		err = utils.SendPackageV2(o.deployConfig.SSHConfig, o.Pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
 		if err != nil {
 			return err
 		}
 		// checkout download pkg
 		if _, ok := httputil.IsURL(o.Pkg); ok {
 			hook = fmt.Sprintf("tar -tf %s", filepath.Join(config.DefaultPkgPath, filepath.Base(o.Pkg)))
-			ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, node, hook)
+			ret, err := sshutils.SSHCmdWithSudo(o.deployConfig.SSHConfig, node, hook)
 			if err != nil {
 				logger.Errorf("node(%s) push resource failed: %s", node, err.Error())
 				return err
@@ -467,7 +455,7 @@ func (o *ResourceOptions) ResourcePush() error {
 
 		// clean up old file
 		clean := fmt.Sprintf(`rm -rf %s/%s/%s/%s && mkdir -p %s/%s/%s/%s`, o.deployConfig.StaticServerPath, name, version, arch, o.deployConfig.StaticServerPath, name, version, arch)
-		ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, node, clean)
+		ret, err := sshutils.SSHCmdWithSudo(o.deployConfig.SSHConfig, node, clean)
 		if err != nil {
 			return err
 		}
@@ -477,7 +465,7 @@ func (o *ResourceOptions) ResourcePush() error {
 
 		// tar decompress new file
 		hook = fmt.Sprintf(`tar -zxvf %s -C %s`, filepath.Join(config.DefaultPkgPath, filepath.Base(o.Pkg)), o.deployConfig.StaticServerPath)
-		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, node, hook)
+		ret, err = sshutils.SSHCmdWithSudo(o.deployConfig.SSHConfig, node, hook)
 		if err != nil {
 			logger.Errorf("node(%s) push resource failed: %s", node, err.Error())
 			return err
@@ -489,7 +477,7 @@ func (o *ResourceOptions) ResourcePush() error {
 	}
 
 	// send metadata.json
-	err = utils.SendPackageV2(o.SSHConfig, "metadata.json", o.deployConfig.ServerIPs, o.deployConfig.StaticServerPath, nil, nil)
+	err = utils.SendPackageV2(o.deployConfig.SSHConfig, "metadata.json", o.deployConfig.ServerIPs, o.deployConfig.StaticServerPath, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -519,7 +507,7 @@ func (o *ResourceOptions) ResourceDelete() error {
 		if err != nil {
 			return err
 		}
-		err = utils.SendPackageV2(o.SSHConfig, "metadata.json", []string{node}, o.deployConfig.StaticServerPath, nil, nil)
+		err = utils.SendPackageV2(o.deployConfig.SSHConfig, "metadata.json", []string{node}, o.deployConfig.StaticServerPath, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -527,7 +515,7 @@ func (o *ResourceOptions) ResourceDelete() error {
 		if err != nil {
 			return err
 		}
-		ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, node, fmt.Sprintf("rm -rf %s/%s/%s/%s", o.deployConfig.StaticServerPath, o.Name, o.Version, o.Arch))
+		ret, err := sshutils.SSHCmdWithSudo(o.deployConfig.SSHConfig, node, fmt.Sprintf("rm -rf %s/%s/%s/%s", o.deployConfig.StaticServerPath, o.Name, o.Version, o.Arch))
 		if err != nil {
 			return err
 		}
@@ -541,7 +529,7 @@ func (o *ResourceOptions) ResourceDelete() error {
 }
 
 func (o *ResourceOptions) ReadMetadata(node string) (*kc.ComponentMetas, error) {
-	ret, err := sshutils.SSHCmd(o.SSHConfig, node, fmt.Sprintf("cat %s/%s", o.deployConfig.StaticServerPath, "metadata.json"))
+	ret, err := sshutils.SSHCmd(o.deployConfig.SSHConfig, node, fmt.Sprintf("cat %s/%s", o.deployConfig.StaticServerPath, "metadata.json"))
 	if err != nil {
 		return nil, err
 	}
