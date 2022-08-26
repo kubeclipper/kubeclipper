@@ -1,5 +1,3 @@
-//go:build kc_default
-
 package k8s
 
 var nodeScript = `
