@@ -2,7 +2,8 @@
 
 package k8s
 
-var nodeScript = `
+func init() {
+	nodeScript = `
 systemctl stop firewalld || true
 systemctl disable firewalld || true
 setenforce 0
@@ -17,3 +18,4 @@ sysctl --system
 sysctl -p
 swapoff -a
 sed -i /swap/d /etc/fstab`
+}

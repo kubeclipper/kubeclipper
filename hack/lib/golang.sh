@@ -175,7 +175,7 @@ kube::golang::build_binaries_for_platform() {
       #-gcflags "${gogcflags:-}"
       #-asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
-      -tags "${GOTAGS:-kc_default}"
+      -tags "${GOTAGS:-}"
     )
     V=2 kube::log::info "build with disable cgo..."
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
@@ -187,7 +187,7 @@ kube::golang::build_binaries_for_platform() {
       #-gcflags "${gogcflags:-}"
       #-asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
-      -tags "${GOTAGS:-kc_default}"
+      -tags "${GOTAGS:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
