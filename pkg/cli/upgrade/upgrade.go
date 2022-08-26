@@ -9,9 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/spf13/cobra"
 
@@ -37,17 +38,18 @@ const (
 	  ...
   When you want to upgrade whole platform or console with your own package, your structure must be consistent with above.`
 	upgradeExample = `
-  # Upgrade whole kubeclipper platform use online pkg
-  kcctl upgrade all --online --version ( vX.X.X | branch-name )
+  # Upgrade whole kubeclipper platform use online package, --version can accept version number or branch name
+  kcctl upgrade all --online --version v1.1.0
+  kcctl upgrade all --online --version master
 
   # Upgrade whole kubeclipper platform use your own pkg
-  kcctl upgrade all --pkg xxx
+  kcctl upgrade all --pkg /tmp/kc-upgrade-amd64.tar.gz
 
   # Upgrade agent of kubeclipper platform use your own pkg
-  kcctl upgrade agent --pkg xxx
+  kcctl upgrade agent --pkg /tmp/kc-agent.tar.gz
 
   # Upgrade agent of kubeclipper platform use your own binary file
-  kcctl upgrade agent --pkg xxx --binary`
+  kcctl upgrade agent --pkg /tmp/kubeclipper-server --binary`
 )
 
 var (
@@ -269,28 +271,27 @@ func (o *UpgradeOptions) replaceService(comp string) error {
 	return nil
 }
 
-func (o *UpgradeOptions) replaceServiceCmds(component string) []string {
-	cmds := make([]string, 0)
+func (o *UpgradeOptions) replaceServiceCmds(component string) (cmds []string) {
 	switch component {
 	case options.UpgradeKcctl:
-		cmds = append(cmds, []string{
+		cmds = []string{
 			"cp /usr/local/bin/kcctl /tmp/kubeclipper/kcctl",
 			"cp -rf /tmp/kc/kcctl /usr/local/bin/kcctl",
-		}...)
+		}
 	case options.UpgradeConsole:
-		cmds = append(cmds, []string{
+		cmds = []string{
 			"systemctl stop kc-console",
 			"cp -rf /etc/kc-console /tmp/kubeclipper/",
 			"cp -rf /tmp/kc/kc-console/* /etc/kc-console/dist/",
 			"systemctl start kc-console",
-		}...)
+		}
 	default:
-		cmds = append(cmds, []string{
+		cmds = []string{
 			fmt.Sprintf("systemctl stop kc-%s", component),
 			fmt.Sprintf("cp /usr/local/bin/kubeclipper-%s /tmp/kubeclipper/kubeclipper-%s", component, component),
 			fmt.Sprintf("cp -rf /tmp/kc/kubeclipper-%s /usr/local/bin/kubeclipper-%s", component, component),
 			fmt.Sprintf("systemctl start kc-%s", component),
-		}...)
+		}
 	}
 	return cmds
 }
