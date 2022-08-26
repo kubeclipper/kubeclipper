@@ -492,7 +492,9 @@ func (o *RegistryOptions) cleanDocker() error {
 	// stop docker service
 	cmdList := []string{
 		"systemctl disable docker --now",                                          // stop docker
-		`rm -rf /usr/bin/docker* /usr/bin/containerd* /usr/bin/ctr /usr/bin/runc`, // remove docker
+		`rm -rf /usr/bin/docker* /usr/bin/containerd* /usr/bin/ctr /usr/bin/runc`, // remove docker binary
+		fmt.Sprintf("rm -rf %s", o.DataRoot),                                      // remote docker data
+		`rm -rf /etc/systemd/system/docker.service`,                               // remove docker systemd
 		"systemctl reset-failed docker || true",
 	}
 	for _, cmd := range cmdList {
@@ -537,8 +539,7 @@ func (o *RegistryOptions) cleanDocker() error {
 func (o *RegistryOptions) cleanRegistry() error {
 	// clean registry volume and kc package
 	cmdList := []string{
-		fmt.Sprintf(`rm -rf %s %s/kc*`, o.RegistryVolume, config.DefaultPkgPath), //  clean registry volume
-		fmt.Sprintf(`rm -rf /var/run/docker* %s/kc`, o.DataRoot),                 // clean kc package
+		fmt.Sprintf(`rm -rf %s %s/kc*`, o.RegistryVolume, config.DefaultPkgPath),
 	}
 	for _, cmd := range cmdList {
 		ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
