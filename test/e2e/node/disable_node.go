@@ -85,7 +85,7 @@ var _ = cluster2.SIGDescribe("[Fast] [Serial] Enable node", func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
-			LabelSelector: fmt.Sprintf("%s", common.LabelNodeDisable),
+			LabelSelector: common.LabelNodeDisable,
 		})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
