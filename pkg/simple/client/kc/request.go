@@ -66,7 +66,7 @@ func (q *Queries) ToRawQuery() url.Values {
 		queryParameters.Set(query.ParameterToken, fmt.Sprintf("token=%s", q.Token))
 	}
 	if q.Message != "" {
-		queryParameters.Set(query.ParameterMsg, fmt.Sprintf("msg=%s", q.Token))
+		queryParameters.Set(query.ParameterMsg, fmt.Sprintf("msg=%s", q.Message))
 	}
 	return queryParameters
 }

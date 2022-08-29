@@ -10,26 +10,23 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/authentication/oauth"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )
 
-var _ = SIGDescribe("[Slow] [Serial] Node terminal connect", func() {
+var _ = SIGDescribe("[Fast] [Serial] Node terminal connect", func() {
 	f := framework.NewDefaultFramework("node")
 	msg := ""
 	nodeID := ""
-	token := &oauth.Token{}
+	token := ""
 	credential := &v1.SSHCredential{}
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
-			Pagination:    query.NoPagination(),
-			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeRole),
+			Pagination: query.NoPagination(),
 		})
 		framework.ExpectNoError(err)
 		nodeID = nodes.Items[0].Name
@@ -43,7 +40,8 @@ var _ = SIGDescribe("[Slow] [Serial] Node terminal connect", func() {
 			Username: "admin",
 			Password: "Thinkbig1",
 		}
-		token, err = f.Client.Login(context.TODO(), body)
+
+		token, err = f.Client.Token(context.TODO(), body)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Get msg")
@@ -65,7 +63,7 @@ var _ = SIGDescribe("[Slow] [Serial] Node terminal connect", func() {
 
 	ginkgo.It("connect the node and ensure node is connected", func() {
 		ginkgo.By("connect node")
-		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", "172.20.148.8", kc.ListNodesPath, nodeID, "terminal?", nodeID, token.AccessToken, msg)
+		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.Client.Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, token, msg)
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		framework.ExpectNoError(err)
 

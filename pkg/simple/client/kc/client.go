@@ -71,6 +71,11 @@ func (cli *Client) Host() string {
 	return cli.host
 }
 
+func (cli *Client) Token(ctx context.Context, body LoginRequest) (string, error) {
+	token, err := cli.Login(ctx, body)
+	return token.AccessToken, err
+}
+
 func (cli *Client) Scheme() string {
 	return cli.scheme
 }

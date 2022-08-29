@@ -3,7 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
-
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -12,6 +12,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
 )
+
+const version = "v1.23.9"
 
 var _ = SIGDescribe("[Slow] [Serial] Online cluster upgrade", func() {
 	f := framework.NewDefaultFramework("aio")
@@ -34,7 +36,7 @@ var _ = SIGDescribe("[Slow] [Serial] Online cluster upgrade", func() {
 
 	ginkgo.It("upgrade online cluster and ensure cluster is upgraded", func() {
 		ginkgo.By("upgrade cluster")
-		err := f.Client.UpgradeCluster(context.TODO(), clu.Name, initUpgradeCluster(false, "v1.23.9"))
+		err := f.Client.UpgradeCluster(context.TODO(), clu.Name, initUpgradeCluster(false, version))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait cluster upgrade")
@@ -44,7 +46,7 @@ var _ = SIGDescribe("[Slow] [Serial] Online cluster upgrade", func() {
 		ginkgo.By("check cluster is upgraded")
 		clus, err := f.Client.DescribeCluster(context.TODO(), clu.Name)
 		framework.ExpectNoError(err)
-		if clus.Items[0].KubernetesVersion != "v1.23.9" {
+		if clus.Items[0].KubernetesVersion != version {
 			framework.ExpectNoError(errors.New("upgrade online cluster failed"))
 		}
 	})
@@ -64,24 +66,34 @@ var _ = SIGDescribe("[Slow] [Serial] Offline cluster upgrade", func() {
 	})
 
 	ginkgo.BeforeEach(func() {
+		ginkgo.By("create aio cluster")
 		clus, err := createClusterBeforeEach(f, "cluster-aio", initAIOCluster)
 		framework.ExpectNoError(err)
 		clu = clus.Items[0].DeepCopy()
+
+		ginkgo.By("check resource exist")
+		meta, err := f.Client.GetComponentMeta(context.TODO())
+		framework.ExpectNoError(err)
+
+		if !isResourceExist(meta) {
+			framework.Failf("resource not found")
+		}
 	})
 
 	ginkgo.It("upgrade offline cluster and ensure cluster is upgraded", func() {
 		ginkgo.By("upgrade cluster")
-		err := f.Client.UpgradeCluster(context.TODO(), clu.Name, initUpgradeCluster(true, "v1.23.9"))
+		err := f.Client.UpgradeCluster(context.TODO(), clu.Name, initUpgradeCluster(true, version))
 		framework.ExpectNoError(err)
 
-		ginkgo.By("check cluster status is running")
-		err = cluster.WaitForClusterRunning(f.Client, clu.Name, f.Timeouts.ClusterInstall)
+		ginkgo.By("wait cluster upgrade")
+		err = cluster.WaitForUpgrade(f.Client, clu.Name, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check cluster is upgraded")
 		clus, err := f.Client.DescribeCluster(context.TODO(), clu.Name)
 		framework.ExpectNoError(err)
-		if clus.Items[0].KubernetesVersion != "v1.23.9" {
+
+		if clus.Items[0].KubernetesVersion != version {
 			framework.ExpectNoError(errors.New("upgrade offline cluster failed"))
 		}
 	})
@@ -142,4 +154,13 @@ func initOnlineAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 			},
 		},
 	}
+}
+
+func isResourceExist(meta *kc.ComponentMeta) bool {
+	for _, addon := range meta.Addons {
+		if addon.Name == "k8s" && addon.Arch == "amd64" && addon.Version == version {
+			return true
+		}
+	}
+	return false
 }

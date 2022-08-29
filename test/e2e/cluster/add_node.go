@@ -61,7 +61,7 @@ var _ = SIGDescribe("[Slow] [Serial] Add a node to the cluster", func() {
 		ginkgo.By("check node is added")
 		clus, err := f.Client.DescribeCluster(context.TODO(), clu.Name)
 		framework.ExpectNoError(err)
-		if !(clus.Items[0].Workers[0].ID == nodeID) {
+		if clus.Items[0].Workers[0].ID != nodeID {
 			framework.ExpectNoError(errors.New("add node to cluster failed"))
 		}
 	})
@@ -175,7 +175,7 @@ func initPatchNode(operation, node string) *apiv1.PatchNodes {
 }
 
 func createClusterWithWorkerNodeBeforeEach(f *framework.Framework, clusterName string, initial initfunc) (*kc.ClustersList, error) {
-	var nodeID []string
+	var nodeIDs []string
 	ginkgo.By("Check that there are enough available nodes")
 	nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 		Pagination:    query.NoPagination(),
@@ -187,11 +187,11 @@ func createClusterWithWorkerNodeBeforeEach(f *framework.Framework, clusterName s
 		return nil, err
 	}
 	for _, node := range nodes.Items {
-		nodeID = append(nodeID, node.Name)
+		nodeIDs = append(nodeIDs, node.Name)
 	}
 
 	ginkgo.By("create cluster")
-	clus, err := f.Client.CreateCluster(context.TODO(), initial(clusterName, nodeID))
+	clus, err := f.Client.CreateCluster(context.TODO(), initial(clusterName, nodeIDs))
 	framework.ExpectNoError(err)
 	if len(clus.Items) == 0 {
 		framework.Failf("unexpected problem, cluster not be nil at this time")

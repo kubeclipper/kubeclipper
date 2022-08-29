@@ -32,7 +32,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )
 
-var _ = cluster2.SIGDescribe("[Slow] [Serial] Disable node", func() {
+var _ = cluster2.SIGDescribe("[Fast] [Serial] Disable node", func() {
 	f := framework.NewDefaultFramework("node")
 	nodeID := ""
 
@@ -46,19 +46,13 @@ var _ = cluster2.SIGDescribe("[Slow] [Serial] Disable node", func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
-			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeRole),
+			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeDisable),
 		})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
-			framework.Failf("Not enough nodes to test")
+			framework.Failf("Not enough enabled nodes to test")
 		}
 		nodeID = nodes.Items[0].Name
-
-		if _, ok := nodes.Items[0].Labels[common.LabelNodeDisable]; ok {
-			ginkgo.By("Make sure the node is enabled")
-			err := f.Client.EnableNode(context.TODO(), nodeID)
-			framework.ExpectNoError(err)
-		}
 	})
 
 	ginkgo.It("disable a node and ensure the node is disabled", func() {
@@ -77,7 +71,7 @@ var _ = cluster2.SIGDescribe("[Slow] [Serial] Disable node", func() {
 	})
 })
 
-var _ = cluster2.SIGDescribe("[Slow] [Serial] Enable node", func() {
+var _ = cluster2.SIGDescribe("[Fast] [Serial] Enable node", func() {
 	f := framework.NewDefaultFramework("node")
 	nodeID := ""
 
@@ -91,11 +85,11 @@ var _ = cluster2.SIGDescribe("[Slow] [Serial] Enable node", func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
-			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeRole),
+			LabelSelector: fmt.Sprintf("%s", common.LabelNodeDisable),
 		})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
-			framework.Failf("Not enough nodes to test")
+			framework.Failf("Not enough disabled nodes to test")
 		}
 		nodeID = nodes.Items[0].Name
 
