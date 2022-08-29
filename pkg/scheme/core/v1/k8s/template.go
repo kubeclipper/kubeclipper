@@ -13152,7 +13152,7 @@ spec:
           securityContext:
             privileged: true
         - name: "mount-bpffs"
-          image: docker.io/calico/node:v3.22.4
+          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           command: ["calico-node", "-init", "-best-effort"]
           volumeMounts:
             - mountPath: /sys/fs
