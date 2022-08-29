@@ -112,7 +112,6 @@ func NewCmdUpgrade(stream options.IOStreams) *cobra.Command {
 	cmd.Flags().BoolVar(&o.binary, "binary", o.binary, "Upgrade with the specified binary file")
 	cmd.Flags().BoolVar(&o.online, "online", o.online, "upgrade with online package")
 	cmd.Flags().StringVar(&o.version, "version", o.version, "input version or branch name. e.g: v1.12.1 or master、latest")
-	options.AddFlagsToSSH(o.deployConfig.SSHConfig, cmd.Flags())
 
 	return cmd
 }
@@ -138,6 +137,9 @@ func (o *UpgradeOptions) Complete() error {
 func (o *UpgradeOptions) Validate(cmd *cobra.Command, args []string) error {
 	if len(args) < 1 {
 		return utils.UsageErrorf(cmd, "You must specify the component of kubeclipper to upgrade, support [ agent | server | etcd | console ] now")
+	}
+	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)
 	}
 	o.component = args[0]
 
@@ -203,7 +205,7 @@ func (o *UpgradeOptions) checkVersion() error {
 	platforms := strings.Split(versionInfo.Platform, "/")
 	o.arch = platforms[1]
 
-	//TODO: check for version compatibility issues
+	// TODO: check for version compatibility issues
 	if ok := m.MatchString(o.version); ok {
 		v := strings.Split(versionInfo.GitVersion[1:], "-")
 		current, _ := strconv.Atoi(strings.Join(strings.Split(v[0], "."), ""))
