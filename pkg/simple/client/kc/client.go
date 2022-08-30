@@ -33,7 +33,7 @@ const (
 type Client struct {
 	client      *http.Client
 	host        string
-	BearerToken string
+	bearerToken string
 	basePath    string
 	scheme      string
 }
@@ -69,6 +69,10 @@ func (cli *Client) HTTPClient() *http.Client {
 
 func (cli *Client) Host() string {
 	return cli.host
+}
+
+func (cli *Client) Token() string {
+	return cli.bearerToken
 }
 
 func (cli *Client) Scheme() string {

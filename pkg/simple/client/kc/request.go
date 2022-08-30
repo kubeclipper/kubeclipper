@@ -196,8 +196,8 @@ func (cli *Client) buildRequest(method, path string, body io.Reader, h headers) 
 	if expectedPayload && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "text/plain")
 	}
-	if cli.BearerToken != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cli.BearerToken))
+	if cli.bearerToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", cli.bearerToken))
 	}
 	return req, nil
 }

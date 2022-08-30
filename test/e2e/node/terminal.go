@@ -53,7 +53,7 @@ var _ = SIGDescribe("[Fast] [Serial] Node terminal connect", func() {
 
 	ginkgo.It("connect the node and ensure node is connected", func() {
 		ginkgo.By("connect node")
-		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.Client.Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, f.Client.BearerToken, msg)
+		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.Client.Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, f.Client.Token(), msg)
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		framework.ExpectNoError(err)
 

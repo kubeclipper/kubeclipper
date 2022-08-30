@@ -85,7 +85,7 @@ func WithScheme(scheme string) Opt {
 
 func WithBearerAuth(token string) Opt {
 	return func(c *Client) error {
-		c.BearerToken = token
+		c.bearerToken = token
 		return nil
 	}
 }
