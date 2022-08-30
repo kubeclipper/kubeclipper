@@ -20,7 +20,6 @@ var _ = SIGDescribe("[Fast] [Serial] Node terminal connect", func() {
 	f := framework.NewDefaultFramework("node")
 	msg := ""
 	nodeID := ""
-	token := ""
 	credential := &v1.SSHCredential{}
 
 	ginkgo.BeforeEach(func() {
@@ -33,15 +32,6 @@ var _ = SIGDescribe("[Fast] [Serial] Node terminal connect", func() {
 
 		ginkgo.By("Get public key")
 		pub, err := f.Client.GetPublicKey(context.TODO())
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Get token")
-		body := kc.LoginRequest{
-			Username: "admin",
-			Password: "Thinkbig1",
-		}
-
-		token, err = f.Client.Token(context.TODO(), body)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Get msg")
@@ -63,7 +53,7 @@ var _ = SIGDescribe("[Fast] [Serial] Node terminal connect", func() {
 
 	ginkgo.It("connect the node and ensure node is connected", func() {
 		ginkgo.By("connect node")
-		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.Client.Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, token, msg)
+		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.Client.Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, f.Client.BearerToken, msg)
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		framework.ExpectNoError(err)
 
