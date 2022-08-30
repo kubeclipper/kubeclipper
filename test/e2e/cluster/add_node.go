@@ -34,9 +34,7 @@ var _ = SIGDescribe("[Slow] [Serial] Add a node to the cluster", func() {
 		clus, err := createClusterBeforeEach(f, "cluster-aio", initAIOCluster)
 		framework.ExpectNoError(err)
 		clu = clus.Items[0].DeepCopy()
-	})
 
-	ginkgo.BeforeEach(func() {
 		ginkgo.By("Check that there are enough available nodes")
 		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
