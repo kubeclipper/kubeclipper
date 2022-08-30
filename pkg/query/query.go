@@ -54,8 +54,6 @@ const (
 	ParamOffline                  = "offline"
 	ParameterSubDomain            = "subdomain"
 	ParameterFuzzySearch          = "fuzzy"
-	ParameterToken                = "token"
-	ParameterMsg                  = "msg"
 )
 
 const (
@@ -86,9 +84,6 @@ type Query struct {
 	AllowWatchBookmarks  bool
 	ResourceVersionMatch string
 	FuzzySearch          map[string]string
-	Name                 string
-	Token                string
-	Message              string
 }
 
 var NoPagination = func() *Pagination {

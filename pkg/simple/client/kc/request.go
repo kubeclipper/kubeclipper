@@ -59,15 +59,7 @@ func (q *Queries) ToRawQuery() url.Values {
 	if q.FieldSelector != "" {
 		queryParameters.Set(query.ParameterFieldSelector, q.FieldSelector)
 	}
-	if q.Name != "" {
-		queryParameters.Set(query.ParameterName, fmt.Sprintf("name=%s", q.Name))
-	}
-	if q.Token != "" {
-		queryParameters.Set(query.ParameterToken, fmt.Sprintf("token=%s", q.Token))
-	}
-	if q.Message != "" {
-		queryParameters.Set(query.ParameterMsg, fmt.Sprintf("msg=%s", q.Message))
-	}
+
 	return queryParameters
 }
 
