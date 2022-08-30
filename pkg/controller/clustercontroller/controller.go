@@ -24,37 +24,28 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
-
-	"github.com/kubeclipper/kubeclipper/pkg/service"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
-
-	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-
-	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
-	"github.com/kubeclipper/kubeclipper/pkg/query"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
-
+	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
+	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/handler"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/source"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-
-	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type ClusterReconciler struct {
@@ -175,19 +166,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ClusterReconciler) updateClusterNode(ctx context.Context, c *v1.Cluster, del bool) error {
 	for _, item := range c.Workers {
-		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleWorker, del); err != nil {
+		if err := r.updateClusterNodeInfo(ctx, c, item.ID, common.NodeRoleWorker, del); err != nil {
 			return err
 		}
 	}
 	for _, item := range c.Masters {
-		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleMaster, del); err != nil {
+		if err := r.updateClusterNodeInfo(ctx, c, item.ID, common.NodeRoleWorker, del); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ClusterReconciler) updateNodeRoleLabel(ctx context.Context, clusterName, nodeName string, role common.NodeRole, del bool) error {
+func (r *ClusterReconciler) updateClusterNodeInfo(ctx context.Context, c *v1.Cluster, nodeName string, role common.NodeRole, del bool) error {
 	node, err := r.NodeLister.Get(nodeName)
 	if err != nil {
 		return err
@@ -199,11 +190,12 @@ func (r *ClusterReconciler) updateNodeRoleLabel(ctx context.Context, clusterName
 		if _, ok := node.Labels[common.LabelNodeRole]; !ok {
 			return nil
 		}
-		if v, ok := node.Labels[common.LabelClusterName]; !ok || v != clusterName {
+		if v, ok := node.Labels[common.LabelClusterName]; !ok || v != c.Name {
 			return nil
 		}
 		delete(node.Labels, common.LabelNodeRole)
 		delete(node.Labels, common.LabelClusterName)
+		node.Status.ContainerRuntimeInfo = v1.ContainerRuntime{}
 	} else {
 		// check node role label exist.
 		// if existed, return direct
@@ -212,7 +204,9 @@ func (r *ClusterReconciler) updateNodeRoleLabel(ctx context.Context, clusterName
 			return nil
 		}
 		node.Labels[common.LabelNodeRole] = string(role)
-		node.Labels[common.LabelClusterName] = clusterName
+		node.Labels[common.LabelClusterName] = c.Name
+		// TODO: get node cri info detail
+		completeNodesCri(node, c, role)
 	}
 
 	if _, err = r.NodeWriter.UpdateNode(ctx, node); err != nil {
@@ -314,4 +308,22 @@ users:
 
 func getKubeConfig(clusterName string, address string, user string, token string) string {
 	return fmt.Sprintf(kubeconfigFormat, address, clusterName, clusterName, user, user, clusterName, user, clusterName, user, token)
+}
+
+func completeNodesCri(node *v1.Node, cluster *v1.Cluster, role common.NodeRole) {
+	switch role {
+	case common.NodeRoleMaster:
+		completeNodeCri(node, cluster.Masters)
+	case common.NodeRoleWorker:
+		completeNodeCri(node, cluster.Workers)
+	}
+}
+
+func completeNodeCri(node *v1.Node, nodes v1.WorkerNodeList) {
+	for _, val := range nodes {
+		if val.ID == node.Name {
+			node.Status.ContainerRuntimeInfo = val.ContainerRuntime
+			break
+		}
+	}
 }

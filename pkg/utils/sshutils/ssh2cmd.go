@@ -10,7 +10,7 @@ func SSHToCmd(sshConfig *SSH, host string) bool {
 
 	ret := host == "" ||
 		sshConfig == nil ||
-		sshConfig != nil && sshConfig.User == "" || (sshConfig.Password == "" && sshConfig.PkFile == "")
+		sshConfig != nil && sshConfig.User == "" || (sshConfig.Password == "" && sshConfig.PkFile == "" && sshConfig.PkDataEncode == "")
 	return ret
 }
 

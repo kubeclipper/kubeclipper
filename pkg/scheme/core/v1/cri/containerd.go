@@ -82,7 +82,7 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, containerd *v1
 				Commands: []v1.Command{
 					{
 						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeStep),
+						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, CriContainerd, criVersion, component.TypeStep),
 						CustomCommand: runtimeBytes,
 					},
 				},
@@ -102,7 +102,7 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, containerd *v1
 				Commands: []v1.Command{
 					{
 						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, criContainerd, criVersion, component.TypeStep),
+						Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, CriContainerd, criVersion, component.TypeStep),
 						CustomCommand: runtimeBytes,
 					},
 				},
@@ -136,7 +136,7 @@ func (runnable *ContainerdRunnable) NewInstance() component.ObjectMeta {
 
 func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.Options) ([]byte, error) {
 	runnable.setParams()
-	instance, err := downloader.NewInstance(ctx, criContainerd, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
+	instance, err := downloader.NewInstance(ctx, CriContainerd, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 		return nil, err
 	}
 	// remove related binary configuration files
-	instance, err := downloader.NewInstance(ctx, criContainerd, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
+	instance, err := downloader.NewInstance(ctx, CriContainerd, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 		logger.Debug("remove containerd config dir successfully")
 	}
 	// remove containerd data
-	if err = os.RemoveAll(containerdDefaultDataDir); err == nil {
+	if err = os.RemoveAll(ContainerdDefaultDataDir); err == nil {
 		logger.Debug("remove containerd systemd config successfully")
 	}
 	logger.Debug("uninstall containerd successfully")

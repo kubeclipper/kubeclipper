@@ -74,7 +74,7 @@ func (runnable *DockerRunnable) InitStep(ctx context.Context, cri *v1.ContainerR
 				Commands: []v1.Command{
 					{
 						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeStep),
+						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, CriDocker, criVersion, component.TypeStep),
 						CustomCommand: runtimeBytes,
 					},
 				},
@@ -94,7 +94,7 @@ func (runnable *DockerRunnable) InitStep(ctx context.Context, cri *v1.ContainerR
 				Commands: []v1.Command{
 					{
 						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, criDocker, criVersion, component.TypeStep),
+						Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, CriDocker, criVersion, component.TypeStep),
 						CustomCommand: runtimeBytes,
 					},
 				},
@@ -128,7 +128,7 @@ func (runnable *DockerRunnable) NewInstance() component.ObjectMeta {
 
 func (runnable DockerRunnable) Install(ctx context.Context, opts component.Options) ([]byte, error) {
 	runnable.setParams()
-	instance, err := downloader.NewInstance(ctx, criDocker, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
+	instance, err := downloader.NewInstance(ctx, CriDocker, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Opt
 		return nil, err
 	}
 	// remove related binary configuration files
-	instance, err := downloader.NewInstance(ctx, criDocker, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
+	instance, err := downloader.NewInstance(ctx, CriDocker, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Opt
 	if err = os.RemoveAll(dockerDefaultCriDir); err == nil {
 		logger.Debug("remove /etc/containerd cri dir successfully")
 	}
-	if err = os.RemoveAll(strutil.StringDefaultIfEmpty(dockerDefaultDataDir, runnable.DataRootDir)); err == nil {
+	if err = os.RemoveAll(strutil.StringDefaultIfEmpty(DockerDefaultDataDir, runnable.DataRootDir)); err == nil {
 		logger.Debug("remove docker data dir successfully")
 	}
 	// remove docker config dir

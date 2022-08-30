@@ -1044,8 +1044,7 @@ func CleanCNI(c *v1.CNI, nodes []v1.StepNode) ([]v1.Step, error) {
 	case "calico":
 		return ClearCalico(c.Calico, nodes), nil
 	}
-
-	return nil, fmt.Errorf("no support cni type: %s", c.Type)
+	return nil, nil
 }
 
 func ClearCalico(calico *v1.Calico, nodes []v1.StepNode) []v1.Step {

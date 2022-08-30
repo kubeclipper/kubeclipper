@@ -745,6 +745,74 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/clusters/fed": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Federal clusters.",
+        "operationId": "FedCluster",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/clusters/fed/{name}": {
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "unbind clusters.",
+        "operationId": "UnbindCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/clusters/{cluster}/backups/{backup}": {
       "put": {
         "produces": [
@@ -2826,6 +2894,40 @@
             "schema": {
               "$ref": "#/definitions/errors.HTTPError"
             }
+          }
+        }
+      },
+      "head": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "check templates exists.",
+        "operationId": "CheckTemplateExists",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error"
           }
         }
       }
@@ -5386,6 +5488,19 @@
       }
     },
     "v1.KubeProxy": {},
+    "v1.KubeadmSpec": {
+      "required": [
+        "kubeConfig"
+      ],
+      "properties": {
+        "apiServer": {
+          "type": "string"
+        },
+        "kubeConfig": {
+          "type": "string"
+        }
+      }
+    },
     "v1.Kubelet": {
       "required": [
         "rootDir"
@@ -5954,11 +6069,25 @@
     },
     "v1.ProviderSpec": {
       "required": [
-        "name"
+        "name",
+        "fedType",
+        "sshConfig"
       ],
       "properties": {
+        "fedType": {
+          "type": "string"
+        },
+        "kubeadm": {
+          "$ref": "#/definitions/v1.KubeadmSpec"
+        },
         "name": {
           "type": "string"
+        },
+        "nodeRegion": {
+          "type": "string"
+        },
+        "sshConfig": {
+          "$ref": "#/definitions/v1.SSH"
         }
       }
     },
@@ -6050,6 +6179,26 @@
         },
         "ssl": {
           "type": "boolean"
+        }
+      }
+    },
+    "v1.SSH": {
+      "required": [
+        "user"
+      ],
+      "properties": {
+        "connectionTimeout": {
+          "type": "integer",
+          "format": "integer"
+        },
+        "password": {
+          "type": "string"
+        },
+        "pkDataEncode": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
         }
       }
     },
@@ -6370,6 +6519,9 @@
       "properties": {
         "id": {
           "type": "string"
+        },
+        "insecureRegistry": {
+          "$ref": "#/definitions/v1.ContainerRuntime"
         },
         "labels": {
           "type": "object",

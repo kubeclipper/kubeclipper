@@ -20,6 +20,7 @@ package sshutils
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,9 +35,10 @@ import (
 
 type SSH struct {
 	User              string         `json:"user" yaml:"user,omitempty"`
-	Password          string         `json:"password" yaml:"password,omitempty"`
-	PkFile            string         `json:"pkFile" yaml:"pkFile,omitempty"`
-	PkPassword        string         `json:"pkPassword" yaml:"pkPassword,omitempty"`
+	Password          string         `json:"password,omitempty" yaml:"password,omitempty"`
+	PkFile            string         `json:"pkFile,omitempty" yaml:"pkFile,omitempty"`
+	PkPassword        string         `json:"pkPassword,omitempty" yaml:"pkPassword,omitempty"`
+	PkDataEncode      string         `json:"pkDataEncode,omitempty" yaml:"pkDataEncode,omitempty"`
 	ConnectionTimeout *time.Duration `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 }
 
@@ -69,7 +71,7 @@ func (ss *SSH) NewClient(host string) (*ssh.Client, error) {
 }
 
 func (ss *SSH) connect(host string) (*ssh.Client, error) {
-	auth := ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword)
+	auth := ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword, ss.PkDataEncode)
 	config := ssh.Config{
 		Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com",
 			"arcfour256", "arcfour128", "aes128-cbc", "3des-cbc", "aes192-cbc", "aes256-cbc"},
@@ -97,9 +99,20 @@ func (ss *SSH) addrReformat(host string) string {
 	return host
 }
 
-func (ss *SSH) sshAuthMethod(passwd, pkFile, pkPasswd string) (auth []ssh.AuthMethod) {
+func (ss *SSH) sshAuthMethod(passwd, pkFile, pkPasswd string, pkDataEncode string) (auth []ssh.AuthMethod) {
+	if pkDataEncode != "" {
+		pkData, err := base64.StdEncoding.DecodeString(pkDataEncode)
+		if err == nil {
+			am, err := ss.sshPrivateKey(pkData)
+			if err == nil {
+				auth = append(auth, am)
+			}
+		} else {
+			logger.Errorf("pk data base64 decode failed: %v", err)
+		}
+	}
 	if fileExist(pkFile) {
-		am, err := ss.sshPrivateKeyMethod(pkFile, pkPasswd)
+		am, err := ss.sshPrivateKeyFile(pkFile, pkPasswd)
 		if err == nil {
 			auth = append(auth, am)
 		}
@@ -111,7 +124,16 @@ func (ss *SSH) sshAuthMethod(passwd, pkFile, pkPasswd string) (auth []ssh.AuthMe
 	return auth
 }
 
-func (ss *SSH) sshPrivateKeyMethod(pkFile, pkPassword string) (am ssh.AuthMethod, err error) {
+func (ss *SSH) sshPrivateKey(pkData []byte) (am ssh.AuthMethod, err error) {
+	pk, err := ssh.ParsePrivateKey(pkData)
+	if err != nil {
+		return nil, err
+	}
+
+	return ssh.PublicKeys(pk), nil
+}
+
+func (ss *SSH) sshPrivateKeyFile(pkFile, pkPassword string) (am ssh.AuthMethod, err error) {
 	pkData := ss.readFile(pkFile)
 	var pk ssh.Signer
 	if pkPassword == "" {

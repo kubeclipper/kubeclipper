@@ -292,9 +292,10 @@ type Taint struct {
 
 // WorkerNode define
 type WorkerNode struct {
-	ID     string            `json:"id"`
-	Labels map[string]string `json:"labels,omitempty"`
-	Taints []Taint           `json:"taints,omitempty"`
+	ID               string            `json:"id"`
+	Labels           map[string]string `json:"labels,omitempty"`
+	Taints           []Taint           `json:"taints,omitempty"`
+	ContainerRuntime ContainerRuntime  `json:"insecureRegistry,omitempty"`
 }
 
 type WorkerNodeList []WorkerNode

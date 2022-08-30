@@ -268,7 +268,7 @@ func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
 		err          error
 	)
 	// get auth method
-	auth = ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword)
+	auth = ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword, ss.PkDataEncode)
 
 	clientConfig = &ssh.ClientConfig{
 		User:    ss.User,

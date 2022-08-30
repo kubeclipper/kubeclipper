@@ -21,36 +21,24 @@ package app
 import (
 	"io"
 
-	"github.com/kubeclipper/kubeclipper/pkg/cli/upgrade"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/completion"
-	"github.com/kubeclipper/kubeclipper/pkg/cli/proxy"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
-	"github.com/kubeclipper/kubeclipper/pkg/cli/resource"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/registry"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/drain"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/join"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/create"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/clean"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/delete"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/get"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/login"
-
-	"github.com/spf13/cobra"
-
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/clean"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/completion"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/create"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/delete"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/drain"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/fed"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/get"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/join"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/login"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/proxy"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/registry"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/resource"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/upgrade"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/version"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -94,6 +82,7 @@ func NewKubeClipperCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(completion.NewCmdCompletion(ioStreams.Out))
 	cmds.AddCommand(proxy.NewCmdProxy(ioStreams))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(ioStreams))
+	cmds.AddCommand(fed.NewCmdFederal(ioStreams))
 
 	return cmds
 }

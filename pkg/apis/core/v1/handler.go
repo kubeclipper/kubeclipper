@@ -30,56 +30,41 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robfig/cron/v3"
-
-	r "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/tools/remotecommand"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
-
-	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller"
-	"github.com/kubeclipper/kubeclipper/pkg/oplog"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
-
-	"github.com/gorilla/websocket"
-	"k8s.io/apimachinery/pkg/util/json"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
-
-	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
-
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
-
-	"github.com/google/uuid"
-
-	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/emicklei/go-restful"
-	"go.uber.org/zap"
-
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/controller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
+	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
+	serverconfig "github.com/kubeclipper/kubeclipper/pkg/server/config"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
+	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
+	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/json"
+	r "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type handler struct {
@@ -88,6 +73,7 @@ type handler struct {
 	opOperator       operation.Operator
 	platformOperator platform.Operator
 	delivery         service.IDelivery
+	config           *serverconfig.Config
 }
 
 const (
@@ -103,13 +89,14 @@ var (
 )
 
 func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, delivery service.IDelivery) *handler {
+	platform platform.Operator, delivery service.IDelivery, config *serverconfig.Config) *handler {
 	return &handler{
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
 		opOperator:       op,
 		platformOperator: platform,
 		leaseOperator:    leaseOperator,
+		config:           config,
 	}
 }
 
@@ -2952,4 +2939,122 @@ func (h *handler) ListBackupsWithCronBackup(req *restful.Request, resp *restful.
 	}
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+}
+
+func (h *handler) FedCluster(request *restful.Request, response *restful.Response) {
+	c := &v1.Cluster{}
+	if err := request.ReadEntity(c); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	ctx := context.TODO()
+
+	cluInfo, err := h.clusterOperator.GetClusterEx(ctx, c.Name, "0")
+	if err != nil && !apimachineryErrors.IsNotFound(err) {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if cluInfo != nil {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s already exists", c.Name))
+		return
+	}
+
+	// connecting to a target cluster api-server
+	// get target cluster info
+	// cluster nodes check ip and ssh
+	// kc-server create cluster info
+	// kc-agent config.yaml and kc-agent binary install
+	// start kc-agent and update deploy-config.yaml
+	// kc-server tell the kc-agent the cri type of the node
+	// kc-agent report cri information
+	// kc-server update cluster info
+
+	provider, err := clustermanage.GetClusterProvider(c.Provider.Name)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	cm := provider.CreateClusterManage(c.Provider)
+
+	var ips []string
+	var ipMap map[string]string
+	c, ipMap, err = cm.ClusterInfo(c.Name, c.Provider)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	for ip := range ipMap {
+		ips = append(ips, ip)
+	}
+
+	err = h.clusterNodeCheck(c, ipMap, ips)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if !dryRun {
+		c.Status.Phase = v1.ClusterRunning
+		_, err := h.clusterOperator.CreateCluster(ctx, c)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		go func() {
+			err = h.agentNodeFiles(c, ips, ipMap)
+			if err != nil {
+				logger.Errorf("send agent failed: %v", err)
+				return
+			}
+			err = h.enableAgent(c, ips)
+			if err != nil {
+				logger.Errorf("enable agent failed: %v", err)
+				return
+			}
+			h.clusterServiceAccount(c, v1.ActionInstall)
+		}()
+	}
+
+	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
+}
+
+func (h *handler) UnbindCluster(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter("name")
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	c, err := h.clusterOperator.GetClusterEx(request.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if !dryRun {
+		go func() {
+			h.clusterServiceAccount(c, v1.ActionUninstall)
+			_ = h.cleanAgentNodeFiles(c)
+		}()
+
+		err = h.clusterOperator.DeleteCluster(context.TODO(), c.Name)
+		if err != nil && !apimachineryErrors.IsNotFound(err) {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
+		nodes := append(c.Masters, c.Workers...)
+		for _, no := range nodes {
+			err := h.clusterOperator.DeleteNode(context.TODO(), no.ID)
+			if err != nil && !apimachineryErrors.IsNotFound(err) {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+		}
+	}
+
+	response.WriteHeader(http.StatusOK)
 }

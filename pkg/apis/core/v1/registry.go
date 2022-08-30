@@ -21,6 +21,7 @@ package v1
 import (
 	"net/http"
 
+	serverconfig "github.com/kubeclipper/kubeclipper/pkg/server/config"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/kubeclipper/kubeclipper/pkg/server/runtime"
@@ -116,7 +117,6 @@ func SetupWebService(h *handler) *restful.WebService {
 	webservice.Route(webservice.DELETE("/clusters/{name}").
 		To(h.DeleteCluster).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Delete clusters.").
 		Param(webservice.PathParameter("name", "cluster name")).
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete clusters").
@@ -135,6 +135,24 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
+	webservice.Route(webservice.POST("/clusters/fed").
+		To(h.FedCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Federal clusters.").
+		Reads(corev1.Cluster{}).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}))
+
+	webservice.Route(webservice.DELETE("/clusters/fed/{name}").
+		To(h.UnbindCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("unbind clusters.").
+		Param(webservice.PathParameter("name", "cluster name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
 
 	webservice.Route(webservice.POST("/clusters/{name}/certification").
 		To(h.UpdateClusterCertification).
@@ -915,8 +933,8 @@ func SetupWebService(h *handler) *restful.WebService {
 }
 
 func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator,
-	leaseOperator lease.Operator, delivery service.IDelivery) error {
-	h := newHandler(clusterOperator, op, leaseOperator, platform, delivery)
+	leaseOperator lease.Operator, delivery service.IDelivery, config *serverconfig.Config) error {
+	h := newHandler(clusterOperator, op, leaseOperator, platform, delivery, config)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

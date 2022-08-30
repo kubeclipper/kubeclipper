@@ -19,12 +19,17 @@
 package nodestatus
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/pelletier/go-toml"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
@@ -240,4 +245,80 @@ func toNodeAddress(n []sysutil.Net) []v1.NodeAddress {
 		}
 	}
 	return addrs
+}
+
+func ContainerRuntimeInfo() Setter {
+	return func(node *v1.Node) error {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Warnf("get remote container runtime status failed: %v", r)
+			}
+		}()
+		endpoints := ContainerRuntimeEndpoint(node.Status.ContainerRuntimeInfo.Type)
+		if endpoints == nil {
+			return nil
+		}
+
+		for _, endpoint := range endpoints {
+			conn, err := NewRemoteRuntimeService(context.TODO(), endpoint)
+			if err != nil {
+				logger.Warnf("connect remote container runtime failed: %v", err)
+				continue
+			}
+			status, err := Info(conn)
+			if err != nil {
+				logger.Warnf("get remote container runtime status failed: %v", err)
+				continue
+			}
+			if _, ok := status.GetInfo()["containerdRootDir"]; ok {
+				node.Status.ContainerRuntimeInfo.DataRootDir = status.GetInfo()["containerdRootDir"]
+			}
+			confMap := make(map[string]interface{})
+			if _, ok := status.GetInfo()["config"]; !ok {
+				logger.Debug("remote container runtime status config does not exist")
+				break
+			}
+			err = json.Unmarshal([]byte(status.GetInfo()["config"]), &confMap)
+			if err != nil {
+				logger.Warnf("unmarshal remote container runtime status config failed: %v", err)
+				break
+			}
+			if _, ok := confMap["registry"]; !ok {
+				logger.Warnf("unmarshal remote container runtime status config registry does not exist")
+				break
+			}
+			registryMap := confMap["registry"].(map[string]interface{})
+
+			if registryMap["configPath"].(string) != "" {
+				configPath := registryMap["configPath"].(string)
+				fs, err := ioutil.ReadDir(configPath)
+				if err != nil {
+					logger.Warnf("read remote container runtime configPath failed: %v", err)
+					continue
+				}
+				for _, f := range fs {
+					if !f.IsDir() {
+						continue
+					}
+					tr, err := toml.LoadFile(filepath.Join(configPath, f.Name(), "hosts.toml"))
+					if err != nil {
+						logger.Warnf("read remote container runtime hosts.toml failed: %v", err)
+						continue
+					}
+					node.Status.ContainerRuntimeInfo.InsecureRegistry = tr.GetPath([]string{"host"}).(*toml.Tree).Keys()
+				}
+			}
+
+			if _, ok := registryMap["mirrors"]; ok {
+				mirrorsMap := registryMap["mirrors"].(map[string]interface{})
+				for _, v := range mirrorsMap {
+					e := v.(map[string]interface{})
+					if v, ok := e["endpoint"]; ok {
+						node.Status.ContainerRuntimeInfo.InsecureRegistry = append(node.Status.ContainerRuntimeInfo.InsecureRegistry, v.(string))
+					}
+				}
+			}
+		}
+		return nil
+	}
 }

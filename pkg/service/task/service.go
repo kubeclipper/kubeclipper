@@ -208,6 +208,7 @@ func (s *Service) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.Metadata(),
 		nodestatus.NodeAddress(s.IPDetect),
 		nodestatus.MachineInfo(),
+		nodestatus.ContainerRuntimeInfo(),
 		nodestatus.ReadyCondition(s.clock.Now, TODO, TODO, TODO))
 
 	return setters

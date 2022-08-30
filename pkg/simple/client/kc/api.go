@@ -32,17 +32,23 @@ import (
 )
 
 const (
-	ListNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
-	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
-	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
-	backupPath        = "/api/core.kubeclipper.io/v1/backups"
-	backupPonitPath   = "/api/core.kubeclipper.io/v1/backuppoints"
-	usersPath         = "/api/iam.kubeclipper.io/v1/users"
-	rolesPath         = "/api/iam.kubeclipper.io/v1/roles"
-	platformPath      = "/api/config.kubeclipper.io/v1/template"
-	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
-	versionPath       = "/version"
-	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
+	versionPath = "/version"
+	coregrv     = "/api/core.kubeclipper.io/v1"
+	iamgrv      = "/api/iam.kubeclipper.io/v1"
+	configgrv   = "/api/config.kubeclipper.io/v1"
+
+	clustersPath      = coregrv + "/clusters"
+	ListNodesPath     = coregrv + "/nodes"
+	publicKeyPath     = configgrv + "/terminal.key"
+	fedClusterPath    = clustersPath + "/fed"
+	unbindClusterPath = clustersPath + "/fed/%s"
+	componentPath     = clustersPath + "/%s/plugins"
+	backupPath        = coregrv + "/backups"
+	backupPonitPath   = coregrv + "/backuppoints"
+	usersPath         = iamgrv + "/users"
+	rolesPath         = iamgrv + "/roles"
+	platformPath      = configgrv + "/template"
+	componentMetaPath = configgrv + "/componentmeta"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -136,6 +142,23 @@ func (cli *Client) DescribeCluster(ctx context.Context, name string) (*ClustersL
 		Items: []v1.Cluster{cluster},
 	}
 	return &clusters, err
+}
+
+func (cli *Client) FedCluster(ctx context.Context, cluster *v1.Cluster) (*v1.Cluster, error) {
+	serverResp, err := cli.post(ctx, fedClusterPath, nil, cluster, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.Cluster{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	return &v, err
+}
+
+func (cli *Client) UnbindCluster(ctx context.Context, name string) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf(unbindClusterPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
 }
 
 func (cli *Client) ListRoles(ctx context.Context, query Queries) (*RoleList, error) {

@@ -52,6 +52,7 @@ type ClientOptions struct {
 	// MaxPingsOut is the maximum number of pending ping commands that can
 	// be awaiting a response before raising an ErrStaleConnection error.
 	MaxPingsOut int    `yaml:"maxPingsOut" json:"maxPingsOut"`
+	TLS         bool   `yaml:"tls" json:"tls"`
 	TLSCaPath   string `yaml:"tlsCaPath" json:"tlsCaPath"`
 	TLSCertPath string `yaml:"tlsCertPath" json:"tlsCertPath"`
 	TLSKeyPath  string `yaml:"tlsKeyPath" json:"tlsKeyPath"`
