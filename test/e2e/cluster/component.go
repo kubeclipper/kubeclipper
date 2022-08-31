@@ -33,7 +33,7 @@ var _ = SIGDescribe("[Slow] [Serial] Install component", func() {
 	})
 
 	ginkgo.BeforeEach(func() {
-		clus, err := createClusterBeforeEach(f, initAIOCluster)
+		clus, err := createClusterBeforeEach(f, "cluster-aio", initAIOCluster)
 		framework.ExpectNoError(err)
 		clu = clus.Items[0].DeepCopy()
 	})
@@ -75,7 +75,7 @@ var _ = SIGDescribe("[Slow] [Serial] Uninstall component", func() {
 	})
 
 	ginkgo.BeforeEach(func() {
-		clus, err := createClusterBeforeEach(f, initClusterWithPlugin)
+		clus, err := createClusterBeforeEach(f, "cluster-aio", initClusterWithPlugin)
 		framework.ExpectNoError(err)
 		if len(clus.Items) == 0 {
 			framework.Failf("unexpected problem, cluster not be nil at this time")
@@ -110,7 +110,7 @@ func initNFSComponent() *nfsprovisioner.NFSProvisioner {
 	}
 }
 
-func initClusterWithPlugin(clusterName, nodeID string) *corev1.Cluster {
+func initClusterWithPlugin(clusterName string, nodeID []string) *corev1.Cluster {
 	nfs := initNFSComponent()
 	nBytes, _ := json.Marshal(nfs)
 	return &corev1.Cluster{
@@ -129,7 +129,7 @@ func initClusterWithPlugin(clusterName, nodeID string) *corev1.Cluster {
 		},
 		Masters: corev1.WorkerNodeList{
 			{
-				ID: nodeID,
+				ID: nodeID[0],
 			},
 		},
 		Workers:           nil,

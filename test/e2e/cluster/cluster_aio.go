@@ -36,8 +36,8 @@ import (
 var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 	f := framework.NewDefaultFramework("aio")
 
+	var nodeID []string
 	clusterName := "e2e-aio"
-	nodeID := ""
 
 	f.AddAfterEach("cleanup aio", func(f *framework.Framework, failed bool) {
 		ginkgo.By("delete aio cluster")
@@ -59,7 +59,9 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 		if len(nodes.Items) == 0 {
 			framework.Failf("Not enough nodes to test")
 		}
-		nodeID = nodes.Items[0].Name
+		for _, node := range nodes.Items {
+			nodeID = append(nodeID, node.Name)
+		}
 	})
 
 	ginkgo.It("should create a AIO minimal kubernetes cluster and ensure cluster is running.", func() {
@@ -82,7 +84,7 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 	})
 })
 
-func initAIOCluster(clusterName, nodeID string) *corev1.Cluster {
+func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 	// TODO: make version be parameter
 	return &corev1.Cluster{
 		Provider: corev1.ProviderSpec{
@@ -100,7 +102,7 @@ func initAIOCluster(clusterName, nodeID string) *corev1.Cluster {
 		},
 		Masters: corev1.WorkerNodeList{
 			{
-				ID: nodeID,
+				ID: nodeID[0],
 			},
 		},
 		Workers:           nil,
@@ -137,9 +139,10 @@ func initAIOCluster(clusterName, nodeID string) *corev1.Cluster {
 	}
 }
 
-type initfunc func(clusterName, nodeID string) *corev1.Cluster
+type initfunc func(clusterName string, nodeID []string) *corev1.Cluster
 
-func createClusterBeforeEach(f *framework.Framework, initial initfunc) (*kc.ClustersList, error) {
+func createClusterBeforeEach(f *framework.Framework, clusterName string, initial initfunc) (*kc.ClustersList, error) {
+	var nodeID []string
 	ginkgo.By("Check that there are enough available nodes")
 	nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
 		Pagination:    query.NoPagination(),
@@ -150,9 +153,12 @@ func createClusterBeforeEach(f *framework.Framework, initial initfunc) (*kc.Clus
 		framework.Failf("Not enough nodes to test")
 		return nil, err
 	}
+	for _, node := range nodes.Items {
+		nodeID = append(nodeID, node.Name)
+	}
 
 	ginkgo.By("create aio cluster")
-	clus, err := f.Client.CreateCluster(context.TODO(), initial("cluster-aio", nodes.Items[0].Name))
+	clus, err := f.Client.CreateCluster(context.TODO(), initial(clusterName, nodeID))
 	framework.ExpectNoError(err)
 	if len(clus.Items) == 0 {
 		framework.Failf("unexpected problem, cluster not be nil at this time")

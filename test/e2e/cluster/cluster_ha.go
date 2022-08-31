@@ -58,7 +58,7 @@ var _ = SIGDescribe("[Slow] [Serial] HA", func() {
 
 	ginkgo.It("should create a HA minimal kubernetes cluster and ensure cluster is running.", func() {
 		time.Sleep(5 * time.Second)
-		ginkgo.By("create aio cluster")
+		ginkgo.By("create ha cluster")
 		clus, err := f.Client.CreateCluster(context.TODO(), initHACluster(clusterName, nodeList))
 		framework.ExpectNoError(err)
 		if len(clus.Items) == 0 {

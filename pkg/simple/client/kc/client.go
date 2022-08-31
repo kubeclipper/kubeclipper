@@ -71,6 +71,10 @@ func (cli *Client) Host() string {
 	return cli.host
 }
 
+func (cli *Client) Token() string {
+	return cli.bearerToken
+}
+
 func (cli *Client) Scheme() string {
 	return cli.scheme
 }

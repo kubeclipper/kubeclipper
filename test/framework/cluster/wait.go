@@ -240,6 +240,17 @@ func WaitForRecovery(c *kc.Client, clusterName string, timeout time.Duration) er
 	})
 }
 
+func WaitForUpgrade(c *kc.Client, clusterName string, timeout time.Duration) error {
+	return WaitForClusterCondition(c, clusterName, "upgrade successful", timeout, func(clu *corev1.Cluster) (bool, error) {
+		if clu.Status.Phase == corev1.ClusterRunning {
+			return true, nil
+		} else if clu.Status.Phase == corev1.ClusterUpdateFailed {
+			return false, fmt.Errorf("upgrade cluster %s failed", clusterName)
+		}
+		return false, nil
+	})
+}
+
 // maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
 // taskFormat and taskArgs should be the task being performed when the error occurred,
 // e.g. "waiting for pod to be running".

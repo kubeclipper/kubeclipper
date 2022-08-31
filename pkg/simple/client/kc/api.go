@@ -25,14 +25,14 @@ import (
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
-	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-
+	apiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
 
 const (
-	listNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
+	ListNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
 	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
 	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
 	backupPath        = "/api/core.kubeclipper.io/v1/backups"
@@ -40,12 +40,13 @@ const (
 	usersPath         = "/api/iam.kubeclipper.io/v1/users"
 	rolesPath         = "/api/iam.kubeclipper.io/v1/roles"
 	platformPath      = "/api/config.kubeclipper.io/v1/template"
+	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
 	versionPath       = "/version"
 	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
-	serverResp, err := cli.get(ctx, listNodesPath, query.ToRawQuery(), nil)
+	serverResp, err := cli.get(ctx, ListNodesPath, query.ToRawQuery(), nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, er
 }
 
 func (cli *Client) DescribeNode(ctx context.Context, name string) (*NodesList, error) {
-	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", listNodesPath, name), nil, nil)
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", ListNodesPath, name), nil, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,19 @@ func (cli *Client) DescribeNode(ctx context.Context, name string) (*NodesList, e
 }
 
 func (cli *Client) DeleteNode(ctx context.Context, name string) error {
-	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", listNodesPath, name), nil, nil)
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", ListNodesPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
+}
+
+func (cli *Client) EnableNode(ctx context.Context, name string) error {
+	serverResp, err := cli.patch(ctx, fmt.Sprintf("%s/%s/%s", ListNodesPath, name, "enable"), nil, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
+}
+
+func (cli *Client) DisableNode(ctx context.Context, name string) error {
+	serverResp, err := cli.patch(ctx, fmt.Sprintf("%s/%s/%s", ListNodesPath, name, "disable"), nil, nil, nil)
 	defer ensureReaderClosed(serverResp)
 	return err
 }
@@ -189,6 +202,20 @@ func (cli *Client) CreateUser(ctx context.Context, user *iamv1.User) (*UsersList
 	return &users, err
 }
 
+func (cli *Client) AddOrRemoveNode(ctx context.Context, patchNode *corev1.PatchNodes, clusterName string) (*ClustersList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, clusterName, "nodes"), nil, patchNode, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.Cluster{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	clusters := ClustersList{
+		Items: []v1.Cluster{v},
+	}
+	return &clusters, err
+}
+
 func (cli *Client) CreateRole(ctx context.Context, role *iamv1.GlobalRole) (*RoleList, error) {
 	serverResp, err := cli.post(ctx, rolesPath, nil, role, nil)
 	defer ensureReaderClosed(serverResp)
@@ -237,6 +264,17 @@ func (cli *Client) GetPlatformSetting(ctx context.Context) (*v1.DockerRegistry, 
 		return nil, err
 	}
 	v := v1.DockerRegistry{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	return &v, err
+}
+
+func (cli *Client) GetPublicKey(ctx context.Context) (*v1.WebTerminal, error) {
+	serverResp, err := cli.get(ctx, publicKeyPath, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.WebTerminal{}
 	err = json.NewDecoder(serverResp.body).Decode(&v)
 	return &v, err
 }
@@ -341,4 +379,10 @@ func (cli *Client) CreateRecovery(ctx context.Context, cluName string, recovery 
 	r := &v1.Recovery{}
 	err = json.NewDecoder(resp.body).Decode(r)
 	return r, err
+}
+
+func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCluster *apiv1.ClusterUpgrade) error {
+	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, cluName, "upgrade"), nil, upgradeCluster, nil)
+	defer ensureReaderClosed(resp)
+	return err
 }
