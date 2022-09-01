@@ -117,6 +117,9 @@ func (d *ProxyOptions) Complete() error {
 }
 
 func (d *ProxyOptions) ValidateArgs() error {
+	if d.deployConfig.SSHConfig.PkFile == "" && d.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", d.deployConfig.Config)
+	}
 	if d.proxy == "" {
 		return fmt.Errorf("--proxy must be specified")
 	}
