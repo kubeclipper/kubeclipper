@@ -84,7 +84,7 @@ func NewCmdDrain(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "drain (--agent <agentIps>) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 "drain kubeclipper server or agent",
+		Short:                 "Drain kubeclipper agent node",
 		Long:                  longDescription,
 		Example:               drainExample,
 		Run: func(cmd *cobra.Command, args []string) {

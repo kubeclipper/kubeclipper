@@ -100,7 +100,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "join [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 "join kubeclipper agent and server node",
+		Short:                 "Join kubeclipper agent node",
 		Long:                  longDescription,
 		Example:               joinExample,
 		Args:                  cobra.NoArgs,

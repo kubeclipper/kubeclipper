@@ -34,8 +34,14 @@ const (
   Using the create command to create cluster, user, or role resources.
   Or you can choose to create those directly from a file.`
 	createExample = `
-  # Using config file to create resource
-  kcctl create -f 'FILE-PATH'`
+  # Create cluster offline. The default value of offline is true, so it can be omitted.
+  kcctl create cluster --name demo --master 192.168.10.123
+
+  # Create role has permission to view cluster
+  kcctl create role --name cluster_viewer --rules=role-template-view-clusters
+
+  # Create user with required parameters
+  kcctl create user --name simple-user --role=platform-view --password 123456 --phone 10086 --email simple@example.com`
 )
 
 type BaseOptions struct {
@@ -65,13 +71,11 @@ func NewCmdCreate(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "create (--filename | -f <FILE-NAME>)",
 		DisableFlagsInUseLine: true,
-		Short:                 "create kubeclipper resource",
+		Short:                 "Create kubeclipper resource",
 		Long:                  longDescription,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete(o.CliOpts))
-			// utils.CheckErr(o.ValidateArgs(cmd, args))
-			// utils.CheckErr(o.RunGet())
 		},
 	}
 	cmd.Flags().StringVarP(&o.Filename, "filename", "f", "", "use resource file to create")

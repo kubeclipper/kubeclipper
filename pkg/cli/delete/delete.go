@@ -74,7 +74,7 @@ func NewCmdDelete(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "delete (<cluster> | <user> | <role>) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 "delete kubeclipper resource",
+		Short:                 "Delete kubeclipper resource",
 		Long:                  longDescription,
 		Example:               deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {

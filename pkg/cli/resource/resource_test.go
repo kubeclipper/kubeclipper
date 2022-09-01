@@ -74,7 +74,6 @@ func TestResourceOptions_parsePackageName(t *testing.T) {
 			o := &ResourceOptions{
 				IOStreams:    tt.fields.IOStreams,
 				PrintFlags:   tt.fields.PrintFlags,
-				SSHConfig:    tt.fields.SSHConfig,
 				DeployConfig: tt.fields.DeployConfig,
 				deployConfig: tt.fields.deployConfig,
 				List:         tt.fields.List,

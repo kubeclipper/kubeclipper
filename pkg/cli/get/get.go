@@ -94,7 +94,7 @@ func NewCmdGet(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "get [(-o|--output=)table|json|yaml] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 "Display one or many resources",
+		Short:                 "Display one or multiple resources",
 		Long:                  longDescription,
 		Example:               getExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -170,7 +170,7 @@ func NewCmdRegistry(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "registry",
 		DisableFlagsInUseLine: true,
-		Short:                 "registry operation",
+		Short:                 "Registry operation",
 		Long:                  longDescription,
 		Example:               registryExample,
 		Args:                  cobra.NoArgs,
