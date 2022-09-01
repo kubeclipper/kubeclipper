@@ -18,11 +18,17 @@
 
 package sshutils
 
-//const _host = "172.20.151.80"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// const _host = "172.20.151.80"
 //
-////const _host = "172.20.150.220"
+// //const _host = "172.20.150.220"
 //
-//var (
+// var (
 //	_defaultTimeout = time.Duration(1) * time.Minute
 //	sshConfig       = &SSH{
 //		User:              "root",
@@ -34,17 +40,17 @@ package sshutils
 //		Password:          "root",
 //		ConnectionTimeout: &_defaultTimeout,
 //	}
-//)
+// )
 //
-//func TestSSHCmd(t *testing.T) {
+// func TestSSHCmd(t *testing.T) {
 //	result, err := SSHCmd(sshConfig, _host, "ls")
 //	if err != nil {
 //		t.Fatal(err)
 //	}
 //	t.Log(result)
-//}
+// }
 //
-//func TestCmdPatch(t *testing.T) {
+// func TestCmdPatch(t *testing.T) {
 //	walk := func(result Result, err error) error {
 //		t.Log(result)
 //		t.Log("err: ", err)
@@ -72,4 +78,36 @@ package sshutils
 //		t.Fatal(err)
 //	}
 //	t.Log("cmd run success")
-//}
+// }
+
+func TestSSHCmd(t *testing.T) {
+	defer func() {
+		Cmd("rm", "/tmp/d.txt")
+		Cmd("rm", "/tmp/dd.txt")
+	}()
+	ret, err := SSHCmd(nil, "", "bash -c \"echo 123\"")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "123", ret.StdoutToString(""))
+
+	_, err = SSHCmd(nil, "", WrapEcho("12345", "/tmp/d.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ret, err = RunCmdAsSSH("cat /tmp/d.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "12345", ret.StdoutToString(""))
+
+	_, err = SSHCmdWithSudo(nil, "", WrapEcho("54321", "/tmp/dd.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ret, err = RunCmdAsSSH("cat /tmp/dd.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "54321", ret.StdoutToString(""))
+}

@@ -149,6 +149,9 @@ func (c *DrainOptions) Complete() error {
 }
 
 func (c *DrainOptions) ValidateArgs() error {
+	if c.deployConfig.SSHConfig.PkFile == "" && c.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", c.deployConfig.Config)
+	}
 	if c.cliOpts.Config == "" {
 		return errors.New("config path cannot be empty")
 	}
