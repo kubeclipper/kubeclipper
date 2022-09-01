@@ -96,7 +96,7 @@ func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dst
 						return
 					}
 					if ok {
-						logger.Infof("[%s]copy file(%s) md5 validate success", host, location)
+						logger.V(2).Infof("[%s]copy file(%s) md5 validate success", host, location)
 					} else {
 						logger.Errorf("[%s]copy file(%s) md5 validate failed", host, location)
 					}
@@ -108,7 +108,7 @@ func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dst
 					return
 				}
 				if ok {
-					logger.Infof("[%s]copy file(%s) md5 validate success", host, location)
+					logger.V(2).Infof("[%s]copy file(%s) md5 validate success", host, location)
 				} else {
 					logger.Errorf("[%s]copy file(%s) md5 validate failed", host, location)
 				}
@@ -144,58 +144,6 @@ func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dst
 	case <-stopCh:
 		return nil
 	}
-}
-
-// location : url
-// md5
-// dst: /root
-// hook: cd /root && rm -rf kube && tar zxvf %s  && cd /root/kube/shell && sh init.sh
-
-func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dst string, before, after *string) string {
-	var md5 string
-	location, md5, _ = downloadFile(location)
-	pkg := path.Base(location)
-	fullPath := fmt.Sprintf("%s/%s", dst, pkg)
-	mkDstDir := fmt.Sprintf("mkdir -p %s || true", dst)
-	var wm sync.WaitGroup
-	for _, host := range hosts {
-		wm.Add(1)
-		go func(host string) {
-			defer wm.Done()
-			_ = sshConfig.CmdAsync(host, mkDstDir)
-			logger.V(2).Infof("[%s]please wait for mkDstDir", host)
-			if before != nil {
-				logger.V(2).Infof("[%s]please wait for before hook", host)
-				_ = sshConfig.CmdAsync(host, *before)
-			}
-			if sshConfig.IsFileExist(host, fullPath) {
-				if ok, _ := sshConfig.ValidateMd5sumLocalWithRemote(host, location, fullPath); ok {
-					logger.Infof("[%s]SendPackage:  %s file is exist and ValidateMd5 success", host, fullPath)
-				} else {
-					rm := fmt.Sprintf("rm -rf %s", fullPath)
-					_ = sshConfig.Cmd(host, rm)
-					// del then copy
-					if ok := sshConfig.CopyForMD5(host, location, fullPath, md5); ok {
-						logger.Infof("[%s]copy file md5 validate success", host)
-					} else {
-						logger.Errorf("[%s]copy file md5 validate failed", host)
-					}
-				}
-			} else {
-				if ok := sshConfig.CopyForMD5(host, location, fullPath, md5); ok {
-					logger.Infof("[%s]copy file md5 validate success", host)
-				} else {
-					logger.Errorf("[%s]copy file md5 validate failed", host)
-				}
-			}
-			if after != nil {
-				logger.V(2).Infof("[%s]please wait for after hook", host)
-				_ = sshConfig.CmdAsync(host, *after)
-			}
-		}(host)
-	}
-	wm.Wait()
-	return location
 }
 
 func downloadFile(location string) (filePATH, md5 string, err error) {

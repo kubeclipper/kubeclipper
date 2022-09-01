@@ -20,19 +20,11 @@ package utils
 
 import (
 	"os"
-	"strings"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
 func FileExist(path string) bool {
 	_, err := os.Lstat(path)
 	return !os.IsNotExist(err)
-}
-
-func GetRemoteHostName(sshConfig *sshutils.SSH, hostIP string) string {
-	hostName := sshConfig.CmdToString(hostIP, "hostname", "")
-	return strings.ToLower(hostName)
 }
 
 func WriteToFile(filePath string, data []byte) error {
@@ -46,20 +38,4 @@ func WriteToFile(filePath string, data []byte) error {
 		return err
 	}
 	return nil
-}
-
-func RemoveDuplication(arr []string) []string {
-	set := make(map[string]struct{}, len(arr))
-	j := 0
-	for _, v := range arr {
-		_, ok := set[v]
-		if ok {
-			continue
-		}
-		set[v] = struct{}{}
-		arr[j] = v
-		j++
-	}
-
-	return arr[:j]
 }

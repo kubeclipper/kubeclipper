@@ -63,15 +63,21 @@ type SSHRunCmd func(sshConfig *SSH, host, cmd string) (Result, error)
 
 // SSHCmdWithSudo  try to run cmd with sudo.
 func SSHCmdWithSudo(sshConfig *SSH, host, cmd string) (Result, error) {
-	result := Result{
-		User: sshConfig.User,
-		Host: host,
-		Cmd:  cmd,
-	}
+	var (
+		sudoCmd = cmd
+		err     error
+	)
 	// add sudo prefix if we need
-	sudoCmd, err := fillCmd(sshConfig, cmd)
-	if err != nil {
-		return result, err
+	if !SSHToCmd(sshConfig, host) {
+		result := Result{
+			User: sshConfig.User,
+			Host: host,
+			Cmd:  cmd,
+		}
+		sudoCmd, err = fillCmd(sshConfig, cmd)
+		if err != nil {
+			return result, err
+		}
 	}
 	return SSHCmd(sshConfig, host, sudoCmd)
 }
@@ -80,6 +86,11 @@ func SSHCmdWithSudo(sshConfig *SSH, host, cmd string) (Result, error) {
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
 func SSHCmd(sshConfig *SSH, host, cmd string) (Result, error) {
+	// if caller don't provide enough config for run ssh cmd，change to run cmd by os.exec on localhost.
+	// only for aio deploy now.
+	if SSHToCmd(sshConfig, host) {
+		return RunCmdAsSSH(cmd)
+	}
 	stdout, stderr, code, err := runSSHCommand(sshConfig, host, cmd)
 	result := Result{
 		User:     sshConfig.User,

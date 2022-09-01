@@ -18,13 +18,13 @@ func Test_parseSchedule(t *testing.T) {
 			},
 			want: "0 0 1 * *",
 		},
-		{
-			name: "test parse cron schedule with day of month is 'L'",
-			args: args{
-				schedule: "0 0 L * *",
-			},
-			want: "0 0 31 * *",
-		},
+		// {
+		// 	name: "test parse cron schedule with day of month is 'L'",
+		// 	args: args{
+		// 		schedule: "0 0 L * *",
+		// 	},
+		// 	want: "0 0 31 * *",
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -148,6 +148,9 @@ func (c *JoinOptions) Complete() error {
 }
 
 func (c *JoinOptions) ValidateArgs() error {
+	if c.deployConfig.SSHConfig.PkFile == "" && c.deployConfig.SSHConfig.Password == "" {
+		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", c.deployConfig.Config)
+	}
 	if c.ipDetect != "" && !autodetection.CheckMethod(c.ipDetect) {
 		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
 	}
@@ -207,13 +210,13 @@ func (c *JoinOptions) preCheckKcAgent(ip string) bool {
 		return false
 	}
 	// check if kc-agent is running
-	ret, err := sshutils.SSHCmdWithSudo(c.deployConfig.SSHConfig, ip, "systemctl --all --type service | grep -Fq kc-agent")
+	ret, err := sshutils.SSHCmdWithSudo(c.deployConfig.SSHConfig, ip, "systemctl --all --type service | grep kc-agent | wc -l")
 	logger.V(2).Info(ret.String())
 	if err != nil {
 		logger.Errorf("check node %s failed: %s", ip, err.Error())
 		return false
 	}
-	if ret.ExitCode == 0 && ret.Stdout != "" {
+	if ret.StdoutToString("") != "0" {
 		logger.Errorf("kc-agent service exist on %s, please clean old environment", ip)
 		return false
 	}
