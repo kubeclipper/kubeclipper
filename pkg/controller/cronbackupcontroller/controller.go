@@ -67,6 +67,7 @@ type CronBackupReconciler struct {
 	CronBackupLister  listerv1.CronBackupLister
 	CronBackupWriter  cluster.CronBackupWriter
 	CmdDelivery       service.CmdDelivery
+	Now               func() time.Time
 }
 
 func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -92,7 +93,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	now := metav1.NewTime(time.Now())
+	now := metav1.NewTime(r.Now())
 	if cronBackup.Spec.RunAt != nil {
 		// first created cron backup, update next schedule time
 		if cronBackup.Status.NextScheduleTime == nil {
@@ -129,7 +130,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if cronBackup.Spec.Schedule != "" {
 		// first created cron backup, update next schedule time
 		if cronBackup.Status.NextScheduleTime == nil {
-			schedule := parseSchedule(cronBackup.Spec.Schedule)
+			schedule := r.parseSchedule(cronBackup.Spec.Schedule)
 			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
 			// update the next schedule time
 			nextRunAt := metav1.NewTime(s.Next(time.Now()))
@@ -157,7 +158,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			cronBackup.Status.LastScheduleTime = &now
 			cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
 
-			schedule := parseSchedule(cronBackup.Spec.Schedule)
+			schedule := r.parseSchedule(cronBackup.Spec.Schedule)
 			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
 			// update the next schedule time
 			nextRunAt := metav1.NewTime(s.Next(now.Time))
@@ -539,21 +540,14 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	return nil
 }
 
-func parseSchedule(schedule string) string {
-	year := time.Now().Year()
+func (r *CronBackupReconciler) parseSchedule(schedule string) string {
+	currentTime := r.Now()
 	arr := strings.Split(schedule, " ")
 	if arr[2] == "L" {
-		switch time.Now().Month() {
-		case 1, 3, 5, 7, 8, 10, 12:
-			return strings.Replace(schedule, "L", "31", 1)
-		case 4, 6, 9, 11:
-			return strings.Replace(schedule, "L", "30", 1)
-		case 2:
-			if (year%4 == 0 && year%100 != 0) || year%400 == 0 {
-				return strings.Replace(schedule, "L", "28", 1)
-			}
-			return strings.Replace(schedule, "L", "29", 1)
-		}
+		first := currentTime.AddDate(0, 0, -currentTime.Day()+1)
+		next := first.AddDate(0, 1, -1)
+		lastDay := strconv.Itoa(next.Day())
+		return strings.Replace(schedule, "L", lastDay, 1)
 	}
 	return schedule
 }
