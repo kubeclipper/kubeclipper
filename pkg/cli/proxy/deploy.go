@@ -160,15 +160,31 @@ func (d *ProxyOptions) checkProxy(name string) error {
 }
 
 func (d *ProxyOptions) sendPackage() {
-	tar := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s", filepath.Join(config.DefaultPkgPath, "kc"),
-		filepath.Join(config.DefaultPkgPath, path.Base(d.pkg)), config.DefaultPkgPath)
-	cp := sshutils.WrapSh(fmt.Sprintf("cp -rf %s /usr/local/bin/", filepath.Join(config.DefaultPkgPath, "kc/bin/kubeclipper-proxy")))
-	// rm -rf /root/kc && tar -xvf /root/kc/pkg/kc.tar -C ~/kc/pkg && /bin/bash -c 'cp -rf /root/kc/pkg/kc/bin/* /usr/local/bin/'
-	hook := sshutils.Combine([]string{tar, cp})
-	err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.pkg, []string{d.proxy}, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.pkg, []string{d.proxy}, config.DefaultPkgPath, nil, nil)
 	if err != nil {
 		logger.Fatalf("sendPackage err:%s", err.Error())
 	}
+	// if has dir in tar package,add --strip-components 1 to tar cmd.
+	tar := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s", filepath.Join(config.DefaultPkgPath, "kc"),
+		filepath.Join(config.DefaultPkgPath, path.Base(d.pkg)), config.DefaultPkgPath)
+	tarWithStrip := fmt.Sprintf("%s --strip-components 1", tar)
+	script := `ok=$(tar -tf %s |grep /|wc -l); if [ $ok -eq 0 ]; then %s; else %s; fi;`
+	realScript := sshutils.WrapSh(fmt.Sprintf(script, filepath.Join(config.DefaultPkgPath, path.Base(d.pkg)), tar, tarWithStrip))
+	cp := sshutils.WrapSh(fmt.Sprintf("cp -rf %s /usr/local/bin/", filepath.Join(config.DefaultPkgPath, "kubeclipper-proxy")))
+	cmdList := []string{
+		realScript,
+		cp,
+	}
+	for _, v := range cmdList {
+		ret, err := sshutils.SSHCmdWithSudo(d.deployConfig.SSHConfig, d.proxy, v)
+		if err != nil {
+			logger.Fatalf("run %s err:%s", v, err.Error())
+		}
+		if err = ret.Error(); err != nil {
+			logger.Fatalf("run %s err:%s", v, err.Error())
+		}
+	}
+
 }
 
 func (d *ProxyOptions) deployProxy() {
