@@ -711,6 +711,19 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusBadRequest, http.StatusText(http.StatusBadRequest), errors.HTTPError{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
+	webservice.Route(webservice.HEAD("/templates").
+		To(h.CheckTemplateExists).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("check templates exists.").
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
 	webservice.Route(webservice.PUT("/templates/{name}").
 		To(h.UpdateTemplate).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
