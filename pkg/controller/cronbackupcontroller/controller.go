@@ -540,8 +540,8 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	return nil
 }
 
-func (s *CronBackupReconciler) parseSchedule(schedule string) string {
-	currentTime := s.Now()
+func (r *CronBackupReconciler) parseSchedule(schedule string) string {
+	currentTime := r.Now()
 	arr := strings.Split(schedule, " ")
 	if arr[2] == "L" {
 		first := currentTime.AddDate(0, 0, -currentTime.Day()+1)
