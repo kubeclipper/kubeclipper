@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 
@@ -428,6 +429,7 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		ClusterWriter:     clusterOperator,
 		CronBackupWriter:  clusterOperator,
 		BackupWriter:      clusterOperator,
+		Now:               time.Now,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
