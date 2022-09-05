@@ -516,6 +516,13 @@ func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1
 			RetryTimes: 1,
 			Nodes:      nodes,
 			Action:     v1.ActionInstall,
+			BeforeRunCommands: []v1.Command{
+				{
+					Type: v1.CommandShell,
+					// kubeadm reset and rm -rf /etc/kubernetes
+					ShellCommand: []string{"bash", "-c", "kubeadm reset -f && rm -rf /etc/kubernetes"},
+				},
+			},
 			Commands: []v1.Command{
 				{
 					Type:          v1.CommandCustom,

@@ -533,6 +533,12 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		}
 	}
 	if stepper.NodeRole == NodeRoleWorker {
+		//clearCmd := fmt.Sprintf("kubeadm reset -f && rm -rf %s",
+		//	strutil.StringDefaultIfEmpty(EtcdDefaultDataDir, K8SDefaultConfigDir))
+		//_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", clearCmd)
+		//if err != nil {
+		//	logger.Warnf("clean init node env error: %s", err.Error())
+		//}
 		workerJoinCmd := strings.Split(cmds[1], " ")
 		hosts.AddHost(stepper.WorkerNodeVIP, stepper.APIServerDomainName)
 		if len(stepper.Masters) == 1 {
