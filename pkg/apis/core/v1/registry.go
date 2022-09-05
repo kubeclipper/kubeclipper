@@ -722,7 +722,7 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false).
 			DataFormat("fieldSelector=%s=%s")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
-		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), nil))
 
 	webservice.Route(webservice.PUT("/templates/{name}").
 		To(h.UpdateTemplate).
