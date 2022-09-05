@@ -2776,7 +2776,7 @@ func (h *handler) watchCronBackups(req *restful.Request, resp *restful.Response,
 }
 
 func (h *handler) CreateCronBackup(request *restful.Request, response *restful.Response) {
-	cb := new(v1.CronBackup)
+	cb := &v1.CronBackup{}
 	if err := request.ReadEntity(cb); err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
@@ -2789,17 +2789,37 @@ func (h *handler) CreateCronBackup(request *restful.Request, response *restful.R
 		}
 	}
 
+	ok, err := h.checkCronBackupExist(request.Request.Context(), cb.Name, cb.Spec.ClusterName)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if ok {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cron backup '%s' of '%s' already exists", cb.Name, cb.Spec.ClusterName))
+		return
+	}
+
 	cb.Labels[common.LabelCronBackupEnable] = ""
 	createdCB, err := h.clusterOperator.CreateCronBackup(request.Request.Context(), cb)
-	if err != nil {
-		if apimachineryErrors.IsAlreadyExists(err) {
-			restplus.HandleBadRequest(response, request, err)
-			return
-		}
+	if err != nil && !apimachineryErrors.IsAlreadyExists(err) {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, createdCB)
+}
+
+func (h *handler) checkCronBackupExist(ctx context.Context, name, cluster string) (bool, error) {
+	cronBackups, err := h.clusterOperator.ListCronBackups(ctx, query.New())
+	if err != nil {
+		return false, err
+	}
+	for _, cronBackup := range cronBackups.Items {
+		if cronBackup.Name == name && cronBackup.Spec.ClusterName == cluster {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (h *handler) DeleteCronBackup(request *restful.Request, response *restful.Response) {
