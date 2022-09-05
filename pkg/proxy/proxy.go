@@ -66,6 +66,10 @@ func (s *Server) StartProxy() error {
 }
 
 func (s *Server) proxyServer() error {
+	if s.Config.ServerIP == "" {
+		logger.Warn("no serverip specified")
+		return nil
+	}
 	err := startProxy(config.Tunnel{
 		LocalPort:     s.Config.DefaultMQPort,
 		RemoteAddress: fmt.Sprintf("%s:%v", s.Config.ServerIP, s.Config.DefaultMQPort),
