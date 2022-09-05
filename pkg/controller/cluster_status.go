@@ -22,10 +22,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 
@@ -42,7 +44,6 @@ import (
 
 const (
 	clusterStatusMonitorPeriod = 3 * time.Minute
-	k8sVersion                 = 12000
 )
 
 type ClusterStatusMon struct {
