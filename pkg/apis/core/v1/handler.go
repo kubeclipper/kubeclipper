@@ -2508,6 +2508,18 @@ func (h *handler) CreateTemplate(request *restful.Request, response *restful.Res
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	ok, err := h.checkTemplateExist(request.Request.Context(), template.Annotations[common.AnnotationDisplayName])
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if ok {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("template '%s' already exists", template.Annotations[common.AnnotationDisplayName]))
+		return
+	}
+
 	template.ObjectMeta.GenerateName = "tmpl-"
 	template, err = h.clusterOperator.CreateTemplate(request.Request.Context(), template)
 	if err != nil {
@@ -2545,6 +2557,36 @@ func (h *handler) DeleteTemplate(request *restful.Request, response *restful.Res
 		return
 	}
 	response.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) CheckTemplateExists(request *restful.Request, response *restful.Response) {
+	q := query.ParseQueryParameter(request)
+
+	displayName := q.FieldSelector
+	exists, err := h.checkTemplateExist(request.Request.Context(), displayName)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if exists {
+		response.Header().Set(resourceExistCheckerHeader, "true")
+		return
+	}
+	response.Header().Set(resourceExistCheckerHeader, "false")
+	response.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) checkTemplateExist(ctx context.Context, name string) (bool, error) {
+	templates, err := h.clusterOperator.ListTemplates(ctx, query.New())
+	if err != nil {
+		return false, err
+	}
+	for _, template := range templates.Items {
+		if template.Annotations[common.AnnotationDisplayName] == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (h *handler) DescribeBackupPoint(request *restful.Request, response *restful.Response) {
