@@ -2509,18 +2509,14 @@ func (h *handler) CreateTemplate(request *restful.Request, response *restful.Res
 		return
 	}
 
-	q := query.New()
-	q.FuzzySearch = map[string]string{
-		common.AnnotationDisplayName: template.Annotations[common.AnnotationDisplayName],
-	}
-	templates, err := h.clusterOperator.ListTemplatesEx(request.Request.Context(), q)
+	ok, err := h.checkTemplateExist(request.Request.Context(), template.Annotations[common.AnnotationDisplayName])
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
-	if len(templates.Items) > 0 {
-		restplus.HandleInternalError(response, request, fmt.Errorf("template '%s' already exists", template.Annotations[common.AnnotationDisplayName]))
+	if ok {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("template '%s' already exists", template.Annotations[common.AnnotationDisplayName]))
 		return
 	}
 
@@ -2567,7 +2563,7 @@ func (h *handler) CheckTemplateExists(request *restful.Request, response *restfu
 	q := query.ParseQueryParameter(request)
 
 	displayName := q.FieldSelector
-	exists, err := h.checkTemplate(request.Request.Context(), displayName)
+	exists, err := h.checkTemplateExist(request.Request.Context(), displayName)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -2580,7 +2576,7 @@ func (h *handler) CheckTemplateExists(request *restful.Request, response *restfu
 	response.WriteHeader(http.StatusOK)
 }
 
-func (h *handler) checkTemplate(ctx context.Context, name string) (bool, error) {
+func (h *handler) checkTemplateExist(ctx context.Context, name string) (bool, error) {
 	templates, err := h.clusterOperator.ListTemplates(ctx, query.New())
 	if err != nil {
 		return false, err
