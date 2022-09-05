@@ -494,8 +494,8 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		return nil, err
 	}
 	if stepper.NodeRole == NodeRoleMaster {
-		clearCmd := fmt.Sprintf("kubeadm reset -f && rm -rf %s",
-			strutil.StringDefaultIfEmpty(EtcdDefaultDataDir, stepper.EtcdDataPath))
+		clearCmd := fmt.Sprintf("kubeadm reset -f && rm -rf %s && rm -rf %s",
+			strutil.StringDefaultIfEmpty(EtcdDefaultDataDir, stepper.EtcdDataPath), K8SDefaultConfigDir)
 		_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", clearCmd)
 		if err != nil {
 			logger.Warnf("clean init node env error: %s", err.Error())
@@ -533,6 +533,11 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		}
 	}
 	if stepper.NodeRole == NodeRoleWorker {
+		clearCmd := fmt.Sprintf("kubeadm reset -f && rm -rf %s", K8SDefaultConfigDir)
+		_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", clearCmd)
+		if err != nil {
+			logger.Warnf("clean init node env error: %s", err.Error())
+		}
 		workerJoinCmd := strings.Split(cmds[1], " ")
 		hosts.AddHost(stepper.WorkerNodeVIP, stepper.APIServerDomainName)
 		if len(stepper.Masters) == 1 {
