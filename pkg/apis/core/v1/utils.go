@@ -364,11 +364,11 @@ func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1
 	return actBackup.GetStep(action), nil
 }
 
-func (h *handler) parseUpdateCertOperation(extraMetadata *component.ExtraMetadata) (*v1.Operation, error) {
+func (h *handler) parseUpdateCertOperation(clu *v1.Cluster, extraMetadata *component.ExtraMetadata) (*v1.Operation, error) {
 	cert := &k8s.Certification{}
 	op := &v1.Operation{}
 	nodes := utils.UnwrapNodeList(extraMetadata.Masters)
-	op.Steps, _ = cert.InstallSteps(nodes)
+	op.Steps, _ = cert.InstallSteps(clu, nodes)
 	return op, nil
 }
 

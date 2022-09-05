@@ -22,6 +22,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 	"time"
 
@@ -29,8 +31,6 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/labels"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -42,6 +42,7 @@ import (
 
 const (
 	clusterStatusMonitorPeriod = 3 * time.Minute
+	k8sVersion                 = 12000
 )
 
 type ClusterStatusMon struct {
@@ -150,12 +151,22 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		s.log.Warn("get cluster failed when update cluster certification status, skip it", zap.String("cluster", clusterName))
 		return
 	}
-	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Masters[0].ID, []string{"kubeadm", "certs", "check-expiration"}, 3*time.Minute)
+	var cmd []string
+	if clu.KubernetesVersion[1:] < k8s.K8sVersion {
+		cmd = []string{"kubeadm", "alpha", "certs", "check-expiration"}
+	} else {
+		cmd = []string{"kubeadm", "certs", "check-expiration"}
+	}
+	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Masters[0].ID, cmd, 3*time.Minute)
 	if err != nil {
 		s.log.Warn("get cluster failed when get cluster certification status, skip it", zap.String("cluster", clusterName))
 		return
 	}
 	splitRes := strings.Split(string(res), "\n\n")
+	if len(splitRes) != 3 {
+		logger.Errorf("read cluster certs error")
+		return
+	}
 	crts := strings.Split(splitRes[1], "\n")
 	cas := strings.Split(splitRes[2], "\n")
 	certification := make([]v1.Certification, 0)
