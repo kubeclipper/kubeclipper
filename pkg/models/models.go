@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -170,4 +172,11 @@ func ObjectMetaFilter(obj metav1.ObjectMeta, key, value string) bool {
 		}
 	}
 	return true
+}
+
+func ObjectSpecFilter(spec v1.CronBackupSpec, key, value string) bool {
+	if key == "spec.clusterName" && strings.Contains(spec.ClusterName, value) {
+		return true
+	}
+	return false
 }
