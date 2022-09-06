@@ -621,10 +621,10 @@ func (c *clusterOperator) backupPointFuzzyFilter(obj runtime.Object, q *query.Qu
 		return nil
 	}
 	objs := make([]runtime.Object, 0, len(backupPoints.Items))
-	for index, backup := range backupPoints.Items {
+	for index, backupPoint := range backupPoints.Items {
 		selected := true
 		for k, v := range q.FuzzySearch {
-			if !models.ObjectMetaFilter(backup.ObjectMeta, k, v) {
+			if !models.ObjectMetaFilter(backupPoint.ObjectMeta, k, v) {
 				selected = false
 			}
 		}
@@ -641,11 +641,14 @@ func (c *clusterOperator) cronBackupFuzzyFilter(obj runtime.Object, q *query.Que
 		return nil
 	}
 	objs := make([]runtime.Object, 0, len(cronBackups.Items))
-	for index, backup := range cronBackups.Items {
+	for index, cronBackup := range cronBackups.Items {
 		selected := true
 		for k, v := range q.FuzzySearch {
-			if !models.ObjectMetaFilter(backup.ObjectMeta, k, v) {
+			if !models.ObjectMetaFilter(cronBackup.ObjectMeta, k, v) {
 				selected = false
+			}
+			if models.ObjectSpecFilter(cronBackup.Spec, k, v) {
+				selected = true
 			}
 		}
 		if selected {

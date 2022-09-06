@@ -2782,14 +2782,20 @@ func (h *handler) CreateCronBackup(request *restful.Request, response *restful.R
 }
 
 func (h *handler) checkCronBackupExist(ctx context.Context, name, cluster string) (bool, error) {
-	cronBackups, err := h.clusterOperator.ListCronBackups(ctx, query.New())
+	q := &query.Query{
+		Pagination: query.NoPagination(),
+		FuzzySearch: map[string]string{
+			"name":             name,
+			"spec.clusterName": cluster,
+		},
+	}
+	cronBackups, err := h.clusterOperator.ListCronBackupEx(ctx, q)
 	if err != nil {
 		return false, err
 	}
-	for _, cronBackup := range cronBackups.Items {
-		if cronBackup.Name == name && cronBackup.Spec.ClusterName == cluster {
-			return true, nil
-		}
+
+	if cronBackups.TotalCount > 0 {
+		return true, nil
 	}
 	return false, nil
 }
