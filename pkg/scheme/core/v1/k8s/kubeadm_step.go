@@ -48,6 +48,8 @@ const (
 	container       = "container"
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
+	//KubeCertsCluVersion the version that kubeadm certs command appears
+	KubeCertsCluVersion = "1.20"
 )
 
 type Runnable v1.Cluster
@@ -750,8 +752,15 @@ func (stepper *Certification) InitStepper() *Certification {
 	return stepper
 }
 
-func (stepper *Certification) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
-	return []v1.Step{
+func (stepper *Certification) InstallSteps(clu *v1.Cluster, nodes []v1.StepNode) ([]v1.Step, error) {
+	var cmd []string
+	if clu.KubernetesVersion[1:] < KubeCertsCluVersion {
+		cmd = []string{"kubeadm", "alpha", "certs", "renew", "all"}
+	} else {
+		cmd = []string{"kubeadm", "certs", "renew", "all"}
+	}
+
+	step := []v1.Step{
 		{
 			ID:         strutil.GetUUID(),
 			Name:       "updateCerts",
@@ -763,7 +772,7 @@ func (stepper *Certification) InstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"kubeadm", "certs", "renew", "all"},
+					ShellCommand: cmd,
 				},
 			},
 		},
@@ -802,7 +811,9 @@ func (stepper *Certification) InstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 				},
 			},
 		},
-	}, nil
+	}
+
+	return step, nil
 }
 
 func (stepper *Container) InitStepper(criType string) *Container {

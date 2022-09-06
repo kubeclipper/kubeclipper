@@ -493,7 +493,7 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-	op, err := h.parseUpdateCertOperation(extraMeta)
+	op, err := h.parseUpdateCertOperation(c, extraMeta)
 	if err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
