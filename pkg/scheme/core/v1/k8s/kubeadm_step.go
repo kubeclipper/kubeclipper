@@ -545,7 +545,7 @@ func (stepper *CNIInfo) InitStepper(c *v1.CNI, networking *v1.Networking) *CNIIn
 	return stepper
 }
 
-func (stepper *CNIInfo) InstallSteps(allNodes, nodes []v1.StepNode, onlyLoad bool) ([]v1.Step, error) {
+func (stepper *CNIInfo) InstallSteps(allNodes, firstMasterNodes []v1.StepNode, onlyLoad bool) ([]v1.Step, error) {
 	var steps []v1.Step
 	bytes, err := json.Marshal(stepper)
 	if err != nil {
@@ -570,18 +570,20 @@ func (stepper *CNIInfo) InstallSteps(allNodes, nodes []v1.StepNode, onlyLoad boo
 				},
 			},
 		}
-		// load only images for some special scenarios, such as JoinNode
-		if onlyLoad {
-			return steps, nil
-		}
 	}
+
+	// only load images for some special scenarios, such as JoinNode
+	if onlyLoad {
+		return steps, nil
+	}
+
 	return append(steps, v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "installCNI",
 		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 1,
-		Nodes:      nodes,
+		Nodes:      firstMasterNodes,
 		Commands: []v1.Command{
 			{
 				Type: v1.CommandTemplateRender,
