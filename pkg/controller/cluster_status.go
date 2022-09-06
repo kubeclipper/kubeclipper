@@ -153,7 +153,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		return
 	}
 	var cmd []string
-	if clu.KubernetesVersion[1:] < k8s.K8sVersion {
+	if clu.KubernetesVersion[1:] < k8s.KubeCertsCluVersion {
 		cmd = []string{"kubeadm", "alpha", "certs", "check-expiration"}
 	} else {
 		cmd = []string{"kubeadm", "certs", "check-expiration"}

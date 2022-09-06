@@ -48,7 +48,8 @@ const (
 	container       = "container"
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
-	K8sVersion      = "1.20"
+	//KubeCertsCluVersion the version that kubeadm certs command appears
+	KubeCertsCluVersion = "1.20"
 )
 
 type Runnable v1.Cluster
@@ -751,7 +752,7 @@ func (stepper *Certification) InitStepper() *Certification {
 
 func (stepper *Certification) InstallSteps(clu *v1.Cluster, nodes []v1.StepNode) ([]v1.Step, error) {
 	var cmd []string
-	if clu.KubernetesVersion[1:] < K8sVersion {
+	if clu.KubernetesVersion[1:] < KubeCertsCluVersion {
 		cmd = []string{"kubeadm", "alpha", "certs", "renew", "all"}
 	} else {
 		cmd = []string{"kubeadm", "certs", "renew", "all"}
