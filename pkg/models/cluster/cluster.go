@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 
@@ -635,6 +636,16 @@ func (c *clusterOperator) backupPointFuzzyFilter(obj runtime.Object, q *query.Qu
 	return objs
 }
 
+func cronBackupCustomFilter(spec v1.CronBackupSpec, key, value string) bool {
+	switch key {
+	case "cluster":
+		if !strings.Contains(spec.ClusterName, value) {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *clusterOperator) cronBackupFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	cronBackups, ok := obj.(*v1.CronBackupList)
 	if !ok {
@@ -647,8 +658,8 @@ func (c *clusterOperator) cronBackupFuzzyFilter(obj runtime.Object, q *query.Que
 			if !models.ObjectMetaFilter(cronBackup.ObjectMeta, k, v) {
 				selected = false
 			}
-			if models.ObjectSpecFilter(cronBackup.Spec, k, v) {
-				selected = true
+			if !cronBackupCustomFilter(cronBackup.Spec, k, v) {
+				selected = false
 			}
 		}
 		if selected {

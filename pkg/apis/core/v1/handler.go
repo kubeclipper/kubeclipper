@@ -2813,8 +2813,8 @@ func (h *handler) checkCronBackupExist(ctx context.Context, name, cluster string
 	q := &query.Query{
 		Pagination: query.NoPagination(),
 		FuzzySearch: map[string]string{
-			"name":             name,
-			"spec.clusterName": cluster,
+			"name":    name,
+			"cluster": cluster,
 		},
 	}
 	cronBackups, err := h.clusterOperator.ListCronBackupEx(ctx, q)
