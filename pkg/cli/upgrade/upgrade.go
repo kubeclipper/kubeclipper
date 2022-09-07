@@ -157,7 +157,7 @@ func (o *UpgradeOptions) Validate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(o.deployConfig.ServerIPs)%2 == 0 {
-		return fmt.Errorf("server node must be even number")
+		return fmt.Errorf("server node must be odd number")
 	}
 	o.serverIPs = o.deployConfig.ServerIPs
 	o.agentIPs = o.deployConfig.Agents.ListIP()
@@ -185,7 +185,9 @@ func (o *UpgradeOptions) checkBinary() error {
 	if !strings.Contains(cmd.StdOut(), "ELF") {
 		return fmt.Errorf("pkg [%s] is not a binary file", o.pkg)
 	}
-	tar := fmt.Sprintf("mkdir -p /tmp/kc && cp %s /tmp/kc && cd /tmp && tar -cf /tmp/kc-%s.tar.gz kc", o.pkg, o.component)
+	dir := filepath.Dir(o.pkg)
+	target := filepath.Join(dir, "kc")
+	tar := fmt.Sprintf("mkdir -p %s && cp %s %s && cd %s && tar -cf /tmp/kc-%s.tar.gz kc && rm -rf /tmp/kc", target, o.pkg, target, dir, o.component)
 	sshutils.Cmd("/bin/sh", "-c", tar)
 	o.pkg = fmt.Sprintf("/tmp/kc-%s.tar.gz", o.component)
 	return nil
@@ -221,6 +223,11 @@ func (o *UpgradeOptions) checkVersion() error {
 	return nil
 }
 
+func (o *UpgradeOptions) cleanDir() error {
+	cmd := fmt.Sprintf("rm -rf %s", filepath.Join(config.DefaultPkgPath, "kc"))
+	return sshutils.CmdBatchWithSudo(o.deployConfig.SSHConfig, serviceMap[o.component], cmd, sshutils.DefaultWalk)
+}
+
 func (o *UpgradeOptions) RunUpgrade() error {
 	err := o.sendPackage()
 	if err != nil {
@@ -232,10 +239,7 @@ func (o *UpgradeOptions) RunUpgrade() error {
 	default:
 		err = o.replaceService(o.component)
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return o.cleanDir()
 }
 
 func (o *UpgradeOptions) sendPackage() error {
