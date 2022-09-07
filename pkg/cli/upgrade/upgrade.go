@@ -239,6 +239,9 @@ func (o *UpgradeOptions) RunUpgrade() error {
 	default:
 		err = o.replaceService(o.component)
 	}
+	if err != nil {
+		return err
+	}
 	return o.cleanDir()
 }
 
