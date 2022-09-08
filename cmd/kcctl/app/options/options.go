@@ -65,6 +65,7 @@ const (
 	DefaultDeployConfig       = "deploy-config.yaml"
 	DefaultConfig             = "config"
 	DefaultCaPath             = "pki"
+	DefaultSSHPort            = 22
 	DefaultEtcdPKIPath        = "pki/etcd"
 	DefaultNatsPKIPath        = "pki/nats"
 	DefaultKcServerConfigPath = "/etc/kubeclipper-server"
@@ -268,6 +269,7 @@ func NewDeployOptions() *DeployConfig {
 		IPDetect: autodetection.MethodFirst,
 		SSHConfig: &sshutils.SSH{
 			User: "root",
+			Port: DefaultSSHPort,
 		},
 		EtcdConfig: &Etcd{
 			ClientPort:  2379,
@@ -308,9 +310,15 @@ func (c *DeployConfig) MergeDeployOptions() {
 }
 
 func (c *DeployConfig) Complete() error {
+	port := 0
 	if c.Config == "" {
 		return nil
 	}
+
+	if c.SSHConfig.Port != 22 {
+		port = c.SSHConfig.Port
+	}
+
 	if !utils.FileExist(c.Config) {
 		return fmt.Errorf("%s is not exist", c.Config)
 	}
@@ -336,6 +344,12 @@ func (c *DeployConfig) Complete() error {
 			metadata.Region = c.DefaultRegion
 			c.Agents[ip] = metadata
 		}
+	}
+
+	if port != 0 {
+		c.SSHConfig.Port = port
+	} else if c.SSHConfig.Port == 0 {
+		c.SSHConfig.Port = DefaultSSHPort
 	}
 
 	return nil
@@ -415,6 +429,7 @@ func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 func AddFlagsToSSH(ssh *sshutils.SSH, flags *pflag.FlagSet) {
 	flags.StringVarP(&ssh.User, "user", "u", ssh.User, "Deploy ssh user")
 	flags.StringVar(&ssh.Password, "passwd", ssh.Password, "Deploy ssh password")
+	flags.IntVar(&ssh.Port, "ssh-port", ssh.Port, "ssh connection port of agent nodes")
 	flags.StringVar(&ssh.PkFile, "pk-file", ssh.PkFile, "ssh pk file which used to remote access other agent nodes")
 	flags.StringVar(&ssh.PkPassword, "pk-passwd", ssh.PkPassword, "the password of the ssh pk file which used to remote access other agent nodes")
 }

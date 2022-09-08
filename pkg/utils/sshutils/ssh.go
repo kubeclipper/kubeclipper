@@ -35,6 +35,7 @@ import (
 type SSH struct {
 	User              string         `json:"user" yaml:"user,omitempty"`
 	Password          string         `json:"password" yaml:"password,omitempty"`
+	Port              int            `json:"port" yaml:"port,omitempty"`
 	PkFile            string         `json:"pkFile" yaml:"pkFile,omitempty"`
 	PkPassword        string         `json:"pkPassword" yaml:"pkPassword,omitempty"`
 	ConnectionTimeout *time.Duration `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
@@ -92,7 +93,7 @@ func (ss *SSH) connect(host string) (*ssh.Client, error) {
 
 func (ss *SSH) addrReformat(host string) string {
 	if !strings.Contains(host, ":") {
-		host = fmt.Sprintf("%s:22", host)
+		host = fmt.Sprintf("%s:%d", host, ss.Port)
 	}
 	return host
 }
