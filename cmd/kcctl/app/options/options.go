@@ -315,7 +315,7 @@ func (c *DeployConfig) Complete() error {
 		return nil
 	}
 
-	if c.SSHConfig.Port != 22 {
+	if c.SSHConfig.Port != DefaultSSHPort {
 		port = c.SSHConfig.Port
 	}
 
