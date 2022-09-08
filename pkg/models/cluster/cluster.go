@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 
@@ -621,10 +622,10 @@ func (c *clusterOperator) backupPointFuzzyFilter(obj runtime.Object, q *query.Qu
 		return nil
 	}
 	objs := make([]runtime.Object, 0, len(backupPoints.Items))
-	for index, backup := range backupPoints.Items {
+	for index, backupPoint := range backupPoints.Items {
 		selected := true
 		for k, v := range q.FuzzySearch {
-			if !models.ObjectMetaFilter(backup.ObjectMeta, k, v) {
+			if !models.ObjectMetaFilter(backupPoint.ObjectMeta, k, v) {
 				selected = false
 			}
 		}
@@ -635,16 +636,29 @@ func (c *clusterOperator) backupPointFuzzyFilter(obj runtime.Object, q *query.Qu
 	return objs
 }
 
+func cronBackupCustomFilter(spec v1.CronBackupSpec, key, value string) bool {
+	switch key {
+	case "cluster":
+		if !strings.Contains(spec.ClusterName, value) {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *clusterOperator) cronBackupFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	cronBackups, ok := obj.(*v1.CronBackupList)
 	if !ok {
 		return nil
 	}
 	objs := make([]runtime.Object, 0, len(cronBackups.Items))
-	for index, backup := range cronBackups.Items {
+	for index, cronBackup := range cronBackups.Items {
 		selected := true
 		for k, v := range q.FuzzySearch {
-			if !models.ObjectMetaFilter(backup.ObjectMeta, k, v) {
+			if !models.ObjectMetaFilter(cronBackup.ObjectMeta, k, v) {
+				selected = false
+			}
+			if !cronBackupCustomFilter(cronBackup.Spec, k, v) {
 				selected = false
 			}
 		}
