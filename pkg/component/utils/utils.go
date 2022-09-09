@@ -42,13 +42,15 @@ func LoadImage(ctx context.Context, dryRun bool, file, criType string) error {
 
 	switch criType {
 	case "containerd":
-		// docker load -i xxx/images.tar
-		_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "ctr", "--namespace", "k8s.io", "image", "import", file)
+		// ctr --namespace k8s.io image import --all-platforms xxx/images.tar
+		// Why need set `--all-platforms` flag?
+		// This prevents unexpected errors due to the incorrect schema type declaration of the mirroring system that cannot be imported normally.
+		_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "ctr", "--namespace", "k8s.io", "image", "import", "--all-platforms", file)
 		if err != nil {
 			return err
 		}
 	case "docker":
-		// ctr --namespace k8s.io  image import xxx/images.tar
+		// docker load -i xxx/images.tar
 		_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "docker", "load", "-i", file)
 		if err != nil {
 			return err
