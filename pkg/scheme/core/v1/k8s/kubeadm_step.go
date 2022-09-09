@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -295,6 +295,7 @@ func (stepper *Package) InitStepper(c *v1.Cluster) *Package {
 	stepper.Version = c.KubernetesVersion
 	stepper.CriType = c.ContainerRuntime.Type
 	stepper.LocalRegistry = c.LocalRegistry
+	stepper.KubeletDir = c.Kubelet.RootDir
 	return stepper
 }
 
