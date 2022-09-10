@@ -99,6 +99,7 @@ type Package struct {
 	Version       string `json:"version"`
 	CriType       string `json:"criType"`
 	LocalRegistry string `json:"localRegistry"`
+	KubeletDir    string `json:"kubeletDir"`
 }
 
 type KubeadmConfig struct {
@@ -213,6 +214,16 @@ func (stepper *Package) Uninstall(ctx context.Context, opts component.Options) (
 	if err = os.Remove(filepath.Join(KubeletDefaultDataDir, "config.yaml")); err != nil {
 		logger.Errorf("remove config.yaml failed,err:%v", err.Error())
 	}
+
+	err = unmountKubeletDirectory(stepper.KubeletDir)
+	if err != nil {
+		logger.Warn("unmount kubelet dir failed", zap.Error(err))
+		return nil, err
+	}
+	if _, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "rm", "-rf", stepper.KubeletDir); err != nil {
+		logger.Warn("clean kubelet dir failed", zap.Error(err))
+	}
+
 	return nil, nil
 }
 
