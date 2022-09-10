@@ -80,6 +80,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CronBackupList{},
 		&Template{},
 		&TemplateList{},
+		&ConfigMap{},
+		&ConfigMapList{},
 	)
 	return nil
 }

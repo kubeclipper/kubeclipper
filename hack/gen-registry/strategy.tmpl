@@ -79,3 +79,11 @@ func (GENERIC_KINDStrategy) Canonicalize(obj runtime.Object) {
 func (GENERIC_KINDStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
+
+func (GENERIC_KINDStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
+func (GENERIC_KINDStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}

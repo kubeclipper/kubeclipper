@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/configmap"
+
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/cronbackup"
 
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/template"
@@ -74,6 +76,7 @@ type SharedStorageFactory interface {
 	CronBackups() rest.StandardStorage
 	DNSDomains() rest.StandardStorage
 	Template() rest.StandardStorage
+	ConfigMaps() rest.StandardStorage
 }
 
 var _ SharedStorageFactory = (*sharedStorageFactory)(nil)
@@ -180,4 +183,8 @@ func (s *sharedStorageFactory) DNSDomains() rest.StandardStorage {
 
 func (s *sharedStorageFactory) Template() rest.StandardStorage {
 	return s.StorageFor(&corev1.Template{}, template.NewStorage)
+}
+
+func (s *sharedStorageFactory) ConfigMaps() rest.StandardStorage {
+	return s.StorageFor(&corev1.ConfigMap{}, configmap.NewStorage)
 }
