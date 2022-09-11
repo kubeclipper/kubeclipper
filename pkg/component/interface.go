@@ -44,19 +44,6 @@ const (
 	InternalCategoryPAAS       = "PAAS"
 )
 
-const (
-	OSCentos7  = "centos7"
-	OSUbuntu18 = "ubuntu18"
-	// OSArchAMD64 TODO: use amd64 instead of x86_64
-	// Deprecated
-	OSArchAMD64 = "x86_64"
-)
-
-//type Enumerate struct {
-//	Names  []string
-//	Values []JSON
-//}
-
 type Props struct {
 	Min int  `json:"min"`
 	Max *int `json:"max,omitempty"`

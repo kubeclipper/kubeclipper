@@ -35,25 +35,7 @@ type Recovery struct {
 	Description string `json:"description,omitempty" optional:"true"`
 }
 
-// ClusterBackupStatus describes the status of a cluster backup
-//type ClusterRecoveryStatus string
-
 const DefaultRecoveryTimeoutSec = 1200
-
-const (
-//// ClusterRecoveryCreating means the recovery is in creating.
-//ClusterRecoveryCreating ClusterRecoveryStatus = "creating"
-//// ClusterRecoveryCreating means the recovery is available for restoring.
-//ClusterRecoveryAvailable ClusterRecoveryStatus = "available"
-//// ClusterRecoveryError means the recovery is created failed and must not be used.
-//ClusterRecoveryError ClusterRecoveryStatus = "error"
-//// ClusterRecoveryRestoring means the recovery is in using for restoring.
-//ClusterRecoveryRestoring ClusterRecoveryStatus = "restoring"
-)
-
-/* type RecoveryStatus struct {
-	Status ClusterRecoveryStatus `json:"status"`
-} */
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // RecoveryList contains a list of Recovery

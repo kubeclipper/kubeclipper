@@ -290,7 +290,6 @@ func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) 
 }
 
 func (stepper *Package) InitStepper(c *v1.Cluster) *Package {
-	stepper.Arch = ""
 	stepper.Offline = c.Offline()
 	stepper.Version = c.KubernetesVersion
 	stepper.CriType = c.ContainerRuntime.Type

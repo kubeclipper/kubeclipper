@@ -94,7 +94,6 @@ var (
 )
 
 type Package struct {
-	Arch          string `json:"arch"`
 	Offline       bool   `json:"offline"`
 	Version       string `json:"version"`
 	CriType       string `json:"criType"`
@@ -159,12 +158,7 @@ func (stepper *Package) NewInstance() component.ObjectMeta {
 	return &Package{}
 }
 
-func (stepper *Package) setParams() {
-	stepper.Arch = component.OSArchAMD64
-}
-
 func (stepper *Package) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	stepper.setParams()
 	instance, err := downloader.NewInstance(ctx, K8s, stepper.Version, runtime.GOARCH, !stepper.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
@@ -198,7 +192,6 @@ func (stepper *Package) Install(ctx context.Context, opts component.Options) ([]
 }
 
 func (stepper *Package) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	stepper.setParams()
 	if err := stepper.disableKubeletService(ctx, opts.DryRun); err != nil {
 		return nil, err
 	}
