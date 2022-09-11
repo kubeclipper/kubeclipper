@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -931,7 +932,7 @@ var Users = []iamv1.User{
 			APIVersion: iamv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "admin",
+			Name: constatns.DefaultAdminUser,
 			Annotations: map[string]string{
 				"kubeclipper.io/internal": "true",
 			},
@@ -941,9 +942,9 @@ var Users = []iamv1.User{
 			Lang:              "",
 			Phone:             "",
 			Description:       "Platform Admin",
-			DisplayName:       "admin",
+			DisplayName:       constatns.DefaultAdminUser,
 			Groups:            nil,
-			EncryptedPassword: "Thinkbig1",
+			EncryptedPassword: constatns.DefaultAdminUserPass,
 		},
 	},
 }

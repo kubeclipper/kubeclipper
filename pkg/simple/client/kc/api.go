@@ -43,7 +43,7 @@ const (
 	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
 	versionPath       = "/version"
 	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
-	configmapPath     = "/api/core.kubeclipper.io/configmaps"
+	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {

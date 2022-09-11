@@ -20,9 +20,16 @@ package deploy
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
+	"io/ioutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"math"
 	"net"
 	"path"
@@ -403,6 +410,7 @@ func (d *DeployOptions) RunDeploy() error {
 	d.deployKcAgent()
 	d.deployKcConsole()
 	d.removeTempFile()
+	d.uploadConfig()
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 	return nil
 }
@@ -841,6 +849,194 @@ func (d *DeployOptions) sendAgentCertAndKey(contents []certutils.Config, pki str
 		}
 	}
 	return nil
+}
+
+func (d *DeployOptions) uploadConfig() {
+	host := fmt.Sprintf("http://%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.ServerPort)
+	c, err := kc.NewClientWithOpts(
+		kc.WithHost(host),
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	resp, err := c.Login(context.TODO(), kc.LoginRequest{
+		Username: constatns.DefaultAdminUser,
+		Password: constatns.DefaultAdminUserPass,
+	})
+	if err != nil {
+		logger.Fatal(err)
+	}
+	cfg := config.Config{
+		Servers: map[string]*config.Server{
+			"default": {
+				Server: host,
+			},
+		},
+		AuthInfos: map[string]*config.AuthInfo{
+			constatns.DefaultAdminUser: {
+				Token: resp.AccessToken,
+			},
+		},
+		CurrentContext: fmt.Sprintf("%s@default", constatns.DefaultAdminUser),
+		Contexts: map[string]*config.Context{
+			fmt.Sprintf("%s@default", constatns.DefaultAdminUser): {
+				AuthInfo: constatns.DefaultAdminUser,
+				Server:   "default",
+			},
+		},
+	}
+	c, err = kc.FromConfig(cfg)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	uploadDeployConfig(c, d.deployConfig)
+	uploadCerts(c)
+}
+
+func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
+	dcData, err := yaml.Marshal(deployConfig)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	dc := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1.KindConfigMap,
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constatns.DeployConfigConfigMapName,
+		},
+		Data: map[string]string{
+			constatns.DeployConfigConfigMapKey: string(dcData),
+		},
+	}
+	_, err = client.CreateConfigMap(context.TODO(), dc)
+	if err != nil {
+		logger.Fatal(err)
+	}
+}
+
+func uploadCerts(client *kc.Client) {
+	caPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultCaPath)
+	cacrt, err := ioutil.ReadFile(fmt.Sprintf("%s/ca.crt", caPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	cakey, err := ioutil.ReadFile(fmt.Sprintf("%s/ca.key", caPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	cacm := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1.KindConfigMap,
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constatns.KcCertsConfigMapName,
+		},
+		Data: map[string]string{
+			"ca.crt": base64.StdEncoding.EncodeToString(cacrt),
+			"ca.key": base64.StdEncoding.EncodeToString(cakey),
+		},
+	}
+	_, err = client.CreateConfigMap(context.TODO(), cacm)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	etcdPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultEtcdPKIPath)
+	etcdcrt, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd.crt", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdkey, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd.key", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdpeercrt, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd-peer.crt", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdpeerkey, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd-peer.key", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdclientcrt, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-etcd-client.crt", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdclientkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-etcd-client.key", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdhealthcheckcrt, err := ioutil.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdhealthcheckkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	etcdcm := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1.KindConfigMap,
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constatns.KcEtcdCertsConfigMapName,
+		},
+		Data: map[string]string{
+			"etcd.crt":                         base64.StdEncoding.EncodeToString(etcdcrt),
+			"etcd.key":                         base64.StdEncoding.EncodeToString(etcdkey),
+			"etcd-peer.crt":                    base64.StdEncoding.EncodeToString(etcdpeercrt),
+			"etcd-peer.key":                    base64.StdEncoding.EncodeToString(etcdpeerkey),
+			"kc-server-etcd-client.crt":        base64.StdEncoding.EncodeToString(etcdclientcrt),
+			"kc-server-etcd-client.key":        base64.StdEncoding.EncodeToString(etcdclientkey),
+			"kube-etcd-healthcheck-client.crt": base64.StdEncoding.EncodeToString(etcdhealthcheckcrt),
+			"kube-etcd-healthcheck-client.key": base64.StdEncoding.EncodeToString(etcdhealthcheckkey),
+		},
+	}
+	_, err = client.CreateConfigMap(context.TODO(), etcdcm)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	natsPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultNatsPKIPath)
+	natsservercert, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.crt", natsPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	natsserverkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.key", natsPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	natsclientcert, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.crt", natsPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	natsclientkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.key", natsPath))
+	if err != nil {
+		logger.Fatal(err)
+	}
+	natscm := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1.KindConfigMap,
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constatns.KcNatsCertsConfigMapName,
+		},
+		Data: map[string]string{
+			"kc-server-nats-server.crt": base64.StdEncoding.EncodeToString(natsservercert),
+			"kc-server-nats-server.key": base64.StdEncoding.EncodeToString(natsserverkey),
+			"kc-server-nats-client.crt": base64.StdEncoding.EncodeToString(natsclientcert),
+			"kc-server-nats-client.key": base64.StdEncoding.EncodeToString(natsclientkey),
+		},
+	}
+	_, err = client.CreateConfigMap(context.TODO(), natscm)
+	if err != nil {
+		logger.Fatal(err)
+	}
 }
 
 func caList() []certutils.Config {

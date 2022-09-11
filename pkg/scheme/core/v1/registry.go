@@ -25,6 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const (
+	KindCluster   = "Cluster"
+	KindConfigMap = "ConfigMap"
+)
+
 // GroupName is the group name used in this package
 const GroupName = "core.kubeclipper.io"
 
