@@ -72,5 +72,4 @@ type Base struct {
 	Offline          bool     `json:"offline"`
 	DataRootDir      string   `json:"rootDir"`
 	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
-	Arch             string   `json:"arch"`
 }

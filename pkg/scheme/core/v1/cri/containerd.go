@@ -126,16 +126,11 @@ func (runnable *ContainerdRunnable) GetActionSteps(action v1.StepAction) []v1.St
 	return nil
 }
 
-func (runnable *ContainerdRunnable) setParams() {
-	runnable.Arch = component.OSArchAMD64
-}
-
 func (runnable *ContainerdRunnable) NewInstance() component.ObjectMeta {
 	return &ContainerdRunnable{}
 }
 
 func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	runnable.setParams()
 	instance, err := downloader.NewInstance(ctx, criContainerd, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
@@ -161,7 +156,6 @@ func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.O
 }
 
 func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	runnable.setParams()
 	if err := runnable.disableContainerdService(ctx, opts.DryRun); err != nil {
 		return nil, err
 	}

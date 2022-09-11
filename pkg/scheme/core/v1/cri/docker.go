@@ -118,16 +118,11 @@ func (runnable *DockerRunnable) GetActionSteps(action v1.StepAction) []v1.Step {
 	return nil
 }
 
-func (runnable *DockerRunnable) setParams() {
-	runnable.Arch = component.OSArchAMD64
-}
-
 func (runnable *DockerRunnable) NewInstance() component.ObjectMeta {
 	return &DockerRunnable{}
 }
 
 func (runnable DockerRunnable) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	runnable.setParams()
 	instance, err := downloader.NewInstance(ctx, criDocker, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
 		return nil, err
@@ -148,7 +143,6 @@ func (runnable DockerRunnable) Install(ctx context.Context, opts component.Optio
 }
 
 func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	runnable.setParams()
 	if err := runnable.disableDockerService(ctx, opts.DryRun); err != nil {
 		return nil, err
 	}
