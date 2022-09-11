@@ -52,7 +52,7 @@ type ConfigMapWriter interface {
 }
 
 func (o operator) ListConfigMaps(ctx context.Context, query *query.Query) (*v1.ConfigMapList, error) {
-	list, err := models.List(ctx, o.configMapStorage, query)
+	list, err := models.List(ctx, o.cmStorage, query)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (o operator) ListConfigMaps(ctx context.Context, query *query.Query) (*v1.C
 }
 
 func (o operator) WatchConfigMaps(ctx context.Context, query *query.Query) (watch.Interface, error) {
-	return models.Watch(ctx, o.configMapStorage, query)
+	return models.Watch(ctx, o.cmStorage, query)
 }
 
 func (o operator) GetConfigMap(ctx context.Context, name string) (*v1.ConfigMap, error) {
@@ -69,7 +69,7 @@ func (o operator) GetConfigMap(ctx context.Context, name string) (*v1.ConfigMap,
 }
 
 func (o operator) GetConfigMapEx(ctx context.Context, name string, resourceVersion string) (*v1.ConfigMap, error) {
-	cm, err := models.GetV2(ctx, o.configMapStorage, name, resourceVersion, nil)
+	cm, err := models.GetV2(ctx, o.cmStorage, name, resourceVersion, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +77,11 @@ func (o operator) GetConfigMapEx(ctx context.Context, name string, resourceVersi
 }
 
 func (o operator) ListConfigMapsEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, o.configMapStorage, query, o.configmapFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, o.cmStorage, query, o.configmapFuzzyFilter, nil, nil)
 }
 
 func (o operator) CreateConfigMap(ctx context.Context, configmap *v1.ConfigMap) (*v1.ConfigMap, error) {
-	obj, err := o.configMapStorage.Create(ctx, configmap, nil, &metav1.CreateOptions{})
+	obj, err := o.cmStorage.Create(ctx, configmap, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (o operator) CreateConfigMap(ctx context.Context, configmap *v1.ConfigMap) 
 }
 
 func (o operator) UpdateConfigMap(ctx context.Context, configmap *v1.ConfigMap) (*v1.ConfigMap, error) {
-	obj, wasCreated, err := o.configMapStorage.Update(ctx, configmap.Name, rest.DefaultUpdatedObjectInfo(configmap),
+	obj, wasCreated, err := o.cmStorage.Update(ctx, configmap.Name, rest.DefaultUpdatedObjectInfo(configmap),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func (o operator) UpdateConfigMap(ctx context.Context, configmap *v1.ConfigMap) 
 
 func (o operator) DeleteConfigMap(ctx context.Context, name string) error {
 	var err error
-	_, _, err = o.configMapStorage.Delete(ctx, name, func(ctx context.Context, obj runtime.Object) error {
+	_, _, err = o.cmStorage.Delete(ctx, name, func(ctx context.Context, obj runtime.Object) error {
 		return nil
 	}, &metav1.DeleteOptions{})
 	return err
