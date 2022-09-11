@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models/core"
+
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
@@ -247,6 +249,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		s.storageFactory.DNSDomains(),
 		s.storageFactory.Template(),
 	)
+	coreOperator := core.NewOperator(s.storageFactory.ConfigMaps())
 	leaseOperator := lease.NewLeaseOperator(s.storageFactory.Leases())
 	opOperator := operation.NewOperationOperator(s.storageFactory.Operations())
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
@@ -284,7 +287,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
-	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, deliverySvc); err != nil {
+	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, coreOperator, deliverySvc); err != nil {
 		return err
 	}
 	staticResourceSvc, err := staticresource.NewService(s.Config.StaticServerOptions)

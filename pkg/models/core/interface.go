@@ -38,9 +38,11 @@ type Operator interface {
 var _ Operator = (*operator)(nil)
 
 type operator struct {
-	configMapStorage rest.StandardStorage
+	cmStorage rest.StandardStorage
 }
 
-func NewOperator() Operator {
-	return &operator{}
+func NewOperator(cmStorage rest.StandardStorage) Operator {
+	return &operator{
+		cmStorage: cmStorage,
+	}
 }

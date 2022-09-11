@@ -43,6 +43,7 @@ const (
 	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
 	versionPath       = "/version"
 	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
+	configmapPath     = "/api/core.kubeclipper.io/configmaps"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -385,4 +386,66 @@ func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCl
 	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, cluName, "upgrade"), nil, upgradeCluster, nil)
 	defer ensureReaderClosed(resp)
 	return err
+}
+
+func (cli *Client) ListConfigMaps(ctx context.Context, query Queries) (*ConfigMapList, error) {
+	serverResp, err := cli.get(ctx, configmapPath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	cms := ConfigMapList{}
+	err = json.NewDecoder(serverResp.body).Decode(&cms)
+	return &cms, err
+}
+
+func (cli *Client) DescribeConfigMap(ctx context.Context, name string) (*ConfigMapList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", configmapPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	cm := v1.ConfigMap{}
+	err = json.NewDecoder(serverResp.body).Decode(&cm)
+	cms := ConfigMapList{
+		Items: []v1.ConfigMap{cm},
+	}
+	return &cms, err
+}
+
+func (cli *Client) CreateConfigMap(ctx context.Context, cm *v1.ConfigMap) (*ConfigMapList, error) {
+	serverResp, err := cli.post(ctx, configmapPath, nil, cm, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.ConfigMap{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	cms := ConfigMapList{
+		Items: []v1.ConfigMap{v},
+	}
+	return &cms, err
+}
+
+func (cli *Client) DeleteConfigMap(ctx context.Context, name string) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", configmapPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cli *Client) UpdateConfigMap(ctx context.Context, cm *v1.ConfigMap) (*ConfigMapList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", configmapPath, cm.Name), nil, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.ConfigMap{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	cms := ConfigMapList{
+		Items: []v1.ConfigMap{v},
+	}
+	return &cms, err
 }

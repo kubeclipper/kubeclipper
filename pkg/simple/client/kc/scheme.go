@@ -175,14 +175,6 @@ func (n *RoleList) TablePrint() ([]string, [][]string) {
 	return headers, data
 }
 
-// func isTemplateRole(role *v1.GlobalRole) string {
-//	r, ok := role.Labels[v1.LabelRoleTemplate]
-//	if ok {
-//		return r
-//	}
-//	return "false"
-// }
-
 func isMapKeyExist(maps map[string]string, key string) string {
 	if r, ok := maps[key]; ok {
 		return r
@@ -240,4 +232,32 @@ type BackupList struct {
 type BackupPointList struct {
 	Items      []v1.BackupPoint `json:"items" description:"paging data"`
 	TotalCount int              `json:"totalCount,omitempty" description:"total count"`
+}
+
+type ConfigMapList struct {
+	Items      []v1.ConfigMap `json:"items" description:"paging data"`
+	TotalCount int            `json:"totalCount,omitempty" description:"total count"`
+}
+
+func (n *ConfigMapList) JSONPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.JSONPrinter(n.Items[0])
+	}
+	return printer.JSONPrinter(n)
+}
+
+func (n *ConfigMapList) YAMLPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.YAMLPrinter(n.Items[0])
+	}
+	return printer.YAMLPrinter(n)
+}
+
+func (n *ConfigMapList) TablePrint() ([]string, [][]string) {
+	headers := []string{"name", "create_timestamp"}
+	var data [][]string
+	for _, cm := range n.Items {
+		data = append(data, []string{cm.Name, cm.CreationTimestamp.String()})
+	}
+	return headers, data
 }

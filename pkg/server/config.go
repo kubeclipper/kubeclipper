@@ -545,6 +545,11 @@ var Roles = []iamv1.GlobalRole{
 				Resources: []string{"templates"},
 				Verbs:     []string{"update", "patch", "create", "delete"},
 			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"*"},
+			},
 		},
 	},
 	{

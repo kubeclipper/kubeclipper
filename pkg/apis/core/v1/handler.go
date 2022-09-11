@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models/core"
+
 	"github.com/robfig/cron/v3"
 
 	r "k8s.io/apimachinery/pkg/util/rand"
@@ -87,6 +89,7 @@ type handler struct {
 	leaseOperator    lease.Operator
 	opOperator       operation.Operator
 	platformOperator platform.Operator
+	coreOperator     core.Operator
 	delivery         service.IDelivery
 }
 
@@ -103,13 +106,14 @@ var (
 )
 
 func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, delivery service.IDelivery) *handler {
+	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery) *handler {
 	return &handler{
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
 		opOperator:       op,
 		platformOperator: platform,
 		leaseOperator:    leaseOperator,
+		coreOperator:     coreOperator,
 	}
 }
 
@@ -2978,4 +2982,132 @@ func (h *handler) ListBackupsWithCronBackup(req *restful.Request, resp *restful.
 	}
 
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+}
+
+func (h *handler) ListConfigMaps(req *restful.Request, resp *restful.Response) {
+	q := query.ParseQueryParameter(req)
+	if q.Watch {
+		h.watchConfigMap(req, resp, q)
+		return
+	}
+	if clientrest.IsInformerRawQuery(req.Request) {
+		result, err := h.coreOperator.ListConfigMaps(req.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+	} else {
+		result, err := h.coreOperator.ListConfigMapsEx(req.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+	}
+}
+
+func (h *handler) DescribeConfigMap(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter(query.ParameterName)
+	resourceVersion := strutil.StringDefaultIfEmpty("0", req.QueryParameter(query.ParameterResourceVersion))
+	c, err := h.coreOperator.GetConfigMapEx(req.Request.Context(), name, resourceVersion)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, c)
+}
+
+func (h *handler) CreateConfigMap(req *restful.Request, resp *restful.Response) {
+	cm := &v1.ConfigMap{}
+	err := req.ReadEntity(cm)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	cm, err = h.coreOperator.CreateConfigMap(req.Request.Context(), cm)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusCreated, cm)
+}
+
+func (h *handler) UpdateConfigMap(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	cm := &v1.ConfigMap{}
+	if err := req.ReadEntity(cm); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+
+	if name != cm.Name {
+		restplus.HandleBadRequest(resp, req, errors.New("name in url path not same with body"))
+		return
+	}
+
+	_, err := h.coreOperator.GetConfigMapEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	// TODO: check configmap Immutable
+
+	if !dryRun {
+		cm, err = h.coreOperator.UpdateConfigMap(req.Request.Context(), cm)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, cm)
+}
+
+func (h *handler) DeleteConfigMap(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+	_, err := h.coreOperator.GetConfigMapEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	if !dryRun {
+		err = h.coreOperator.DeleteConfigMap(req.Request.Context(), name)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	resp.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) watchConfigMap(req *restful.Request, resp *restful.Response, q *query.Query) {
+	timeout := time.Duration(0)
+	if q.TimeoutSeconds != nil {
+		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 {
+		timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
+	}
+
+	watcher, err := h.coreOperator.WatchConfigMaps(req.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("ConfigMap"), req, resp, timeout)
 }

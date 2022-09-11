@@ -26,9 +26,9 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=false
 type ConfigMap struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ObjectMeta
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Immutable field, if set, ensures that data stored in the ConfigMap cannot
 	// be updated (only object metadata can be modified).
