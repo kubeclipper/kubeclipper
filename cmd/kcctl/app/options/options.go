@@ -65,7 +65,6 @@ const (
 	DefaultDeployConfig       = "deploy-config.yaml"
 	DefaultConfig             = "config"
 	DefaultCaPath             = "pki"
-	DefaultSSHPort            = 22
 	DefaultEtcdPKIPath        = "pki/etcd"
 	DefaultNatsPKIPath        = "pki/nats"
 	DefaultKcServerConfigPath = "/etc/kubeclipper-server"
@@ -269,7 +268,7 @@ func NewDeployOptions() *DeployConfig {
 		IPDetect: autodetection.MethodFirst,
 		SSHConfig: &sshutils.SSH{
 			User: "root",
-			Port: DefaultSSHPort,
+			Port: 22,
 		},
 		EtcdConfig: &Etcd{
 			ClientPort:  2379,
@@ -310,13 +309,8 @@ func (c *DeployConfig) MergeDeployOptions() {
 }
 
 func (c *DeployConfig) Complete() error {
-	port := 0
 	if c.Config == "" {
 		return nil
-	}
-
-	if c.SSHConfig.Port != DefaultSSHPort {
-		port = c.SSHConfig.Port
 	}
 
 	if !utils.FileExist(c.Config) {
@@ -344,12 +338,6 @@ func (c *DeployConfig) Complete() error {
 			metadata.Region = c.DefaultRegion
 			c.Agents[ip] = metadata
 		}
-	}
-
-	if port != 0 {
-		c.SSHConfig.Port = port
-	} else if c.SSHConfig.Port == 0 {
-		c.SSHConfig.Port = DefaultSSHPort
 	}
 
 	return nil
