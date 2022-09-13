@@ -78,7 +78,7 @@ type GetOptions struct {
 }
 
 var (
-	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster)
+	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap)
 )
 
 func NewGetOptions(streams options.IOStreams) *GetOptions {
@@ -163,6 +163,8 @@ func (l *GetOptions) list() error {
 		result, err = l.client.ListRoles(context.TODO(), kc.Queries(*q))
 	case options.ResourceCluster:
 		result, err = l.client.ListClusters(context.TODO(), kc.Queries(*q))
+	case options.ResourceConfigMap:
+		result, err = l.client.ListConfigMaps(context.TODO(), kc.Queries(*q))
 	default:
 		return fmt.Errorf("unsupported resource")
 	}
@@ -187,6 +189,8 @@ func (l *GetOptions) describe() error {
 		result, err = l.client.DescribeRole(context.TODO(), l.name)
 	case options.ResourceCluster:
 		result, err = l.client.DescribeCluster(context.TODO(), l.name)
+	case options.ResourceConfigMap:
+		result, err = l.client.DescribeConfigMap(context.TODO(), l.name)
 	default:
 		return fmt.Errorf("unsupported resource")
 	}
@@ -212,6 +216,8 @@ func ValidArgsFunction(o *GetOptions) func(cmd *cobra.Command, args []string, to
 			return o.listNode(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		case options.ResourceCluster:
 			return o.listCluster(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+		case options.ResourceConfigMap:
+			return o.listConfigMaps(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -274,6 +280,23 @@ func (l *GetOptions) listCluster(toComplete string) []string {
 	q.LabelSelector = l.LabelSelector
 	q.FieldSelector = l.FieldSelector
 	data, err := l.client.ListClusters(context.TODO(), kc.Queries(*q))
+	if err != nil {
+		return nil
+	}
+	for _, v := range data.Items {
+		if strings.HasPrefix(v.Name, toComplete) {
+			list = append(list, v.Name)
+		}
+	}
+	return list
+}
+
+func (l *GetOptions) listConfigMaps(toComplete string) []string {
+	list := make([]string, 0)
+	q := query.New()
+	q.LabelSelector = l.LabelSelector
+	q.FieldSelector = l.FieldSelector
+	data, err := l.client.ListConfigMaps(context.TODO(), kc.Queries(*q))
 	if err != nil {
 		return nil
 	}

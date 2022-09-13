@@ -19,11 +19,14 @@
 package options
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -92,15 +95,16 @@ var (
 )
 
 const (
-	ResourceNode    = "node"
-	ResourceCluster = "cluster"
-	ResourceUser    = "user"
-	ResourceRole    = "role"
-	UpgradeKcctl    = "kcctl"
-	UpgradeAgent    = "agent"
-	UpgradeServer   = "server"
-	UpgradeConsole  = "console"
-	UpgradeAll      = "all"
+	ResourceNode      = "node"
+	ResourceCluster   = "cluster"
+	ResourceUser      = "user"
+	ResourceRole      = "role"
+	ResourceConfigMap = "configmap"
+	UpgradeKcctl      = "kcctl"
+	UpgradeAgent      = "agent"
+	UpgradeServer     = "server"
+	UpgradeConsole    = "console"
+	UpgradeAll        = "all"
 )
 
 type IOStreams struct {
@@ -420,4 +424,107 @@ func AddFlagsToSSH(ssh *sshutils.SSH, flags *pflag.FlagSet) {
 	flags.IntVar(&ssh.Port, "ssh-port", ssh.Port, "ssh connection port of agent nodes")
 	flags.StringVar(&ssh.PkFile, "pk-file", ssh.PkFile, "ssh pk file which used to remote access other agent nodes")
 	flags.StringVar(&ssh.PkPassword, "pk-passwd", ssh.PkPassword, "the password of the ssh pk file which used to remote access other agent nodes")
+}
+
+func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, error) {
+	tmpl, err := template.New("text").Parse(config.KcServerConfigTmpl)
+	if err != nil {
+		return "", fmt.Errorf("template parse failed: %s", err.Error())
+	}
+	var mqServerEndpoints []string
+	for _, v := range c.MQ.IPs {
+		mqServerEndpoints = append(mqServerEndpoints, fmt.Sprintf("%s:%d", v, c.MQ.Port))
+	}
+	etcdEndpoints := []string{fmt.Sprintf("%s:%d", ip, c.EtcdConfig.ClientPort)}
+	var data = make(map[string]interface{})
+	data["ServerAddress"] = ip
+	data["ServerPort"] = c.ServerPort
+	// TODO: make auto generate
+	data["JwtSecret"] = c.JWTSecret
+	data["StaticServerPort"] = c.StaticServerPort
+	data["StaticServerPath"] = c.StaticServerPath
+	if c.Debug {
+		data["LogLevel"] = "debug"
+	} else {
+		data["LogLevel"] = "info"
+	}
+	data["EtcdEndpoints"] = etcdEndpoints
+	data["EtcdCaPath"] = filepath.Join(DefaultKcServerConfigPath, DefaultCaPath, fmt.Sprintf("%s.crt", Ca))
+	data["EtcdCertPath"] = filepath.Join(DefaultKcServerConfigPath, DefaultEtcdPKIPath, fmt.Sprintf("%s.crt", EtcdKcClient))
+	data["EtcdKeyPath"] = filepath.Join(DefaultKcServerConfigPath, DefaultEtcdPKIPath, fmt.Sprintf("%s.key", EtcdKcClient))
+
+	data["MQExternal"] = c.MQ.External
+	data["MQUser"] = c.MQ.User
+	data["MQAuthToken"] = c.MQ.Secret
+	data["MQServerEndpoints"] = mqServerEndpoints
+	data["MQTLS"] = c.MQ.TLS
+	if !c.MQ.External {
+		isFloatIP, _ := sshutils.IsFloatIP(c.SSHConfig, ip)
+		if isFloatIP {
+			// if user specify a float ip,we replace to listen 0.0.0.0
+			data["MQServerAddress"] = "0.0.0.0"
+		} else {
+			data["MQServerAddress"] = ip
+		}
+		data["MQServerPort"] = c.MQ.Port
+		data["MQClusterPort"] = c.MQ.ClusterPort
+		data["LeaderHost"] = fmt.Sprintf("%s:%d", c.ServerIPs[0], c.MQ.ClusterPort)
+		if c.MQ.TLS {
+			data["MQServerCertPath"] = filepath.Join(DefaultKcServerConfigPath, DefaultNatsPKIPath, fmt.Sprintf("%s.crt", NatsIOServer))
+			data["MQServerKeyPath"] = filepath.Join(DefaultKcServerConfigPath, DefaultNatsPKIPath, fmt.Sprintf("%s.key", NatsIOServer))
+		}
+	}
+
+	if c.MQ.TLS {
+		data["MQCaPath"] = c.MQ.CA
+		data["MQClientCertPath"] = c.MQ.ClientCert
+		data["MQClientKeyPath"] = c.MQ.ClientKey
+	}
+	var buffer bytes.Buffer
+	if err := tmpl.Execute(&buffer, data); err != nil {
+		return "", fmt.Errorf("template execute failed: %s", err.Error())
+	}
+	return buffer.String(), nil
+}
+
+func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) (string, error) {
+	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
+	if err != nil {
+		return "", fmt.Errorf("template parse failed: %s", err.Error())
+	}
+	var mqServerEndpoints []string
+	for _, v := range c.MQ.IPs {
+		mqServerEndpoints = append(mqServerEndpoints, fmt.Sprintf("%s:%d", v, c.MQ.Port))
+	}
+
+	var data = make(map[string]interface{})
+	data["AgentID"] = uuid.New().String()
+	data["Region"] = metadata.Region
+	data["FloatIP"] = metadata.FloatIP
+	data["IPDetect"] = c.IPDetect
+	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.ServerIPs[0], c.StaticServerPort)
+	if c.Debug {
+		data["LogLevel"] = "debug"
+	} else {
+		data["LogLevel"] = "info"
+	}
+	data["MQServerEndpoints"] = mqServerEndpoints
+	data["MQAuthToken"] = c.MQ.Secret
+	data["MQExternal"] = c.MQ.External
+	data["MQUser"] = c.MQ.User
+	data["MQAuthToken"] = c.MQ.Secret
+	data["MQTLS"] = c.MQ.TLS
+	if c.MQ.TLS {
+		data["MQCaPath"] = filepath.Join(DefaultKcAgentConfigPath, DefaultCaPath, filepath.Base(c.MQ.CA))
+		data["MQClientCertPath"] = filepath.Join(DefaultKcAgentConfigPath, DefaultNatsPKIPath, filepath.Base(c.MQ.ClientCert))
+		data["MQClientKeyPath"] = filepath.Join(DefaultKcAgentConfigPath, DefaultNatsPKIPath, filepath.Base(c.MQ.ClientKey))
+	}
+	data["OpLogDir"] = c.OpLog.Dir
+	data["OpLogThreshold"] = c.OpLog.Threshold
+	data["KcImageRepoMirror"] = c.ImageProxy.KcImageRepoMirror
+	var buffer bytes.Buffer
+	if err = tmpl.Execute(&buffer, data); err != nil {
+		return "", fmt.Errorf("template execute failed: %s", err.Error())
+	}
+	return buffer.String(), nil
 }
