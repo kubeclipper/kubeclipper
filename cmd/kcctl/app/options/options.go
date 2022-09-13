@@ -268,6 +268,7 @@ func NewDeployOptions() *DeployConfig {
 		IPDetect: autodetection.MethodFirst,
 		SSHConfig: &sshutils.SSH{
 			User: "root",
+			Port: 22,
 		},
 		EtcdConfig: &Etcd{
 			ClientPort:  2379,
@@ -311,6 +312,7 @@ func (c *DeployConfig) Complete() error {
 	if c.Config == "" {
 		return nil
 	}
+
 	if !utils.FileExist(c.Config) {
 		return fmt.Errorf("%s is not exist", c.Config)
 	}
@@ -415,6 +417,7 @@ func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 func AddFlagsToSSH(ssh *sshutils.SSH, flags *pflag.FlagSet) {
 	flags.StringVarP(&ssh.User, "user", "u", ssh.User, "Deploy ssh user")
 	flags.StringVar(&ssh.Password, "passwd", ssh.Password, "Deploy ssh password")
+	flags.IntVar(&ssh.Port, "ssh-port", ssh.Port, "ssh connection port of agent nodes")
 	flags.StringVar(&ssh.PkFile, "pk-file", ssh.PkFile, "ssh pk file which used to remote access other agent nodes")
 	flags.StringVar(&ssh.PkPassword, "pk-passwd", ssh.PkPassword, "the password of the ssh pk file which used to remote access other agent nodes")
 }

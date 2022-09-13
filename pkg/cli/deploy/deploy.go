@@ -226,6 +226,9 @@ func (d *DeployOptions) ValidateArgs() error {
 	if !d.aio && d.deployConfig.SSHConfig.PkFile == "" && d.deployConfig.SSHConfig.Password == "" {
 		return fmt.Errorf("one of --pk-file or --passwd must be specified")
 	}
+	if d.deployConfig.SSHConfig.Port <= 0 {
+		return fmt.Errorf("ssh connection port must be a positive number")
+	}
 	if len(d.deployConfig.ServerIPs) == 0 {
 		return fmt.Errorf("must specify at least one server")
 	}
