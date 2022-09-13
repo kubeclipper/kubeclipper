@@ -224,7 +224,7 @@ func (p *PatchNodes) getPackageSteps(cluster *corev1.Cluster, action corev1.Step
 		return pack.UninstallSteps(pNodes)
 	}
 
-	return nil, fmt.Errorf("packageSteps no support action: %s", action)
+	return nil, fmt.Errorf("packageSteps dose not support action: %s", action)
 }
 
 func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, c *corev1.Cluster, patchNodes []corev1.StepNode, action corev1.StepAction) ([]corev1.Step, error) {

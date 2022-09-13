@@ -1045,7 +1045,7 @@ func CleanCNI(c *v1.CNI, nodes []v1.StepNode) ([]v1.Step, error) {
 		return ClearCalico(c.Calico, nodes), nil
 	}
 
-	return nil, fmt.Errorf("no support cni type: %s", c.Type)
+	return nil, fmt.Errorf("dose not support cni type: %s", c.Type)
 }
 
 func ClearCalico(calico *v1.Calico, nodes []v1.StepNode) []v1.Step {
@@ -1151,5 +1151,5 @@ func (stepper *KubectlTerminal) InstallSteps(stepMaster0 []v1.StepNode) ([]v1.St
 }
 
 func (stepper *KubectlTerminal) UninstallSteps() ([]v1.Step, error) {
-	return nil, fmt.Errorf("KubectlTerminal no support uninstall")
+	return nil, fmt.Errorf("KubectlTerminal dose not support uninstall")
 }

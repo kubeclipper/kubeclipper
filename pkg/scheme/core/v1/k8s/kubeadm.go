@@ -592,7 +592,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 }
 
 func (stepper *ClusterNode) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("no support uninstall clusterNode")
+	return nil, fmt.Errorf("ClusterNode dose not support uninstall")
 }
 
 func (stepper *ClusterNode) generatesIPSOCareStaticPod(ctx context.Context) error {
@@ -673,7 +673,7 @@ func (stepper *CNIInfo) CalicoTemplate() (string, error) {
 	case "v3.22.4":
 		return calicoV3224, nil
 	}
-	return "", fmt.Errorf("calico no support %s version", stepper.CNI.Version)
+	return "", fmt.Errorf("calico dose not support version: %s", stepper.CNI.Version)
 }
 
 func (stepper *CNIInfo) renderCalico(ctx context.Context, dryRun bool) error {
@@ -752,7 +752,7 @@ func (stepper *Container) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *Container) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("no support install Container")
+	return nil, fmt.Errorf("Container dose not support install")
 }
 
 func (stepper *Container) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
@@ -776,7 +776,7 @@ func (stepper *Kubectl) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *Kubectl) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("no support uninstall Kubectl")
+	return nil, fmt.Errorf("Kubectl dose not support uninstall")
 }
 
 func (stepper *Kubectl) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {

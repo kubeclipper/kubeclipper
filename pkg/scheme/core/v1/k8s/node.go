@@ -249,7 +249,7 @@ func (stepper *JoinCmd) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 }
 
 func (stepper *JoinCmd) UninstallSteps() ([]v1.Step, error) {
-	return nil, fmt.Errorf("joinCmd no support uninstall steps")
+	return nil, fmt.Errorf("JoinCmd dose not support uninstall steps")
 }
 
 func (stepper *Drain) InitStepper(hostname string, extraArgs []string) *Drain {
@@ -259,7 +259,7 @@ func (stepper *Drain) InitStepper(hostname string, extraArgs []string) *Drain {
 }
 
 func (stepper *Drain) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
-	return nil, fmt.Errorf("drain no support install steps")
+	return nil, fmt.Errorf("Drain dose not support install steps")
 }
 
 func (stepper *Drain) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
@@ -328,7 +328,7 @@ func (stepper JoinCmd) Install(ctx context.Context, opts component.Options) ([]b
 }
 
 func (stepper JoinCmd) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("JoinNodeCmd no support Uninstall")
+	return nil, fmt.Errorf("JoinNodeCmd dose not support Uninstall")
 }
 
 func (stepper *Drain) NewInstance() component.ObjectMeta {

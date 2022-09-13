@@ -188,11 +188,11 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 }
 
 func (runnable *ContainerdRunnable) OfflineUpgrade(ctx context.Context, dryRun bool) ([]byte, error) {
-	return nil, fmt.Errorf("no support offlineUpgrade containerdRunnable")
+	return nil, fmt.Errorf("ContainerdRunnable dose not support offlineUpgrade")
 }
 
 func (runnable *ContainerdRunnable) OnlineUpgrade(ctx context.Context, dryRun bool) ([]byte, error) {
-	return nil, fmt.Errorf("no support onlineUpgrade containerdRunnable")
+	return nil, fmt.Errorf("ContainerdRunnable not supported onlineUpgrade")
 }
 
 func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) string {

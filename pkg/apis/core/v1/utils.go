@@ -61,7 +61,7 @@ func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepActio
 		}
 		return r.GetActionSteps(action), nil
 	}
-	return nil, fmt.Errorf("no support %v type cri", c.Type)
+	return nil, fmt.Errorf("%v type CRI is not supported", c.Type)
 }
 
 func getK8sSteps(ctx context.Context, c *v1.Cluster, action v1.StepAction) ([]v1.Step, error) {
