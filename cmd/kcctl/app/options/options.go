@@ -30,7 +30,6 @@ import (
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
@@ -424,10 +423,10 @@ func AddFlagsToSSH(ssh *sshutils.SSH, flags *pflag.FlagSet) {
 	flags.StringVar(&ssh.PkPassword, "pk-passwd", ssh.PkPassword, "the password of the ssh pk file which used to remote access other agent nodes")
 }
 
-func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) string {
+func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, error) {
 	tmpl, err := template.New("text").Parse(config.KcServerConfigTmpl)
 	if err != nil {
-		logger.Fatalf("template parse failed: %s", err.Error())
+		return "", fmt.Errorf("template parse failed: %s", err.Error())
 	}
 	var mqServerEndpoints []string
 	for _, v := range c.MQ.IPs {
@@ -480,15 +479,15 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) string {
 	}
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, data); err != nil {
-		logger.Fatalf("template execute failed: %s", err.Error())
+		return "", fmt.Errorf("template execute failed: %s", err.Error())
 	}
-	return buffer.String()
+	return buffer.String(), nil
 }
 
-func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) string {
+func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) (string, error) {
 	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
 	if err != nil {
-		logger.Fatalf("template parse failed: %s", err.Error())
+		return "", fmt.Errorf("template parse failed: %s", err.Error())
 	}
 	var mqServerEndpoints []string
 	for _, v := range c.MQ.IPs {
@@ -522,7 +521,7 @@ func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) string
 	data["KcImageRepoMirror"] = c.ImageProxy.KcImageRepoMirror
 	var buffer bytes.Buffer
 	if err = tmpl.Execute(&buffer, data); err != nil {
-		logger.Fatalf("template execute failed: %s", err.Error())
+		return "", fmt.Errorf("template execute failed: %s", err.Error())
 	}
-	return buffer.String()
+	return buffer.String(), nil
 }

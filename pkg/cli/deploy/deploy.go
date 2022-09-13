@@ -632,7 +632,10 @@ func (d *DeployOptions) deployKcServer() {
 	}
 
 	for _, host := range d.deployConfig.ServerIPs {
-		data := d.deployConfig.GetKcServerConfigTemplateContent(host)
+		data, err := d.deployConfig.GetKcServerConfigTemplateContent(host)
+		if err != nil {
+			logger.Fatal(err)
+		}
 		cmd := sshutils.WrapEcho(data, "/etc/kubeclipper-server/kubeclipper-server.yaml") +
 			"&& systemctl daemon-reload && systemctl enable kc-server --now"
 		ret, err := sshutils.SSHCmdWithSudo(d.deployConfig.SSHConfig, host, cmd)
@@ -665,7 +668,10 @@ func (d *DeployOptions) deployKcConsole() {
 
 func (d *DeployOptions) deployKcAgent() {
 	for agent, metadata := range d.deployConfig.Agents {
-		agentConfig := d.deployConfig.GetKcAgentConfigTemplateContent(metadata)
+		agentConfig, err := d.deployConfig.GetKcAgentConfigTemplateContent(metadata)
+		if err != nil {
+			logger.Fatal(err)
+		}
 		cmdList := []string{
 			sshutils.WrapEcho(config.KcAgentService, "/usr/lib/systemd/system/kc-agent.service"),
 			"mkdir -pv /etc/kubeclipper-agent",
