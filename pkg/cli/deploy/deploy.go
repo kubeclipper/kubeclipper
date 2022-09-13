@@ -25,11 +25,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/constatns"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"io/ioutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"math"
 	"net"
 	"path"
@@ -40,10 +36,15 @@ import (
 	"text/template"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
+
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 
-	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/sethvargo/go-password/password"
@@ -614,115 +615,14 @@ func (d *DeployOptions) getKcConsoleTemplateContent() string {
 	return buffer.String()
 }
 
-func (d *DeployOptions) getKcServerConfigTemplateContent(ip string) string {
-	tmpl, err := template.New("text").Parse(config.KcServerConfigTmpl)
-	if err != nil {
-		logger.Fatalf("template parse failed: %s", err.Error())
-	}
-	var mqServerEndpoints []string
-	for _, v := range d.deployConfig.MQ.IPs {
-		mqServerEndpoints = append(mqServerEndpoints, fmt.Sprintf("%s:%d", v, d.deployConfig.MQ.Port))
-	}
-	etcdEndpoints := []string{fmt.Sprintf("%s:%d", ip, d.deployConfig.EtcdConfig.ClientPort)}
-	var data = make(map[string]interface{})
-	data["ServerAddress"] = ip
-	data["ServerPort"] = d.deployConfig.ServerPort
-	// TODO: make auto generate
-	data["JwtSecret"] = d.deployConfig.JWTSecret
-	data["StaticServerPort"] = d.deployConfig.StaticServerPort
-	data["StaticServerPath"] = d.deployConfig.StaticServerPath
-	if d.deployConfig.Debug {
-		data["LogLevel"] = "debug"
-	} else {
-		data["LogLevel"] = "info"
-	}
-	data["EtcdEndpoints"] = etcdEndpoints
-	data["EtcdCaPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultCaPath, fmt.Sprintf("%s.crt", options.Ca))
-	data["EtcdCertPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.crt", options.EtcdKcClient))
-	data["EtcdKeyPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.key", options.EtcdKcClient))
-
-	data["MQExternal"] = d.deployConfig.MQ.External
-	data["MQUser"] = d.deployConfig.MQ.User
-	data["MQAuthToken"] = d.deployConfig.MQ.Secret
-	data["MQServerEndpoints"] = mqServerEndpoints
-	data["MQTLS"] = d.deployConfig.MQ.TLS
-	if !d.deployConfig.MQ.External {
-		isFloatIP, _ := sshutils.IsFloatIP(d.deployConfig.SSHConfig, ip)
-		if isFloatIP {
-			// if user specify a float ip,we replace to listen 0.0.0.0
-			data["MQServerAddress"] = "0.0.0.0"
-		} else {
-			data["MQServerAddress"] = ip
-		}
-		data["MQServerPort"] = d.deployConfig.MQ.Port
-		data["MQClusterPort"] = d.deployConfig.MQ.ClusterPort
-		data["LeaderHost"] = fmt.Sprintf("%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.MQ.ClusterPort)
-		if d.deployConfig.MQ.TLS {
-			data["MQServerCertPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultNatsPKIPath, fmt.Sprintf("%s.crt", options.NatsIOServer))
-			data["MQServerKeyPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultNatsPKIPath, fmt.Sprintf("%s.key", options.NatsIOServer))
-		}
-	}
-
-	if d.deployConfig.MQ.TLS {
-		data["MQCaPath"] = d.deployConfig.MQ.CA
-		data["MQClientCertPath"] = d.deployConfig.MQ.ClientCert
-		data["MQClientKeyPath"] = d.deployConfig.MQ.ClientKey
-	}
-	var buffer bytes.Buffer
-	if err := tmpl.Execute(&buffer, data); err != nil {
-		logger.Fatalf("template execute failed: %s", err.Error())
-	}
-	return buffer.String()
-}
-
-func (d *DeployOptions) getKcAgentConfigTemplateContent(metadata options.Metadata) string {
-	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
-	if err != nil {
-		logger.Fatalf("template parse failed: %s", err.Error())
-	}
-	var mqServerEndpoints []string
-	for _, v := range d.deployConfig.MQ.IPs {
-		mqServerEndpoints = append(mqServerEndpoints, fmt.Sprintf("%s:%d", v, d.deployConfig.MQ.Port))
-	}
-
-	var data = make(map[string]interface{})
-	data["AgentID"] = uuid.New().String()
-	data["Region"] = metadata.Region
-	data["FloatIP"] = metadata.FloatIP
-	data["IPDetect"] = d.deployConfig.IPDetect
-	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.StaticServerPort)
-	if d.deployConfig.Debug {
-		data["LogLevel"] = "debug"
-	} else {
-		data["LogLevel"] = "info"
-	}
-	data["MQServerEndpoints"] = mqServerEndpoints
-	data["MQAuthToken"] = d.deployConfig.MQ.Secret
-	data["MQExternal"] = d.deployConfig.MQ.External
-	data["MQUser"] = d.deployConfig.MQ.User
-	data["MQAuthToken"] = d.deployConfig.MQ.Secret
-	data["MQTLS"] = d.deployConfig.MQ.TLS
-	if d.deployConfig.MQ.TLS {
-		data["MQCaPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultCaPath, filepath.Base(d.deployConfig.MQ.CA))
-		data["MQClientCertPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, filepath.Base(d.deployConfig.MQ.ClientCert))
-		data["MQClientKeyPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, filepath.Base(d.deployConfig.MQ.ClientKey))
-	}
-	data["OpLogDir"] = d.deployConfig.OpLog.Dir
-	data["OpLogThreshold"] = d.deployConfig.OpLog.Threshold
-	data["KcImageRepoMirror"] = d.deployConfig.ImageProxy.KcImageRepoMirror
-	var buffer bytes.Buffer
-	if err = tmpl.Execute(&buffer, data); err != nil {
-		logger.Fatalf("template execute failed: %s", err.Error())
-	}
-	return buffer.String()
-}
-
 func (d *DeployOptions) deployKcServer() {
 	cmdList := []string{
 		"mkdir -pv /etc/kubeclipper-server",
 		sshutils.WrapEcho(config.KcServerService, "/usr/lib/systemd/system/kc-server.service"),
-		fmt.Sprintf("mkdir -pv %s ", d.deployConfig.StaticServerPath),
+		fmt.Sprintf("mkdir -pv %s/kc", d.deployConfig.StaticServerPath),
 		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/resource/* %s/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
+		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/kubeclipper-server %s/kc/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
+		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/kubeclipper-agent %s/kc/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
 	}
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(d.deployConfig.SSHConfig, d.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
@@ -732,7 +632,7 @@ func (d *DeployOptions) deployKcServer() {
 	}
 
 	for _, host := range d.deployConfig.ServerIPs {
-		data := d.getKcServerConfigTemplateContent(host)
+		data := d.deployConfig.GetKcServerConfigTemplateContent(host)
 		cmd := sshutils.WrapEcho(data, "/etc/kubeclipper-server/kubeclipper-server.yaml") +
 			"&& systemctl daemon-reload && systemctl enable kc-server --now"
 		ret, err := sshutils.SSHCmdWithSudo(d.deployConfig.SSHConfig, host, cmd)
@@ -765,7 +665,7 @@ func (d *DeployOptions) deployKcConsole() {
 
 func (d *DeployOptions) deployKcAgent() {
 	for agent, metadata := range d.deployConfig.Agents {
-		agentConfig := d.getKcAgentConfigTemplateContent(metadata)
+		agentConfig := d.deployConfig.GetKcAgentConfigTemplateContent(metadata)
 		cmdList := []string{
 			sshutils.WrapEcho(config.KcAgentService, "/usr/lib/systemd/system/kc-agent.service"),
 			"mkdir -pv /etc/kubeclipper-agent",

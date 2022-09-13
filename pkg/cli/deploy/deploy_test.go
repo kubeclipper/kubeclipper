@@ -48,7 +48,7 @@ func TestDeployOptions_getKcServerConfigTemplateContent(t *testing.T) {
 	}
 
 	for _, s := range d.deployConfig.ServerIPs {
-		t.Log(d.getKcServerConfigTemplateContent(s))
+		t.Log(d.deployConfig.GetKcServerConfigTemplateContent(s))
 	}
 }
 
@@ -65,7 +65,7 @@ func TestDeployOptions_getKcAgentConfigTemplateContent(t *testing.T) {
 		FloatIP: "1.1.1.1",
 	}
 	for range d.deployConfig.ServerIPs {
-		t.Log(d.getKcAgentConfigTemplateContent(metadata))
+		t.Log(d.deployConfig.GetKcAgentConfigTemplateContent(metadata))
 	}
 }
 
