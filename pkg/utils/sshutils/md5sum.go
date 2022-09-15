@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
 func MD5FromLocal(localPath string) (string, error) {
@@ -44,7 +42,6 @@ func MD5FromLocal(localPath string) (string, error) {
 	md5 := bout.String()
 	md5 = strings.ReplaceAll(md5, "\n", "")
 	md5 = strings.ReplaceAll(md5, "\r", "")
-	logger.V(5).Infof("local file(%s) md5 is %s", localPath, md5)
 	return md5, nil
 }
 
@@ -58,7 +55,6 @@ func (ss *SSH) MD5FromRemote(host, remoteFilePath string) (string, error) {
 		return "", err
 	}
 	md5 := ret.StdoutToString("")
-	logger.V(5).Infof("[%s] remote file(%s) md5 is %s", host, remoteFilePath, md5)
 	return md5, nil
 }
 
@@ -67,11 +63,9 @@ func (ss *SSH) ValidateMd5sumLocalWithRemote(host, localFile, remoteFile string)
 	if err != nil {
 		return false, err
 	}
-	logger.V(5).Infof("localFile file(%s) md5 value is %s", localFile, localMD5)
 	remoteMD5, err := ss.MD5FromRemote(host, remoteFile)
 	if err != nil {
 		return false, err
 	}
-	logger.V(5).Infof("remoteFile file(%s) md5 value is %s", remoteFile, remoteMD5)
 	return localMD5 == remoteMD5, nil
 }
