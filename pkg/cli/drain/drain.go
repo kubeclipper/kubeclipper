@@ -44,7 +44,7 @@ import (
 
 const (
 	longDescription = `
-  Drain the Kubeclipper service or agent node from the cluster.
+  Drain the Kubeclipper server or agent node from the cluster.
 
   Now only support drain kc-agent node, so the --agent parameter must be valid.`
 	drainExample = `
