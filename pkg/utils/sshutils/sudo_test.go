@@ -20,17 +20,6 @@ package sshutils
 
 import "testing"
 
-//func Test_fillCmd(t *testing.T) {
-//	cmd := "systemctl daemon-reload && systemctl enable kc-etcd"
-//	sudoCmd, err := fillCmd(_testSSH, cmd)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	if sudoCmd != " echo 'root' | sudo -S systemctl daemon-reload &&echo 'root' | sudo -S  systemctl enable kc-etcd" {
-//		t.Failed()
-//	}
-//}
-
 func Test_printCmd(t *testing.T) {
 	cmd := printCmd("root", "echo 'root'|sudo -S id -u")
 	if cmd != "echo '$PASSWD'|sudo -S id -u" {

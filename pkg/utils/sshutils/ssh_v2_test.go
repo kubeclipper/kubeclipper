@@ -24,62 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// const _host = "172.20.151.80"
-//
-// //const _host = "172.20.150.220"
-//
-// var (
-//	_defaultTimeout = time.Duration(1) * time.Minute
-//	sshConfig       = &SSH{
-//		User:              "root",
-//		Password:          "Thinkbig1",
-//		ConnectionTimeout: &_defaultTimeout,
-//	}
-//	_testSSH = &SSH{
-//		User:              "test2",
-//		Password:          "root",
-//		ConnectionTimeout: &_defaultTimeout,
-//	}
-// )
-//
-// func TestSSHCmd(t *testing.T) {
-//	result, err := SSHCmd(sshConfig, _host, "ls")
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	t.Log(result)
-// }
-//
-// func TestCmdPatch(t *testing.T) {
-//	walk := func(result Result, err error) error {
-//		t.Log(result)
-//		t.Log("err: ", err)
-//		if err != nil {
-//			return err
-//		}
-//		if result.ExitCode != 0 {
-//			return fmt.Errorf("stderr:%s", result.Stderr)
-//		}
-//		return nil
-//	}
-//	hosts := []string{
-//		//"172.20.149.53",
-//		//"172.20.150.220",
-//		"172.20.150.200",
-//		"172.20.151.80",
-//	}
-//	// err := CmdBatch(sshConfig, hosts, "ls /tmp2", walk)
-//	// err := CmdBatch(sshConfig, hosts, "ls ~", walk)
-//	// err := CmdBatch(sshConfig, hosts, "id -u", walk)
-//	err := CmdBatchWithSudo(sshConfig, hosts, "id -u", walk)
-//	// err := CmdBatch(sshConfig, hosts, "sudo -u root ls /root", walk)
-//	// err := CmdBatch(sshConfig, hosts, "ls /tmp2 2>/dev/null", walk)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	t.Log("cmd run success")
-// }
-
 func TestSSHCmd(t *testing.T) {
 	defer func() {
 		Cmd("rm", "/tmp/d.txt")

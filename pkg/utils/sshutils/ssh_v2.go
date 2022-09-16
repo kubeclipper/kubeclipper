@@ -25,8 +25,6 @@ import (
 	"sync"
 
 	"golang.org/x/crypto/ssh"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
 type Result struct {
@@ -108,7 +106,6 @@ func SSHCmd(sshConfig *SSH, host, cmd string) (Result, error) {
 // host as specific user, along with any SSH-level error.
 func runSSHCommand(sshConfig *SSH, host, cmd string) (stdout, stderr string, exitcode int, err error) {
 	pCmd := printCmd(sshConfig.Password, cmd)
-	logger.V(2).Infof("running `%s` on %s@%s", pCmd, sshConfig.User, host)
 	client, err := sshConfig.NewClient(host)
 	if err != nil {
 		return "", "", 0, err

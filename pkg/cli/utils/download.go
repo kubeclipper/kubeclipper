@@ -157,7 +157,9 @@ func downloadFile(location string) (filePATH, md5 string, err error) {
 			// generator download cmd
 			dwnCmd := downloadCmd(location)
 			// os exec download command
-			sshutils.Cmd("/bin/sh", "-c", "mkdir -p /tmp/kc && cd /tmp/kc && "+dwnCmd)
+			if err = sshutils.Cmd("/bin/sh", "-c", "mkdir -p /tmp/kc && cd /tmp/kc && "+dwnCmd); err != nil {
+				return "", "", err
+			}
 		}
 		location = absPATH
 	}

@@ -188,7 +188,9 @@ func (o *UpgradeOptions) checkBinary() error {
 	dir := filepath.Dir(o.pkg)
 	target := filepath.Join(dir, "kc")
 	tar := fmt.Sprintf("mkdir -p %s && cp %s %s && cd %s && tar -cf /tmp/kc-%s.tar.gz kc && rm -rf /tmp/kc", target, o.pkg, target, dir, o.component)
-	sshutils.Cmd("/bin/sh", "-c", tar)
+	if err = sshutils.Cmd("/bin/sh", "-c", tar); err != nil {
+		return err
+	}
 	o.pkg = fmt.Sprintf("/tmp/kc-%s.tar.gz", o.component)
 	return nil
 }

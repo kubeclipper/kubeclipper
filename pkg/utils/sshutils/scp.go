@@ -20,11 +20,8 @@ package sshutils
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -40,38 +37,6 @@ import (
 const KB = 1024
 const MB = 1024 * 1024
 
-func md5sumLocal(localPath string) string {
-	cmd := fmt.Sprintf("md5sum %s | cut -d\" \" -f1", localPath)
-	c := exec.Command("sh", "-c", cmd)
-	out, err := c.CombinedOutput()
-	if err != nil {
-		logger.Errorf("exec cmd failed due to %s", err.Error())
-	}
-	md5 := string(out)
-	md5 = strings.ReplaceAll(md5, "\n", "")
-	md5 = strings.ReplaceAll(md5, "\r", "")
-
-	return md5
-}
-
-func (ss *SSH) CopyForMD5(host, localFilePath, remoteFilePath, md5 string) bool {
-	if md5 == "" {
-		md5 = md5sumLocal(localFilePath)
-	}
-	logger.V(2).Infof("source file md5 value is %s", md5)
-	_ = ss.Copy(host, localFilePath, remoteFilePath)
-	remoteMD5, _ := ss.MD5FromRemote(host, remoteFilePath)
-	logger.V(2).Infof("host: %s , remote md5: %s", host, remoteMD5)
-	remoteMD5 = strings.TrimSpace(remoteMD5)
-	md5 = strings.TrimSpace(md5)
-	if remoteMD5 == md5 {
-		logger.Info("md5 validate true")
-		return true
-	}
-	logger.Error("md5 validate false")
-	return false
-}
-
 // CopyForMD5V2 copy and check md5
 func (ss *SSH) CopyForMD5V2(host, localFilePath, remoteFilePath, localMD5 string) (bool, error) {
 	var err error
@@ -81,7 +46,6 @@ func (ss *SSH) CopyForMD5V2(host, localFilePath, remoteFilePath, localMD5 string
 			return false, err
 		}
 	}
-	logger.V(3).Infof("source file(%s) md5 value is %s", localFilePath, localMD5)
 	err = ss.CopySudo(host, localFilePath, remoteFilePath)
 	if err != nil {
 		return false, err
@@ -90,12 +54,9 @@ func (ss *SSH) CopyForMD5V2(host, localFilePath, remoteFilePath, localMD5 string
 	if err != nil {
 		return false, err
 	}
-	logger.V(3).Infof("[%s]remote file(%s) md5 value is %s", host, remoteFilePath, remoteMD5)
 	if strings.TrimSpace(localMD5) == strings.TrimSpace(remoteMD5) {
-		logger.V(4).Infof("md5 validate true localMd5:%s remoteMd5:%s", localMD5, remoteMD5)
 		return true, nil
 	}
-	logger.Errorf("md5 validate false localMd5:%s remoteMd5:%s", localMD5, remoteMD5)
 	return false, nil
 }
 
@@ -138,19 +99,18 @@ func (ss *SSH) Copy(host, localFilePath, remoteFilePath string) error {
 
 	sftpClient, err := ss.sftpConnect(host)
 	if err != nil {
-		logger.Fatalf("[%s]sftp conn failed: %s", host, err)
+		return err
 	}
 	defer sftpClient.Close()
 	srcFile, err := os.Open(localFilePath)
 	if err != nil {
-		logger.Fatalf("[%s]open local file %s failed: %s", host, localFilePath, err)
+		return err
 	}
 	defer srcFile.Close()
 
 	dstFile, err := sftpClient.Create(remoteFilePath)
 	if err != nil {
-		logger.Fatalf("[%s]open remote file %s failed: %s", host, remoteFilePath, err)
-
+		return err
 	}
 	defer dstFile.Close()
 	buf := make([]byte, 100*MB) // 100mb
@@ -217,18 +177,18 @@ func (ss *SSH) download(host, localFilePath, remoteFilePath string) error {
 
 	sftpClient, err := ss.sftpConnect(host)
 	if err != nil {
-		logger.Fatalf("[%s]sftp conn failed: %s", host, err)
+		return err
 	}
 	defer sftpClient.Close()
 	srcFile, err := sftpClient.Open(remoteFilePath)
 	if err != nil {
-		logger.Fatalf("[%s]open remote file %s failed: %s", host, remoteFilePath, err)
+		return err
 	}
 	defer srcFile.Close()
 
 	dstFile, err := os.Create(localFilePath)
 	if err != nil {
-		logger.Fatalf("[%s]create local file %s failed: %s", host, localFilePath, err)
+		return err
 	}
 	defer dstFile.Close()
 	buf := make([]byte, 100*MB) // 100mb
@@ -295,148 +255,6 @@ func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
 	}
 
 	return sftpClient, nil
-}
-
-// CopyRemoteFileToLocal is scp remote file to local
-func (ss *SSH) CopyRemoteFileToLocal(host, localFilePath, remoteFilePath string) {
-	sftpClient, err := ss.sftpConnect(host)
-	if err != nil {
-		logger.Fatalf("[%s]sftp conn failed: %s", host, err)
-	}
-	defer sftpClient.Close()
-	// open remote source file
-	srcFile, err := sftpClient.Open(remoteFilePath)
-	if err != nil {
-		logger.Fatalf("[%s]sftp open remote file %s failed: %s", host, remoteFilePath, err)
-	}
-	defer srcFile.Close()
-
-	// open local Destination file
-	dstFile, err := os.Create(localFilePath)
-	if err != nil {
-		logger.Fatalf("[%s]sftp open local file %s failed: %s", host, localFilePath, err)
-
-	}
-	defer dstFile.Close()
-	// copy to local file
-	_, _ = srcFile.WriteTo(dstFile)
-}
-
-// CopyLocalToRemote is copy file or dir to remotePath, add md5 validate
-func (ss *SSH) CopyLocalToRemote(host, localPath, remotePath string) {
-	sftpClient, err := ss.sftpConnect(host)
-	if err != nil {
-		logger.Fatalf("[%s]sftp conn failed: %s", host, err)
-	}
-	defer sftpClient.Close()
-	sshClient, err := ss.connect(host)
-	if err != nil {
-		logger.Fatalf("[%s]ssh conn failed: %s", host, err)
-	}
-	defer sshClient.Close()
-	s, _ := os.Stat(localPath)
-	if s.IsDir() {
-		ss.copyLocalDirToRemote(host, sshClient, sftpClient, localPath, remotePath)
-	} else {
-		baseRemoteFilePath := filepath.Dir(remotePath)
-		mkDstDir := fmt.Sprintf("mkdir -p %s || true", baseRemoteFilePath)
-		_ = ss.CmdAsync(host, mkDstDir)
-		ss.copyLocalFileToRemote(host, sshClient, sftpClient, localPath, remotePath)
-	}
-}
-
-// ssh session is a problem, 复用 ssh 链接
-func (ss *SSH) copyLocalDirToRemote(host string, sshClient *ssh.Client, sftpClient *sftp.Client, localPath, remotePath string) {
-	localFiles, err := ioutil.ReadDir(localPath)
-	if err != nil {
-		logger.Fatalf("readDir err : %s", err)
-	}
-	_ = sftpClient.Mkdir(remotePath)
-	for _, file := range localFiles {
-		lfp := path.Join(localPath, file.Name())
-		rfp := path.Join(remotePath, file.Name())
-		if file.IsDir() {
-			_ = sftpClient.Mkdir(rfp)
-			ss.copyLocalDirToRemote(host, sshClient, sftpClient, lfp, rfp)
-		} else {
-			ss.copyLocalFileToRemote(host, sshClient, sftpClient, lfp, rfp)
-		}
-	}
-}
-
-// solve the session
-func (ss *SSH) copyLocalFileToRemote(host string, sshClient *ssh.Client, sftpClient *sftp.Client, localPath, remotePath string) {
-	srcFile, err := os.Open(localPath)
-	if err != nil {
-		logger.Fatalf("open file [%s] err : %s", localPath, err)
-	}
-	defer srcFile.Close()
-	dstFile, err := sftpClient.Create(remotePath)
-	if err != nil {
-		logger.Error("err:", err)
-	}
-	defer dstFile.Close()
-	buf := make([]byte, 100*MB) // 100mb
-	total := 0
-	unit := ""
-	for {
-		n, _ := srcFile.Read(buf)
-		if n == 0 {
-			break
-		}
-		length, _ := dstFile.Write(buf[0:n])
-		isKb := length/MB < 1
-		speed := 0
-		if isKb {
-			total += length
-			unit = "KB"
-			speed = length / KB
-		} else {
-			total += length
-			unit = "MB"
-			speed = length / MB
-		}
-		totalLength, totalUnit := toSizeFromInt(total)
-		logger.V(2).Infof("[%s]transfer local [%s] to Dst [%s] total size is: %.2f%s ;speed is %d%s", host, localPath, remotePath, totalLength, totalUnit, speed, unit)
-	}
-	if !ss.isCopyMd5Success(sshClient, localPath, remotePath) {
-		//	logger.Debug("[ssh][%s] copy local file: %s to remote file: %s validate md5sum success", host, localPath, remotePath)
-		// } else {
-		logger.Errorf("[%s] copy local file: %s to remote file: %s validate md5sum failed", host, localPath, remotePath)
-	}
-}
-
-func (ss *SSH) isCopyMd5Success(sshClient *ssh.Client, localFile, remoteFile string) bool {
-	cmd := fmt.Sprintf("md5sum %s | cut -d\" \" -f1", remoteFile)
-	localMd5 := md5sumLocal(localFile)
-	sshSession, err := sshClient.NewSession()
-	if err != nil {
-		return false
-	}
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,     // disable echoing
-		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
-		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
-	}
-
-	if err := sshSession.RequestPty("xterm", 80, 40, modes); err != nil {
-		return false
-	}
-
-	if sshSession.Stdout != nil {
-		sshSession.Stdout = nil
-		sshSession.Stderr = nil
-	}
-	b, err := sshSession.CombinedOutput(cmd)
-	if err != nil {
-		logger.Fatalf("Error exec command failed: %s", err)
-	}
-	var remoteMd5 string
-	if b != nil {
-		remoteMd5 = string(b)
-		remoteMd5 = strings.ReplaceAll(remoteMd5, "\r\n", "")
-	}
-	return localMd5 == remoteMd5
 }
 
 func toSizeFromInt(length int) (float64, string) {
