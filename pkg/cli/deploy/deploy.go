@@ -405,15 +405,22 @@ func (d *DeployOptions) RunDeploy() error {
 	if err := d.generateAndSendCerts(); err != nil {
 		return err
 	}
+	logger.Infof("------ Send packages ------")
 	d.sendPackage()
+	logger.Infof("------ Install kc-etcd ------")
 	d.deployEtcd()
 	// TODO: add check etcd status instead of time.sleep
 	time.Sleep(5 * time.Second)
+	logger.Infof("------ Install kc-server ------")
 	d.deployKcServer()
 	time.Sleep(5 * time.Second)
+	logger.Infof("------ Install kc-agent ------")
 	d.deployKcAgent()
+	logger.Infof("------ Install kc-console ------")
 	d.deployKcConsole()
+	logger.Infof("------ Delete intermediate files ------")
 	d.removeTempFile()
+	logger.Infof("------ Upload configs ------")
 	d.uploadConfig()
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 	return nil
@@ -425,7 +432,7 @@ func (d *DeployOptions) sendPackage() {
 	cp := sshutils.WrapSh(fmt.Sprintf("cp -rf %s /usr/local/bin/", filepath.Join(config.DefaultPkgPath, "kc/bin/*")))
 	// rm -rf /root/kc && tar -xvf /root/kc/pkg/kc.tar -C ~/kc/pkg && /bin/bash -c 'cp -rf /root/kc/pkg/kc/bin/* /usr/local/bin/'
 	hook := sshutils.Combine([]string{tar, cp})
-	err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.Pkg, d.allNodes, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackage(d.deployConfig.SSHConfig, d.deployConfig.Pkg, d.allNodes, config.DefaultPkgPath, nil, &hook)
 	if err != nil {
 		logger.Fatalf("sendPackage err:%s", err.Error())
 	}
