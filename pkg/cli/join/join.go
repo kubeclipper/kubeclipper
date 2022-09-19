@@ -48,13 +48,13 @@ const (
   At least one Server node must be installed before adding an Agents node.
   deploy-config.yaml file is used to check whether a node can be added correctly.`
 	joinExample = `
-  # Add multiple agent nodes use default config.
+  # Add agent node use default config.
   kcctl join --agent 192.168.10.123
 
-  # Add multiple agent nodes specify region.
+  # Add agent node specify region.
   kcctl join --agent us-west-1:192.168.10.123
 
-  # Add multiple agent nodes specify config.
+  # Add agent node specify config.
   kcctl join --agent 192.168.10.123 --deploy-config ~/.kc/deploy-config.yaml
 
   # Add multiple agent nodes.
