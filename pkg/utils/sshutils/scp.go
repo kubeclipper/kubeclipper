@@ -20,12 +20,15 @@ package sshutils
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/vbauerster/mpb/v8"
 
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
@@ -266,4 +269,68 @@ func toSizeFromInt(length int) (float64, string) {
 	value, _ = strconv.ParseFloat(fmt.Sprintf("%.2f", float64(length)/KB), 64)
 	return value, "KB"
 
+}
+
+func (ss *SSH) CopySudoWithBar(bar *mpb.Bar, host, localFilePath, remoteFilePath string) error {
+	if ss.User == "root" { // root user,need not transit
+		return ss.CopyWithBar(bar, host, localFilePath, remoteFilePath)
+	}
+	// 	if not root,first scp to /tmp,then sudo mv to target
+	middle := filepath.Join("/tmp", remoteFilePath)
+	err := ss.CopyWithBar(bar, host, localFilePath, middle)
+	if err != nil {
+		return errors.Wrap(err, "copy")
+	}
+	ret, err := SSHCmdWithSudo(ss, host, fmt.Sprintf("mkdir -pv %s && mv -f %s %s", filepath.Dir(remoteFilePath), middle, remoteFilePath))
+	if err != nil {
+		return errors.Wrap(err, "mv")
+	}
+	return errors.Wrap(ret.Error(), "mv")
+}
+
+func (ss *SSH) CopyWithBar(bar *mpb.Bar, host, localFilePath, remoteFilePath string) error {
+	// do mkdir to ensure remote dir always exists
+	ret, err := SSHCmd(ss, host, fmt.Sprintf("mkdir -pv %s", filepath.Dir(remoteFilePath)))
+	if err != nil {
+		return err
+	}
+	if err = ret.Error(); err != nil {
+		return err
+	}
+	// if need run as exec,change to use scp cmd.
+	if SSHToCmd(ss, host) {
+		ret, err = CmdToString("scp", localFilePath, remoteFilePath)
+		if err != nil {
+			return err
+		}
+		return ret.Error()
+	}
+
+	sftpClient, err := ss.sftpConnect(host)
+	if err != nil {
+		return err
+	}
+	defer sftpClient.Close()
+	srcFile, err := os.Open(localFilePath)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := sftpClient.Create(remoteFilePath)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	stat, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+	bar.SetTotal(stat.Size(), false)
+
+	proxyReader := bar.ProxyReader(srcFile)
+
+	_, err = io.Copy(dstFile, proxyReader)
+	return err
 }

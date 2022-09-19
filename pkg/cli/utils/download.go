@@ -19,9 +19,13 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"sync"
+
+	"github.com/vbauerster/mpb/v8"
+	"github.com/vbauerster/mpb/v8/decor"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
 
@@ -33,6 +37,7 @@ import (
 )
 
 // SendPackageV2 scp file to remote host
+// Deprecated
 func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dstDir string, before, after *string) error {
 	var md5 string
 	// download pkg to /tmp/kc/
@@ -181,4 +186,219 @@ func downloadCmd(url string) string {
 		c = fmt.Sprintf(" wget -c %s %s", param, url)
 	}
 	return c
+}
+
+func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDir string, before, after *string) error {
+	var md5 string
+	// download pkg to /tmp/kc/
+	location, md5, err := downloadFile(location)
+	if err != nil {
+		return errors.Wrap(err, "downloadFile")
+	}
+	pkg := path.Base(location)
+	// scp to ~/kc/kc-bj-cd.tar.gz
+	fullPath := fmt.Sprintf("%s/%s", dstDir, pkg)
+	mkDstDir := fmt.Sprintf("mkdir -p %s || true", dstDir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var wg sync.WaitGroup
+
+	var errCh = make(chan error, len(hosts))
+	defer close(errCh)
+
+	wg.Add(len(hosts))
+	p := mpb.NewWithContext(ctx, mpb.WithWidth(60), mpb.WithWaitGroup(&wg))
+
+	for _, host := range hosts {
+		task := fmt.Sprintf("%s:", host)
+		//queue := make([]*mpb.Bar, 4)
+
+		hookbar := p.Add(0,
+			mpb.NopStyle().Build(),
+			mpb.PrependDecorators(
+				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
+				decor.Name("run before hook..."),
+			),
+		)
+
+		checkfilebar := p.Add(0,
+			mpb.NopStyle().Build(),
+			mpb.BarQueueAfter(hookbar, false),
+			mpb.BarFillerClearOnComplete(),
+			mpb.PrependDecorators(
+				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
+				decor.Name("check file exist..."),
+			),
+		)
+
+		checkmd5bar := p.Add(0,
+			mpb.NopStyle().Build(),
+			mpb.BarQueueAfter(checkfilebar, false),
+			mpb.BarFillerClearOnComplete(),
+			mpb.PrependDecorators(
+				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
+				decor.Name("check file md5..."),
+			),
+		)
+
+		downloadbar := p.Add(0,
+			mpb.BarStyle().Rbound("|").Build(),
+			mpb.BarQueueAfter(checkmd5bar, false),
+			//mpb.BarFillerClearOnComplete(),
+			mpb.PrependDecorators(
+				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
+				decor.Name("downloading", decor.WCSyncSpaceR),
+				decor.Percentage(decor.WCSyncSpace),
+				decor.Name(" | "),
+				decor.CountersKibiByte("% .2f / % .2f"),
+				//decor.OnComplete(decor.Name("\x1b[31mdownloading\x1b[0m", decor.WCSyncSpaceR), "done!"),
+				//decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_MMSS, 0, decor.WCSyncWidth), ""),
+			),
+			mpb.AppendDecorators(
+				// replace ETA decorator with "done" message, OnComplete event
+				//decor.OnComplete(
+				//	// ETA decorator with ewma age of 60
+				//	decor.EwmaETA(decor.ET_STYLE_GO, 60, decor.WCSyncWidth), "done",
+				//),
+				//decor.EwmaETA(decor.ET_STYLE_GO, 90),
+				decor.EwmaETA(decor.ET_STYLE_GO, 60),
+				decor.Name(" ] "),
+				decor.EwmaSpeed(decor.UnitKiB, "% .2f", 60),
+			),
+		)
+
+		checkmd5afterdownloadbar := p.Add(0,
+			mpb.NopStyle().Build(),
+			mpb.BarQueueAfter(downloadbar, false),
+			mpb.BarFillerClearOnComplete(),
+			mpb.PrependDecorators(
+				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
+				decor.Name("check file md5..."),
+			),
+		)
+
+		afterhookbar := p.Add(0,
+			mpb.NopStyle().Build(),
+			mpb.BarQueueAfter(checkmd5afterdownloadbar, false),
+			mpb.BarFillerClearOnComplete(),
+			mpb.PrependDecorators(
+				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
+				decor.OnComplete(decor.Name("run after hook...", decor.WCSyncSpaceR), "done!"),
+			),
+		)
+
+		go func(host string) {
+			defer wg.Done()
+
+			_, err := sshutils.SSHCmd(sshConfig, host, mkDstDir)
+			if err != nil {
+				errCh <- errors.WithMessage(err, "mkdir dst")
+				return
+			}
+			if before != nil {
+				ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, *before)
+				if err != nil {
+					errCh <- errors.WithMessage(err, "run before hook")
+					return
+				}
+				if err = ret.Error(); err != nil {
+					errCh <- errors.WithMessage(err, "run before hook ret.Error()")
+					return
+				}
+			}
+			hookbar.SetTotal(-1, true)
+
+			exist, err := sshConfig.IsFileExistV2(host, fullPath)
+			if err != nil {
+				errCh <- errors.WithMessage(err, "IsFileExistV2")
+				return
+			}
+			checkfilebar.SetTotal(-1, true)
+
+			if exist {
+				removeMD5, err := sshConfig.MD5FromRemote(host, fullPath)
+				if err != nil {
+					errCh <- errors.WithMessage(err, "check remote file MD5")
+					return
+				}
+				if md5 == removeMD5 {
+					checkmd5bar.SetTotal(-1, true)
+					downloadbar.SetTotal(-1, true)
+					checkmd5afterdownloadbar.SetTotal(-1, true)
+				} else {
+					rm := fmt.Sprintf("rm -rf %s", fullPath)
+					ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, rm)
+					if err != nil || ret.Error() != nil {
+						errCh <- errors.WithMessage(err, "remove remote old files")
+						return
+					}
+					checkmd5bar.SetTotal(-1, true)
+					if err := sshConfig.CopySudoWithBar(downloadbar, host, location, fullPath); err != nil {
+						errCh <- errors.WithMessage(err, "download")
+						return
+					}
+					if downloadbar.IsRunning() {
+						downloadbar.SetTotal(-1, true)
+					}
+					remoteMD5, err := sshConfig.MD5FromRemote(host, fullPath)
+					if err != nil {
+						errCh <- errors.WithMessage(err, "check remote file MD5")
+						return
+					}
+					if md5 == remoteMD5 {
+						checkmd5afterdownloadbar.SetTotal(-1, true)
+					} else {
+						errCh <- errors.WithMessage(err, "check remote file MD5")
+						return
+					}
+				}
+			} else {
+				checkmd5bar.SetTotal(-1, true)
+				if err := sshConfig.CopySudoWithBar(downloadbar, host, location, fullPath); err != nil {
+					errCh <- errors.WithMessage(err, "download")
+					return
+				}
+				if downloadbar.IsRunning() {
+					downloadbar.SetTotal(-1, true)
+				}
+				remoteMD5, err := sshConfig.MD5FromRemote(host, fullPath)
+				if err != nil {
+					errCh <- errors.WithMessage(err, "check remote file MD5")
+					return
+				}
+				if md5 == remoteMD5 {
+					checkmd5afterdownloadbar.SetTotal(-1, true)
+				} else {
+					errCh <- errors.WithMessage(err, "check remote file MD5")
+					return
+				}
+			}
+
+			if after != nil {
+				ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, *after)
+				if err != nil {
+					errCh <- errors.WithMessage(err, "run after hook")
+					return
+				}
+				if err = ret.Error(); err != nil {
+					errCh <- errors.WithMessage(err, "run after hook ret.Error()")
+					return
+				}
+			}
+			afterhookbar.SetTotal(-1, true)
+		}(host)
+	}
+	var stopCh = make(chan struct{})
+	go func() {
+		defer close(stopCh)
+		p.Wait()
+	}()
+
+	select {
+	case err = <-errCh:
+		return err
+	case <-stopCh:
+		return nil
+	}
 }
