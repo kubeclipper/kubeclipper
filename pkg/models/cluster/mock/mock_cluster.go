@@ -946,6 +946,21 @@ func (mr *MockOperatorMockRecorder) CreateBackupPoint(ctx, backupPoint interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackupPoint", reflect.TypeOf((*MockOperator)(nil).CreateBackupPoint), ctx, backupPoint)
 }
 
+// CreateCloudProvider mocks base method.
+func (m *MockOperator) CreateCloudProvider(ctc context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateCloudProvider", ctc, domain)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateCloudProvider indicates an expected call of CreateCloudProvider.
+func (mr *MockOperatorMockRecorder) CreateCloudProvider(ctc, domain interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudProvider", reflect.TypeOf((*MockOperator)(nil).CreateCloudProvider), ctc, domain)
+}
+
 // CreateCluster mocks base method.
 func (m *MockOperator) CreateCluster(ctx context.Context, cluster *v1.Cluster) (*v1.Cluster, error) {
 	m.ctrl.T.Helper()
@@ -1062,6 +1077,20 @@ func (m *MockOperator) DeleteBackupPoint(ctx context.Context, name string) error
 func (mr *MockOperatorMockRecorder) DeleteBackupPoint(ctx, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBackupPoint", reflect.TypeOf((*MockOperator)(nil).DeleteBackupPoint), ctx, name)
+}
+
+// DeleteCloudProvider mocks base method.
+func (m *MockOperator) DeleteCloudProvider(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCloudProvider", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCloudProvider indicates an expected call of DeleteCloudProvider.
+func (mr *MockOperatorMockRecorder) DeleteCloudProvider(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudProvider", reflect.TypeOf((*MockOperator)(nil).DeleteCloudProvider), ctx, name)
 }
 
 // DeleteCluster mocks base method.
@@ -1234,6 +1263,36 @@ func (m *MockOperator) GetBackupPointEx(ctx context.Context, name, resourceVersi
 func (mr *MockOperatorMockRecorder) GetBackupPointEx(ctx, name, resourceVersion interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBackupPointEx", reflect.TypeOf((*MockOperator)(nil).GetBackupPointEx), ctx, name, resourceVersion)
+}
+
+// GetCloudProvider mocks base method.
+func (m *MockOperator) GetCloudProvider(ctx context.Context, name string) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudProvider", ctx, name)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudProvider indicates an expected call of GetCloudProvider.
+func (mr *MockOperatorMockRecorder) GetCloudProvider(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudProvider", reflect.TypeOf((*MockOperator)(nil).GetCloudProvider), ctx, name)
+}
+
+// GetCloudProviderEx mocks base method.
+func (m *MockOperator) GetCloudProviderEx(ctx context.Context, name, resourceVersion string) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudProviderEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudProviderEx indicates an expected call of GetCloudProviderEx.
+func (mr *MockOperatorMockRecorder) GetCloudProviderEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudProviderEx", reflect.TypeOf((*MockOperator)(nil).GetCloudProviderEx), ctx, name, resourceVersion)
 }
 
 // GetCluster mocks base method.
@@ -1461,6 +1520,36 @@ func (mr *MockOperatorMockRecorder) ListBackups(ctx, query interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBackups", reflect.TypeOf((*MockOperator)(nil).ListBackups), ctx, query)
 }
 
+// ListCloudProviders mocks base method.
+func (m *MockOperator) ListCloudProviders(ctx context.Context, query *query.Query) (*v1.CloudProviderList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudProviders", ctx, query)
+	ret0, _ := ret[0].(*v1.CloudProviderList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudProviders indicates an expected call of ListCloudProviders.
+func (mr *MockOperatorMockRecorder) ListCloudProviders(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudProviders", reflect.TypeOf((*MockOperator)(nil).ListCloudProviders), ctx, query)
+}
+
+// ListCloudProvidersEx mocks base method.
+func (m *MockOperator) ListCloudProvidersEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudProvidersEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudProvidersEx indicates an expected call of ListCloudProvidersEx.
+func (mr *MockOperatorMockRecorder) ListCloudProvidersEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudProvidersEx", reflect.TypeOf((*MockOperator)(nil).ListCloudProvidersEx), ctx, query)
+}
+
 // ListClusterEx mocks base method.
 func (m *MockOperator) ListClusterEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
 	m.ctrl.T.Helper()
@@ -1686,6 +1775,21 @@ func (mr *MockOperatorMockRecorder) UpdateBackupPoint(ctx, backupPoint interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBackupPoint", reflect.TypeOf((*MockOperator)(nil).UpdateBackupPoint), ctx, backupPoint)
 }
 
+// UpdateCloudProvider mocks base method.
+func (m *MockOperator) UpdateCloudProvider(ctx context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCloudProvider", ctx, domain)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateCloudProvider indicates an expected call of UpdateCloudProvider.
+func (mr *MockOperatorMockRecorder) UpdateCloudProvider(ctx, domain interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudProvider", reflect.TypeOf((*MockOperator)(nil).UpdateCloudProvider), ctx, domain)
+}
+
 // UpdateCluster mocks base method.
 func (m *MockOperator) UpdateCluster(ctx context.Context, cluster *v1.Cluster) (*v1.Cluster, error) {
 	m.ctrl.T.Helper()
@@ -1789,6 +1893,21 @@ func (m *MockOperator) WatchBackups(ctx context.Context, query *query.Query) (wa
 func (mr *MockOperatorMockRecorder) WatchBackups(ctx, query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchBackups", reflect.TypeOf((*MockOperator)(nil).WatchBackups), ctx, query)
+}
+
+// WatchCloudProviders mocks base method.
+func (m *MockOperator) WatchCloudProviders(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchCloudProviders", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchCloudProviders indicates an expected call of WatchCloudProviders.
+func (mr *MockOperatorMockRecorder) WatchCloudProviders(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchCloudProviders", reflect.TypeOf((*MockOperator)(nil).WatchCloudProviders), ctx, query)
 }
 
 // WatchClusters mocks base method.
@@ -3854,4 +3973,222 @@ func (m *MockTemplateWriter) UpdateTemplate(ctx context.Context, template *v1.Te
 func (mr *MockTemplateWriterMockRecorder) UpdateTemplate(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTemplate", reflect.TypeOf((*MockTemplateWriter)(nil).UpdateTemplate), ctx, template)
+}
+
+// MockCloudProviderReader is a mock of CloudProviderReader interface.
+type MockCloudProviderReader struct {
+	ctrl     *gomock.Controller
+	recorder *MockCloudProviderReaderMockRecorder
+}
+
+// MockCloudProviderReaderMockRecorder is the mock recorder for MockCloudProviderReader.
+type MockCloudProviderReaderMockRecorder struct {
+	mock *MockCloudProviderReader
+}
+
+// NewMockCloudProviderReader creates a new mock instance.
+func NewMockCloudProviderReader(ctrl *gomock.Controller) *MockCloudProviderReader {
+	mock := &MockCloudProviderReader{ctrl: ctrl}
+	mock.recorder = &MockCloudProviderReaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCloudProviderReader) EXPECT() *MockCloudProviderReaderMockRecorder {
+	return m.recorder
+}
+
+// GetCloudProvider mocks base method.
+func (m *MockCloudProviderReader) GetCloudProvider(ctx context.Context, name string) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudProvider", ctx, name)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudProvider indicates an expected call of GetCloudProvider.
+func (mr *MockCloudProviderReaderMockRecorder) GetCloudProvider(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudProvider", reflect.TypeOf((*MockCloudProviderReader)(nil).GetCloudProvider), ctx, name)
+}
+
+// GetCloudProviderEx mocks base method.
+func (m *MockCloudProviderReader) GetCloudProviderEx(ctx context.Context, name, resourceVersion string) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudProviderEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudProviderEx indicates an expected call of GetCloudProviderEx.
+func (mr *MockCloudProviderReaderMockRecorder) GetCloudProviderEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudProviderEx", reflect.TypeOf((*MockCloudProviderReader)(nil).GetCloudProviderEx), ctx, name, resourceVersion)
+}
+
+// ListCloudProviders mocks base method.
+func (m *MockCloudProviderReader) ListCloudProviders(ctx context.Context, query *query.Query) (*v1.CloudProviderList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudProviders", ctx, query)
+	ret0, _ := ret[0].(*v1.CloudProviderList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudProviders indicates an expected call of ListCloudProviders.
+func (mr *MockCloudProviderReaderMockRecorder) ListCloudProviders(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudProviders", reflect.TypeOf((*MockCloudProviderReader)(nil).ListCloudProviders), ctx, query)
+}
+
+// ListCloudProvidersEx mocks base method.
+func (m *MockCloudProviderReader) ListCloudProvidersEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudProvidersEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudProvidersEx indicates an expected call of ListCloudProvidersEx.
+func (mr *MockCloudProviderReaderMockRecorder) ListCloudProvidersEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudProvidersEx", reflect.TypeOf((*MockCloudProviderReader)(nil).ListCloudProvidersEx), ctx, query)
+}
+
+// WatchCloudProviders mocks base method.
+func (m *MockCloudProviderReader) WatchCloudProviders(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchCloudProviders", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchCloudProviders indicates an expected call of WatchCloudProviders.
+func (mr *MockCloudProviderReaderMockRecorder) WatchCloudProviders(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchCloudProviders", reflect.TypeOf((*MockCloudProviderReader)(nil).WatchCloudProviders), ctx, query)
+}
+
+// MockCloudProviderEx is a mock of CloudProviderEx interface.
+type MockCloudProviderEx struct {
+	ctrl     *gomock.Controller
+	recorder *MockCloudProviderExMockRecorder
+}
+
+// MockCloudProviderExMockRecorder is the mock recorder for MockCloudProviderEx.
+type MockCloudProviderExMockRecorder struct {
+	mock *MockCloudProviderEx
+}
+
+// NewMockCloudProviderEx creates a new mock instance.
+func NewMockCloudProviderEx(ctrl *gomock.Controller) *MockCloudProviderEx {
+	mock := &MockCloudProviderEx{ctrl: ctrl}
+	mock.recorder = &MockCloudProviderExMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCloudProviderEx) EXPECT() *MockCloudProviderExMockRecorder {
+	return m.recorder
+}
+
+// GetCloudProviderEx mocks base method.
+func (m *MockCloudProviderEx) GetCloudProviderEx(ctx context.Context, name, resourceVersion string) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudProviderEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudProviderEx indicates an expected call of GetCloudProviderEx.
+func (mr *MockCloudProviderExMockRecorder) GetCloudProviderEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudProviderEx", reflect.TypeOf((*MockCloudProviderEx)(nil).GetCloudProviderEx), ctx, name, resourceVersion)
+}
+
+// ListCloudProvidersEx mocks base method.
+func (m *MockCloudProviderEx) ListCloudProvidersEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudProvidersEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudProvidersEx indicates an expected call of ListCloudProvidersEx.
+func (mr *MockCloudProviderExMockRecorder) ListCloudProvidersEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudProvidersEx", reflect.TypeOf((*MockCloudProviderEx)(nil).ListCloudProvidersEx), ctx, query)
+}
+
+// MockCloudProviderWriter is a mock of CloudProviderWriter interface.
+type MockCloudProviderWriter struct {
+	ctrl     *gomock.Controller
+	recorder *MockCloudProviderWriterMockRecorder
+}
+
+// MockCloudProviderWriterMockRecorder is the mock recorder for MockCloudProviderWriter.
+type MockCloudProviderWriterMockRecorder struct {
+	mock *MockCloudProviderWriter
+}
+
+// NewMockCloudProviderWriter creates a new mock instance.
+func NewMockCloudProviderWriter(ctrl *gomock.Controller) *MockCloudProviderWriter {
+	mock := &MockCloudProviderWriter{ctrl: ctrl}
+	mock.recorder = &MockCloudProviderWriterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCloudProviderWriter) EXPECT() *MockCloudProviderWriterMockRecorder {
+	return m.recorder
+}
+
+// CreateCloudProvider mocks base method.
+func (m *MockCloudProviderWriter) CreateCloudProvider(ctc context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateCloudProvider", ctc, domain)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateCloudProvider indicates an expected call of CreateCloudProvider.
+func (mr *MockCloudProviderWriterMockRecorder) CreateCloudProvider(ctc, domain interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).CreateCloudProvider), ctc, domain)
+}
+
+// DeleteCloudProvider mocks base method.
+func (m *MockCloudProviderWriter) DeleteCloudProvider(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCloudProvider", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCloudProvider indicates an expected call of DeleteCloudProvider.
+func (mr *MockCloudProviderWriterMockRecorder) DeleteCloudProvider(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).DeleteCloudProvider), ctx, name)
+}
+
+// UpdateCloudProvider mocks base method.
+func (m *MockCloudProviderWriter) UpdateCloudProvider(ctx context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCloudProvider", ctx, domain)
+	ret0, _ := ret[0].(*v1.CloudProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateCloudProvider indicates an expected call of UpdateCloudProvider.
+func (mr *MockCloudProviderWriterMockRecorder) UpdateCloudProvider(ctx, domain interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).UpdateCloudProvider), ctx, domain)
 }

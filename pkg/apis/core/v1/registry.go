@@ -978,6 +978,85 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.ConfigMap{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
+	webservice.Route(webservice.GET("/cloudproviders").
+		To(h.ListCloudProviders).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("List cloudProviders.").
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFuzzySearch, "fuzzy search conditions").
+			DataFormat("foo~bar,bar~baz").
+			Required(false)).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
+
+	webservice.Route(webservice.POST("/cloudproviders").
+		To(h.CreateCloudProvider).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Create cloudProvider.").
+		Reads(corev1.CloudProvider{}).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create cloudProvider").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.CloudProvider{}))
+
+	webservice.Route(webservice.PUT("/cloudproviders/{name}").
+		To(h.UpdateCloudProvider).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Update cloudProvider.").
+		Reads(corev1.CloudProvider{}).
+		Param(webservice.PathParameter("name", "cloudProvider name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run update cloudProvider").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
+	webservice.Route(webservice.POST("/cloudproviders/{name}/sync").
+		To(h.SyncCloudProvider).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Sync cloudProvider.").
+		Reads(corev1.CloudProvider{}).
+		Param(webservice.PathParameter("name", "cloudProvider name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run sync cloudProvider").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
+	webservice.Route(webservice.DELETE("/cloudproviders/{name}").
+		To(h.DeleteCloudProvider).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Delete cloudProvider.").
+		Param(webservice.PathParameter("name", "cloudProvider name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete cloudProvider").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
+	webservice.Route(webservice.GET("/cloudproviders/{name}").
+		To(h.DescribeCloudProvider).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Describe cloudProvider.").
+		Param(webservice.PathParameter(query.ParameterName, "cloudProvider name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
+			Required(false).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.CloudProvider{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 	return webservice
 }
 

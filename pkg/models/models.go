@@ -54,9 +54,9 @@ func Get(ctx context.Context, s rest.StandardStorage, name string, resourceVersi
 
 }
 
-func GetV2(ctx context.Context, s rest.StandardStorage, name string, resrouceVersion string, mutatingFunc MutatingFunc) (runtime.Object, error) {
+func GetV2(ctx context.Context, s rest.StandardStorage, name string, resourceVersion string, mutatingFunc MutatingFunc) (runtime.Object, error) {
 	obj, err := s.Get(ctx, name, &metav1.GetOptions{
-		ResourceVersion: resrouceVersion,
+		ResourceVersion: resourceVersion,
 	})
 	if err != nil {
 		return nil, err
