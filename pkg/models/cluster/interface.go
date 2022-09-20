@@ -74,6 +74,9 @@ type Operator interface {
 
 	TemplateReader
 	TemplateWriter
+
+	CloudProviderReader
+	CloudProviderWriter
 }
 
 type ClusterReader interface {
@@ -236,4 +239,22 @@ type TemplateWriter interface {
 	UpdateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error)
 	DeleteTemplate(ctx context.Context, name string) error
 	DeleteTemplateCollection(ctx context.Context, query *query.Query) error
+}
+
+type CloudProviderReader interface {
+	GetCloudProvider(ctx context.Context, name string) (*v1.CloudProvider, error)
+	ListCloudProviders(ctx context.Context, query *query.Query) (*v1.CloudProviderList, error)
+	WatchCloudProviders(ctx context.Context, query *query.Query) (watch.Interface, error)
+	CloudProviderEx
+}
+
+type CloudProviderEx interface {
+	GetCloudProviderEx(ctx context.Context, name string, resourceVersion string) (*v1.CloudProvider, error)
+	ListCloudProvidersEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
+}
+
+type CloudProviderWriter interface {
+	CreateCloudProvider(ctc context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error)
+	UpdateCloudProvider(ctx context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error)
+	DeleteCloudProvider(ctx context.Context, name string) error
 }

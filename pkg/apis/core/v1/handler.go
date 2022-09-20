@@ -3111,3 +3111,154 @@ func (h *handler) watchConfigMap(req *restful.Request, resp *restful.Response, q
 	}
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("ConfigMap"), req, resp, timeout)
 }
+
+func (h *handler) ListCloudProviders(req *restful.Request, resp *restful.Response) {
+	q := query.ParseQueryParameter(req)
+	if q.Watch {
+		h.watchCloudProvider(req, resp, q)
+		return
+	}
+	if clientrest.IsInformerRawQuery(req.Request) {
+		result, err := h.clusterOperator.ListCloudProviders(req.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+	} else {
+		result, err := h.clusterOperator.ListCloudProvidersEx(req.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+	}
+}
+
+func (h *handler) DescribeCloudProvider(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter(query.ParameterName)
+	resourceVersion := strutil.StringDefaultIfEmpty("0", req.QueryParameter(query.ParameterResourceVersion))
+	c, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, resourceVersion)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, c)
+}
+
+func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Response) {
+	cp := &v1.CloudProvider{}
+	err := req.ReadEntity(cp)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	cp, err = h.clusterOperator.CreateCloudProvider(req.Request.Context(), cp)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusCreated, cp)
+}
+
+func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	cp := &v1.CloudProvider{}
+	if err := req.ReadEntity(cp); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+
+	if name != cp.Name {
+		restplus.HandleBadRequest(resp, req, errors.New("name in url path not same with body"))
+		return
+	}
+
+	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	if !dryRun {
+		cp, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, cp)
+}
+
+func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+	cp, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	if !dryRun {
+		// update annotation to trigger sync
+		cp.Annotations[common.AnnotationProviderSyncTime] = time.Now().Format(time.RFC3339)
+		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	resp.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	if !dryRun {
+		err = h.clusterOperator.DeleteCloudProvider(req.Request.Context(), name)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	resp.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) watchCloudProvider(req *restful.Request, resp *restful.Response, q *query.Query) {
+	timeout := time.Duration(0)
+	if q.TimeoutSeconds != nil {
+		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 {
+		timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
+	}
+
+	watcher, err := h.clusterOperator.WatchCloudProviders(req.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("CloudProvider"), req, resp, timeout)
+}

@@ -45,31 +45,32 @@ import (
 var _ Operator = (*clusterOperator)(nil)
 
 type clusterOperator struct {
-	clusterStorage     rest.StandardStorage
-	nodeStorage        rest.StandardStorage
-	regionStorage      rest.StandardStorage
-	backupStorage      rest.StandardStorage
-	recoveryStorage    rest.StandardStorage
-	backupPointStorage rest.StandardStorage
-	cronBackupStorage  rest.StandardStorage
-	upgradeStorage     rest.StandardStorage
-	dnsStorage         rest.StandardStorage
-	templateStorage    rest.StandardStorage
+	clusterStorage       rest.StandardStorage
+	nodeStorage          rest.StandardStorage
+	regionStorage        rest.StandardStorage
+	backupStorage        rest.StandardStorage
+	recoveryStorage      rest.StandardStorage
+	backupPointStorage   rest.StandardStorage
+	cronBackupStorage    rest.StandardStorage
+	upgradeStorage       rest.StandardStorage
+	dnsStorage           rest.StandardStorage
+	templateStorage      rest.StandardStorage
+	cloudProviderStorage rest.StandardStorage
 }
 
-func NewClusterOperator(clusterStorage rest.StandardStorage, nodeStorage rest.StandardStorage,
-	regionStorage rest.StandardStorage, backupStorage rest.StandardStorage, recoveryStorage, backupPointStorage,
-	cronBackupStorage rest.StandardStorage, dnsStorage rest.StandardStorage, templateStorage rest.StandardStorage) Operator {
+func NewClusterOperator(clusterStorage, nodeStorage, regionStorage, backupStorage, recoveryStorage, backupPointStorage,
+	cronBackupStorage, dnsStorage, templateStorage, cloudProviderStorage rest.StandardStorage) Operator {
 	return &clusterOperator{
-		clusterStorage:     clusterStorage,
-		nodeStorage:        nodeStorage,
-		regionStorage:      regionStorage,
-		backupStorage:      backupStorage,
-		recoveryStorage:    recoveryStorage,
-		backupPointStorage: backupPointStorage,
-		cronBackupStorage:  cronBackupStorage,
-		dnsStorage:         dnsStorage,
-		templateStorage:    templateStorage,
+		clusterStorage:       clusterStorage,
+		nodeStorage:          nodeStorage,
+		regionStorage:        regionStorage,
+		backupStorage:        backupStorage,
+		recoveryStorage:      recoveryStorage,
+		backupPointStorage:   backupPointStorage,
+		cronBackupStorage:    cronBackupStorage,
+		dnsStorage:           dnsStorage,
+		templateStorage:      templateStorage,
+		cloudProviderStorage: cloudProviderStorage,
 	}
 }
 
@@ -752,6 +753,83 @@ func (c *clusterOperator) templateFuzzyFilter(obj runtime.Object, q *query.Query
 		}
 		if selected {
 			objs = append(objs, &templates.Items[index])
+		}
+	}
+	return objs
+}
+
+func (c *clusterOperator) ListCloudProviders(ctx context.Context, query *query.Query) (*v1.CloudProviderList, error) {
+	list, err := models.List(ctx, c.cloudProviderStorage, query)
+	if err != nil {
+		return nil, err
+	}
+	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("CloudProvider"))
+	return list.(*v1.CloudProviderList), nil
+}
+
+func (c *clusterOperator) WatchCloudProviders(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, c.cloudProviderStorage, query)
+}
+
+func (c *clusterOperator) GetCloudProvider(ctx context.Context, name string) (*v1.CloudProvider, error) {
+	return c.GetCloudProviderEx(ctx, name, "")
+}
+
+func (c *clusterOperator) GetCloudProviderEx(ctx context.Context, name string, resourceVersion string) (*v1.CloudProvider, error) {
+	cp, err := models.GetV2(ctx, c.cloudProviderStorage, name, resourceVersion, nil)
+	if err != nil {
+		return nil, err
+	}
+	return cp.(*v1.CloudProvider), nil
+}
+
+func (c *clusterOperator) ListCloudProvidersEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	return models.ListExV2(ctx, c.cloudProviderStorage, query, c.cloudProviderFuzzyFilter, nil, nil)
+}
+
+func (c *clusterOperator) CreateCloudProvider(ctx context.Context, CloudProvider *v1.CloudProvider) (*v1.CloudProvider, error) {
+	obj, err := c.cloudProviderStorage.Create(ctx, CloudProvider, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*v1.CloudProvider), nil
+}
+
+func (c *clusterOperator) UpdateCloudProvider(ctx context.Context, CloudProvider *v1.CloudProvider) (*v1.CloudProvider, error) {
+	obj, wasCreated, err := c.cloudProviderStorage.Update(ctx, CloudProvider.Name, rest.DefaultUpdatedObjectInfo(CloudProvider),
+		nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if wasCreated {
+		logger.Debug("CloudProvider not exist, use create instead of update", zap.String("CloudProvider", CloudProvider.Name))
+	}
+	return obj.(*v1.CloudProvider), nil
+}
+
+func (c *clusterOperator) DeleteCloudProvider(ctx context.Context, name string) error {
+	var err error
+	_, _, err = c.cloudProviderStorage.Delete(ctx, name, func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}, &metav1.DeleteOptions{})
+	return err
+}
+
+func (c *clusterOperator) cloudProviderFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+	cloudProvider, ok := obj.(*v1.CloudProviderList)
+	if !ok {
+		return nil
+	}
+	objs := make([]runtime.Object, 0, len(cloudProvider.Items))
+	for index, template := range cloudProvider.Items {
+		selected := true
+		for k, v := range q.FuzzySearch {
+			if !models.ObjectMetaFilter(template.ObjectMeta, k, v) {
+				selected = false
+			}
+		}
+		if selected {
+			objs = append(objs, &cloudProvider.Items[index])
 		}
 	}
 	return objs
