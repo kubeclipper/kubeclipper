@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/externalcluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
-
 	"github.com/robfig/cron/v3"
 
 	r "k8s.io/apimachinery/pkg/util/rand"
@@ -115,6 +115,74 @@ func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOp
 		leaseOperator:    leaseOperator,
 		coreOperator:     coreOperator,
 	}
+}
+
+func (h *handler) JoinExternalCluster(request *restful.Request, response *restful.Response) {
+	configMap := &v1.ConfigMap{}
+	err := request.ReadEntity(configMap)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	provider, err := externalcluster.GetClusterProvider(configMap.Data["providerName"])
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	manage, err := provider.CreateClusterManage(configMap)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	clu, err := manage.ClusterInfo()
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	clu.Status.Phase = v1.ClusterImporting
+
+	if !dryRun {
+		_, err = h.coreOperator.CreateConfigMap(context.TODO(), configMap)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		_, err = h.clusterOperator.CreateCluster(context.TODO(), clu)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+	}
+	_ = response.WriteHeaderAndEntity(http.StatusOK, configMap)
+}
+
+func (h *handler) UnbindCluster(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter(query.ParameterName)
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+
+	c, err := h.clusterOperator.GetClusterEx(request.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if !dryRun {
+		c.Status.Phase = v1.ClusterUnbinding
+		_, err = h.clusterOperator.UpdateCluster(context.TODO(), c)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+	}
+
+	response.WriteHeader(http.StatusOK)
 }
 
 func (h *handler) ListClusters(request *restful.Request, response *restful.Response) {

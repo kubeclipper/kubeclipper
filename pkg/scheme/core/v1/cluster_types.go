@@ -35,7 +35,6 @@ type Cluster struct {
 	// Standard object's metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Provider          ProviderSpec `json:"provider,omitempty"`
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
 	LocalRegistry     string           `json:"localRegistry,omitempty" optional:"true"`
@@ -101,6 +100,11 @@ const (
 	ClusterRestoreFailed   ClusterPhase = "RestoreFailed"
 	ClusterTerminating     ClusterPhase = "Terminating"
 	ClusterTerminateFailed ClusterPhase = "TerminateFailed"
+	ClusterImporting       ClusterPhase = "Importing"
+	ClusterImportFailed    ClusterPhase = "ImportFailed"
+	ClusterUnbinding       ClusterPhase = "Unbinding"
+	ClusterUnbundled       ClusterPhase = "Unbundled"
+	ClusterUnbindFailed    ClusterPhase = "UnbindFailed"
 )
 
 const (
@@ -135,9 +139,6 @@ func (c *Cluster) Offline() bool {
 }
 
 func (c *Cluster) Complete() {
-	if c.Provider.Name == "" {
-		c.Provider.Name = ClusterKubeadm
-	}
 	if c.Networking.ProxyMode == "" {
 		c.Networking.ProxyMode = "ipvs"
 	}

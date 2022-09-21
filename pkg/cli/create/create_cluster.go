@@ -282,9 +282,6 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		annotations[common.AnnotationOffline] = ""
 	}
 	c := &v1.Cluster{
-		Provider: v1.ProviderSpec{
-			Name: v1.ClusterKubeadm,
-		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
 			APIVersion: "core.kubeclipper.io/v1",

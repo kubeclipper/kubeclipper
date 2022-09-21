@@ -25,62 +25,46 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudpprovidercontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/models/core"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
-
-	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/tokencontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
-
-	"github.com/google/uuid"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller/regioncontroller"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/backupcontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/dnscontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
-
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-
-	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/apis/audit"
-	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
-	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/component-base/version"
-
 	"github.com/emicklei/go-restful"
-	"go.uber.org/zap"
-
+	"github.com/google/uuid"
 	auditingv1 "github.com/kubeclipper/kubeclipper/pkg/apis/auditing/v1"
 	configv1 "github.com/kubeclipper/kubeclipper/pkg/apis/config/v1"
+	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/apis/iam/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/apis/oauth"
 	"github.com/kubeclipper/kubeclipper/pkg/auditing"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/anonymous"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/bearertoken"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
 	authnpath "github.com/kubeclipper/kubeclipper/pkg/authentication/request/path"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/wstoken"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/rbac"
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
+	"github.com/kubeclipper/kubeclipper/pkg/controller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/backupcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudpprovidercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/dnscontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/externalclustercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/regioncontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/tokencontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/healthz"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/server/config"
 	"github.com/kubeclipper/kubeclipper/pkg/server/filters"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry"
@@ -88,8 +72,15 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 	"github.com/kubeclipper/kubeclipper/pkg/service/delivery"
 	"github.com/kubeclipper/kubeclipper/pkg/service/staticresource"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/hashutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/metrics"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/apis/audit"
+	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
+	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/component-base/version"
 )
 
 type APIServer struct {
@@ -415,6 +406,7 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		return err
 	}
 	if err = (&clustercontroller.ClusterReconciler{
+
 		CmdDelivery:         mgr.GetCmdDelivery(),
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
@@ -423,6 +415,7 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		OperationWriter:     opOperator,
 		CronBackupWriter:    clusterOperator,
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
+		ConfigMapOperator:   coreOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
@@ -469,7 +462,16 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:          clusterOperator,
 		ConfigmapLister:     informerFactory.Core().V1().ConfigMaps().Lister(),
-		ConfigmapWriter:     coreOperator,
+		ConfigmapWriter:     coreOperator}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
+	if err = (&externalclustercontroller.ExternalClusterReconciler{
+		CmdDelivery:       mgr.GetCmdDelivery(),
+		ClusterLister:     informerFactory.Core().V1().Clusters().Lister(),
+		NodeLister:        informerFactory.Core().V1().Nodes().Lister(),
+		ClusterWriter:     clusterOperator,
+		NodeWriter:        clusterOperator,
+		ConfigMapOperator: coreOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}

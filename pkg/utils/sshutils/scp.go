@@ -26,11 +26,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"github.com/vbauerster/mpb/v8"
-
-	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
 const KB = 1024
@@ -216,7 +215,6 @@ func (ss *SSH) download(host, localFilePath, remoteFilePath string) error {
 	return nil
 }
 
-// SftpConnect  is
 func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
 	sshClient, err := ss.connect(host)
 	if err != nil {

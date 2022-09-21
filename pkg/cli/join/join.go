@@ -19,15 +19,18 @@
 package join
 
 import (
-	"bytes"
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
-	"text/template"
 
-	"github.com/google/uuid"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
@@ -113,6 +116,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunJoinFunc())
 		},
 	}
+	options.AddFlagsToSSH(o.deployConfig.SSHConfig, cmd.Flags())
 	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method.")
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
@@ -240,7 +244,11 @@ func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) err
 	if err != nil {
 		return err
 	}
-	agentConfig := c.getKcAgentConfigTemplateContent(metadata)
+	agentConfigData := c.deployConfig.GetKcAgentConfig(metadata)
+	agentConfig, err := c.deployConfig.KcAgentConfigString(agentConfigData)
+	if err != nil {
+		return errors.Wrap(err, "KcAgentConfigString")
+	}
 	cmdList := []string{
 		sshutils.WrapEcho(config.KcAgentService, "/usr/lib/systemd/system/kc-agent.service"), // write systemd file
 		"mkdir -pv /etc/kubeclipper-agent ",
@@ -269,7 +277,48 @@ func (c *JoinOptions) enableAgent(node string, metadata options.Metadata) error 
 	}
 	// update deploy-config.yaml
 	c.deployConfig.Agents.Add(node, metadata)
-	return c.deployConfig.Write()
+
+	host := fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.ServerPort)
+	cli, err := kc.NewClientWithOpts(
+		kc.WithHost(host),
+	)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	resp, err := cli.Login(context.TODO(), kc.LoginRequest{
+		Username: constatns.DefaultAdminUser,
+		Password: constatns.DefaultAdminUserPass,
+	})
+	if err != nil {
+		logger.Fatal(err)
+	}
+	cfg := config.Config{
+		Servers: map[string]*config.Server{
+			"default": {
+				Server: host,
+			},
+		},
+		AuthInfos: map[string]*config.AuthInfo{
+			constatns.DefaultAdminUser: {
+				Token: resp.AccessToken,
+			},
+		},
+		CurrentContext: fmt.Sprintf("%s@default", constatns.DefaultAdminUser),
+		Contexts: map[string]*config.Context{
+			fmt.Sprintf("%s@default", constatns.DefaultAdminUser): {
+				AuthInfo: constatns.DefaultAdminUser,
+				Server:   "default",
+			},
+		},
+	}
+
+	cli, err = kc.FromConfig(cfg)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	uploadDeployConfig(cli, c.deployConfig)
+	return nil
 }
 
 func (c *JoinOptions) runJoinServerNode() error {
@@ -291,53 +340,6 @@ func (c *JoinOptions) serverNodeFiles() error {
 
 func (c *JoinOptions) enableServerService() error {
 	return nil
-}
-
-func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata) string {
-	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
-	if err != nil {
-		logger.Fatalf("template parse failed: %s", err.Error())
-	}
-
-	var data = make(map[string]interface{})
-	data["Region"] = metadata.Region
-	data["FloatIP"] = metadata.FloatIP
-	data["IPDetect"] = c.deployConfig.IPDetect
-	data["AgentID"] = uuid.New().String()
-	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.StaticServerPort)
-	if c.deployConfig.Debug {
-		data["LogLevel"] = "debug"
-	} else {
-		data["LogLevel"] = "info"
-	}
-	var endpoint []string
-	for _, v := range c.deployConfig.MQ.IPs {
-		endpoint = append(endpoint, fmt.Sprintf("%s:%d", v, c.deployConfig.MQ.Port))
-	}
-	data["MQServerEndpoints"] = endpoint
-	data["MQExternal"] = c.deployConfig.MQ.External
-	data["MQUser"] = c.deployConfig.MQ.User
-	data["MQAuthToken"] = c.deployConfig.MQ.Secret
-	data["MQTLS"] = c.deployConfig.MQ.TLS
-	if c.deployConfig.MQ.TLS {
-		if c.deployConfig.MQ.External {
-			data["MQCaPath"] = c.deployConfig.MQ.CA
-			data["MQClientCertPath"] = c.deployConfig.MQ.ClientCert
-			data["MQClientKeyPath"] = c.deployConfig.MQ.ClientKey
-		} else {
-			data["MQCaPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultCaPath, filepath.Base(c.deployConfig.MQ.CA))
-			data["MQClientCertPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, filepath.Base(c.deployConfig.MQ.ClientCert))
-			data["MQClientKeyPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, filepath.Base(c.deployConfig.MQ.ClientKey))
-		}
-	}
-	data["OpLogDir"] = c.deployConfig.OpLog.Dir
-	data["OpLogThreshold"] = c.deployConfig.OpLog.Threshold
-	data["KcImageRepoMirror"] = c.deployConfig.ImageProxy.KcImageRepoMirror
-	var buffer bytes.Buffer
-	if err = tmpl.Execute(&buffer, data); err != nil {
-		logger.Fatalf("template execute failed: %s", err.Error())
-	}
-	return buffer.String()
 }
 
 func (c *JoinOptions) sendCerts(ip string) error {
@@ -386,4 +388,27 @@ func (c *JoinOptions) sendCerts(ip string) error {
 	}
 
 	return nil
+}
+
+func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
+	dcData, err := yaml.Marshal(deployConfig)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	dc := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1.KindConfigMap,
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constatns.DeployConfigConfigMapName,
+		},
+		Data: map[string]string{
+			constatns.DeployConfigConfigMapKey: string(dcData),
+		},
+	}
+	_, err = client.CreateConfigMap(context.TODO(), dc)
+	if err != nil {
+		logger.Fatal(err)
+	}
 }

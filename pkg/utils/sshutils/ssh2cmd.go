@@ -7,10 +7,9 @@ import (
 // SSHToCmd if caller don't provide enough config for run ssh cmd，change to run cmd by os.exec on localhost.
 // for aio deploy now.
 func SSHToCmd(sshConfig *SSH, host string) bool {
-
 	ret := host == "" ||
 		sshConfig == nil ||
-		sshConfig != nil && sshConfig.User == "" || (sshConfig.Password == "" && sshConfig.PkFile == "" && sshConfig.PrivateKey == "")
+		sshConfig != nil && sshConfig.User == "" || (sshConfig.Password == "" && sshConfig.PkFile == "" && sshConfig.PrivateKeyData == "")
 	return ret
 }
 

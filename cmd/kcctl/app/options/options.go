@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -486,18 +487,27 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	return buffer.String(), nil
 }
 
-func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata, agentID string) (string, error) {
+func (c *DeployConfig) KcAgentConfigString(data map[string]interface{}) (string, error) {
+
 	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
 	if err != nil {
 		return "", fmt.Errorf("template parse failed: %s", err.Error())
 	}
+	var buffer bytes.Buffer
+	if err = tmpl.Execute(&buffer, data); err != nil {
+		return "", fmt.Errorf("template execute failed: %s", err.Error())
+	}
+	return buffer.String(), nil
+}
+
+func (c *DeployConfig) GetKcAgentConfig(metadata Metadata) map[string]interface{} {
 	var mqServerEndpoints []string
 	for _, v := range c.MQ.IPs {
 		mqServerEndpoints = append(mqServerEndpoints, fmt.Sprintf("%s:%d", v, c.MQ.Port))
 	}
 
 	var data = make(map[string]interface{})
-	data["AgentID"] = agentID
+	data["AgentID"] = uuid.New().String()
 	data["Region"] = metadata.Region
 	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = c.IPDetect
@@ -521,9 +531,6 @@ func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata, agentI
 	data["OpLogDir"] = c.OpLog.Dir
 	data["OpLogThreshold"] = c.OpLog.Threshold
 	data["KcImageRepoMirror"] = c.ImageProxy.KcImageRepoMirror
-	var buffer bytes.Buffer
-	if err = tmpl.Execute(&buffer, data); err != nil {
-		return "", fmt.Errorf("template execute failed: %s", err.Error())
-	}
-	return buffer.String(), nil
+
+	return data
 }

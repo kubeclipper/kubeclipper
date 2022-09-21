@@ -114,9 +114,6 @@ func initClusterWithPlugin(clusterName string, nodeID []string) *corev1.Cluster 
 	nfs := initNFSComponent()
 	nBytes, _ := json.Marshal(nfs)
 	return &corev1.Cluster{
-		Provider: corev1.ProviderSpec{
-			Name: corev1.ClusterKubeadm,
-		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
 			APIVersion: corev1.SchemeGroupVersion.String(),

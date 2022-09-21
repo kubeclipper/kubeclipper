@@ -24,6 +24,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/models/core"
+	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -66,6 +71,7 @@ type ClusterReconciler struct {
 	ClusterWriter       cluster.ClusterWriter
 	OperationWriter     operation.Writer
 	CronBackupWriter    cluster.CronBackupWriter
+	ConfigMapOperator   core.Operator
 	CloudProviderLister listerv1.CloudProviderLister
 }
 
@@ -129,6 +135,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	if clu.Status.Phase == v1.ClusterUnbinding || clu.Status.Phase == v1.ClusterUnbindFailed {
+		err := r.unbindCluster(clu)
+		if err != nil {
+			logger.Errorf("unbind cluster(%s) failed: %v", clu.Name, err)
+			return ctrl.Result{}, err
+		}
+
+		logger.Infof("update external cluster status to '%s' successfully", v1.ClusterImportFailed)
+		return ctrl.Result{}, nil
+	}
+
 	if clu.ObjectMeta.DeletionTimestamp.IsZero() {
 		if !sets.NewString(clu.ObjectMeta.Finalizers...).Has(v1.ClusterFinalizer) {
 			clu.ObjectMeta.Finalizers = append(clu.ObjectMeta.Finalizers, v1.ClusterFinalizer)
@@ -143,7 +160,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// The object is being deleted
 		if sets.NewString(clu.ObjectMeta.Finalizers...).Has(v1.ClusterFinalizer) {
 			err = r.updateClusterNode(ctx, clu, true)
-			if err != nil {
+			if err != nil && !errors.IsNotFound(err) {
 				log.Error("Failed to update cluster node", zap.Error(err))
 				return ctrl.Result{}, err
 			}
@@ -330,4 +347,109 @@ users:
 
 func getKubeConfig(clusterName string, address string, user string, token string) string {
 	return fmt.Sprintf(kubeconfigFormat, address, clusterName, clusterName, user, user, clusterName, user, clusterName, user, token)
+}
+
+func (r *ClusterReconciler) unbindCluster(clu *v1.Cluster) error {
+	for _, master := range clu.Masters {
+		err := utils.ClusterServiceAccount(r.CmdDelivery, master.ID, v1.ActionUninstall)
+		if err != nil {
+			logger.Warnf("node(%s) delete clusterServiceAccount failed: %v", master.ID, err)
+			continue
+		}
+		break
+	}
+
+	cmd := "rm -rf /usr/local/bin/etcdctl && rm -rf /etc/kubeclipper-agent && systemctl disable kc-agent --now"
+	nodes := append(clu.Masters, clu.Workers...)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*3)
+	go func() {
+		<-time.After(time.Second * 3)
+		defer cancelFunc()
+	}()
+	for i, _ := range nodes {
+		go func(no v1.WorkerNode) {
+			_, err := r.NodeLister.Get(no.ID)
+			if errors.IsNotFound(err) {
+				return
+			}
+			_, err = r.CmdDelivery.DeliverCmd(ctx, no.ID, []string{"/bin/bash", "-c", cmd}, 3*time.Second)
+			if err != nil {
+				logger.Warnf("clean node(%s) kc-agent service failed: %v", no.ID, err)
+				return
+			}
+		}(nodes[i])
+	}
+
+	return r.deleteClusterData(clu)
+}
+
+func (r *ClusterReconciler) deleteClusterData(clu *v1.Cluster) error {
+	nodeIPs := make([]string, 0)
+	nodes := append(clu.Masters, clu.Workers...)
+	for _, no := range nodes {
+		node, err := r.NodeLister.Get(no.ID)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		nodeIPs = append(nodeIPs, node.Status.Ipv4DefaultIP)
+	}
+
+	deploy, err := r.ConfigMapOperator.GetConfigMapEx(context.TODO(), constatns.DeployConfigConfigMapName, "0")
+	if err != nil {
+		logger.Errorf("get deploy config failed: %v", err)
+		return err
+	}
+	confString := deploy.Data[constatns.DeployConfigConfigMapKey]
+	deployConf := &options.DeployConfig{}
+	err = yaml.Unmarshal([]byte(confString), deployConf)
+	if err != nil {
+		logger.Errorf("deploy config unmarshal failed: %v", err)
+		return err
+	}
+	for _, ip := range nodeIPs {
+		deployConf.Agents.Delete(ip)
+	}
+	dcData, err := yaml.Marshal(deployConf)
+	if err != nil {
+		logger.Errorf("deploy config marshal failed: %v", err)
+		return err
+	}
+	deploy.Data[constatns.DeployConfigConfigMapKey] = string(dcData)
+	_, err = r.ConfigMapOperator.UpdateConfigMap(context.TODO(), deploy)
+	if err != nil {
+		logger.Errorf("update deploy config failed: %v", err)
+		return err
+	}
+
+	if clu.Annotations[common.AnnotationConfigMap] != "" {
+		err = r.ConfigMapOperator.DeleteConfigMap(context.TODO(), clu.Annotations[common.AnnotationConfigMap])
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Errorf("delete import-cluster(%s) config failed: %v", clu.Name, err)
+			return err
+		}
+	}
+
+	for _, no := range nodes {
+		err := r.NodeWriter.DeleteNode(context.TODO(), no.ID)
+		if err != nil && !errors.IsNotFound(err) {
+			logger.Warnf("delete unbundled-cluster node failed: %v", err)
+			return nil
+		}
+	}
+
+	clu.Status.Phase = v1.ClusterUnbundled
+	clu, err = r.ClusterWriter.UpdateCluster(context.TODO(), clu)
+	if err != nil {
+		return fmt.Errorf("error updating an unbundled cluster: %v", err)
+	}
+
+	err = r.ClusterWriter.DeleteCluster(context.TODO(), clu.Name)
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error deleting an unbundled cluster: %v", err)
+	}
+
+	return nil
 }

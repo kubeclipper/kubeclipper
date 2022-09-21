@@ -96,6 +96,23 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
 
+	webservice.Route(webservice.POST("/clusters/external").
+		To(h.JoinExternalCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Create clusters.").
+		Reads(corev1.ConfigMap{}).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.ConfigMap{}))
+	webservice.Route(webservice.DELETE("/clusters/external/{name}").
+		To(h.UnbindCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Create clusters.").
+		Param(webservice.PathParameter("name", "cluster name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.ConfigMap{}))
+
 	webservice.Route(webservice.POST("/clusters").
 		To(h.CreateClusters).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).

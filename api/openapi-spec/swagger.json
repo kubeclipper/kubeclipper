@@ -995,6 +995,77 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/clusters/external": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create clusters.",
+        "operationId": "JoinExternalCluster",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.ConfigMap"
+            }
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ConfigMap"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/clusters/external/{name}": {
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create clusters.",
+        "operationId": "UnbindCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ConfigMap"
+            }
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/clusters/{cluster}/backups/{backup}": {
       "put": {
         "produces": [
@@ -5494,9 +5565,6 @@
         "networking": {
           "$ref": "#/definitions/v1.Networking"
         },
-        "provider": {
-          "$ref": "#/definitions/v1.ProviderSpec"
-        },
         "status": {
           "$ref": "#/definitions/v1.ClusterStatus"
         },
@@ -6501,16 +6569,6 @@
         }
       }
     },
-    "v1.ProviderSpec": {
-      "required": [
-        "name"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      }
-    },
     "v1.Record": {
       "properties": {
         "createTime": {
@@ -6934,9 +6992,13 @@
     },
     "v1.WorkerNode": {
       "required": [
-        "id"
+        "id",
+        "containerRuntime"
       ],
       "properties": {
+        "containerRuntime": {
+          "$ref": "#/definitions/v1.ContainerRuntime"
+        },
         "id": {
           "type": "string"
         },

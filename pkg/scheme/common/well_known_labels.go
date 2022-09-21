@@ -86,9 +86,10 @@ const (
 	// eg: storage
 	LabelCategory = "kubeclipper.io/category"
 	// eg: name
-	AnnotationDisplayName = "kubeclipper.io/display-name"
-	AnnotationDescription = "kubeclipper.io/description"
-	AnnotationOffline     = "kubeclipper.io/offline"
 
+	AnnotationDisplayName      = "kubeclipper.io/display-name"
+	AnnotationDescription      = "kubeclipper.io/description"
+	AnnotationOffline          = "kubeclipper.io/offline"
 	AnnotationProviderSyncTime = "kubeclipper.io/providerSyncTime"
+	AnnotationConfigMap        = "kubeclipper.io/configmap"
 )
