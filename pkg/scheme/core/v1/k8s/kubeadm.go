@@ -347,6 +347,21 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		return nil, err
 	}
 
+	// before run 'kubeadm init', clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim'
+	pids, err := getProcessID(ctx, opts.DryRun)
+	if err != nil {
+		logger.Error("get process id error", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pids) > 0 {
+		err = killProcess(ctx, opts.DryRun, pids)
+		if err != nil {
+			logger.Error("kill process error", zap.Error(err))
+			return nil, err
+		}
+	}
+
 	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubeadm", "init", "--config", "/tmp/.k8s/kubeadm.yaml", "--upload-certs")
 	if err != nil {
 		logger.Error("run kubeadm init error", zap.Error(err))
@@ -367,6 +382,41 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		}
 	}
 	return []byte(fmt.Sprintf("%s,%s", joinControlPlaneCMD, joinWorkerCMD)), nil
+}
+
+func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
+	pids := make([]string, 0)
+	processes := []string{"kube-proxy", "kube-apiserver", "kube-controller", "kube-scheduler", "containerd-shim"}
+
+	for _, process := range processes {
+		ec, err := cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | awk '{print $2}'")
+		if err != nil {
+			logger.Error("run ps -ef error", zap.Error(err))
+			return pids, err
+		}
+		if ec.StdOut() != "" {
+			p := strings.Split(ec.StdOut(), "\n")
+			for i, v := range p {
+				if v == "" {
+					p = append(p[:i], p[i+1:]...)
+				}
+			}
+			pids = append(pids, p...)
+		}
+	}
+
+	return pids, nil
+}
+
+func killProcess(ctx context.Context, dryRun bool, pids []string) error {
+	for _, pid := range pids {
+		_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "kill", "-9", pid)
+		if err != nil {
+			logger.Error("kill the process error", zap.Error(err))
+			return err
+		}
+	}
+	return nil
 }
 
 func (stepper *ControlPlane) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
