@@ -34,6 +34,8 @@ type Interface interface {
 	CronBackups() CronBackupInformer
 	Leases() LeaseInformer
 	Domains() DomainInformer
+	CloudProviders() CloudProviderInformer
+	ConfigMaps() ConfigMapInformer
 }
 
 type version struct {
@@ -105,6 +107,20 @@ func (v *version) Leases() LeaseInformer {
 
 func (v *version) Domains() DomainInformer {
 	return &domainInformer{
+		factory:          v.factory,
+		tweakListOptions: v.tweakListOptions,
+	}
+}
+
+func (v *version) CloudProviders() CloudProviderInformer {
+	return &cloudProviderInformer{
+		factory:          v.factory,
+		tweakListOptions: v.tweakListOptions,
+	}
+}
+
+func (v *version) ConfigMaps() ConfigMapInformer {
+	return &configMapInformer{
 		factory:          v.factory,
 		tweakListOptions: v.tweakListOptions,
 	}

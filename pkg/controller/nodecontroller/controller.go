@@ -106,7 +106,7 @@ func (r *NodeReconciler) syncNodeRole(ctx context.Context, node *v1.Node) error 
 		}
 		return err
 	}
-	if err := r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleMaster); err != nil {
+	if err = r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleMaster); err != nil {
 		return err
 	}
 	return r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleWorker)

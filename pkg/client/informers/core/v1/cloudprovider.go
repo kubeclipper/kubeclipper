@@ -34,51 +34,51 @@ import (
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
-// ClusterInformer provides access to a shared informer and lister for Clusters.
-type ClusterInformer interface {
+// CloudProviderInformer provides access to a shared informer and lister for cloudProviders.
+type CloudProviderInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() corev1lister.ClusterLister
+	Lister() corev1lister.CloudProviderLister
 }
 
-type clusterInformer struct {
+type cloudProviderInformer struct {
 	factory          internal.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-func NewClusterInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterInformer(client, resyncPeriod, indexers, nil)
+func NewCloudProviderInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredCloudProviderInformer(client, resyncPeriod, indexers, nil)
 }
 
-func NewFilteredClusterInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredCloudProviderInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().Clusters().List(context.TODO(), options)
+				return client.CoreV1().CloudProviders().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().Clusters().Watch(context.TODO(), options)
+				return client.CoreV1().CloudProviders().Watch(context.TODO(), options)
 			},
 		},
-		&corev1.Cluster{},
+		&corev1.CloudProvider{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *clusterInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *cloudProviderInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredCloudProviderInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *clusterInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.Cluster{}, f.defaultInformer)
+func (f *cloudProviderInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&corev1.CloudProvider{}, f.defaultInformer)
 }
 
-func (f *clusterInformer) Lister() corev1lister.ClusterLister {
-	return corev1lister.NewClusterLister(f.Informer().GetIndexer())
+func (f *cloudProviderInformer) Lister() corev1lister.CloudProviderLister {
+	return corev1lister.NewCloudProviderLister(f.Informer().GetIndexer())
 }

@@ -21,18 +21,14 @@ package sshutils
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/vbauerster/mpb/v8"
 
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
+	"github.com/vbauerster/mpb/v8"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
@@ -222,42 +218,11 @@ func (ss *SSH) download(host, localFilePath, remoteFilePath string) error {
 
 // SftpConnect  is
 func (ss *SSH) sftpConnect(host string) (*sftp.Client, error) {
-	var (
-		auth         []ssh.AuthMethod
-		addr         string
-		clientConfig *ssh.ClientConfig
-		sshClient    *ssh.Client
-		sftpClient   *sftp.Client
-		err          error
-	)
-	// get auth method
-	auth = ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword)
-
-	clientConfig = &ssh.ClientConfig{
-		User:    ss.User,
-		Auth:    auth,
-		Timeout: 30 * time.Second,
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
-		Config: ssh.Config{
-			Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com", "arcfour256", "arcfour128", "aes128-cbc", "3des-cbc", "aes192-cbc", "aes256-cbc"},
-		},
-	}
-
-	// connet to ssh
-	addr = ss.addrReformat(host)
-
-	if sshClient, err = ssh.Dial("tcp", addr, clientConfig); err != nil {
+	sshClient, err := ss.connect(host)
+	if err != nil {
 		return nil, err
 	}
-
-	// create sftp client
-	if sftpClient, err = sftp.NewClient(sshClient); err != nil {
-		return nil, err
-	}
-
-	return sftpClient, nil
+	return sftp.NewClient(sshClient)
 }
 
 func toSizeFromInt(length int) (float64, string) {

@@ -1810,6 +1810,7 @@ func (in *WorkerNode) DeepCopyInto(out *WorkerNode) {
 		*out = make([]Taint, len(*in))
 		copy(*out, *in)
 	}
+	in.ContainerRuntime.DeepCopyInto(&out.ContainerRuntime)
 	return
 }
 

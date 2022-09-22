@@ -34,11 +34,11 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
-
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
@@ -58,14 +58,15 @@ import (
 )
 
 type ClusterReconciler struct {
-	CmdDelivery      service.CmdDelivery
-	mgr              manager.Manager
-	ClusterLister    listerv1.ClusterLister
-	NodeLister       listerv1.NodeLister
-	NodeWriter       cluster.NodeWriter
-	ClusterWriter    cluster.ClusterWriter
-	OperationWriter  operation.Writer
-	CronBackupWriter cluster.CronBackupWriter
+	CmdDelivery         service.CmdDelivery
+	mgr                 manager.Manager
+	ClusterLister       listerv1.ClusterLister
+	NodeLister          listerv1.NodeLister
+	NodeWriter          cluster.NodeWriter
+	ClusterWriter       cluster.ClusterWriter
+	OperationWriter     operation.Writer
+	CronBackupWriter    cluster.CronBackupWriter
+	CloudProviderLister listerv1.CloudProviderLister
 }
 
 func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
@@ -225,47 +226,22 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	if c.Status.Phase == v1.ClusterInstalling || c.Status.Phase == v1.ClusterInstallFailed {
 		return nil
 	}
-
-	node, err := r.NodeLister.Get(c.Masters[0].ID)
+	var (
+		kubeconfig string
+		err        error
+	)
+	// get kubeconfig from kc
+	kubeconfig, err = r.getKubeConfig(ctx, c)
 	if err != nil {
-		log.Error("get master node error",
-			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name))
+		log.Error("create cluster client config failed", zap.String("cluster", c.Name), zap.Error(err))
 		return err
 	}
 
-	// there is 3 ip maybe used in kubeconfig,sort by priority: proxyServer > floatIP > defaultIP
-	proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
-	floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
-	apiServer := node.Status.Ipv4DefaultIP + ":6443"
-	if floatIP != "" {
-		apiServer = floatIP + ":6443"
-	}
-	if proxyAPIServer != "" {
-		apiServer = proxyAPIServer
-	}
-	// kubeconfig already used same ip, do nothing.
-	// else we need use current ip to generate a new kubeconfig.
-	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil && strings.Contains(string(c.KubeConfig), apiServer) {
-		log.Debug("clientset has been init")
+	// needn't update
+	if kubeconfig == "" {
 		return nil
 	}
 
-	token, err := r.CmdDelivery.DeliverCmd(ctx, c.Masters[0].ID,
-		[]string{"/bin/bash", "-c", `kubectl get secret $(kubectl get sa kc-server -n kube-system -o jsonpath={.secrets[0].name}) -n kube-system -o jsonpath={.data.token} | base64 -d`}, 3*time.Second)
-	if err != nil {
-		log.Error("get cluster service account token error", zap.Error(err))
-		return err
-	}
-	log.Debug("get cluster kc-server service account token", zap.String("token", string(token)))
-	if string(token) == "" {
-		return fmt.Errorf("get invalid token")
-	}
-	// cacrt, err := s.cmdDelivery.DeliverCmd(context.TODO(), clu.Masters[0].ID, []string{"kubectl", "config", "view", "--raw", "-o", "jsonpath={.clusters[0].cluster..certificate-authority-data}"}, 3*time.Second)
-	// if err != nil {
-	//	logger.Error("get cluster service account token error", zap.String("cluster", name), zap.Error(err))
-	//	return err
-	// }
-	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s", apiServer), "kc-server", string(token))
 	c.KubeConfig = []byte(kubeconfig)
 	_, err = r.ClusterWriter.UpdateCluster(ctx, c)
 	if err != nil {
@@ -290,6 +266,46 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	}
 	r.mgr.AddClusterClientSet(c.Name, client.NewKubernetesClient(clientcfg, clientset))
 	return nil
+}
+
+func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (string, error) {
+	log := logger.FromContext(ctx)
+
+	node, err := r.NodeLister.Get(c.Masters[0].ID)
+	if err != nil {
+		log.Error("get master node error",
+			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name), zap.Error(err))
+		return "", err
+	}
+	// there is 3 ip maybe used in kubeconfig,sort by priority: proxyServer > floatIP > defaultIP
+	proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
+	floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
+	apiServer := node.Status.Ipv4DefaultIP + ":6443"
+	if floatIP != "" {
+		apiServer = floatIP + ":6443"
+	}
+	if proxyAPIServer != "" {
+		apiServer = proxyAPIServer
+	}
+	// kubeconfig already used same ip, do nothing.
+	// else we need use current ip to generate a new kubeconfig.
+	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist && c.KubeConfig != nil && strings.Contains(string(c.KubeConfig), apiServer) {
+		log.Debug("clientset has been init")
+		return "", nil
+	}
+
+	token, err := r.CmdDelivery.DeliverCmd(ctx, c.Masters[0].ID,
+		[]string{"/bin/bash", "-c", `kubectl get secret $(kubectl get sa kc-server -n kube-system -o jsonpath={.secrets[0].name}) -n kube-system -o jsonpath={.data.token} | base64 -d`}, 3*time.Second)
+	if err != nil {
+		log.Error("get cluster service account token error", zap.Error(err))
+		return "", err
+	}
+	log.Debug("get cluster kc-server service account token", zap.String("token", string(token)))
+	if string(token) == "" {
+		return "", fmt.Errorf("get invalid token")
+	}
+	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s", apiServer), "kc-server", string(token))
+	return kubeconfig, nil
 }
 
 var kubeconfigFormat = `

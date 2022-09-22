@@ -21,10 +21,10 @@ package sshutils
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -33,6 +33,7 @@ type SSH struct {
 	Password          string         `json:"password" yaml:"password,omitempty"`
 	Port              int            `json:"port" yaml:"port,omitempty"`
 	PkFile            string         `json:"pkFile" yaml:"pkFile,omitempty"`
+	PrivateKey        string         `json:"privateKey" yaml:"privateKey,omitempty"`
 	PkPassword        string         `json:"pkPassword" yaml:"pkPassword,omitempty"`
 	ConnectionTimeout *time.Duration `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 }
@@ -42,7 +43,21 @@ func (ss *SSH) NewClient(host string) (*ssh.Client, error) {
 }
 
 func (ss *SSH) connect(host string) (*ssh.Client, error) {
-	auth := ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword)
+	var (
+		pkData []byte
+		err    error
+	)
+	if ss.PkFile != "" {
+		pkData, err = ioutil.ReadFile(ss.PkFile)
+		if err != nil {
+			return nil, errors.WithMessage(err, "read private key")
+		}
+		ss.PrivateKey = string(pkData)
+	}
+	auth, err := ss.sshAuthMethod(ss.Password, ss.PrivateKey, ss.PkPassword)
+	if err != nil {
+		return nil, errors.WithMessage(err, "get auth method")
+	}
 	config := ssh.Config{
 		Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com",
 			"arcfour256", "arcfour128", "aes128-cbc", "3des-cbc", "aes192-cbc", "aes256-cbc"},
@@ -70,25 +85,22 @@ func (ss *SSH) addrReformat(host string) string {
 	return host
 }
 
-func (ss *SSH) sshAuthMethod(passwd, pkFile, pkPasswd string) (auth []ssh.AuthMethod) {
-	if fileExist(pkFile) {
-		am, err := ss.sshPrivateKeyMethod(pkFile, pkPasswd)
-		if err == nil {
-			auth = append(auth, am)
+func (ss *SSH) sshAuthMethod(passwd, pkData, pkPasswd string) ([]ssh.AuthMethod, error) {
+	auth := make([]ssh.AuthMethod, 0)
+	if pkData != "" {
+		am, err := ss.sshPrivateKeyMethod([]byte(pkData), pkPasswd)
+		if err != nil {
+			return nil, err
 		}
+		auth = append(auth, am)
 	}
 	if passwd != "" {
 		auth = append(auth, ss.sshPasswordMethod(passwd))
 	}
-
-	return auth
+	return auth, nil
 }
 
-func (ss *SSH) sshPrivateKeyMethod(pkFile, pkPassword string) (am ssh.AuthMethod, err error) {
-	pkData, err := ss.readFile(pkFile)
-	if err != nil {
-		return nil, err
-	}
+func (ss *SSH) sshPrivateKeyMethod(pkData []byte, pkPassword string) (am ssh.AuthMethod, err error) {
 	var pk ssh.Signer
 	if pkPassword == "" {
 		pk, err = ssh.ParsePrivateKey(pkData)
@@ -107,17 +119,4 @@ func (ss *SSH) sshPrivateKeyMethod(pkFile, pkPassword string) (am ssh.AuthMethod
 
 func (ss *SSH) sshPasswordMethod(passwd string) ssh.AuthMethod {
 	return ssh.Password(passwd)
-}
-
-func fileExist(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil || os.IsExist(err)
-}
-
-func (ss *SSH) readFile(name string) ([]byte, error) {
-	content, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-	return content, nil
 }
