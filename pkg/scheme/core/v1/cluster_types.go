@@ -104,9 +104,10 @@ const (
 )
 
 const (
-	ClusterFinalizer   = "finalizer.cluster.kubeclipper.io"
-	OperationFinalizer = "finalizer.operation.kubeclipper.io"
-	BackupFinalizer    = "finalizer.backup.kubeclipper.io"
+	ClusterFinalizer       = "finalizer.cluster.kubeclipper.io"
+	CloudProviderFinalizer = "finalizer.cloudprovider.kubeclipper.io"
+	OperationFinalizer     = "finalizer.operation.kubeclipper.io"
+	BackupFinalizer        = "finalizer.backup.kubeclipper.io"
 )
 
 type ClusterStatus struct {
@@ -115,7 +116,7 @@ type ClusterStatus struct {
 	// should be tied to the phase.
 	// +optional
 	Phase ClusterPhase `json:"phase,omitempty"`
-	//Status ClusterStatusType `json:"status,omitempty"`
+	// Status ClusterStatusType `json:"status,omitempty"`
 	// Versions contains information regarding the current and desired versions
 	// of the cluster control plane and worker nodes.
 	// +optional
@@ -292,9 +293,10 @@ type Taint struct {
 
 // WorkerNode define
 type WorkerNode struct {
-	ID     string            `json:"id"`
-	Labels map[string]string `json:"labels,omitempty"`
-	Taints []Taint           `json:"taints,omitempty"`
+	ID               string            `json:"id"`
+	Labels           map[string]string `json:"labels,omitempty"`
+	Taints           []Taint           `json:"taints,omitempty"`
+	ContainerRuntime ContainerRuntime  `json:"containerRuntime,omitempty"`
 }
 
 type WorkerNodeList []WorkerNode

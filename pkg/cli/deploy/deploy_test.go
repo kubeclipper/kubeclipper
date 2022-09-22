@@ -21,6 +21,8 @@ package deploy
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 )
 
@@ -65,7 +67,8 @@ func TestDeployOptions_getKcAgentConfigTemplateContent(t *testing.T) {
 		FloatIP: "1.1.1.1",
 	}
 	for range d.deployConfig.ServerIPs {
-		t.Log(d.deployConfig.GetKcAgentConfigTemplateContent(metadata))
+		agentID := uuid.New().String()
+		t.Log(d.deployConfig.GetKcAgentConfigTemplateContent(metadata, agentID))
 	}
 }
 

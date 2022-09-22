@@ -42,6 +42,9 @@ const (
 	LabelBackupPoint       = "kubeclipper.io/backupPoint"
 	LabelCronBackupDisable = "kubeclipper.io/cronBackupDisable"
 	LabelCronBackupEnable  = "kubeclipper.io/cronBackupEnable"
+
+	LabelClusterProviderType = "kubeclipper.io/clusterProviderType"
+	LabelClusterProviderName = "kubeclipper.io/clusterProviderName"
 )
 
 const (
@@ -83,8 +86,9 @@ const (
 	// eg: storage
 	LabelCategory = "kubeclipper.io/category"
 	// eg: name
-	AnnotationDisplayName      = "kubeclipper.io/display-name"
-	AnnotationDescription      = "kubeclipper.io/description"
-	AnnotationOffline          = "kubeclipper.io/offline"
+	AnnotationDisplayName = "kubeclipper.io/display-name"
+	AnnotationDescription = "kubeclipper.io/description"
+	AnnotationOffline     = "kubeclipper.io/offline"
+
 	AnnotationProviderSyncTime = "kubeclipper.io/providerSyncTime"
 )

@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudpprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
@@ -383,6 +384,7 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		storageFactory.Template(),
 		storageFactory.CloudProvider(),
 	)
+	coreOperator := core.NewOperator(storageFactory.ConfigMaps())
 	opOperator := operation.NewOperationOperator(storageFactory.Operations())
 	iamOperator := iam.NewOperator(storageFactory.Users(),
 		storageFactory.GlobalRoles(),
@@ -413,13 +415,14 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		return err
 	}
 	if err = (&clustercontroller.ClusterReconciler{
-		CmdDelivery:      mgr.GetCmdDelivery(),
-		ClusterLister:    informerFactory.Core().V1().Clusters().Lister(),
-		NodeLister:       informerFactory.Core().V1().Nodes().Lister(),
-		NodeWriter:       clusterOperator,
-		ClusterWriter:    clusterOperator,
-		OperationWriter:  opOperator,
-		CronBackupWriter: clusterOperator,
+		CmdDelivery:         mgr.GetCmdDelivery(),
+		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
+		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
+		NodeWriter:          clusterOperator,
+		ClusterWriter:       clusterOperator,
+		OperationWriter:     opOperator,
+		CronBackupWriter:    clusterOperator,
+		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
@@ -458,10 +461,23 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
+	if err = (&cloudpprovidercontroller.Reconciler{
+		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
+		ClusterWriter:       clusterOperator,
+		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
+		CloudProviderWriter: clusterOperator,
+		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
+		NodeWriter:          clusterOperator,
+		ConfigmapLister:     informerFactory.Core().V1().ConfigMaps().Lister(),
+		ConfigmapWriter:     coreOperator,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
 	(&controller.ClusterStatusMon{
-		ClusterWriter: clusterOperator,
-		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
-		CmdDelivery:   mgr.GetCmdDelivery(),
+		ClusterWriter:       clusterOperator,
+		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
+		CmdDelivery:         mgr.GetCmdDelivery(),
+		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
 	}).SetupWithManager(mgr)
 	(&controller.NodeStatusMon{
 		NodeLister:  informerFactory.Core().V1().Nodes().Lister(),

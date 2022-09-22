@@ -56,6 +56,7 @@ func CommonRequest(requestURL, httpMethod string, header, rawQuery map[string]st
 	}
 
 	ts := &http.Transport{
+		DisableKeepAlives: true,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},

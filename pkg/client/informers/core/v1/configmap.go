@@ -34,51 +34,51 @@ import (
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
-// ClusterInformer provides access to a shared informer and lister for Clusters.
-type ClusterInformer interface {
+// ConfigMapInformer provides access to a shared informer and lister for configMaps.
+type ConfigMapInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() corev1lister.ClusterLister
+	Lister() corev1lister.ConfigMapLister
 }
 
-type clusterInformer struct {
+type configMapInformer struct {
 	factory          internal.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-func NewClusterInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredClusterInformer(client, resyncPeriod, indexers, nil)
+func NewConfigMapInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredConfigMapInformer(client, resyncPeriod, indexers, nil)
 }
 
-func NewFilteredClusterInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredConfigMapInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().Clusters().List(context.TODO(), options)
+				return client.CoreV1().ConfigMaps().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoreV1().Clusters().Watch(context.TODO(), options)
+				return client.CoreV1().ConfigMaps().Watch(context.TODO(), options)
 			},
 		},
-		&corev1.Cluster{},
+		&corev1.ConfigMap{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *clusterInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredClusterInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *configMapInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredConfigMapInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *clusterInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.Cluster{}, f.defaultInformer)
+func (f *configMapInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&corev1.ConfigMap{}, f.defaultInformer)
 }
 
-func (f *clusterInformer) Lister() corev1lister.ClusterLister {
-	return corev1lister.NewClusterLister(f.Informer().GetIndexer())
+func (f *configMapInformer) Lister() corev1lister.ConfigMapLister {
+	return corev1lister.NewConfigMapLister(f.Informer().GetIndexer())
 }

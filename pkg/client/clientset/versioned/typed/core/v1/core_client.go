@@ -41,6 +41,8 @@ type CoreV1Interface interface {
 	BackupPointsGetter
 	CronBackupsGetter
 	DomainsGetter
+	ConfigMapsGetter
+	CloudProvidersGetter
 }
 
 type CoreV1Client struct {
@@ -94,6 +96,14 @@ func (c *CoreV1Client) Domains() DomainsInterface {
 	return newDomains(c)
 }
 
+func (c *CoreV1Client) ConfigMaps() ConfigMapsInterface {
+	return newConfigMaps(c)
+}
+
+func (c *CoreV1Client) CloudProviders() CloudProvidersInterface {
+	return newCloudProviders(c)
+}
+
 func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
@@ -112,9 +122,9 @@ func setConfigDefaults(config *rest.Config) error {
 	config.APIPath = "/api"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
-	//if config.UserAgent == "" {
+	// if config.UserAgent == "" {
 	//	config.UserAgent = rest.DefaultKubernetesUserAgent()
-	//}
+	// }
 
 	return nil
 }

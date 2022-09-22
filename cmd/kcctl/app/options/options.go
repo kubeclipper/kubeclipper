@@ -26,7 +26,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/uuid"
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -487,7 +486,7 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	return buffer.String(), nil
 }
 
-func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) (string, error) {
+func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata, agentID string) (string, error) {
 	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
 	if err != nil {
 		return "", fmt.Errorf("template parse failed: %s", err.Error())
@@ -498,7 +497,7 @@ func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) (strin
 	}
 
 	var data = make(map[string]interface{})
-	data["AgentID"] = uuid.New().String()
+	data["AgentID"] = agentID
 	data["Region"] = metadata.Region
 	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = c.IPDetect

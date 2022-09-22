@@ -18,6 +18,12 @@
 
 package v1
 
+type CloudProviderListerExpansion interface {
+}
+
+type ConfigMapListerExpansion interface {
+}
+
 type ClusterListerExpansion interface {
 }
 

@@ -36,6 +36,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
@@ -678,7 +679,8 @@ func (d *DeployOptions) deployKcConsole() {
 
 func (d *DeployOptions) deployKcAgent() {
 	for agent, metadata := range d.deployConfig.Agents {
-		agentConfig, err := d.deployConfig.GetKcAgentConfigTemplateContent(metadata)
+		agentID := uuid.New().String()
+		agentConfig, err := d.deployConfig.GetKcAgentConfigTemplateContent(metadata, agentID)
 		if err != nil {
 			logger.Fatal(err)
 		}

@@ -47,11 +47,12 @@ const (
 )
 
 type ClusterStatusMon struct {
-	ClusterWriter cluster.ClusterWriter
-	ClusterLister listerv1.ClusterLister
-	CmdDelivery   service.CmdDelivery
-	mgr           manager.Manager
-	log           logger.Logging
+	ClusterWriter       cluster.ClusterWriter
+	ClusterLister       listerv1.ClusterLister
+	CmdDelivery         service.CmdDelivery
+	mgr                 manager.Manager
+	log                 logger.Logging
+	CloudProviderLister listerv1.CloudProviderLister
 }
 
 func (s *ClusterStatusMon) SetupWithManager(mgr manager.Manager) {
@@ -86,7 +87,10 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		} else {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentUnhealthy)
 		}
-		s.updateClusterCertification(clu.Name)
+		err = s.updateClusterCertification(clu.Name)
+		if err != nil {
+			s.log.Error("update cluster certification failed", zap.Error(err))
+		}
 		for _, com := range clu.Addons {
 			comp, ok := component.Load(fmt.Sprintf(component.RegisterFormat, com.Name, com.Version))
 			if !ok {
@@ -146,12 +150,27 @@ func (s *ClusterStatusMon) updateClusterComponentStatus(clusterName string, cate
 	}
 }
 
-func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
+func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error {
 	clu, err := s.ClusterLister.Get(clusterName)
 	if err != nil {
 		s.log.Warn("get cluster failed when update cluster certification status, skip it", zap.String("cluster", clusterName))
-		return
+		return err
 	}
+	var certifications []v1.Certification
+	// get certifications from kc
+	certifications, err = s.getCertificationFromKC(clu)
+	if err != nil {
+		return err
+	}
+
+	clu.Status.Certifications = certifications
+	if _, err = s.ClusterWriter.UpdateCluster(context.TODO(), clu); err != nil {
+		s.log.Warn("update cluster certification status failed", zap.String("cluster", clu.Name), zap.Error(err))
+	}
+	return nil
+}
+
+func (s *ClusterStatusMon) getCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {
 	var cmd []string
 	if clu.KubernetesVersion[1:] < k8s.KubeCertsCluVersion {
 		cmd = []string{"kubeadm", "alpha", "certs", "check-expiration"}
@@ -160,13 +179,13 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 	}
 	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Masters[0].ID, cmd, 3*time.Minute)
 	if err != nil {
-		s.log.Warn("get cluster failed when get cluster certification status, skip it", zap.String("cluster", clusterName))
-		return
+		s.log.Warn("get cluster failed when get cluster certification status, skip it", zap.String("cluster", clu.Name))
+		return nil, err
 	}
 	splitRes := strings.Split(string(res), "\n\n")
 	if len(splitRes) != 3 {
 		logger.Errorf("read cluster certs error")
-		return
+		return nil, err
 	}
 	crts := strings.Split(splitRes[1], "\n")
 	cas := strings.Split(splitRes[2], "\n")
@@ -175,8 +194,8 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		crt := strings.Fields(ca)
 		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
 		if parErr != nil {
-			s.log.Warn("get cluster failed when get cluster ca expiration time", zap.String("cluster", clusterName))
-			return
+			s.log.Warn("get cluster failed when get cluster ca expiration time", zap.String("cluster", clu.Name))
+			return nil, err
 		}
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
@@ -188,8 +207,8 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 		crt := strings.Fields(cert)
 		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
 		if parErr != nil {
-			s.log.Warn("get cluster failed when get cluster cert expiration time", zap.String("cluster", clusterName))
-			return
+			s.log.Warn("get cluster failed when get cluster cert expiration time", zap.String("cluster", clu.Name))
+			return nil, err
 		}
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
@@ -197,11 +216,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) {
 			ExpirationTime: metav1.Time{Time: expire},
 		})
 	}
-	clu.Status.Certifications = certification
-	if _, err = s.ClusterWriter.UpdateCluster(context.TODO(), clu); err != nil {
-		s.log.Warn("update cluster certification status failed", zap.String("cluster", clusterName), zap.Error(err))
-		return
-	}
+	return certification, nil
 }
 
 func getClusterComponentIndex(clu *v1.Cluster, component string) int {
