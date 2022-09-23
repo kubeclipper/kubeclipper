@@ -385,14 +385,26 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 }
 
 func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
+	var (
+		err error
+		ec  *cmdutil.ExecCmd
+	)
 	pids := make([]string, 0)
 	processes := []string{"kube-proxy", "kube-apiserver", "kube-controller", "kube-scheduler", "containerd-shim", "etcd"}
 
 	for _, process := range processes {
-		ec, err := cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | awk '{print $2}'")
-		if err != nil {
-			logger.Error("run ps -ef error", zap.Error(err))
-			return pids, err
+		if strings.Contains(process, "etcd") {
+			ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | grep -v \"/usr\" | awk '{print $2}'")
+			if err != nil {
+				logger.Error("run ps -ef error", zap.Error(err))
+				return pids, err
+			}
+		} else {
+			ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | awk '{print $2}'")
+			if err != nil {
+				logger.Error("run ps -ef error", zap.Error(err))
+				return pids, err
+			}
 		}
 		if ec.StdOut() != "" {
 			p := strings.Split(ec.StdOut(), "\n")
