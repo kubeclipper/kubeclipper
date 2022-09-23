@@ -347,7 +347,7 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		return nil, err
 	}
 
-	// before run 'kubeadm init', clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim'
+	// before run 'kubeadm init', clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim, etcd'
 	pids, err := getProcessID(ctx, opts.DryRun)
 	if err != nil {
 		logger.Error("get process id error", zap.Error(err))
@@ -386,7 +386,7 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 
 func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
 	pids := make([]string, 0)
-	processes := []string{"kube-proxy", "kube-apiserver", "kube-controller", "kube-scheduler", "containerd-shim"}
+	processes := []string{"kube-proxy", "kube-apiserver", "kube-controller", "kube-scheduler", "containerd-shim", "etcd"}
 
 	for _, process := range processes {
 		ec, err := cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | awk '{print $2}'")
@@ -526,6 +526,21 @@ func (stepper *ClusterNode) setRole(role string) {
 }
 
 func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	// before join node, clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim, etcd'
+	pids, err := getProcessID(ctx, opts.DryRun)
+	if err != nil {
+		logger.Error("get process id error", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pids) > 0 {
+		err = killProcess(ctx, opts.DryRun, pids)
+		if err != nil {
+			logger.Error("kill process error", zap.Error(err))
+			return nil, err
+		}
+	}
+
 	v := component.GetExtraData(ctx)
 	if v == nil {
 		return nil, fmt.Errorf("no join command received")
@@ -538,7 +553,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		return nil, fmt.Errorf("join command invalid")
 	}
 
-	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "modprobe br_netfilter && modprobe nf_conntrack")
+	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "modprobe br_netfilter && modprobe nf_conntrack")
 	if err != nil {
 		logger.Warnf("modprobe command error: %s", err.Error())
 	}
