@@ -752,6 +752,39 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/cloudproviders/precheck": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Check cloudProvider params is ok",
+        "operationId": "PreCheckCloudProvider",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.CloudProvider"
+            }
+          },
+          {
+            "type": "boolean",
+            "description": "dry run Check cloudProvider params",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/cloudproviders/{name}": {
       "get": {
         "produces": [
@@ -6937,6 +6970,9 @@
         "id"
       ],
       "properties": {
+        "containerRuntime": {
+          "$ref": "#/definitions/v1.ContainerRuntime"
+        },
         "id": {
           "type": "string"
         },
