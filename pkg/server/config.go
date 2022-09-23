@@ -353,6 +353,57 @@ var Roles = []iamv1.GlobalRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/module":              "Cluster Management",
+				"kubeclipper.io/role-template-rules": "{\"cloudproviders\": \"view\"}",
+				"kubeclipper.io/alias-name":          "CloudProvider View",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-view-cloudproviders",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"cloudproviders", "cloudproviders/precheck"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindGlobalRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-cloudproviders\"]",
+				"kubeclipper.io/module":              "Cluster Management",
+				"kubeclipper.io/role-template-rules": "{\"cloudproviders\": \"edit\"}",
+				"kubeclipper.io/alias-name":          "CloudProvider Edit",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-edit-cloudproviders",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"cloudproviders", "cloudproviders/precheck"},
+				Verbs:     []string{"*"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindGlobalRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/module":              "Cluster Management",
 				"kubeclipper.io/role-template-rules": "{\"clusters\": \"view\"}",
 				"kubeclipper.io/alias-name":          "Cluster View",
 				"kubeclipper.io/internal":            "true",

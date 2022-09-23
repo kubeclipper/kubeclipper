@@ -1006,6 +1006,15 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
 
+	webservice.Route(webservice.POST("/cloudproviders/precheck").
+		To(h.PreCheckCloudProvider).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Check cloudProvider params is ok").
+		Reads(corev1.CloudProvider{}).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run Check cloudProvider params").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
 	webservice.Route(webservice.POST("/cloudproviders").
 		To(h.CreateCloudProvider).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).

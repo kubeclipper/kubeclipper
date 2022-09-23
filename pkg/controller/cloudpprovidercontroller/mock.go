@@ -118,7 +118,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	mockProvider := mock.NewProvider()
+	mockProvider := mock.NewProvider(provider)
 
 	if provider.ObjectMeta.DeletionTimestamp.IsZero() {
 		// insert finalizers

@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/mock"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 
 	"github.com/robfig/cron/v3"
@@ -314,6 +315,11 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 			return
 		}
 		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if _, ok := c.Labels[common.LabelClusterProviderName]; ok {
+		restplus.HandleBadRequest(response, request, errors.New("can't delete cluster which belongs to provider"))
 		return
 	}
 
@@ -3148,6 +3154,33 @@ func (h *handler) DescribeCloudProvider(req *restful.Request, resp *restful.Resp
 		return
 	}
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, c)
+}
+
+func (h *handler) PreCheckCloudProvider(req *restful.Request, resp *restful.Response) {
+	cp := &v1.CloudProvider{}
+	err := req.ReadEntity(cp)
+	if err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	switch cp.Type {
+	case "mock":
+		provider := mock.NewProvider(cp)
+		check, err := provider.PreCheck(req.Request.Context())
+		if err != nil {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		if !check {
+			restplus.HandleBadRequest(resp, req, errors.New("preCheck failed"))
+			return
+		}
+	default:
+		restplus.HandleBadRequest(resp, req, errors.New("invalid provider type"))
+		return
+	}
+
+	resp.WriteHeader(http.StatusOK)
 }
 
 func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Response) {
