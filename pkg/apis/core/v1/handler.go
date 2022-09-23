@@ -3190,12 +3190,24 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
+	if err = h.providerValidate(cp); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	cp.Status.Phase = v1.CloudProviderSyncing
 	cp, err = h.clusterOperator.CreateCloudProvider(req.Request.Context(), cp)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
 	_ = resp.WriteHeaderAndEntity(http.StatusCreated, cp)
+}
+
+func (h *handler) providerValidate(cp *v1.CloudProvider) error {
+	if cp.SSH.PrivateKey != "" && cp.SSH.Password != "" {
+		return errors.New("can't specify both password and privateKey")
+	}
+	return nil
 }
 
 func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Response) {
@@ -3205,6 +3217,13 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
+
+	if err := h.providerValidate(cp); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+
+	cp.Status.Phase = v1.CloudProviderSyncing
 	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
 
 	if name != cp.Name {
@@ -3244,6 +3263,7 @@ func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
+	cp.Status.Phase = v1.CloudProviderSyncing
 
 	if !dryRun {
 		// update annotation to trigger sync
@@ -3260,7 +3280,7 @@ func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response
 func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Response) {
 	name := req.PathParameter("name")
 	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
-	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	provider, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(resp, req, err)
@@ -3270,6 +3290,12 @@ func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 	if !dryRun {
+		provider.Status.Phase = v1.CloudProviderTerminating
+		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), provider)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
 		err = h.clusterOperator.DeleteCloudProvider(req.Request.Context(), name)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)

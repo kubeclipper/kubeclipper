@@ -37,7 +37,30 @@ type CloudProvider struct {
 	// SSH config for connect to nodes.
 	SSH    SSH                  `json:"ssh,omitempty"`
 	Config runtime.RawExtension `json:"config,omitempty"`
+
+	Status CloudProviderStatus `json:"status,omitempty" optional:"true"`
 }
+
+type CloudProviderStatus struct {
+	// Phase is a description of the current cluster status, summarizing the various conditions,
+	// possible active updates etc. This field is for informational purpose only and no logic
+	// should be tied to the phase.
+	// +optional
+	Phase CloudProviderPhase `json:"phase,omitempty"`
+	// Reason human-readable error msg
+	Reason string `json:"reason"`
+	// Detail when sync failed,this we note what happened
+	Detail string `json:"detail"`
+}
+
+type CloudProviderPhase string
+
+// These are the valid phases of a project.
+const (
+	CloudProviderSyncing     CloudProviderPhase = "Syncing"
+	CloudProviderSuccessful  CloudProviderPhase = "Successful"
+	CloudProviderTerminating CloudProviderPhase = "Terminating"
+)
 
 type SSH struct {
 	User               string `json:"user,omitempty"`

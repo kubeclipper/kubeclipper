@@ -254,7 +254,7 @@ type CloudProviderEx interface {
 }
 
 type CloudProviderWriter interface {
-	CreateCloudProvider(ctc context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error)
-	UpdateCloudProvider(ctx context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error)
+	CreateCloudProvider(ctc context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error)
+	UpdateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error)
 	DeleteCloudProvider(ctx context.Context, name string) error
 }

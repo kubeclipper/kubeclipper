@@ -20,8 +20,10 @@ package cloudpprovidercontroller
 
 import (
 	"context"
+	"reflect"
 	"time"
 
+	pkgerrors "github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/mock"
@@ -124,14 +126,35 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		// insert finalizers
 		if !sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
 			provider.ObjectMeta.Finalizers = append(provider.ObjectMeta.Finalizers, v1.CloudProviderFinalizer)
-			if _, err = r.CloudProviderWriter.UpdateCloudProvider(context.TODO(), provider); err != nil {
+			provider, err = r.CloudProviderWriter.UpdateCloudProvider(context.TODO(), provider)
+			if err != nil {
 				return ctrl.Result{}, err
 			}
 		}
+
 		// 	if provider created or updated,we need sync data.
 		if err = mockProvider.Sync(ctx); err != nil {
 			log.Error("failed to sync", zap.Error(err))
-			return ctrl.Result{}, err
+			newProvider := provider.DeepCopy()
+			newProvider.Status.Reason = convert(err)
+			newProvider.Status.Detail = err.Error()
+			if reflect.DeepEqual(provider, newProvider) {
+				return ctrl.Result{}, err
+			}
+			if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
+				return ctrl.Result{}, pkgerrors.WithMessage(err, "record error msg")
+			}
+			// ignore error,if update
+			return ctrl.Result{}, nil
+		}
+
+		newProvider := provider.DeepCopy()
+		newProvider.Status.Phase = v1.CloudProviderSuccessful
+		newProvider.Status.Reason = ""
+		if !reflect.DeepEqual(provider, newProvider) {
+			if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
+				return ctrl.Result{}, pkgerrors.WithMessage(err, "update status to successful")
+			}
 		}
 	} else {
 		// The object is being deleted
@@ -139,7 +162,17 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			// when cloudProvider deleted,we need delete this provider's clusters from kc,and clean kc-agent on all nodes.
 			if err = mockProvider.Cleanup(ctx); err != nil {
 				log.Error("failed to cleanup", zap.Error(err))
-				return ctrl.Result{}, err
+				newProvider := provider.DeepCopy()
+				newProvider.Status.Reason = convert(err)
+				newProvider.Status.Detail = err.Error()
+				if reflect.DeepEqual(provider, newProvider) {
+					return ctrl.Result{}, err
+				}
+				if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
+					return ctrl.Result{}, pkgerrors.WithMessage(err, "record error msg")
+				}
+				// ignore error,if update
+				return ctrl.Result{}, nil
 			}
 
 			// when cleanup remove our cloudProvider finalizer
@@ -150,15 +183,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				log.Error("failed to delete finalizer", zap.Error(err))
 				return ctrl.Result{}, err
 			}
-		} else {
-			// if without finalizer,delete really
-			if err = r.CloudProviderWriter.DeleteCloudProvider(ctx, req.Name); err != nil {
-				log.Error("failed to delete provider", zap.Error(err))
-				return ctrl.Result{}, err
-			}
 		}
 		return ctrl.Result{}, nil
 	}
 
 	return ctrl.Result{RequeueAfter: cloudProviderInterval}, nil
+}
+
+// convert err to a human-readable msg
+func convert(err error) string {
+	return err.Error()
 }
