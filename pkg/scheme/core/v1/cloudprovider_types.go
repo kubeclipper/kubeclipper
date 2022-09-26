@@ -37,7 +37,39 @@ type CloudProvider struct {
 	// SSH config for connect to nodes.
 	SSH    SSH                  `json:"ssh,omitempty"`
 	Config runtime.RawExtension `json:"config,omitempty"`
+	Status CloudProviderStatus  `json:"status"`
 }
+
+type CloudProviderStatus struct {
+	Conditions []CloudProviderCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+}
+
+// CloudProviderCondition contains condition information for a cloudProvider.
+type CloudProviderCondition struct {
+	// Type of node condition.
+	Type CloudProviderConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status ConditionStatus `json:"status"`
+	// Last time we got an update on a given condition.
+	// +optional
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transit from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	//  Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+type CloudProviderConditionType string
+
+const (
+	CloudProviderReady       CloudProviderConditionType = "Ready"
+	CloudProviderProgressing CloudProviderConditionType = "Progressing"
+)
 
 type SSH struct {
 	User               string `json:"user,omitempty"`
@@ -57,3 +89,12 @@ type CloudProviderList struct {
 	// Items is the list of CloudProvider.
 	Items []CloudProvider
 }
+
+const (
+	CloudProviderCreated         = "Created"
+	CloudProviderSyncing         = "Syncing"
+	CloudProviderSyncSucceed     = "SyncSucceed"
+	CloudProviderSyncFailed      = "SyncFailed"
+	CloudProviderTerminating     = "Terminating"
+	CloudProviderTerminateFailed = "TerminateFailed"
+)

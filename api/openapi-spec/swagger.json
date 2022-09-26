@@ -5451,7 +5451,27 @@
         "ssh": {
           "$ref": "#/definitions/v1.SSH"
         },
+        "status": {
+          "$ref": "#/definitions/v1.CloudProviderStatus"
+        },
         "type": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.CloudProviderStatus": {
+      "required": [
+        "reason",
+        "detail"
+      ],
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "reason": {
           "type": "string"
         }
       }
