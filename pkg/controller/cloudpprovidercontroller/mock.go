@@ -131,31 +131,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				return ctrl.Result{}, err
 			}
 		}
-
-		// 	if provider created or updated,we need sync data.
-		if err = mockProvider.Sync(ctx); err != nil {
-			log.Error("failed to sync", zap.Error(err))
-			newProvider := provider.DeepCopy()
-			newProvider.Status.Reason = convert(err)
-			newProvider.Status.Detail = err.Error()
-			if reflect.DeepEqual(provider, newProvider) {
-				return ctrl.Result{}, err
-			}
-			if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
-				return ctrl.Result{}, pkgerrors.WithMessage(err, "record error msg")
-			}
-			// ignore error,if update
-			return ctrl.Result{}, nil
-		}
-
-		newProvider := provider.DeepCopy()
-		newProvider.Status.Phase = v1.CloudProviderSuccessful
-		newProvider.Status.Reason = ""
-		if !reflect.DeepEqual(provider, newProvider) {
-			if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
-				return ctrl.Result{}, pkgerrors.WithMessage(err, "update status to successful")
-			}
-		}
 	} else {
 		// The object is being deleted
 		if sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
@@ -187,6 +162,30 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, nil
 	}
 
+	// 	if provider created or updated,we need sync data.
+	if err = mockProvider.Sync(ctx); err != nil {
+		log.Error("failed to sync", zap.Error(err))
+		newProvider := provider.DeepCopy()
+		newProvider.Status.Reason = convert(err)
+		newProvider.Status.Detail = err.Error()
+		if reflect.DeepEqual(provider, newProvider) {
+			return ctrl.Result{}, err
+		}
+		if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
+			return ctrl.Result{}, pkgerrors.WithMessage(err, "record error msg")
+		}
+		// ignore error,if update
+		return ctrl.Result{}, nil
+	}
+
+	newProvider := provider.DeepCopy()
+	newProvider.Status.Phase = v1.CloudProviderSuccessful
+	newProvider.Status.Reason = ""
+	if !reflect.DeepEqual(provider, newProvider) {
+		if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
+			return ctrl.Result{}, pkgerrors.WithMessage(err, "update status to successful")
+		}
+	}
 	return ctrl.Result{RequeueAfter: cloudProviderInterval}, nil
 }
 
