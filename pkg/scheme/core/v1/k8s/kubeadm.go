@@ -464,6 +464,21 @@ func (stepper *ControlPlane) Uninstall(ctx context.Context, opts component.Optio
 	// delete pvcs
 	_ = stepper.deletePVC(ctx, opts, namespaces...)
 	_ = stepper.waitPVReclaim(ctx, opts)
+
+	// clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim, etcd'
+	pids, err := getProcessID(ctx, opts.DryRun)
+	if err != nil {
+		logger.Error("get process id error", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pids) > 0 {
+		err = killProcess(ctx, opts.DryRun, pids)
+		if err != nil {
+			logger.Error("kill process error", zap.Error(err))
+			return nil, err
+		}
+	}
 	return nil, nil
 }
 
