@@ -3195,8 +3195,6 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
-	condition := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "provider created")
-	cloudpprovidercontroller.SetCondition(&cp.Status, *condition)
 	cp, err = h.clusterOperator.CreateCloudProvider(req.Request.Context(), cp)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
@@ -3232,7 +3230,7 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	oldCP, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(resp, req, err)
@@ -3243,9 +3241,6 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 	}
 
 	if !dryRun {
-		cp.Status = oldCP.Status
-		condition := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "provider updated")
-		cloudpprovidercontroller.SetCondition(&cp.Status, *condition)
 		cp, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)
@@ -3295,8 +3290,6 @@ func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 	if !dryRun {
-		conditionReady := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminating, "provider deleted")
-		cloudpprovidercontroller.SetCondition(&provider.Status, *conditionReady)
 		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), provider)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)

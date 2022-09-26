@@ -72,10 +72,10 @@ type Reconciler struct {
 }
 
 func (r *Reconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
-	c, err := controller.NewUnmanaged("cloudprovider-rancher", controller.Options{
+	c, err := controller.NewUnmanaged("cloudprovider", controller.Options{
 		MaxConcurrentReconciles: 1, // must run serialize
 		Reconciler:              r,
-		Log:                     mgr.GetLogger().WithName("cloudprovider-rancher-controller"),
+		Log:                     mgr.GetLogger().WithName("cloudprovider-controller"),
 		RecoverPanic:            true,
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func (r *Reconciler) findObjectsForCloudProvider(objProvider client.Object) []re
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.FromContext(ctx)
-	defer utils.Trace(log, "rancher provider reconcile")
+	defer utils.Trace(log, "mock provider reconcile")
 
 	provider, err := r.CloudProviderLister.Get(req.Name)
 	if err != nil {
@@ -128,6 +128,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			condition := NewCondition(v1.CloudProviderProgressing, v1.ConditionTrue, v1.CloudProviderCreated, "provider created success")
 			SetCondition(&provider.Status, *condition)
 		}
+		var created bool
+		// record created condition
+		if GetCondition(provider.Status, v1.CloudProviderReady) == nil {
+			created = true
+			condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderCreated, "provider created")
+			SetCondition(&provider.Status, *condition)
+		}
 		// insert finalizers
 		if !sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
 			provider.ObjectMeta.Finalizers = append(provider.ObjectMeta.Finalizers, v1.CloudProviderFinalizer)
@@ -136,9 +143,24 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+		if created {
+			return ctrl.Result{}, nil
+		}
 	} else {
 		// The object is being deleted
 		if sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
+			// record deleted condition
+			conditionReady := GetCondition(provider.Status, v1.CloudProviderReady)
+			if conditionReady.Reason != v1.CloudProviderTerminating && conditionReady.Reason != v1.CloudProviderTerminateFailed {
+				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminating, "provider deleted")
+				SetCondition(&provider.Status, *condition)
+				if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, provider); err != nil {
+					return ctrl.Result{}, pkgerrors.WithMessage(err, "record error msg")
+				}
+				// ignore error,if update
+				return ctrl.Result{}, nil
+			}
+
 			// when cloudProvider deleted,we need delete this provider's clusters from kc,and clean kc-agent on all nodes.
 			if err = mockProvider.Cleanup(ctx); err != nil {
 				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminateFailed, convert(err))
