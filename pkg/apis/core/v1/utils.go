@@ -188,7 +188,7 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 	ips := make([]string, 0)
 	var masters, workers []component.Node
 	for _, node := range nodeList.Items {
-		if node.Labels[common.LabelNodeRole] != "master" {
+		if node.Labels[common.LabelNodeRole] != k8s.NodeRoleMaster {
 			workers = append(workers, component.Node{
 				ID:       node.Name,
 				IPv4:     node.Status.Ipv4DefaultIP,
