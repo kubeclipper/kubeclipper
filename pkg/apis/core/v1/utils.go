@@ -186,9 +186,14 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 
 	names := make([]string, 0)
 	ips := make([]string, 0)
-	var masters []component.Node
+	var masters, workers []component.Node
 	for _, node := range nodeList.Items {
 		if node.Labels[common.LabelNodeRole] != "master" {
+			workers = append(workers, component.Node{
+				ID:       node.Name,
+				IPv4:     node.Status.Ipv4DefaultIP,
+				Hostname: node.Status.NodeInfo.Hostname,
+			})
 			continue
 		}
 		names = append(names, node.Status.NodeInfo.Hostname)
@@ -205,7 +210,7 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 		return nil, err
 	}
 
-	recoveryStep, err := getRecoveryStep(c, bp, b, restoreDir, masters, names, ips, action)
+	recoveryStep, err := getRecoveryStep(c, bp, b, restoreDir, masters, workers, names, ips, action)
 	if err != nil {
 		return nil, err
 	}
@@ -215,10 +220,11 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 	return steps, nil
 }
 
-func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir string, masters []component.Node, nodeNames, nodeIPs []string, action v1.StepAction) (steps []v1.Step, err error) {
+func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir string, masters, workers []component.Node, nodeNames, nodeIPs []string, action v1.StepAction) (steps []v1.Step, err error) {
 	meta := component.ExtraMetadata{
 		ClusterName: c.Name,
 		Masters:     masters,
+		Workers:     workers,
 	}
 	ctx := component.WithExtraMetadata(context.TODO(), meta)
 
