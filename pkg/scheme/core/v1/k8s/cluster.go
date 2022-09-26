@@ -51,14 +51,12 @@ var (
 	_ component.StepRunnable = (*UpgradePackage)(nil)
 	_ component.StepRunnable = (*ActBackup)(nil)
 	_ component.StepRunnable = (*Recovery)(nil)
-	_ component.StepRunnable = (*AfterRecovery)(nil)
 )
 
 const (
 	upgradePackage = "upgradePackage"
 	actBackup      = "actBackup"
 	recovery       = "Recovery"
-	afterRecovery  = "afterRecovery"
 )
 
 func init() {
@@ -69,9 +67,6 @@ func init() {
 		panic(err)
 	}
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, recovery, version, component.TypeStep), &Recovery{}); err != nil {
-		panic(err)
-	}
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, afterRecovery, version, component.TypeStep), &AfterRecovery{}); err != nil {
 		panic(err)
 	}
 }
@@ -132,8 +127,6 @@ type Recovery struct {
 	BackupFileSize     int64
 	BackupFileMD5      string
 	FileDir
-
-	AfterRecovery AfterRecovery
 
 	installSteps []v1.Step
 }
@@ -709,7 +702,7 @@ func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) err
 		return err
 	}
 
-	step := v1.Step{
+	stepper.installSteps = append(stepper.installSteps, v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "recovery",
 		Timeout:    metav1.Duration{Duration: 7 * time.Minute},
@@ -724,30 +717,43 @@ func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) err
 				CustomCommand: rBytes,
 			},
 		},
-	}
-	stepper.installSteps = append(stepper.installSteps, step)
+	})
 
-	rBytes, err = json.Marshal(&stepper.AfterRecovery)
-	if err != nil {
-		return err
-	}
-	step = v1.Step{
-		ID:         strutil.GetUUID(),
-		Name:       "afterRecovery",
-		Timeout:    metav1.Duration{Duration: 7 * time.Minute},
-		ErrIgnore:  false,
-		RetryTimes: 0,
-		Nodes:      utils.UnwrapNodeList(metadata.Masters[:1]),
-		Action:     v1.ActionInstall,
-		Commands: []v1.Command{
-			{
-				Type:          v1.CommandCustom,
-				Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, afterRecovery, version, component.TypeStep),
-				CustomCommand: rBytes,
+	stepper.installSteps = append(stepper.installSteps,
+		v1.Step{
+			ID:         strutil.GetUUID(),
+			Name:       "restartCniAndKubeProxy",
+			Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Nodes:      []v1.StepNode{utils.UnwrapNodeList(metadata.Masters)[0]},
+			Action:     v1.ActionInstall,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"/bin/bash", "-c", "while true; do kubectl get po -n kube-system  && break;sleep 5; done"},
+				},
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"/bin/bash", "-c", "kubectl rollout restart ds calico-node -n kube-system && kubectl rollout restart ds kube-proxy -n kube-system"},
+				},
 			},
 		},
-	}
-	stepper.installSteps = append(stepper.installSteps, step)
+		v1.Step{
+			ID:         strutil.GetUUID(),
+			Name:       "restartWorkerKubelet",
+			Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Nodes:      utils.UnwrapNodeList(metadata.Workers),
+			Action:     v1.ActionInstall,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", "systemctl restart kubelet"},
+				},
+			},
+		})
 
 	return nil
 }
@@ -765,15 +771,11 @@ func (stepper *Recovery) Install(ctx context.Context, opts component.Options) ([
 	if err != nil {
 		return nil, err
 	}
-	// _, err = stepper.AfterRecovery(ctx, opts)
-	// if err != nil {
-	//	return nil, err
-	// }
 	return nil, nil
 }
 
 func (stepper *Recovery) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("Recovery dose not support uninstall")
+	return nil, fmt.Errorf("recovery dose not support uninstall")
 }
 
 func (stepper *Recovery) NewInstance() component.ObjectMeta {
@@ -996,86 +998,6 @@ func (stepper *Recovery) Recovering(ctx context.Context, opts component.Options)
 	logger.Info("recovering successfully")
 
 	return nil, nil
-}
-
-func (stepper *AfterRecovery) NewInstance() component.ObjectMeta {
-	return stepper
-}
-
-func (stepper *AfterRecovery) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	var err error
-	var ec *cmdutil.ExecCmd
-
-	// check k8s component
-	checkCmd := "kubectl get po -n kube-system"
-	err = retryFunc(ctx, 5*time.Second, "check k8s component status", func(ctx context.Context) error {
-		ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", checkCmd)
-		if ec != nil {
-			if ec.StdErr() != "" {
-				return fmt.Errorf(ec.StdErr())
-			}
-			return nil
-		}
-		return err
-	})
-	if err != nil {
-		logger.Errorf("check k8s component status cmd failed: %s", err.Error())
-		return nil, err
-	}
-
-	// restart cni(current calico) and kube-proxy
-	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "kubectl rollout restart ds calico-node -n kube-system")
-	if err != nil {
-		if ec != nil {
-			logger.Errorf("restart cni pod and kube-proxy cmd failed: %s", ec.StdErr())
-		}
-		return nil, err
-	}
-	for i := 0; i < 3; i++ {
-		err = retryFunc(ctx, 5*time.Second, "check k8s cni pod status", func(ctx context.Context) error {
-			ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", `kubectl get po  -n kube-system -l k8s-app=calico-node | grep -v Running |  sed -n '2,$p'`)
-			if err == nil && ec.StdOut() == "" {
-				return nil
-			}
-			return err
-		})
-		if err != nil {
-			logger.Errorf("check k8s cni pod cmd failed: %s", err.Error())
-			return nil, err
-		}
-		<-time.After(2 * time.Second)
-	}
-
-	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "kubectl rollout restart ds kube-proxy -n kube-system")
-	if err != nil {
-		if ec != nil {
-			logger.Errorf("restart cni pod and kube-proxy cmd failed: %s", ec.StdErr())
-		}
-		logger.Errorf("restart cni pod and kube-proxy cmd failed: %s", err.Error())
-		return nil, err
-	}
-	for i := 0; i < 3; i++ {
-		err = retryFunc(ctx, 5*time.Second, "check k8s kube-proxy pod status", func(ctx context.Context) error {
-			ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", `kubectl get po  -n kube-system -l k8s-app=kube-proxy | grep -v Running |  sed -n '2,$p'`)
-			if err == nil && ec.StdOut() == "" {
-				return nil
-			}
-			return err
-		})
-		if err != nil {
-			logger.Errorf("check k8s kube-proxy pod cmd failed: %s", err.Error())
-			return nil, err
-		}
-		<-time.After(2 * time.Second)
-	}
-
-	logger.Info("after-recovery successfully")
-
-	return nil, nil
-}
-
-func (stepper *AfterRecovery) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("AfterRecovery dose not support uninstall")
 }
 
 func (stepper *Recovery) BackupStoreCreate() (bs.BackupStore, error) {
