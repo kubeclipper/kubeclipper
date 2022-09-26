@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/mock"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudpprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 
 	"github.com/robfig/cron/v3"
@@ -3194,7 +3195,8 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
-	cp.Status.Phase = v1.CloudProviderSyncing
+	condition := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "provider created")
+	cloudpprovidercontroller.SetCondition(&cp.Status, *condition)
 	cp, err = h.clusterOperator.CreateCloudProvider(req.Request.Context(), cp)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
@@ -3223,7 +3225,6 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	cp.Status.Phase = v1.CloudProviderSyncing
 	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
 
 	if name != cp.Name {
@@ -3231,7 +3232,7 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	oldCP, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(resp, req, err)
@@ -3242,6 +3243,9 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 	}
 
 	if !dryRun {
+		cp.Status = oldCP.Status
+		condition := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "provider updated")
+		cloudpprovidercontroller.SetCondition(&cp.Status, *condition)
 		cp, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)
@@ -3263,9 +3267,10 @@ func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	cp.Status.Phase = v1.CloudProviderSyncing
 
 	if !dryRun {
+		conditionReady := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "user triggered sync")
+		cloudpprovidercontroller.SetCondition(&cp.Status, *conditionReady)
 		// update annotation to trigger sync
 		cp.Annotations[common.AnnotationProviderSyncTime] = time.Now().Format(time.RFC3339)
 		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
@@ -3290,7 +3295,8 @@ func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 	if !dryRun {
-		provider.Status.Phase = v1.CloudProviderTerminating
+		conditionReady := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminating, "provider deleted")
+		cloudpprovidercontroller.SetCondition(&provider.Status, *conditionReady)
 		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), provider)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)

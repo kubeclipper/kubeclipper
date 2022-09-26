@@ -24,6 +24,7 @@ import (
 	"time"
 
 	pkgerrors "github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/mock"
@@ -123,23 +124,27 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	mockProvider := mock.NewProvider(provider)
 
 	if provider.ObjectMeta.DeletionTimestamp.IsZero() {
+		if GetCondition(provider.Status, v1.CloudProviderProgressing) == nil {
+			condition := NewCondition(v1.CloudProviderProgressing, v1.ConditionTrue, v1.CloudProviderCreated, "provider created success")
+			SetCondition(&provider.Status, *condition)
+		}
 		// insert finalizers
 		if !sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
 			provider.ObjectMeta.Finalizers = append(provider.ObjectMeta.Finalizers, v1.CloudProviderFinalizer)
-			provider, err = r.CloudProviderWriter.UpdateCloudProvider(context.TODO(), provider)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
+		}
+		provider, err = r.CloudProviderWriter.UpdateCloudProvider(context.TODO(), provider)
+		if err != nil {
+			return ctrl.Result{}, err
 		}
 	} else {
 		// The object is being deleted
 		if sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
 			// when cloudProvider deleted,we need delete this provider's clusters from kc,and clean kc-agent on all nodes.
 			if err = mockProvider.Cleanup(ctx); err != nil {
+				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminateFailed, convert(err))
 				log.Error("failed to cleanup", zap.Error(err))
 				newProvider := provider.DeepCopy()
-				newProvider.Status.Reason = convert(err)
-				newProvider.Status.Detail = err.Error()
+				SetCondition(&newProvider.Status, *condition)
 				if reflect.DeepEqual(provider, newProvider) {
 					return ctrl.Result{}, err
 				}
@@ -166,8 +171,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err = mockProvider.Sync(ctx); err != nil {
 		log.Error("failed to sync", zap.Error(err))
 		newProvider := provider.DeepCopy()
-		newProvider.Status.Reason = convert(err)
-		newProvider.Status.Detail = err.Error()
+		condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncFailed, convert(err))
+		SetCondition(&newProvider.Status, *condition)
 		if reflect.DeepEqual(provider, newProvider) {
 			return ctrl.Result{}, err
 		}
@@ -179,8 +184,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	newProvider := provider.DeepCopy()
-	newProvider.Status.Phase = v1.CloudProviderSuccessful
-	newProvider.Status.Reason = ""
+	condition := NewCondition(v1.CloudProviderReady, v1.ConditionTrue, v1.CloudProviderSyncSucceed, "sync successful")
+	SetCondition(&newProvider.Status, *condition)
 	if !reflect.DeepEqual(provider, newProvider) {
 		if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, newProvider); err != nil {
 			return ctrl.Result{}, pkgerrors.WithMessage(err, "update status to successful")
@@ -192,4 +197,59 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 // convert err to a human-readable msg
 func convert(err error) string {
 	return err.Error()
+}
+
+// NewCondition creates a new deployment condition.
+func NewCondition(condType v1.CloudProviderConditionType, status v1.ConditionStatus, reason, message string) *v1.CloudProviderCondition {
+	return &v1.CloudProviderCondition{
+		Type:               condType,
+		Status:             status,
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetCondition returns the condition with the provided type.
+func GetCondition(status v1.CloudProviderStatus, condType v1.CloudProviderConditionType) *v1.CloudProviderCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetCondition updates the deployment to include the provided condition. If the condition that
+// we are about to add already exists and has the same status and reason then we are not going to update.
+func SetCondition(status *v1.CloudProviderStatus, condition v1.CloudProviderCondition) {
+	currentCond := GetCondition(*status, condition.Type)
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason && currentCond.Message == condition.Message {
+		return
+	}
+	// Do not update lastTransitionTime if the status of the condition doesn't change.
+	if currentCond != nil && currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+	newConditions := filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(newConditions, condition)
+}
+
+// RemoveCondition removes the deployment condition with the provided type.
+func RemoveCondition(status *v1.CloudProviderStatus, condType v1.CloudProviderConditionType) {
+	status.Conditions = filterOutCondition(status.Conditions, condType)
+}
+
+// filterOutCondition returns a new slice of deployment conditions without conditions with the provided type.
+func filterOutCondition(conditions []v1.CloudProviderCondition, condType v1.CloudProviderConditionType) []v1.CloudProviderCondition {
+	var newConditions []v1.CloudProviderCondition
+	for _, c := range conditions {
+		if c.Type == condType {
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+	return newConditions
 }

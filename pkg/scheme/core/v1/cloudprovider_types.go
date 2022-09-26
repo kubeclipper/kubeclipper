@@ -37,29 +37,38 @@ type CloudProvider struct {
 	// SSH config for connect to nodes.
 	SSH    SSH                  `json:"ssh,omitempty"`
 	Config runtime.RawExtension `json:"config,omitempty"`
-
-	Status CloudProviderStatus `json:"status,omitempty" optional:"true"`
+	Status CloudProviderStatus  `json:"status"`
 }
 
 type CloudProviderStatus struct {
-	// Phase is a description of the current cluster status, summarizing the various conditions,
-	// possible active updates etc. This field is for informational purpose only and no logic
-	// should be tied to the phase.
-	// +optional
-	Phase CloudProviderPhase `json:"phase,omitempty"`
-	// Reason human-readable error msg
-	Reason string `json:"reason"`
-	// Detail when sync failed,this we note what happened
-	Detail string `json:"detail"`
+	Conditions []CloudProviderCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
-type CloudProviderPhase string
+// CloudProviderCondition contains condition information for a cloudProvider.
+type CloudProviderCondition struct {
+	// Type of node condition.
+	Type CloudProviderConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status ConditionStatus `json:"status"`
+	// Last time we got an update on a given condition.
+	// +optional
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transit from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	//  Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
 
-// These are the valid phases of a project.
+type CloudProviderConditionType string
+
 const (
-	CloudProviderSyncing     CloudProviderPhase = "Syncing"
-	CloudProviderSuccessful  CloudProviderPhase = "Successful"
-	CloudProviderTerminating CloudProviderPhase = "Terminating"
+	CloudProviderReady       CloudProviderConditionType = "Ready"
+	CloudProviderProgressing CloudProviderConditionType = "Progressing"
 )
 
 type SSH struct {
@@ -80,3 +89,12 @@ type CloudProviderList struct {
 	// Items is the list of CloudProvider.
 	Items []CloudProvider
 }
+
+const (
+	CloudProviderCreated         = "Created"
+	CloudProviderSyncing         = "Syncing"
+	CloudProviderSyncSucceed     = "SyncSucceed"
+	CloudProviderSyncFailed      = "SyncFailed"
+	CloudProviderTerminating     = "Terminating"
+	CloudProviderTerminateFailed = "TerminateFailed"
+)
