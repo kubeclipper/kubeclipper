@@ -347,6 +347,21 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		return nil, err
 	}
 
+	// before run 'kubeadm init', clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim, etcd'
+	pids, err := getProcessID(ctx, opts.DryRun)
+	if err != nil {
+		logger.Error("get process id error", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pids) > 0 {
+		err = killProcess(ctx, opts.DryRun, pids)
+		if err != nil {
+			logger.Error("kill process error", zap.Error(err))
+			return nil, err
+		}
+	}
+
 	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubeadm", "init", "--config", "/tmp/.k8s/kubeadm.yaml", "--upload-certs")
 	if err != nil {
 		logger.Error("run kubeadm init error", zap.Error(err))
@@ -367,6 +382,53 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		}
 	}
 	return []byte(fmt.Sprintf("%s,%s", joinControlPlaneCMD, joinWorkerCMD)), nil
+}
+
+func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
+	var (
+		err error
+		ec  *cmdutil.ExecCmd
+	)
+	pids := make([]string, 0)
+	processes := []string{"kube-proxy", "kube-apiserver", "kube-controller", "kube-scheduler", "containerd-shim", "etcd"}
+
+	for _, process := range processes {
+		if strings.Contains(process, "etcd") {
+			ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | grep -v \"/usr\" | awk '{print $2}'")
+			if err != nil {
+				logger.Error("run ps -ef error", zap.Error(err))
+				return pids, err
+			}
+		} else {
+			ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | awk '{print $2}'")
+			if err != nil {
+				logger.Error("run ps -ef error", zap.Error(err))
+				return pids, err
+			}
+		}
+		if ec.StdOut() != "" {
+			p := strings.Split(ec.StdOut(), "\n")
+			for i, v := range p {
+				if v == "" {
+					p = append(p[:i], p[i+1:]...)
+				}
+			}
+			pids = append(pids, p...)
+		}
+	}
+
+	return pids, nil
+}
+
+func killProcess(ctx context.Context, dryRun bool, pids []string) error {
+	for _, pid := range pids {
+		_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "kill", "-9", pid)
+		if err != nil {
+			logger.Error("kill the process error", zap.Error(err))
+			return err
+		}
+	}
+	return nil
 }
 
 func (stepper *ControlPlane) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
@@ -402,6 +464,21 @@ func (stepper *ControlPlane) Uninstall(ctx context.Context, opts component.Optio
 	// delete pvcs
 	_ = stepper.deletePVC(ctx, opts, namespaces...)
 	_ = stepper.waitPVReclaim(ctx, opts)
+
+	// clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim, etcd'
+	pids, err := getProcessID(ctx, opts.DryRun)
+	if err != nil {
+		logger.Error("get process id error", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pids) > 0 {
+		err = killProcess(ctx, opts.DryRun, pids)
+		if err != nil {
+			logger.Error("kill process error", zap.Error(err))
+			return nil, err
+		}
+	}
 	return nil, nil
 }
 
@@ -476,6 +553,21 @@ func (stepper *ClusterNode) setRole(role string) {
 }
 
 func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	// before join node, clean the processes 'kube-controller, kube-apiserver, kube-proxy, kube-scheduler, containerd-shim, etcd'
+	pids, err := getProcessID(ctx, opts.DryRun)
+	if err != nil {
+		logger.Error("get process id error", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pids) > 0 {
+		err = killProcess(ctx, opts.DryRun, pids)
+		if err != nil {
+			logger.Error("kill process error", zap.Error(err))
+			return nil, err
+		}
+	}
+
 	v := component.GetExtraData(ctx)
 	if v == nil {
 		return nil, fmt.Errorf("no join command received")
@@ -488,7 +580,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		return nil, fmt.Errorf("join command invalid")
 	}
 
-	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "modprobe br_netfilter && modprobe nf_conntrack")
+	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "modprobe br_netfilter && modprobe nf_conntrack")
 	if err != nil {
 		logger.Warnf("modprobe command error: %s", err.Error())
 	}
