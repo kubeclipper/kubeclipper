@@ -264,9 +264,19 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 					Type:         v1.CommandShell,
 					ShellCommand: []string{"kubectl", "apply", "-f", filepath.Join(n.ManifestsDir, fmt.Sprintf(filenameFormat, n.StorageClassName))},
 				},
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"kubectl", "apply", "-f", filepath.Join(n.ManifestsDir, common.CSITestFile)},
+				},
 			},
 		},
 	}...)
+
+	checkInstallStep, err := common.GetCheckCSIInstall(metadata.Masters[:1], nfs)
+	if err != nil {
+		return err
+	}
+	n.installSteps = append(n.installSteps, checkInstallStep)
 
 	// uninstall
 	if metadata.OperationType != v1.OperationDeleteCluster {
@@ -458,6 +468,12 @@ func (n *NFSProvisioner) renderNameSpace(w io.Writer) error {
 	return err
 }
 
+func (n *NFSProvisioner) renderNFSTest(w io.Writer) error {
+	at := tmplutil.New()
+	_, err := at.RenderTo(w, common.CheckCSITemplate, n)
+	return err
+}
+
 func (n *NFSProvisioner) Render(ctx context.Context, opts component.Options) error {
 	// storage namespace
 	n.Namespace = namespace
@@ -467,6 +483,11 @@ func (n *NFSProvisioner) Render(ctx context.Context, opts component.Options) err
 	nameSpace := filepath.Join(n.ManifestsDir, fmt.Sprintf(filenameFormat, namespace))
 	if err := fileutil.WriteFileWithContext(ctx, nameSpace, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
 		n.renderNameSpace, opts.DryRun); err != nil {
+		return err
+	}
+	nfsTestFile := filepath.Join(n.ManifestsDir, common.CSITestFile)
+	if err := fileutil.WriteFileWithContext(ctx, nfsTestFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
+		n.renderNFSTest, opts.DryRun); err != nil {
 		return err
 	}
 	manifestsFile := filepath.Join(n.ManifestsDir, fmt.Sprintf(filenameFormat, n.StorageClassName))
