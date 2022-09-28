@@ -4,8 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
+	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -18,21 +24,25 @@ import (
 )
 
 func init() {
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, ciName, version, CheckCSIInstall), &CheckInstall{}); err != nil {
+	c := &CSIHealthCheck{}
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, CsiHealthCheck, version, HealthCheck), &CSIHealthCheck{}); err != nil {
+		panic(err)
+	}
+	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, CsiHealthCheck, version, HealthCheck), c); err != nil {
 		panic(err)
 	}
 }
 
 var (
-	_ component.StepRunnable = (*CheckInstall)(nil)
+	_ component.StepRunnable = (*CSIHealthCheck)(nil)
 )
 
 const (
-	ciName           = "check-install"
-	ManifestsDir     = "/tmp"
-	CSITestFile      = "csi-test.yaml"
-	CheckCSIInstall  = "CheckCSIInstall"
-	CheckCSITemplate = `
+	CsiHealthCheck         = "csi-healthcheck"
+	ManifestsDir           = "/tmp/.csi-healthcheck"
+	checkCSIHealthFile     = "csi-test.yaml"
+	HealthCheck            = "CheckCSIHealth"
+	CSIHealthCheckTemplate = `
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -47,25 +57,31 @@ spec:
 `
 )
 
-type CheckInstall struct {
-	CsiType string
+type CSIHealthCheck struct {
+	StorageClassName string
 }
 
-func (c *CheckInstall) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+func (c *CSIHealthCheck) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	filePath := filepath.Join(ManifestsDir, checkCSIHealthFile)
+	// create pvc
+	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "apply", "-f", filePath)
+	if err != nil {
+		logger.Warnf("kubectl apply %s failed: %s", checkCSIHealthFile, err.Error())
+	}
 	// check install csi success or not
-	if err := utils.RetryFunc(ctx, opts, 10*time.Second, "checkCSIInstall", c.checkCSIInstall); err != nil {
+	if err := utils.RetryFunc(ctx, opts, 10*time.Second, "checkCSIInstall", c.checkCSIHealth); err != nil {
 		return nil, err
 	}
 	// delete pod, pvc, pv
-	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "delete", "-f", ManifestsDir+"/."+c.CsiType+"/"+"csi-test.yaml")
+	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "delete", "-f", filePath)
 	if err != nil {
-		logger.Warnf("delete %s-test resources failed: %s", c.CsiType, err.Error())
+		logger.Warnf("kubectl delete %s failed: %s", checkCSIHealthFile, err.Error())
 	}
 
 	return nil, err
 }
 
-func (c *CheckInstall) checkCSIInstall(ctx context.Context, opts component.Options) error {
+func (c *CSIHealthCheck) checkCSIHealth(ctx context.Context, opts component.Options) error {
 	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "get", "pvc", "csi-test-pvc")
 	if err != nil {
 		return err
@@ -76,40 +92,81 @@ func (c *CheckInstall) checkCSIInstall(ctx context.Context, opts component.Optio
 			return nil
 		}
 	}
-	return fmt.Errorf("%s installation not completed", c.CsiType)
+	return fmt.Errorf("csi installation not completed")
 }
 
-func (c *CheckInstall) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+func (c *CSIHealthCheck) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
 	return nil, nil
 }
 
-func (c *CheckInstall) NewInstance() component.ObjectMeta {
-	return &CheckInstall{}
+func (c *CSIHealthCheck) NewInstance() component.ObjectMeta {
+	return &CSIHealthCheck{}
 }
 
-// GetCheckCSIInstall get the common step
-func GetCheckCSIInstall(nodes component.NodeList, csiType string) (v1.Step, error) {
-	checkInstall := &CheckInstall{
-		CsiType: csiType,
+// GetCheckCSIHealthStep get the common step
+func (c *CSIHealthCheck) GetCheckCSIHealthStep(nodes []v1.StepNode, storageClassName string) ([]v1.Step, error) {
+	steps := make([]v1.Step, 0)
+	healthCheck := &CSIHealthCheck{
+		StorageClassName: storageClassName,
 	}
-	aData, err := json.Marshal(checkInstall)
+	aData, err := json.Marshal(healthCheck)
 	if err != nil {
-		return v1.Step{}, err
+		return steps, err
 	}
-	return v1.Step{
-		ID:         strutil.GetUUID(),
-		Name:       "checkInstallCSI",
-		Timeout:    metav1.Duration{Duration: 3 * time.Minute},
-		ErrIgnore:  false,
-		RetryTimes: 1,
-		Nodes:      utils.UnwrapNodeList(nodes),
-		Action:     v1.ActionInstall,
-		Commands: []v1.Command{
-			{
-				Type:          v1.CommandCustom,
-				Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, ciName, version, CheckCSIInstall),
-				CustomCommand: aData,
+	steps = append(steps, []v1.Step{
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "renderCheckCSIHealthManifests",
+			Timeout:    metav1.Duration{Duration: 3 * time.Second},
+			ErrIgnore:  true,
+			RetryTimes: 1,
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Commands: []v1.Command{
+				{
+					Type: v1.CommandTemplateRender,
+					Template: &v1.TemplateCommand{
+						Identity: fmt.Sprintf(component.RegisterTemplateKeyFormat, CsiHealthCheck, version, HealthCheck),
+						Data:     aData,
+					},
+				},
 			},
 		},
-	}, nil
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "checkCSIHealth",
+			Timeout:    metav1.Duration{Duration: 3 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Commands: []v1.Command{
+				{
+					Type:          v1.CommandCustom,
+					Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, CsiHealthCheck, version, HealthCheck),
+					CustomCommand: aData,
+				},
+			},
+		},
+	}...)
+
+	return steps, nil
+}
+
+func (c *CSIHealthCheck) renderCSIHealthCheckPVC(w io.Writer) error {
+	at := tmplutil.New()
+	_, err := at.RenderTo(w, CSIHealthCheckTemplate, c)
+	return err
+}
+
+func (c *CSIHealthCheck) Render(ctx context.Context, opts component.Options) error {
+	if err := os.MkdirAll(ManifestsDir, 0755); err != nil {
+		return err
+	}
+	filePath := filepath.Join(ManifestsDir, checkCSIHealthFile)
+	if err := fileutil.WriteFileWithContext(ctx, filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
+		c.renderCSIHealthCheckPVC, opts.DryRun); err != nil {
+		return err
+	}
+	return nil
 }
