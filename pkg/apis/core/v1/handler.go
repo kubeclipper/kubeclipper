@@ -3230,7 +3230,7 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	oldCP, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(resp, req, err)
@@ -3241,6 +3241,7 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 	}
 
 	if !dryRun {
+		cp.Status = oldCP.Status // ignore status update from client
 		cp, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)
@@ -3267,6 +3268,9 @@ func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response
 		conditionReady := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "user triggered sync")
 		cloudpprovidercontroller.SetCondition(&cp.Status, *conditionReady)
 		// update annotation to trigger sync
+		if cp.Annotations == nil {
+			cp.Annotations = make(map[string]string)
+		}
 		cp.Annotations[common.AnnotationProviderSyncTime] = time.Now().Format(time.RFC3339)
 		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), cp)
 		if err != nil {
