@@ -419,45 +419,27 @@ func (stepper *KubeadmConfig) JoinSteps(isControlPlane bool, nodes []v1.StepNode
 	if err != nil {
 		return nil, err
 	}
-	if isControlPlane {
-		return []v1.Step{
+	step := v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       "renderMasterJoinConfig",
+		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+		ErrIgnore:  false,
+		RetryTimes: 1,
+		Nodes:      nodes,
+		Action:     v1.ActionInstall,
+		Commands: []v1.Command{
 			{
-				ID:         strutil.GetUUID(),
-				Name:       "renderMasterJoinConfig",
-				Timeout:    metav1.Duration{Duration: 1 * time.Minute},
-				ErrIgnore:  false,
-				RetryTimes: 1,
-				Nodes:      nodes,
-				Action:     v1.ActionInstall,
-				Commands: []v1.Command{
-					{
 
-						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, kubeadmConfig, version, component.TypeStep),
-						CustomCommand: kubeadmBytes,
-					},
-				},
-			},
-		}, nil
-	}
-	return []v1.Step{
-		{
-			ID:         strutil.GetUUID(),
-			Name:       "renderWorkerJoinConfig",
-			Timeout:    metav1.Duration{Duration: 1 * time.Minute},
-			ErrIgnore:  false,
-			RetryTimes: 1,
-			Nodes:      nodes,
-			Action:     v1.ActionInstall,
-			Commands: []v1.Command{
-				{
-					Type:          v1.CommandCustom,
-					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, kubeadmConfig, version, component.TypeStep),
-					CustomCommand: kubeadmBytes,
-				},
+				Type:          v1.CommandCustom,
+				Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, kubeadmConfig, version, component.TypeStep),
+				CustomCommand: kubeadmBytes,
 			},
 		},
-	}, nil
+	}
+	if isControlPlane {
+		step.Name = "renderWorkerJoinConfig"
+	}
+	return []v1.Step{step}, nil
 
 }
 
