@@ -164,6 +164,23 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	installSteps = append(installSteps, steps...)
 
 	if len(runnable.Masters) > 1 {
+		kubeadmConf := KubeadmConfig{}
+		steps, err = kubeadmConf.InitStepper(&c, metadata).JoinSteps(true, utils.UnwrapNodeList(metadata.Masters)[1:])
+		if err != nil {
+			return nil, err
+		}
+		installSteps = append(installSteps, steps...)
+	}
+	if len(runnable.Workers) > 0 {
+		kubeadmConf := KubeadmConfig{}
+		steps, err = kubeadmConf.InitStepper(&c, metadata).JoinSteps(false, utils.UnwrapNodeList(metadata.Workers))
+		if err != nil {
+			return nil, err
+		}
+		installSteps = append(installSteps, steps...)
+	}
+
+	if len(runnable.Masters) > 1 {
 		cluNode := ClusterNode{}
 		steps, err = cluNode.InitStepper(&c, metadata).InstallSteps(NodeRoleMaster, utils.UnwrapNodeList(metadata.Masters)[1:])
 		if err != nil {
@@ -394,6 +411,36 @@ func (stepper *KubeadmConfig) InstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 			},
 		},
 	}, nil
+}
+
+func (stepper *KubeadmConfig) JoinSteps(isControlPlane bool, nodes []v1.StepNode) ([]v1.Step, error) {
+	stepper.IsControlPlane = isControlPlane
+	kubeadmBytes, err := json.Marshal(stepper)
+	if err != nil {
+		return nil, err
+	}
+	step := v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       "renderMasterJoinConfig",
+		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+		ErrIgnore:  false,
+		RetryTimes: 1,
+		Nodes:      nodes,
+		Action:     v1.ActionInstall,
+		Commands: []v1.Command{
+			{
+
+				Type:          v1.CommandCustom,
+				Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, kubeadmConfig, version, component.TypeStep),
+				CustomCommand: kubeadmBytes,
+			},
+		},
+	}
+	if isControlPlane {
+		step.Name = "renderWorkerJoinConfig"
+	}
+	return []v1.Step{step}, nil
+
 }
 
 func (stepper *KubeadmConfig) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {

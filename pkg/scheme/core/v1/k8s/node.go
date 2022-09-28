@@ -130,6 +130,14 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes 
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
 
+		// Notice: only support join worker node now.
+		kubeadmConf := KubeadmConfig{}
+		steps, err = kubeadmConf.InitStepper(stepper.Cluster, metadata).JoinSteps(false, patchNodes)
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps...)
+
 		join := ClusterNode{}
 		steps, err = join.InitStepper(stepper.Cluster, metadata).InstallSteps(role, patchNodes)
 		if err != nil {

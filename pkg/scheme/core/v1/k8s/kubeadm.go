@@ -54,6 +54,9 @@ func init() {
 	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, kubeadmConfig, version, component.TypeTemplate), &KubeadmConfig{}); err != nil {
 		panic(err)
 	}
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, kubeadmConfig, version, component.TypeStep), &KubeadmConfig{}); err != nil {
+		panic(err)
+	}
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, controlPlane, version, component.TypeStep), &ControlPlane{}); err != nil {
 		panic(err)
 	}
@@ -83,6 +86,7 @@ func init() {
 var (
 	_ component.StepRunnable   = (*Package)(nil)
 	_ component.TemplateRender = (*KubeadmConfig)(nil)
+	_ component.StepRunnable   = (*KubeadmConfig)(nil)
 	_ component.StepRunnable   = (*ControlPlane)(nil)
 	_ component.StepRunnable   = (*ClusterNode)(nil)
 	_ component.TemplateRender = (*CNIInfo)(nil)
@@ -116,6 +120,10 @@ type KubeadmConfig struct {
 	CertSANs             []string      `json:"certSANs"`
 	LocalRegistry        string        `json:"localRegistry"`
 	Offline              bool          `json:"offline"`
+	IsControlPlane       bool          `json:"isControlPlane,omitempty"`
+	CACertHashes         string        `json:"caCertHashes,omitempty"`
+	BootstrapToken       string        `json:"bootstrapToken,omitempty"`
+	CertificateKey       string        `json:"certificateKey,omitempty"`
 }
 
 type ControlPlane struct {
@@ -257,6 +265,57 @@ func (stepper KubeadmConfig) NewInstance() component.ObjectMeta {
 	return &KubeadmConfig{}
 }
 
+func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	v := component.GetExtraData(ctx)
+	if v == nil {
+		return nil, fmt.Errorf("no join command received")
+	}
+
+	logger.Debug("get join command", zap.ByteString("cmd", v))
+	cmdStr := strings.ReplaceAll(string(v), "\\n", "")
+	cmds := strings.Split(cmdStr, ",")
+	if len(cmds) != 2 {
+		return nil, fmt.Errorf("join command invalid")
+	}
+
+	apiVersion, err := stepper.matchClusterConfigAPIVersion()
+	if err != nil {
+		return nil, err
+	}
+	stepper.ClusterConfigAPIVersion = apiVersion
+	if stepper.Kubelet.RootDir == "" {
+		stepper.Kubelet.RootDir = KubeletDefaultDataDir
+	}
+	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d --control-plane --certificate-key 46518267766fc19772ecc334c13190f8131f1bf48a213538879f6427f74fe8e2
+	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d
+	if stepper.IsControlPlane {
+		masterJoinCmd := strings.Split(cmds[0], " ")
+		if len(masterJoinCmd) < 10 {
+			return nil, fmt.Errorf("master join command invalid")
+		}
+		stepper.BootstrapToken = masterJoinCmd[4]
+		stepper.CACertHashes = masterJoinCmd[6]
+		stepper.CertificateKey = masterJoinCmd[9]
+	} else {
+		workerJoinCmd := strings.Split(cmds[1], " ")
+		if len(workerJoinCmd) < 6 {
+			return nil, fmt.Errorf("worker join command invalid")
+		}
+		stepper.BootstrapToken = workerJoinCmd[4]
+		stepper.CACertHashes = workerJoinCmd[6]
+	}
+	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
+		return nil, err
+	}
+	manifestFile := filepath.Join(ManifestDir, "kubeadm-join.yaml")
+	return v, fileutil.WriteFileWithContext(ctx, manifestFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
+		stepper.renderJoin, opts.DryRun)
+}
+
+func (stepper KubeadmConfig) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+	return nil, nil
+}
+
 func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options) error {
 	apiVersion, err := stepper.matchClusterConfigAPIVersion()
 	if err != nil {
@@ -289,6 +348,13 @@ func (stepper *KubeadmConfig) renderTo(w io.Writer) error {
 	return err
 }
 
+func (stepper *KubeadmConfig) renderJoin(w io.Writer) error {
+	at := tmplutil.New()
+	_, err := at.RenderTo(w, KubeadmJoinTemplate, stepper)
+	return err
+}
+
+// TODO: use kubeadm migrate
 func (stepper *KubeadmConfig) matchClusterConfigAPIVersion() (string, error) {
 	version := stepper.KubernetesVersion
 
@@ -373,10 +439,6 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 	if !opts.DryRun {
 		joinControlPlaneCMD = getJoinCmdFromStdOut(ec.StdOut(), "You can now join any number of the control-plane node running the following command on each as root:")
 		joinWorkerCMD = getJoinCmdFromStdOut(ec.StdOut(), "Then you can join any number of worker nodes by running the following on each as root:")
-		if stepper.ContainerRuntime == "containerd" { // specify cri to compat both docker and containerd
-			joinControlPlaneCMD += " --cri-socket /run/containerd/containerd.sock"
-			joinWorkerCMD += " --cri-socket /run/containerd/containerd.sock"
-		}
 		if err := generateKubeConfig(ctx); err != nil {
 			return nil, err
 		}
@@ -567,19 +629,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 			return nil, err
 		}
 	}
-
-	v := component.GetExtraData(ctx)
-	if v == nil {
-		return nil, fmt.Errorf("no join command received")
-	}
-
-	logger.Debug("get join command", zap.ByteString("cmd", v))
-	cmdStr := strings.ReplaceAll(string(v), "\\n", "")
-	cmds := strings.Split(cmdStr, ",")
-	if len(cmds) != 2 {
-		return nil, fmt.Errorf("join command invalid")
-	}
-
+	joincmd := []string{"kubeadm", "join", "--config", filepath.Join(ManifestDir, "kubeadm-join.yaml")}
 	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "modprobe br_netfilter && modprobe nf_conntrack")
 	if err != nil {
 		logger.Warnf("modprobe command error: %s", err.Error())
@@ -601,9 +651,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		if err := hosts.Save(); err != nil {
 			return nil, err
 		}
-
-		masterJoinCmd := strings.Split(cmds[0], " ")
-		_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, masterJoinCmd[0], masterJoinCmd[1:]...)
+		_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, joincmd[0], joincmd[1:]...)
 		if err != nil {
 			return nil, err
 		}
@@ -634,7 +682,6 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		if err != nil {
 			logger.Warnf("clean init node env error: %s", err.Error())
 		}
-		workerJoinCmd := strings.Split(cmds[1], " ")
 		hosts.AddHost(stepper.WorkerNodeVIP, stepper.APIServerDomainName)
 		if len(stepper.Masters) == 1 {
 			hosts.AddHost(stepper.JoinMasterIP, stepper.APIServerDomainName)
@@ -669,7 +716,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 				return nil, err
 			}
 		}
-		if _, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, workerJoinCmd[0], workerJoinCmd[1:]...); err != nil {
+		if _, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, joincmd[0], joincmd[1:]...); err != nil {
 			return nil, err
 		}
 
@@ -680,7 +727,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 			}
 		}
 	}
-	return v, nil
+	return nil, nil
 }
 
 func (stepper *ClusterNode) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {

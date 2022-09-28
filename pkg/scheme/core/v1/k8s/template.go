@@ -88,7 +88,7 @@ streamingConnectionIdleTimeout: 0s
 syncFrequency: 3s
 volumeStatsAggPeriod: 1m
 ---
-apiVersion: kubeadm.k8s.io/v1beta2
+apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
 kind: InitConfiguration
 nodeRegistration:
 {{- if eq .ContainerRuntime  "containerd"}}
@@ -97,6 +97,25 @@ nodeRegistration:
   kubeletExtraArgs:
     root-dir: {{.Kubelet.RootDir}}
 `
+
+const KubeadmJoinTemplate = `apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
+kind: JoinConfiguration
+discovery:
+  bootstrapToken:
+    apiServerEndpoint: {{.ControlPlaneEndpoint}}
+    token: {{.BootstrapToken}}
+    caCertHashes:
+      - {{.CACertHashes}}
+  timeout: 5m0s
+{{- if .IsControlPlane}}
+controlPlane: 
+  certificateKey: {{.CertificateKey}}{{end}}
+nodeRegistration:
+{{- if eq .ContainerRuntime  "containerd"}}
+  criSocket: /run/containerd/containerd.sock
+{{end}}
+  kubeletExtraArgs:
+    root-dir: {{.Kubelet.RootDir}}`
 
 const lvscareV111 = `
 apiVersion: v1
