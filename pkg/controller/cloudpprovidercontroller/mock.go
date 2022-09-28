@@ -151,8 +151,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if sets.NewString(provider.ObjectMeta.Finalizers...).Has(v1.CloudProviderFinalizer) {
 			// record deleted condition
 			conditionReady := GetCondition(provider.Status, v1.CloudProviderReady)
-			if conditionReady.Reason != v1.CloudProviderTerminating && conditionReady.Reason != v1.CloudProviderTerminateFailed {
-				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminating, "provider deleted")
+			if conditionReady.Reason != v1.CloudProviderRemoving && conditionReady.Reason != v1.CloudProviderRemoveFailed {
+				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderRemoving, "provider deleted")
 				SetCondition(&provider.Status, *condition)
 				if _, err = r.CloudProviderWriter.UpdateCloudProvider(ctx, provider); err != nil {
 					return ctrl.Result{}, pkgerrors.WithMessage(err, "record error msg")
@@ -163,7 +163,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 			// when cloudProvider deleted,we need delete this provider's clusters from kc,and clean kc-agent on all nodes.
 			if err = mockProvider.Cleanup(ctx); err != nil {
-				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderTerminateFailed, convert(err))
+				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderRemoveFailed, convert(err))
 				log.Error("failed to cleanup", zap.Error(err))
 				newProvider := provider.DeepCopy()
 				SetCondition(&newProvider.Status, *condition)

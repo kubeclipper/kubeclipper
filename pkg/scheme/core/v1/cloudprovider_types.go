@@ -91,10 +91,10 @@ type CloudProviderList struct {
 }
 
 const (
-	CloudProviderCreated         = "Created"
-	CloudProviderSyncing         = "Syncing"
-	CloudProviderSyncSucceed     = "SyncSucceed"
-	CloudProviderSyncFailed      = "SyncFailed"
-	CloudProviderTerminating     = "Terminating"
-	CloudProviderTerminateFailed = "TerminateFailed"
+	CloudProviderCreated      = "Created"
+	CloudProviderSyncing      = "Syncing"
+	CloudProviderSyncSucceed  = "SyncSucceed"
+	CloudProviderSyncFailed   = "SyncFailed"
+	CloudProviderRemoving     = "Removing"
+	CloudProviderRemoveFailed = "RemoveFailed"
 )
