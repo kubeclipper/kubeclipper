@@ -101,19 +101,6 @@ func (l *loggingT) writeSeverity(buf *bytes.Buffer, s severity) {
 	buf.WriteString("]")
 }
 
-func (l *loggingT) writeModule(buf *bytes.Buffer, module string) {
-	if module == "" {
-		module = "MISSING"
-	}
-	buf.WriteString("[")
-	if l.Colorful {
-		buf.WriteString(color.GreenString(module))
-	} else {
-		buf.WriteString(module)
-	}
-	buf.WriteString("]")
-}
-
 func (l *loggingT) writerCaller(buf *bytes.Buffer) {
 	if l.Caller {
 		_, file, lineno, ok := runtime.Caller(4)
@@ -133,7 +120,6 @@ func (l *loggingT) writerCaller(buf *bytes.Buffer) {
 func (l *loggingT) addHeader(buf *bytes.Buffer, s severity) {
 	l.writeTS(buf)
 	l.writeSeverity(buf, s)
-	//l.writeModule(buf, module)
 	l.writerCaller(buf)
 	buf.WriteString(" ")
 }

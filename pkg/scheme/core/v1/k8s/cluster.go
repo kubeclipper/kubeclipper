@@ -23,7 +23,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -498,7 +497,7 @@ func (stepper *ActBackup) Install(ctx context.Context, opts component.Options) (
 	if err != nil {
 		return nil, err
 	}
-	data, err := ioutil.ReadFile(filepath.Join(stepper.BackupPointRootDir, stepper.BackupFileName))
+	data, err := os.ReadFile(filepath.Join(stepper.BackupPointRootDir, stepper.BackupFileName))
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +838,7 @@ func (stepper *Recovery) BeforeRecovery(ctx context.Context, opts component.Opti
 		return nil, fmt.Errorf("download backup file size is different from backup file size")
 	}
 
-	data, err := ioutil.ReadFile(downloadFile)
+	data, err := os.ReadFile(downloadFile)
 	if err != nil {
 		logger.Errorf("read download backup file failed: %v", err)
 		return nil, err

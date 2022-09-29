@@ -121,7 +121,7 @@ func NewLoginSSHWSSession(cols, rows int, isAdmin bool, sshClient *ssh.Client, w
 	}, nil
 }
 
-//Close 关闭
+// Close 关闭
 func (sws *LogicSSHWsSession) Close() {
 	if sws.session != nil {
 		sws.session.Close()
@@ -138,7 +138,7 @@ func (sws *LogicSSHWsSession) Start(quitChan chan struct{}) {
 	go sws.sendComboOutput(quitChan)
 }
 
-//receiveWsMsg  receive websocket msg do some handling then write into ssh.session.stdin
+// receiveWsMsg  receive websocket msg do some handling then write into ssh.session.stdin
 func (sws *LogicSSHWsSession) receiveWsMsg(exitCh chan struct{}) {
 	wsConn := sws.wsConn
 	//tells other go routine quit
@@ -179,7 +179,7 @@ func (sws *LogicSSHWsSession) receiveWsMsg(exitCh chan struct{}) {
 	}
 }
 
-//sendWebsocketInputCommandToSshSessionStdinPipe
+// sendWebsocketInputCommandToSshSessionStdinPipe
 func (sws *LogicSSHWsSession) sendWebsocketInputCommandToSSHSessionStdinPipe(cmdBytes []byte) {
 	if _, err := sws.stdinPipe.Write(cmdBytes); err != nil {
 		logger.Errorf("ws cmd bytes write to ssh.stdin pipe failed due to error: %s", err.Error())

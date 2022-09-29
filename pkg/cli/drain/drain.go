@@ -66,9 +66,8 @@ type DrainOptions struct {
 	cliOpts      *options.CliOptions
 	deployConfig *options.DeployConfig
 
-	agents  []string
-	servers []string
-	force   bool
+	agents []string
+	force  bool
 }
 
 func NewDrainOptions(streams options.IOStreams) *DrainOptions {

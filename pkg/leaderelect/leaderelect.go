@@ -27,7 +27,6 @@ import (
 	"go.uber.org/zap"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -115,12 +114,6 @@ func (l *Lock) Identity() string {
 
 func (l *Lock) Describe() string {
 	return fmt.Sprintf("%v/%v", l.LeaseMeta.Namespace, l.LeaseMeta.Name)
-}
-
-func (l *Lock) transformLease(obj runtime.Object) *coordinationv1.Lease {
-	in := obj.(*coordinationv1.Lease)
-	out := in.DeepCopy()
-	return out
 }
 
 func leaseSpecToLeaderElectionRecord(spec *coordinationv1.LeaseSpec) *resourcelock.LeaderElectionRecord {

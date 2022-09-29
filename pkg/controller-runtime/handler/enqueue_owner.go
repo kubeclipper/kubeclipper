@@ -91,6 +91,8 @@ func (e *EnqueueRequestForOwner) Generic(evt event.GenericEvent, q workqueue.Rat
 
 // parseOwnerTypeGroupKind parses the OwnerType into a Group and Kind and caches the result.  Returns false
 // if the OwnerType could not be parsed using the scheme.
+//
+//nolint:unused
 func (e *EnqueueRequestForOwner) parseOwnerTypeGroupKind(scheme *runtime.Scheme) error {
 	// Get the kinds of the type
 	kinds, _, err := scheme.ObjectKinds(e.OwnerType)

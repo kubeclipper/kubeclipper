@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	goruntime "runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -63,7 +62,8 @@ type Service struct {
 	RegisterNode      bool
 
 	// lastStatusReportTime is the time when node status was last reported.
-	lastStatusReportTime time.Time
+	// lastStatusReportTime time.Time
+
 	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
 	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
 	syncNodeStatusMux sync.Mutex
@@ -440,35 +440,5 @@ func (s *Service) parseStepLogOperationID(identity string) (resp oplog.LogConten
 	if err = json.Unmarshal([]byte(identity), &resp); err != nil {
 		return
 	}
-	return
-}
-
-func (s *Service) parseBackupOperationID(id string) (action string, file string, opID string, stepID string, err error) {
-	// format:
-	// action:filename:operation-id
-	sections := strings.Split(id, ":")
-	if len(sections) < 4 {
-		err = fmt.Errorf("invalid backup operation ID: %s", id)
-		return
-	}
-
-	action = sections[0]
-	file = sections[1]
-	opID = sections[2]
-	stepID = sections[3]
-
-	return
-}
-
-func (s *Service) parseBackupFileOperationID(opID string) (dir string, filename string, err error) {
-	sections := strings.Split(opID, ":")
-	if len(sections) < 2 {
-		err = fmt.Errorf("invalid recovery operation ID: %s", opID)
-		return
-	}
-
-	dir = sections[0]
-	filename = sections[1]
-
 	return
 }

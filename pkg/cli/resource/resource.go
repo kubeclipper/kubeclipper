@@ -21,7 +21,6 @@ package resource
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -429,7 +428,7 @@ func (o *ResourceOptions) ResourcePush() error {
 			return err
 		}
 
-		err = ioutil.WriteFile("metadata.json", metaBytes, 0755)
+		err = os.WriteFile("metadata.json", metaBytes, 0755)
 		if err != nil {
 			return err
 		}

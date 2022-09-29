@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -248,7 +248,7 @@ func (o *oidcProvider) IdentityExchange(req *http.Request) (identityprovider.Ide
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch userinfo: %v", err)
 			}
-			data, err := ioutil.ReadAll(resp.Body)
+			data, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch userinfo: %v", err)
 			}

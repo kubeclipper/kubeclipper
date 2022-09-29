@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -72,6 +71,8 @@ type serverResponse struct {
 }
 
 // head sends a http request to the docker API using the method HEAD.
+//
+//nolint:unused
 func (cli *Client) head(ctx context.Context, path string, query url.Values, headers map[string][]string) (serverResponse, error) {
 	return cli.sendRequest(ctx, "HEAD", path, query, nil, headers)
 }
@@ -98,6 +99,7 @@ func (cli *Client) post(ctx context.Context, path string, query url.Values, obj 
 	return cli.sendRequest(ctx, "POST", path, query, body, headers)
 }
 
+//nolint:unused
 func (cli *Client) postRaw(ctx context.Context, path string, query url.Values, body io.Reader, headers map[string][]string) (serverResponse, error) {
 	return cli.sendRequest(ctx, "POST", path, query, body, headers)
 }
@@ -112,6 +114,8 @@ func (cli *Client) put(ctx context.Context, path string, query url.Values, obj i
 }
 
 // putRaw sends a http request to the docker API using the method PUT.
+//
+//nolint:unused
 func (cli *Client) putRaw(ctx context.Context, path string, query url.Values, body io.Reader, headers map[string][]string) (serverResponse, error) {
 	return cli.sendRequest(ctx, "PUT", path, query, body, headers)
 }
@@ -146,7 +150,7 @@ func (cli *Client) checkResponseErr(serverResp serverResponse) error {
 			R: serverResp.body,
 			N: int64(bodyMax),
 		}
-		body, err = ioutil.ReadAll(bodyR)
+		body, err = io.ReadAll(bodyR)
 		if err != nil {
 			return err
 		}
@@ -228,7 +232,7 @@ func (cli *Client) doRequest(ctx context.Context, req *http.Request) (serverResp
 func ensureReaderClosed(response serverResponse) {
 	if response.body != nil {
 		// Drain up to 512 bytes and close the body to let the Transport reuse the connection
-		_, _ = io.CopyN(ioutil.Discard, response.body, 512)
+		_, _ = io.CopyN(io.Discard, response.body, 512)
 		_ = response.body.Close()
 	}
 }

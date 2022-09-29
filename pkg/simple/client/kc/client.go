@@ -34,7 +34,6 @@ type Client struct {
 	client      *http.Client
 	host        string
 	bearerToken string
-	basePath    string
 	scheme      string
 }
 

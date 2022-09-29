@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -65,7 +64,7 @@ type Downloader struct {
 	cManifestDir string
 	dryRun       bool
 	// enable remote download
-	online bool
+	// online bool
 	// inherits the component context
 	ctx context.Context
 }
@@ -256,7 +255,7 @@ func (dl *Downloader) getManifestElements(prefix string) (manifest []ManifestEle
 			return
 		}
 	}
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		logger.Debugf("read [%s] file contents failed: %v", filePath, err)
 		return
@@ -272,7 +271,7 @@ func (dl *Downloader) getManifestElements(prefix string) (manifest []ManifestEle
 func (dl *Downloader) DownloadFile(dstDir, filename string) (err error) {
 	prefix := fmt.Sprintf("backsource.%d-%.3f.", os.Getpid(), float64(time.Now().UnixNano())/float64(time.Second))
 	dstFile := path.Join(dstDir, filename)
-	file, err := ioutil.TempFile(filepath.Dir(dstFile), prefix)
+	file, err := os.CreateTemp(filepath.Dir(dstFile), prefix)
 	if err != nil {
 		return fmt.Errorf("create temp file failed: %v", err)
 	}

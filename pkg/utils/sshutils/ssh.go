@@ -20,7 +20,7 @@ package sshutils
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -48,7 +48,7 @@ func (ss *SSH) connect(host string) (*ssh.Client, error) {
 		err    error
 	)
 	if ss.PkFile != "" {
-		pkData, err = ioutil.ReadFile(ss.PkFile)
+		pkData, err = os.ReadFile(ss.PkFile)
 		if err != nil {
 			return nil, errors.WithMessage(err, "read private key")
 		}

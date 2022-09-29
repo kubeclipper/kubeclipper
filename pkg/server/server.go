@@ -99,7 +99,6 @@ type APIServer struct {
 	Services              []service.Interface
 	cache                 cache.Interface
 	RESTOptionsGetter     *etcdRESTOptions.SimpleRestOptionsFactory
-	informerFactory       informers.SharedInformerFactory
 	storageFactory        registry.SharedStorageFactory
 	rbacAuthorizer        authorizer.Authorizer
 	databaseAuditBackend  auditing.Backend

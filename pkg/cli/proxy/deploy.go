@@ -147,18 +147,6 @@ func (d *ProxyOptions) RunDeploy() error {
 	return nil
 }
 
-func (d *ProxyOptions) checkProxy(name string) error {
-	ret, err := sshutils.SSHCmdWithSudo(d.deployConfig.SSHConfig, d.proxy, fmt.Sprintf("systemctl --all --type service | grep -Fq %s", name))
-	logger.V(2).Infof("exit code %d, err %v", ret.ExitCode, err)
-	if err != nil {
-		return err
-	}
-	if ret.ExitCode == 0 {
-		err = fmt.Errorf("%s service exist, please clean old environment", name)
-	}
-	return err
-}
-
 func (d *ProxyOptions) sendPackage() {
 	err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.pkg, []string{d.proxy}, config.DefaultPkgPath, nil, nil)
 	if err != nil {

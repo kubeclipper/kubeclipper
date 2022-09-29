@@ -21,8 +21,8 @@ package scheme
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -92,12 +92,13 @@ func (m *PackageMetadata) ReadMetadata(online bool, path string) error {
 		if err != nil {
 			return err
 		}
+		defer resp.Body.Close()
 		if err = json.NewDecoder(resp.Body).Decode(m); err != nil {
 			return err
 		}
 	} else {
 		file := filepath.Join(path, "metadata.json")
-		metadata, err := ioutil.ReadFile(file)
+		metadata, err := os.ReadFile(file)
 		if err != nil {
 			return err
 		}
@@ -152,7 +153,7 @@ func (m *PackageMetadata) WriteFile(path string, sort bool) error {
 	}
 	file := filepath.Join(path, "metadata.json")
 
-	return ioutil.WriteFile(file, metaBytes, 0755)
+	return os.WriteFile(file, metaBytes, 0755)
 }
 
 func (m PackageMetadata) AddonsExist(name, version, arch string) bool {
