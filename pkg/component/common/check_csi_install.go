@@ -25,7 +25,7 @@ import (
 
 func init() {
 	c := &CSIHealthCheck{}
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, CsiHealthCheck, version, HealthCheck), &CSIHealthCheck{}); err != nil {
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, CsiHealthCheck, version, HealthCheck), c); err != nil {
 		panic(err)
 	}
 	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, CsiHealthCheck, version, HealthCheck), c); err != nil {
@@ -34,7 +34,8 @@ func init() {
 }
 
 var (
-	_ component.StepRunnable = (*CSIHealthCheck)(nil)
+	_ component.StepRunnable   = (*CSIHealthCheck)(nil)
+	_ component.TemplateRender = (*CSIHealthCheck)(nil)
 )
 
 const (
@@ -66,7 +67,7 @@ func (c *CSIHealthCheck) Install(ctx context.Context, opts component.Options) ([
 	// create pvc
 	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "apply", "-f", filePath)
 	if err != nil {
-		logger.Warnf("kubectl apply %s failed: %s", checkCSIHealthFile, err.Error())
+		logger.Warnf("kubectl apply %s failed: %s", filePath, err.Error())
 	}
 	// check install csi success or not
 	if err := utils.RetryFunc(ctx, opts, 10*time.Second, "checkCSIInstall", c.checkCSIHealth); err != nil {
@@ -75,7 +76,7 @@ func (c *CSIHealthCheck) Install(ctx context.Context, opts component.Options) ([
 	// delete pod, pvc, pv
 	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "delete", "-f", filePath)
 	if err != nil {
-		logger.Warnf("kubectl delete %s failed: %s", checkCSIHealthFile, err.Error())
+		logger.Warnf("kubectl delete %s failed: %s", filePath, err.Error())
 	}
 
 	return nil, err
@@ -105,11 +106,9 @@ func (c *CSIHealthCheck) NewInstance() component.ObjectMeta {
 
 // GetCheckCSIHealthStep get the common step
 func (c *CSIHealthCheck) GetCheckCSIHealthStep(nodes []v1.StepNode, storageClassName string) ([]v1.Step, error) {
-	steps := make([]v1.Step, 0)
-	healthCheck := &CSIHealthCheck{
-		StorageClassName: storageClassName,
-	}
-	aData, err := json.Marshal(healthCheck)
+	steps := make([]v1.Step, 0, 2)
+	c.StorageClassName = storageClassName
+	aData, err := json.Marshal(c)
 	if err != nil {
 		return steps, err
 	}
@@ -164,7 +163,6 @@ func (c *CSIHealthCheck) Render(ctx context.Context, opts component.Options) err
 		return err
 	}
 	filePath := filepath.Join(ManifestsDir, checkCSIHealthFile)
-	err := fileutil.WriteFileWithContext(ctx, filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
+	return fileutil.WriteFileWithContext(ctx, filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
 		c.renderCSIHealthCheckPVC, opts.DryRun)
-	return err
 }
