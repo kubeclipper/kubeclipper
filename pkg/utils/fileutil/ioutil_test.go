@@ -20,7 +20,6 @@ package fileutil
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -48,7 +47,7 @@ func TestWriteFileWithDataFunc(t *testing.T) {
 	for _, tt := range tests {
 		err := WriteFileWithDataFunc(tt.filename, tt.flag, tt.mode, tt.dataFunc, false)
 		assert.NoError(t, err)
-		data, err := ioutil.ReadFile(tt.filename)
+		data, err := os.ReadFile(tt.filename)
 		assert.NoError(t, err)
 		assert.Equal(t, content, string(data))
 		os.Remove(tt.filename)

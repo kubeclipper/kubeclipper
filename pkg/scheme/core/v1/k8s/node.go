@@ -59,7 +59,6 @@ type GenNode struct {
 	Cluster        *v1.Cluster
 	installSteps   []v1.Step
 	uninstallSteps []v1.Step
-	upgradeSteps   []v1.Step
 }
 
 type JoinCmd struct {

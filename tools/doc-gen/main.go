@@ -23,8 +23,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 
 	auditingv1 "github.com/kubeclipper/kubeclipper/pkg/apis/auditing/v1"
 
@@ -123,7 +123,7 @@ func generateSwaggerJSON() []byte {
 	})
 
 	data, _ := json.MarshalIndent(swagger, "", "  ")
-	err := ioutil.WriteFile(output, data, 0644)
+	err := os.WriteFile(output, data, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}

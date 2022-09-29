@@ -25,9 +25,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"net"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -836,11 +836,11 @@ func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
 
 func uploadCerts(client *kc.Client) {
 	caPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultCaPath)
-	cacrt, err := ioutil.ReadFile(fmt.Sprintf("%s/ca.crt", caPath))
+	cacrt, err := os.ReadFile(fmt.Sprintf("%s/ca.crt", caPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	cakey, err := ioutil.ReadFile(fmt.Sprintf("%s/ca.key", caPath))
+	cakey, err := os.ReadFile(fmt.Sprintf("%s/ca.key", caPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -863,35 +863,35 @@ func uploadCerts(client *kc.Client) {
 	}
 
 	etcdPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultEtcdPKIPath)
-	etcdcrt, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd.crt", etcdPath))
+	etcdcrt, err := os.ReadFile(fmt.Sprintf("%s/etcd.crt", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdkey, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd.key", etcdPath))
+	etcdkey, err := os.ReadFile(fmt.Sprintf("%s/etcd.key", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdpeercrt, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd-peer.crt", etcdPath))
+	etcdpeercrt, err := os.ReadFile(fmt.Sprintf("%s/etcd-peer.crt", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdpeerkey, err := ioutil.ReadFile(fmt.Sprintf("%s/etcd-peer.key", etcdPath))
+	etcdpeerkey, err := os.ReadFile(fmt.Sprintf("%s/etcd-peer.key", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdclientcrt, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-etcd-client.crt", etcdPath))
+	etcdclientcrt, err := os.ReadFile(fmt.Sprintf("%s/kc-server-etcd-client.crt", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdclientkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-etcd-client.key", etcdPath))
+	etcdclientkey, err := os.ReadFile(fmt.Sprintf("%s/kc-server-etcd-client.key", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdhealthcheckcrt, err := ioutil.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
+	etcdhealthcheckcrt, err := os.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdhealthcheckkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
+	etcdhealthcheckkey, err := os.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -920,19 +920,19 @@ func uploadCerts(client *kc.Client) {
 	}
 
 	natsPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultNatsPKIPath)
-	natsservercert, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.crt", natsPath))
+	natsservercert, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.crt", natsPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	natsserverkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.key", natsPath))
+	natsserverkey, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.key", natsPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	natsclientcert, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.crt", natsPath))
+	natsclientcert, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.crt", natsPath))
 	if err != nil {
 		logger.Fatal(err)
 	}
-	natsclientkey, err := ioutil.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.key", natsPath))
+	natsclientkey, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.key", natsPath))
 	if err != nil {
 		logger.Fatal(err)
 	}

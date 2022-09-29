@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -80,7 +79,7 @@ func addOrRemoveDockerInsecureRegistry(ctx context.Context, registry string, add
 	if err != nil {
 		return
 	}
-	fileData, err := ioutil.ReadFile(dockerDefaultConfig)
+	fileData, err := os.ReadFile(dockerDefaultConfig)
 	if err != nil {
 		return
 	}
@@ -114,7 +113,7 @@ func addOrRemoveDockerInsecureRegistry(ctx context.Context, registry string, add
 	if err != nil {
 		return err
 	}
-	if err = ioutil.WriteFile(dockerDefaultConfig, newData, info.Mode()); err != nil {
+	if err = os.WriteFile(dockerDefaultConfig, newData, info.Mode()); err != nil {
 		return err
 	}
 	_, _ = cmdutil.CheckContextAndAppendStepLogFile(ctx, []byte(fmt.Sprintf("[%s] + %s \n", time.Now().Format(time.RFC3339), logMsg)))

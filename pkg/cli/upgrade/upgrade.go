@@ -74,7 +74,6 @@ type UpgradeOptions struct {
 	online    bool
 	version   string
 	component string
-	target    string
 	serverIPs []string
 	agentIPs  []string
 }

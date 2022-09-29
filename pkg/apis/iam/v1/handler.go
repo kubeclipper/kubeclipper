@@ -404,6 +404,7 @@ func (h *handler) CheckRolesExist(request *restful.Request, response *restful.Re
 	response.WriteHeader(http.StatusOK)
 }
 
+//nolint:unused
 func (h *handler) watchRole(req *restful.Request, resp *restful.Response, q *query.Query) {
 	timeout := query.MinTimeoutSeconds * time.Second
 	if q.TimeoutSeconds != nil {

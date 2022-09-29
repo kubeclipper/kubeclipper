@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,7 +64,7 @@ func GenerateFiles() {
 		fmt.Printf("Must specify --toc-file.\n")
 		return
 	}
-	contents, err := ioutil.ReadFile(tocFile)
+	contents, err := os.ReadFile(tocFile)
 	if err != nil {
 		fmt.Printf("Failed to read yaml file %s: %v", getTocFile(), err)
 		return

@@ -285,14 +285,6 @@ func (c *JoinOptions) checkServerNode(node string) error {
 	return nil
 }
 
-func (c *JoinOptions) serverNodeFiles() error {
-	return nil
-}
-
-func (c *JoinOptions) enableServerService() error {
-	return nil
-}
-
 func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata) string {
 	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
 	if err != nil {

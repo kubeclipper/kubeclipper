@@ -23,7 +23,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -71,7 +71,7 @@ func CommonRequest(requestURL, httpMethod string, header, rawQuery map[string]st
 		return []byte{}, http.StatusInternalServerError, respErr
 	}
 	defer resp.Body.Close()
-	body, readBodyErr := ioutil.ReadAll(resp.Body)
+	body, readBodyErr := io.ReadAll(resp.Body)
 	if readBodyErr != nil {
 		return []byte{}, http.StatusInternalServerError, readBodyErr
 	}

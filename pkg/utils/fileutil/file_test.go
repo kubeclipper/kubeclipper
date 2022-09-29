@@ -20,7 +20,6 @@ package fileutil
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -72,7 +71,7 @@ To strive, to seek, to find, and not to yield.
 	if err != nil {
 		assert.FailNowf(t, "failed to backup file", err.Error())
 	}
-	actual, err := ioutil.ReadFile(bakFile)
+	actual, err := os.ReadFile(bakFile)
 	if err != nil {
 		assert.FailNowf(t, "failed to read backup file", err.Error())
 	}

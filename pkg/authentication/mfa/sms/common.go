@@ -26,6 +26,11 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
 )
 
+var (
+	ErrSMSRateLimitExceeded = fmt.Errorf("verification code was sent too frequently. Please try again later")
+	ErrSMSSendLimitExceeded = fmt.Errorf("SMS sending limit reached")
+)
+
 const (
 	smsSendInterval = time.Minute
 )

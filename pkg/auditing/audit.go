@@ -24,7 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -193,13 +193,13 @@ func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audi
 	}
 
 	if (e.Level.GreaterOrEqual(audit.LevelRequest) || e.Verb == "create") && req.ContentLength > 0 && req.Header.Get("Content-Type") != "application/x-www-form-urlencoded" {
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			logger.Error("read request body failed", zap.Error(err))
 			return e
 		}
 		_ = req.Body.Close()
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
 
 		if e.Level.GreaterOrEqual(audit.LevelRequest) {
 			if info.Path == "/oauth/login" {

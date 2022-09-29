@@ -52,7 +52,6 @@ type clusterOperator struct {
 	recoveryStorage      rest.StandardStorage
 	backupPointStorage   rest.StandardStorage
 	cronBackupStorage    rest.StandardStorage
-	upgradeStorage       rest.StandardStorage
 	dnsStorage           rest.StandardStorage
 	templateStorage      rest.StandardStorage
 	cloudProviderStorage rest.StandardStorage

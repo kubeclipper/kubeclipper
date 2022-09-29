@@ -20,7 +20,7 @@ package auditing
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -130,7 +130,7 @@ func Test_auditing_LogRequestObject(t *testing.T) {
 			},
 			args: args{
 				req: &http.Request{
-					Body: ioutil.NopCloser(bytes.NewBufferString("testBody")),
+					Body: io.NopCloser(bytes.NewBufferString("testBody")),
 					Header: map[string][]string{
 						"Content-Type": {"application/json"},
 					},

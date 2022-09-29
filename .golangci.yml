@@ -11,8 +11,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
-    - varcheck
     - ineffassign
     - exportloopref
     - errcheck
@@ -23,7 +21,7 @@ linters:
     - staticcheck
     - unconvert
     - revive
-    #- unused
+    - unused
 
 issues:
   exclude-use-default: true
@@ -39,9 +37,7 @@ issues:
     - path: _test\.go
       linters:
         - exportloopref
-        - deadcode
         - errcheck
-        - varcheck
     - path: pkg/auditing/audit.go
       linters:
         - staticcheck
@@ -78,6 +74,6 @@ linters-settings:
       - name: redefines-builtin-id
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.18"
+    go: "1.19"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all" ]
