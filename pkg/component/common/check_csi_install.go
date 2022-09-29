@@ -164,9 +164,7 @@ func (c *CSIHealthCheck) Render(ctx context.Context, opts component.Options) err
 		return err
 	}
 	filePath := filepath.Join(ManifestsDir, checkCSIHealthFile)
-	if err := fileutil.WriteFileWithContext(ctx, filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
-		c.renderCSIHealthCheckPVC, opts.DryRun); err != nil {
-		return err
-	}
-	return nil
+	err := fileutil.WriteFileWithContext(ctx, filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
+		c.renderCSIHealthCheckPVC, opts.DryRun)
+	return err
 }
