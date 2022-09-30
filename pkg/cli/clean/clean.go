@@ -116,6 +116,7 @@ func (c *CleanOptions) RunClean() {
 		c.cleanKcServer()
 		c.cleanKcConsole()
 		c.cleanBinaries()
+		c.cleanKcEnv()
 	}
 	logger.Info("clean successful")
 }
@@ -218,6 +219,24 @@ func (c *CleanOptions) cleanBinaries() {
 
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.allNodes, cmd, sshutils.DefaultWalk)
+		if err != nil {
+			logger.V(2).Error(err)
+		}
+	}
+}
+
+func (c *CleanOptions) cleanKcEnv() {
+	if len(c.deployConfig.ServerIPs) == 0 {
+		logger.V(2).Info("no kubeclipper console need to be cleaned")
+		return
+	}
+
+	cmdList := []string{
+		"rm -rf /etc/kc/kc.env",
+	}
+
+	for _, cmd := range cmdList {
+		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
 		if err != nil {
 			logger.V(2).Error(err)
 		}
