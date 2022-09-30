@@ -61,7 +61,7 @@ KubeClipper 本身并不会占用太多资源，但是为了后续更好的运�
 #### 下载 kcctl
 KubeClipper 提供了命令行工具🔧 kcctl 以简化运维工作，您可以直接使用以下命令下载最新版 kcctl：
 ```bash
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | sh -
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | VERSION=v1.1.1 sh -
 ```
 > 您也可以在 [GitHub Release Page](https://github.com/kubeclipper-labs/kubeclipper/releases) 下载指定版本。
 
@@ -124,7 +124,7 @@ kcctl deploy --user root --pk-file $SSH_PRIVATE_KEY
 ```bash
 kcctl login -H http://localhost  -u admin -p Thinkbig1
 # 如果你在中国， 你可以在安装时使用 cn  环境变量, 此时我们会使用 registry.aliyuncs.com/google_containers 代替 k8s.gcr.io
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn sh -
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | VERSION=v1.1.1 KC_REGION=cn sh -
 ```
 然后使用以下命令创建 k8s 集群:
 ```bash
