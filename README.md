@@ -71,7 +71,7 @@
     <li>Node status management</li>
     <li>Connect node terminal</li>
     <li>Node enable/disable</li>
-    <li>View the list of nodes and clusters under a region</li> 
+    <li>View the list of nodes and clusters under a region</li>
   </ul>
 </details>
 
@@ -122,7 +122,7 @@ curl -sfL https://oss.kubeclipper.io/kcctl.sh | bash -
 # In China, you can add cn env, we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn bash -
 # The latest version is downloaded by default. You can download the specified version
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | VERSION=v1.1.0 bash -
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | VERSION=v1.2.0 bash -
 ```
 
 > You can also download the specified version on the [GitHub Release Page ](https://github.com/kubeclipper-labs/kubeclipper/releases).
