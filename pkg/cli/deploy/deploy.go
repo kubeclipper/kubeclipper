@@ -25,8 +25,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
-	"k8s.io/component-base/version"
 	"math"
 	"net"
 	"os"
@@ -38,6 +36,10 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"k8s.io/component-base/version"
+
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
