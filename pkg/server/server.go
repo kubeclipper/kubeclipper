@@ -283,7 +283,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	ctrl, err := manager.NewControllerManager(s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, SetupController)
+	ctrl, err := manager.NewControllerManager(s.Config.GenericServerRunOptions.BindAddress, s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, SetupController)
 	if err != nil {
 		return err
 	}
