@@ -20,6 +20,8 @@ package manager
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"sync"
 	"time"
 
@@ -92,9 +94,10 @@ type ControllerManager struct {
 	cmdDelivery    service.CmdDelivery
 	storageFactory registry.SharedStorageFactory
 
-	cs                    clientset.Interface
-	internalInformerUser  string
-	InternalInformerToken string
+	cs                      clientset.Interface
+	internalInformerAddress string
+	internalInformerUser    string
+	InternalInformerToken   string
 
 	setupFunc SetupFunc
 
@@ -154,8 +157,7 @@ func (s *ControllerManager) GetCmdDelivery() service.CmdDelivery {
 	return s.cmdDelivery
 }
 
-func NewControllerManager(user, pass string, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, setupFunc SetupFunc) (*ControllerManager, error) {
-
+func NewControllerManager(addr, user, pass string, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, setupFunc SetupFunc) (*ControllerManager, error) {
 	s := &ControllerManager{
 		leaderStopChan:          make(chan struct{}, 1),
 		defaultWorkerLoopPeriod: time.Second,
@@ -164,13 +166,21 @@ func NewControllerManager(user, pass string, storageFactory registry.SharedStora
 		storageFactory:          storageFactory,
 		setupFunc:               setupFunc,
 	}
+	ad, err := url.Parse(addr)
+	if err != nil {
+		return nil, err
+	}
+	if ad.Scheme == "" {
+		addr = fmt.Sprintf("http://%s", addr)
+	}
+	s.internalInformerAddress = addr
 	s.internalInformerUser = user
 	s.InternalInformerToken = pass
 	s.lock = leaderelect.NewLock(resourceLockNS, resourceLockName, lease.NewLeaseOperator(storageFactory.Leases()), resourcelock.ResourceLockConfig{
 		Identity:      uuid.New().String(),
 		EventRecorder: nil,
 	})
-	cs, err := clientset.NewForConfig(clientrest.InternalRestConfig(s.internalInformerUser, s.InternalInformerToken))
+	cs, err := clientset.NewForConfig(clientrest.InternalRestConfig(s.internalInformerAddress, s.internalInformerUser, s.InternalInformerToken))
 	if err != nil {
 		return nil, err
 	}

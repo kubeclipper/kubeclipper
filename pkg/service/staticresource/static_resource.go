@@ -41,7 +41,7 @@ type Service struct {
 
 func NewService(opts *staticserver.Options) (service.Interface, error) {
 	httpSrv := &http.Server{
-		Addr: fmt.Sprintf(":%d", opts.InsecurePort),
+		Addr: fmt.Sprintf("%s:%d", opts.BindAddress, opts.InsecurePort),
 	}
 	if opts.SecurePort != 0 {
 		certificate, err := tls.LoadX509KeyPair(opts.TLSCertFile, opts.TLSPrivateKey)
@@ -49,6 +49,7 @@ func NewService(opts *staticserver.Options) (service.Interface, error) {
 			return nil, err
 		}
 		httpSrv.TLSConfig.Certificates = []tls.Certificate{certificate}
+		httpSrv.Addr = fmt.Sprintf("%s:%d", opts.BindAddress, opts.SecurePort)
 	}
 	return &Service{
 		server: httpSrv,

@@ -283,7 +283,13 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	ctrl, err := manager.NewControllerManager(s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, SetupController)
+	addr := s.Config.GenericServerRunOptions.BindAddress
+	if s.Config.GenericServerRunOptions.SecurePort != 0 {
+		addr = fmt.Sprintf("%s:%d", addr, s.Config.GenericServerRunOptions.SecurePort)
+	} else {
+		addr = fmt.Sprintf("%s:%d", addr, s.Config.GenericServerRunOptions.InsecurePort)
+	}
+	ctrl, err := manager.NewControllerManager(addr, s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, SetupController)
 	if err != nil {
 		return err
 	}
