@@ -25,11 +25,14 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"k8s.io/component-base/version"
 	"math"
 	"net"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -113,7 +116,7 @@ const (
   kcctl deploy --server 172.20.149.198 --agent us-west-1:10.0.0.10 --agent us-west-2:20.0.0.11 --fip 10.0.0.10:172.20.149.199 --fip 20.0.0.11:172.20.149.200
 
   Please read 'kcctl deploy -h' get more deploy flags`
-	defaultPkg              = "https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz"
+	defaultPkg              = "https://oss.kubeclipper.io/release/%s/kc-%s.tar.gz"
 	allInOneEtcdClientPort  = 12379
 	allInOneEtcdPeerPort    = 12380
 	allInOneEtcdMetricsPort = 12381
@@ -175,7 +178,8 @@ func (d *DeployOptions) Complete() error {
 	if d.deployConfig.ServerIPs == nil && d.agents == nil {
 		d.aio = true
 		if d.deployConfig.Pkg == "" {
-			d.deployConfig.Pkg = defaultPkg
+			tag, _ := strutil.ParseGitDescribeInfo(version.Get().GitVersion)
+			d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, tag, runtime.GOARCH)
 		}
 		// set etcd port to avoid conflicts with k8s
 		d.deployConfig.EtcdConfig.ClientPort = allInOneEtcdClientPort
