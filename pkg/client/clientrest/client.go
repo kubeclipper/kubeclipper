@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -90,9 +91,9 @@ func IsInformerRawQuery(req *http.Request) bool {
 	return false
 }
 
-func InternalRestConfig(address, username, token string) *rest.Config {
+func InternalRestConfig(username, token string) *rest.Config {
 	return &rest.Config{
-		Host:                address,
+		Host:                "http://localhost:8080",
 		APIPath:             "",
 		ContentConfig:       rest.ContentConfig{},
 		Username:            username,
