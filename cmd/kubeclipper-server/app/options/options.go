@@ -73,7 +73,7 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 	}
 
 	httpSrv := &http.Server{
-		Addr: fmt.Sprintf("%s:%d", s.GenericServerRunOptions.BindAddress, s.GenericServerRunOptions.InsecurePort),
+		Addr: fmt.Sprintf(":%d", s.GenericServerRunOptions.InsecurePort),
 	}
 	if s.GenericServerRunOptions.SecurePort != 0 {
 		certificate, err := tls.LoadX509KeyPair(s.GenericServerRunOptions.TLSCertFile, s.GenericServerRunOptions.TLSPrivateKey)
@@ -81,7 +81,6 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 			return nil, err
 		}
 		httpSrv.TLSConfig.Certificates = []tls.Certificate{certificate}
-		httpSrv.Addr = fmt.Sprintf("%s:%d", s.GenericServerRunOptions.BindAddress, s.GenericServerRunOptions.SecurePort)
 	}
 
 	apiServer.RESTOptionsGetter = s.CompleteEtcdOptions()
