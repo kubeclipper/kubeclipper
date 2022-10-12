@@ -33,14 +33,15 @@ type (
 )
 
 type ExtraMetadata struct {
-	Masters       NodeList
-	Workers       NodeList
-	Offline       bool
-	LocalRegistry string
-	CRI           string
-	ClusterName   string
-	KubeVersion   string
-	OperationType string
+	Masters        NodeList
+	Workers        NodeList
+	Offline        bool
+	LocalRegistry  string
+	CRI            string
+	ClusterName    string
+	KubeVersion    string
+	OperationType  string
+	KubeletDataDir string
 }
 
 type Node struct {
