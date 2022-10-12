@@ -399,7 +399,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	if v := request.QueryParameter("timeout"); v != "" {
 		timeoutSecs = v
 	}
-
+	c.Complete()
 	// validate node exist
 	extraMeta, err := h.getClusterMetadata(request.Request.Context(), &c)
 	if err != nil {
@@ -415,7 +415,6 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-	c.Complete()
 
 	extraMeta.OperationType = v1.OperationCreateCluster
 	op, err := h.parseOperationFromCluster(extraMeta, &c, v1.ActionInstall)
@@ -784,11 +783,12 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
-		ClusterName:   c.Name,
-		Offline:       c.Offline(),
-		LocalRegistry: c.LocalRegistry,
-		CRI:           c.ContainerRuntime.Type,
-		KubeVersion:   c.KubernetesVersion,
+		ClusterName:    c.Name,
+		Offline:        c.Offline(),
+		LocalRegistry:  c.LocalRegistry,
+		CRI:            c.ContainerRuntime.Type,
+		KubeVersion:    c.KubernetesVersion,
+		KubeletDataDir: c.Kubelet.RootDir,
 	}
 	masters, err := h.getNodeInfo(ctx, c.Masters)
 	if err != nil {
