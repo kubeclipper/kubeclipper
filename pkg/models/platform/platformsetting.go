@@ -138,6 +138,30 @@ func (p *platformOperator) ListEventsEx(ctx context.Context, query *query.Query)
 	return models.ListExV2(ctx, p.eventStorage, query, p.eventFilter, nil, nil)
 }
 
+func (p *platformOperator) ListEventsWithTimeEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	return models.ListExV2(ctx, p.eventStorage, query, p.timeFuzzyFilter, nil, nil)
+}
+
+func (p *platformOperator) timeFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+	events, ok := obj.(*v1.EventList)
+	if !ok {
+		return nil
+	}
+	objs := make([]runtime.Object, 0, len(events.Items))
+	for index, event := range events.Items {
+		selected := true
+		for k, v := range q.FuzzySearch {
+			if !models.ObjectMetaFilter(event.ObjectMeta, k, v) {
+				selected = false
+			}
+		}
+		if selected {
+			objs = append(objs, &events.Items[index])
+		}
+	}
+	return objs
+}
+
 func (p *platformOperator) eventFilter(obj runtime.Object, _ *query.Query) []runtime.Object {
 	records, ok := obj.(*v1.EventList)
 	if !ok {

@@ -21,6 +21,7 @@ package options
 import (
 	"bytes"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 	"html/template"
 	"io"
 	"os"
@@ -208,24 +209,25 @@ type Metadata struct {
 }
 
 type DeployConfig struct {
-	Config           string        `json:"-" yaml:"-"`
-	SSHConfig        *sshutils.SSH `json:"ssh" yaml:"ssh,omitempty"`
-	EtcdConfig       *Etcd         `json:"etcd" yaml:"etcd,omitempty"`
-	ServerIPs        []string      `json:"serverIPs" yaml:"serverIPs,omitempty"`
-	Agents           Agents        `json:"agents" yaml:"agents,omitempty"`
-	Proxys           []string      `json:"proxys" yaml:"proxys,omitempty"`
-	IPDetect         string        `json:"ipDetect" yaml:"ipDetect,omitempty"`
-	Debug            bool          `json:"debug" yaml:"debug,omitempty"`
-	DefaultRegion    string        `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
-	ServerPort       int           `json:"serverPort" yaml:"serverPort,omitempty"`
-	StaticServerPort int           `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
-	StaticServerPath string        `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
-	Pkg              string        `json:"pkg" yaml:"pkg,omitempty"`
-	ConsolePort      int           `json:"consolePort" yaml:"consolePort,omitempty"`
-	JWTSecret        string        `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
-	MQ               *MQ           `json:"mq" yaml:"mq,omitempty"`
-	OpLog            *OpLog        `json:"opLog" yaml:"opLog,omitempty"`
-	ImageProxy       *ImageProxy   `json:"imageProxy" yaml:"imageProxy,omitempty"`
+	Config           string               `json:"-" yaml:"-"`
+	SSHConfig        *sshutils.SSH        `json:"ssh" yaml:"ssh,omitempty"`
+	EtcdConfig       *Etcd                `json:"etcd" yaml:"etcd,omitempty"`
+	ServerIPs        []string             `json:"serverIPs" yaml:"serverIPs,omitempty"`
+	Agents           Agents               `json:"agents" yaml:"agents,omitempty"`
+	Proxys           []string             `json:"proxys" yaml:"proxys,omitempty"`
+	IPDetect         string               `json:"ipDetect" yaml:"ipDetect,omitempty"`
+	Debug            bool                 `json:"debug" yaml:"debug,omitempty"`
+	DefaultRegion    string               `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
+	ServerPort       int                  `json:"serverPort" yaml:"serverPort,omitempty"`
+	StaticServerPort int                  `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
+	StaticServerPath string               `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
+	Pkg              string               `json:"pkg" yaml:"pkg,omitempty"`
+	ConsolePort      int                  `json:"consolePort" yaml:"consolePort,omitempty"`
+	JWTSecret        string               `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
+	AuditOpts        *option.AuditOptions `json:"audit" yaml:"audit"`
+	MQ               *MQ                  `json:"mq" yaml:"mq,omitempty"`
+	OpLog            *OpLog               `json:"opLog" yaml:"opLog,omitempty"`
+	ImageProxy       *ImageProxy          `json:"imageProxy" yaml:"imageProxy,omitempty"`
 }
 
 type AgentRegions map[string][]string // key: region, value: ips
@@ -284,6 +286,7 @@ func NewDeployOptions() *DeployConfig {
 		ServerPort:       8080,
 		StaticServerPort: 8081,
 		StaticServerPath: "/opt/kubeclipper-server/resource",
+		AuditOpts:        option.NewAuditOptions(),
 		MQ: &MQ{
 			User:        "admin",
 			TLS:         true,
@@ -440,6 +443,9 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	data["ServerPort"] = c.ServerPort
 	// TODO: make auto generate
 	data["JwtSecret"] = c.JWTSecret
+	data["EventLogHistoryRetentionPeriod"] = c.AuditOpts.EventLogHistoryRetentionPeriod
+	data["EventLogHistoryMaximumEntries"] = c.AuditOpts.EventLogHistoryMaximumEntries
+	data["AuditLevel"] = c.AuditOpts.AuditLevel
 	data["StaticServerPort"] = c.StaticServerPort
 	data["StaticServerPath"] = c.StaticServerPath
 	if c.Debug {

@@ -57,6 +57,7 @@ type EventReader interface {
 type EventReaderEx interface {
 	GetEventEx(ctx context.Context, name string, resourceVersion string) (*v1.Event, error)
 	ListEventsEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
+	ListEventsWithTimeEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
 }
 
 type EventWriter interface {

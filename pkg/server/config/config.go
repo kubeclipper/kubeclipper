@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"strings"
 
+	auditoptions "github.com/kubeclipper/kubeclipper/pkg/auditing/option"
+
 	authoptions "github.com/kubeclipper/kubeclipper/pkg/authentication/options"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
@@ -56,6 +58,7 @@ type Config struct {
 	MQOptions               *natsio.NatsOptions                `json:"mq,omitempty" yaml:"mq,omitempty"  mapstructure:"mq"`
 	LogOptions              *logger.Options                    `json:"log,omitempty" yaml:"log,omitempty" mapstructure:"log"`
 	AuthenticationOptions   *authoptions.AuthenticationOptions `json:"authentication,omitempty" yaml:"authentication,omitempty" mapstructure:"authentication"`
+	AuditOptions            *auditoptions.AuditOptions         `json:"auditOptions,omitempty" yaml:"auditOptions,omitempty" mapstructure:"authentication"`
 }
 
 func New() *Config {
@@ -67,6 +70,7 @@ func New() *Config {
 		MQOptions:               natsio.NewOptions(),
 		LogOptions:              logger.NewLogOptions(),
 		AuthenticationOptions:   authoptions.NewAuthenticateOptions(),
+		AuditOptions:            auditoptions.NewAuditOptions(),
 	}
 }
 
