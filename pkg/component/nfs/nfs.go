@@ -406,6 +406,7 @@ func (n *NFSProvisioner) GetComponentMeta(lang component.Lang) component.Meta {
 		Version:    version,
 		Unique:     false,
 		Template:   true,
+		Deprecated: true,
 		Dependence: []string{component.InternalCategoryKubernetes},
 		Category:   component.InternalCategoryStorage,
 		Priority:   3,

@@ -72,6 +72,7 @@ type Meta struct {
 	Unique         bool             `json:"unique"`
 	Template       bool             `json:"template"`
 	Category       string           `json:"category"`
+	Deprecated     bool             `json:"deprecated"`
 	Name           string           `json:"name"`
 	Version        string           `json:"version"`
 	Dependence     []string         `json:"dependence"`
