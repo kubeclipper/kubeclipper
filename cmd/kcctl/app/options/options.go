@@ -21,11 +21,12 @@ package options
 import (
 	"bytes"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 	"html/template"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"

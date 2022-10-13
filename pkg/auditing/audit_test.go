@@ -20,12 +20,13 @@ package auditing
 
 import (
 	"bytes"
-	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 	"io"
 	"net/http"
 	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 
 	"k8s.io/apiserver/pkg/apis/audit"
 

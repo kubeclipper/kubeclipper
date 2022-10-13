@@ -47,22 +47,21 @@ func (o *AuditOptions) Validate() error {
 		loc := re.FindStringIndex(o.period)
 		if loc == nil || len(loc) != 2 {
 			return errors.New("parse period error, [--period] format error")
-		} else {
-			n, err := strconv.Atoi(o.period[:loc[1]])
-			if err != nil {
-				return err
-			}
+		}
+		n, err := strconv.Atoi(o.period[:loc[1]])
+		if err != nil {
+			return err
+		}
 
-			switch o.period[loc[1]:] {
-			case "h":
-				o.EventLogHistoryRetentionPeriod = time.Duration(n) * time.Hour
-			case "d":
-				o.EventLogHistoryRetentionPeriod = time.Duration(n) * 24 * time.Hour
-			case "w":
-				o.EventLogHistoryRetentionPeriod = time.Duration(n) * 7 * 24 * time.Hour
-			default:
-				return errors.New("[--period] format error, only support [h, d, w]")
-			}
+		switch o.period[loc[1]:] {
+		case "h":
+			o.EventLogHistoryRetentionPeriod = time.Duration(n) * time.Hour
+		case "d":
+			o.EventLogHistoryRetentionPeriod = time.Duration(n) * 24 * time.Hour
+		case "w":
+			o.EventLogHistoryRetentionPeriod = time.Duration(n) * 7 * 24 * time.Hour
+		default:
+			return errors.New("[--period] format error, only support [h, d, w]")
 		}
 	} else {
 		return errors.New("only support [h, d, w]")
