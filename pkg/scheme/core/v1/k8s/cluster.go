@@ -717,12 +717,29 @@ func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) err
 			},
 		},
 	})
-
+	if len(metadata.Workers) > 0 {
+		stepper.installSteps = append(stepper.installSteps,
+			v1.Step{
+				ID:         strutil.GetUUID(),
+				Name:       "restartWorkerKubelet",
+				Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+				ErrIgnore:  false,
+				RetryTimes: 1,
+				Nodes:      utils.UnwrapNodeList(metadata.Workers),
+				Action:     v1.ActionInstall,
+				Commands: []v1.Command{
+					{
+						Type:         v1.CommandShell,
+						ShellCommand: []string{"bash", "-c", "systemctl restart kubelet"},
+					},
+				},
+			})
+	}
 	stepper.installSteps = append(stepper.installSteps,
 		v1.Step{
 			ID:         strutil.GetUUID(),
 			Name:       "restartCniAndKubeProxy",
-			Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+			Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 			ErrIgnore:  false,
 			RetryTimes: 1,
 			Nodes:      []v1.StepNode{utils.UnwrapNodeList(metadata.Masters)[0]},
@@ -730,26 +747,23 @@ func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) err
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", "while true; do kubectl get po -n kube-system  && break;sleep 5; done"},
+					ShellCommand: []string{"/bin/bash", "-c", "while true; do kubectl get po -n kube-system && break;sleep 5; done"},
+				},
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube | grep -v Running ;fi ; done"},
 				},
 				{
 					Type:         v1.CommandShell,
 					ShellCommand: []string{"/bin/bash", "-c", "kubectl rollout restart ds calico-node -n kube-system && kubectl rollout restart ds kube-proxy -n kube-system"},
 				},
-			},
-		},
-		v1.Step{
-			ID:         strutil.GetUUID(),
-			Name:       "restartWorkerKubelet",
-			Timeout:    metav1.Duration{Duration: 1 * time.Minute},
-			ErrIgnore:  false,
-			RetryTimes: 1,
-			Nodes:      utils.UnwrapNodeList(metadata.Workers),
-			Action:     v1.ActionInstall,
-			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "systemctl restart kubelet"},
+					ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep calico | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep calico | grep -v Running ; fi ; done"},
+				},
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube-proxy | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube-proxy | grep -v Running ; fi ; done"},
 				},
 			},
 		})
