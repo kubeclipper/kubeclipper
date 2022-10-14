@@ -58,7 +58,7 @@ type Config struct {
 	MQOptions               *natsio.NatsOptions                `json:"mq,omitempty" yaml:"mq,omitempty"  mapstructure:"mq"`
 	LogOptions              *logger.Options                    `json:"log,omitempty" yaml:"log,omitempty" mapstructure:"log"`
 	AuthenticationOptions   *authoptions.AuthenticationOptions `json:"authentication,omitempty" yaml:"authentication,omitempty" mapstructure:"authentication"`
-	AuditOptions            *auditoptions.AuditOptions         `json:"auditOptions,omitempty" yaml:"auditOptions,omitempty" mapstructure:"authentication"`
+	AuditOptions            *auditoptions.AuditOptions         `json:"audit,omitempty" yaml:"audit,omitempty" mapstructure:"audit"`
 }
 
 func New() *Config {

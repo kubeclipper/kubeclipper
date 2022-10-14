@@ -13,6 +13,10 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
 )
 
+var (
+	auditStatusMonitorPeriod = 30 * time.Minute
+)
+
 type AuditStatusMon struct {
 	AuditOperator platform.Operator
 	mgr           manager.Manager
@@ -23,15 +27,23 @@ type AuditStatusMon struct {
 func (s *AuditStatusMon) SetupWithManager(mgr manager.Manager) {
 	s.mgr = mgr
 	s.logger = mgr.GetLogger().WithName("audit-status-monitor")
-	mgr.AddWorkerLoop(s.monitorAuditStatus, s.AuditOptions.RetentionPeriod/2)
+	if s.AuditOptions.RetentionPeriod > auditStatusMonitorPeriod {
+		auditStatusMonitorPeriod = s.AuditOptions.RetentionPeriod / 2
+	}
+	mgr.AddWorkerLoop(s.monitorAuditStatus, auditStatusMonitorPeriod)
 }
 
 func (s *AuditStatusMon) monitorAuditStatus() {
 	timestamp := time.Now().Add(-s.AuditOptions.RetentionPeriod)
+	// clean audit operation / login record
+	s.clean("type=", timestamp)
+	s.clean("type!=", timestamp)
+}
 
+func (s *AuditStatusMon) clean(fieldSelector string, timestamp time.Time) {
 	// clean operation audit event
 	q := &query.Query{
-		FieldSelector: "type=",
+		FieldSelector: fieldSelector,
 		Reverse:       true,
 		Pagination:    query.NoPagination(),
 	}

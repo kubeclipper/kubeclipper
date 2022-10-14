@@ -59,16 +59,13 @@ func (s *ServerOptions) Flags() (fss cliflag.NamedFlagSets) {
 }
 
 func (s *ServerOptions) Validate() []error {
-	var err error
 	var errors []error
 	errors = append(errors, s.GenericServerRunOptions.Validate()...)
 	errors = append(errors, s.EtcdOptions.Validate()...)
 	errors = append(errors, s.MQOptions.Validate()...)
 	errors = append(errors, s.LogOptions.Validate()...)
 	errors = append(errors, s.AuthenticationOptions.Validate()...)
-	if err = s.AuditOptions.Validate(); err != nil {
-		errors = append(errors, err)
-	}
+	errors = append(errors, s.AuditOptions.Validate()...)
 	return errors
 }
 

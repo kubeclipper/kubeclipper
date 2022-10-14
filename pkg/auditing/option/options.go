@@ -22,17 +22,17 @@ func NewAuditOptions() *AuditOptions {
 	}
 }
 
-func (o *AuditOptions) Validate() error {
-
+func (o *AuditOptions) Validate() []error {
+	var errs []error
 	if o.RetentionPeriod < 10*time.Minute {
-		return errors.New("retention should not less than 10 minutes")
+		errs = append(errs, errors.New("audit log retention should not less than 10 minutes"))
 	}
 
 	if o.MaximumEntries <= 0 {
-		return errors.New("entries must be greater than 0")
+		errs = append(errs, errors.New("audit log entries must be greater than 0"))
 	}
 
-	return nil
+	return errs
 }
 
 func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {

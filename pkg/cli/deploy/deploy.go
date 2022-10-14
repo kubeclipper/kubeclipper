@@ -218,8 +218,8 @@ func (d *DeployOptions) Complete() error {
 		}
 	}
 
-	if err = d.deployConfig.AuditOpts.Validate(); err != nil {
-		return err
+	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
+		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
 	}
 
 	if d.aio {
