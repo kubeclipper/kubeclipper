@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
 
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -210,25 +211,26 @@ type Metadata struct {
 }
 
 type DeployConfig struct {
-	Config           string               `json:"-" yaml:"-"`
-	SSHConfig        *sshutils.SSH        `json:"ssh" yaml:"ssh,omitempty"`
-	EtcdConfig       *Etcd                `json:"etcd" yaml:"etcd,omitempty"`
-	ServerIPs        []string             `json:"serverIPs" yaml:"serverIPs,omitempty"`
-	Agents           Agents               `json:"agents" yaml:"agents,omitempty"`
-	Proxys           []string             `json:"proxys" yaml:"proxys,omitempty"`
-	IPDetect         string               `json:"ipDetect" yaml:"ipDetect,omitempty"`
-	Debug            bool                 `json:"debug" yaml:"debug,omitempty"`
-	DefaultRegion    string               `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
-	ServerPort       int                  `json:"serverPort" yaml:"serverPort,omitempty"`
-	StaticServerPort int                  `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
-	StaticServerPath string               `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
-	Pkg              string               `json:"pkg" yaml:"pkg,omitempty"`
-	ConsolePort      int                  `json:"consolePort" yaml:"consolePort,omitempty"`
-	JWTSecret        string               `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
-	AuditOpts        *option.AuditOptions `json:"audit" yaml:"audit"`
-	MQ               *MQ                  `json:"mq" yaml:"mq,omitempty"`
-	OpLog            *OpLog               `json:"opLog" yaml:"opLog,omitempty"`
-	ImageProxy       *ImageProxy          `json:"imageProxy" yaml:"imageProxy,omitempty"`
+	Config             string                         `json:"-" yaml:"-"`
+	SSHConfig          *sshutils.SSH                  `json:"ssh" yaml:"ssh,omitempty"`
+	EtcdConfig         *Etcd                          `json:"etcd" yaml:"etcd,omitempty"`
+	ServerIPs          []string                       `json:"serverIPs" yaml:"serverIPs,omitempty"`
+	Agents             Agents                         `json:"agents" yaml:"agents,omitempty"`
+	Proxys             []string                       `json:"proxys" yaml:"proxys,omitempty"`
+	IPDetect           string                         `json:"ipDetect" yaml:"ipDetect,omitempty"`
+	Debug              bool                           `json:"debug" yaml:"debug,omitempty"`
+	DefaultRegion      string                         `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
+	ServerPort         int                            `json:"serverPort" yaml:"serverPort,omitempty"`
+	StaticServerPort   int                            `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
+	StaticServerPath   string                         `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
+	Pkg                string                         `json:"pkg" yaml:"pkg,omitempty"`
+	ConsolePort        int                            `json:"consolePort" yaml:"consolePort,omitempty"`
+	JWTSecret          string                         `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
+	AuditOpts          *option.AuditOptions           `json:"audit" yaml:"audit,omitempty"`
+	MQ                 *MQ                            `json:"mq" yaml:"mq,omitempty"`
+	OpLog              *OpLog                         `json:"opLog" yaml:"opLog,omitempty"`
+	ImageProxy         *ImageProxy                    `json:"imageProxy" yaml:"imageProxy,omitempty"`
+	AuthenticationOpts *options.AuthenticationOptions `json:"authentication" yaml:"authentication,omitempty"`
 }
 
 type AgentRegions map[string][]string // key: region, value: ips
@@ -302,7 +304,8 @@ func NewDeployOptions() *DeployConfig {
 		ImageProxy: &ImageProxy{
 			KcImageRepoMirror: getRepoMirror(),
 		},
-		Agents: make(Agents),
+		AuthenticationOpts: options.NewAuthenticateOptions(),
+		Agents:             make(Agents),
 	}
 }
 
@@ -447,6 +450,8 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod
 	data["MaximumEntries"] = c.AuditOpts.MaximumEntries
 	data["AuditLevel"] = c.AuditOpts.AuditLevel
+	data["LoginHistoryMaximumEntries"] = c.AuthenticationOpts.LoginHistoryMaximumEntries
+	data["LoginHistoryRetentionPeriod"] = c.AuthenticationOpts.LoginHistoryRetentionPeriod
 	data["StaticServerPort"] = c.StaticServerPort
 	data["StaticServerPath"] = c.StaticServerPath
 	if c.Debug {

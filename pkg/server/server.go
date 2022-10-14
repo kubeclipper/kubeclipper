@@ -486,5 +486,9 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		AuditOperator: platform.NewPlatformOperator(storageFactory.Operations(), storageFactory.Events()),
 		AuditOptions:  s.Config.AuditOptions,
 	}).SetupWithManager(mgr)
+	(&controller.IAMStatusMon{
+		IAMOperator:        iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(), storageFactory.GlobalRoleBindings(), storageFactory.Tokens(), storageFactory.LoginRecords()),
+		AuthenticationOpts: s.Config.AuthenticationOptions,
+	}).SetupWithManager(mgr)
 	return nil
 }

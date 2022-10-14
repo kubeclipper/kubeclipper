@@ -164,6 +164,8 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
 	cmd.Flags().StringArrayVar(&o.fips, "float-ip", o.fips, "Kc agent ip and float ip.")
+	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period", o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")
+	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries", o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
 	o.deployConfig.AddFlags(cmd.Flags())
 	o.deployConfig.AuditOpts.AddFlags(cmd.Flags())
 
@@ -220,6 +222,9 @@ func (d *DeployOptions) Complete() error {
 
 	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
 		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
+	}
+	if errs := d.deployConfig.AuthenticationOpts.Validate(); len(errs) != 0 {
+		return fmt.Errorf("%d errors in AuthenticationOpts occured: %v", len(errs), errs)
 	}
 
 	if d.aio {
