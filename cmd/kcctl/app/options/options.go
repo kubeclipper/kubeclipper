@@ -226,11 +226,11 @@ type DeployConfig struct {
 	Pkg                string                         `json:"pkg" yaml:"pkg,omitempty"`
 	ConsolePort        int                            `json:"consolePort" yaml:"consolePort,omitempty"`
 	JWTSecret          string                         `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
-	AuditOpts          *option.AuditOptions           `json:"audit" yaml:"audit"`
+	AuditOpts          *option.AuditOptions           `json:"audit" yaml:"audit,omitempty"`
 	MQ                 *MQ                            `json:"mq" yaml:"mq,omitempty"`
 	OpLog              *OpLog                         `json:"opLog" yaml:"opLog,omitempty"`
 	ImageProxy         *ImageProxy                    `json:"imageProxy" yaml:"imageProxy,omitempty"`
-	AuthenticationOpts *options.AuthenticationOptions `json:"authenticationOpts" yaml:"authenticationOpts"`
+	AuthenticationOpts *options.AuthenticationOptions `json:"authentication" yaml:"authentication,omitempty"`
 }
 
 type AgentRegions map[string][]string // key: region, value: ips
