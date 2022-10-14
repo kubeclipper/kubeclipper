@@ -54,6 +54,7 @@ func (s *ServerOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.MQOptions.AddFlags(fss.FlagSet("mq"))
 	s.LogOptions.AddFlags(fss.FlagSet("log"))
 	s.AuthenticationOptions.AddFlags(fss.FlagSet("authentication"))
+	s.AuditOptions.AddFlags(fss.FlagSet("audit"))
 	return fss
 }
 
@@ -64,6 +65,7 @@ func (s *ServerOptions) Validate() []error {
 	errors = append(errors, s.MQOptions.Validate()...)
 	errors = append(errors, s.LogOptions.Validate()...)
 	errors = append(errors, s.AuthenticationOptions.Validate()...)
+	errors = append(errors, s.AuditOptions.Validate()...)
 	return errors
 }
 

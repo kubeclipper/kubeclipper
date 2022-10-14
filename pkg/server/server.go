@@ -52,7 +52,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/apis/audit"
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/component-base/version"
@@ -206,7 +205,7 @@ func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 
 	s.container.Filter(filters.WithAuthorization(s.rbacAuthorizer))
 
-	a := auditing.NewAuditing(audit.LevelRequest)
+	a := auditing.NewAuditing(s.Config.AuditOptions)
 	a.AddBackend(auditing.ConsoleBackend{})
 	if s.databaseAuditBackend != nil {
 		a.AddBackend(s.databaseAuditBackend)
@@ -283,7 +282,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	ctrl, err := manager.NewControllerManager(s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, SetupController)
+	ctrl, err := manager.NewControllerManager(s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, s.SetupController)
 	if err != nil {
 		return err
 	}
@@ -370,7 +369,7 @@ func (s *APIServer) migrateUser(operator iam.Operator) error {
 	return nil
 }
 
-func SetupController(mgr manager.Manager, informerFactory informers.SharedInformerFactory, storageFactory registry.SharedStorageFactory) error {
+func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informers.SharedInformerFactory, storageFactory registry.SharedStorageFactory) error {
 	var err error
 	clusterOperator := cluster.NewClusterOperator(storageFactory.Clusters(),
 		storageFactory.Nodes(),
@@ -482,6 +481,10 @@ func SetupController(mgr manager.Manager, informerFactory informers.SharedInform
 		NodeLister:  informerFactory.Core().V1().Nodes().Lister(),
 		LeaseLister: informerFactory.Core().V1().Leases().Lister(),
 		NodeWriter:  clusterOperator,
+	}).SetupWithManager(mgr)
+	(&controller.AuditStatusMon{
+		AuditOperator: platform.NewPlatformOperator(storageFactory.Operations(), storageFactory.Events()),
+		AuditOptions:  s.Config.AuditOptions,
 	}).SetupWithManager(mgr)
 	return nil
 }

@@ -165,6 +165,7 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
 	cmd.Flags().StringArrayVar(&o.fips, "float-ip", o.fips, "Kc agent ip and float ip.")
 	o.deployConfig.AddFlags(cmd.Flags())
+	o.deployConfig.AuditOpts.AddFlags(cmd.Flags())
 
 	cmd.AddCommand(NewCmdDeployConfig(o))
 
@@ -215,6 +216,10 @@ func (d *DeployOptions) Complete() error {
 			d.deployConfig.MQ.ClientCert = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultNatsPKIPath, fmt.Sprintf("%s.crt", options.NatsIOClient))
 			d.deployConfig.MQ.ClientKey = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultNatsPKIPath, fmt.Sprintf("%s.key", options.NatsIOClient))
 		}
+	}
+
+	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
+		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
 	}
 
 	if d.aio {

@@ -29,6 +29,8 @@ import (
 	"net/http"
 	"time"
 
+	auditoptions "github.com/kubeclipper/kubeclipper/pkg/auditing/option"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -129,16 +131,16 @@ type Object struct {
 
 var _ Interface = (*auditing)(nil)
 
-func NewAuditing(level audit.Level) Interface {
+func NewAuditing(options *auditoptions.AuditOptions) Interface {
 	return &auditing{
-		level:    level,
-		backends: nil,
+		backends:     nil,
+		auditOptions: options,
 	}
 }
 
 type auditing struct {
-	level    audit.Level
-	backends []Backend
+	backends     []Backend
+	auditOptions *auditoptions.AuditOptions
 }
 
 func (a *auditing) AddBackend(backend Backend) {
@@ -148,7 +150,7 @@ func (a *auditing) AddBackend(backend Backend) {
 }
 
 func (a *auditing) Enabled() bool {
-	return !a.level.Less(audit.LevelMetadata)
+	return !a.auditOptions.AuditLevel.Less(audit.LevelMetadata)
 }
 
 func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audit.Event {
@@ -157,9 +159,10 @@ func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audi
 		return nil
 	}
 	e := &audit.Event{
-		RequestURI:               info.Path,
-		Verb:                     info.Verb,
-		Level:                    a.level,
+		RequestURI: info.Path,
+		Verb:       info.Verb,
+		//Level:                    a.level,
+		Level:                    a.auditOptions.AuditLevel,
 		AuditID:                  types.UID(uuid.New().String()),
 		Stage:                    audit.StageResponseComplete,
 		ImpersonatedUser:         nil,
@@ -167,12 +170,12 @@ func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audi
 		RequestReceivedTimestamp: metav1.NowMicro(),
 		Annotations:              nil,
 		ObjectRef: &audit.ObjectReference{
-			Resource:    info.Resource,
-			Name:        info.Name,
-			UID:         "",
-			APIGroup:    info.APIGroup,
-			APIVersion:  info.APIVersion,
-			Subresource: info.Subresource,
+			Resource: info.Resource,
+			Name:     info.Name,
+			UID:      "",
+			//APIGroup:    info.APIGroup,
+			//APIVersion:  info.APIVersion,
+			//Subresource: info.Subresource,
 		},
 	}
 
@@ -338,9 +341,6 @@ func (c *DatabaseBackend) CreateEvent(e *audit.Event) {
 		StageTimestamp:           e.StageTimestamp,
 		Resource:                 e.ObjectRef.Resource,
 		ResourceName:             e.ObjectRef.Name,
-		Subresource:              e.ObjectRef.Subresource,
-		ResourceAPIGroup:         e.ObjectRef.APIGroup,
-		ResourceAPIVersion:       e.ObjectRef.APIVersion,
 	}
 	if e.RequestURI == "/oauth/login" {
 		internalEv.Type = "login"

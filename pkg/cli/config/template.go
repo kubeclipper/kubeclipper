@@ -177,6 +177,10 @@ authentication:
   maximumClockSkew: 10s
   multipleLogin: true
   jwtSecret: {{.JwtSecret}}
+audit:
+  retentionPeriod: {{.RetentionPeriod}}
+  maximumEntries: {{.MaximumEntries}}
+  auditLevel: {{.AuditLevel}}
 staticServer:
   bindAddress: {{.ServerAddress}}
   insecurePort: {{.StaticServerPort}}

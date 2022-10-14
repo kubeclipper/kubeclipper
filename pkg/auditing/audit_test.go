@@ -26,6 +26,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
+
 	"k8s.io/apiserver/pkg/apis/audit"
 
 	"github.com/kubeclipper/kubeclipper/pkg/server/request"
@@ -55,7 +57,6 @@ func Test_auditing_AddBackend(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &auditing{
-				level: "",
 				backends: []Backend{
 					ConsoleBackend{},
 				},
@@ -98,8 +99,10 @@ func Test_auditing_Enabled(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &auditing{
-				level:    tt.fields.level,
 				backends: tt.fields.backends,
+				auditOptions: &option.AuditOptions{
+					AuditLevel: tt.fields.level,
+				},
 			}
 			if got := a.Enabled(); got != tt.want {
 				t.Errorf("Enabled() = %v, want %v", got, tt.want)
@@ -155,8 +158,10 @@ func Test_auditing_LogRequestObject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &auditing{
-				level:    tt.fields.level,
 				backends: tt.fields.backends,
+				auditOptions: &option.AuditOptions{
+					AuditLevel: tt.fields.level,
+				},
 			}
 			_ = a.LogRequestObject(tt.args.req, tt.args.info)
 		})
@@ -195,8 +200,10 @@ func Test_auditing_LogResponseObject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &auditing{
-				level:    tt.fields.level,
 				backends: tt.fields.backends,
+				auditOptions: &option.AuditOptions{
+					AuditLevel: tt.fields.level,
+				},
 			}
 			a.LogResponseObject(tt.args.e, tt.args.resp)
 		})

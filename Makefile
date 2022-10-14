@@ -63,7 +63,7 @@ vet:
 	go vet ./pkg/... ./cmd/...
 
 lint:
-	golangci-lint run --timeout 5m
+	golangci-lint run --timeout 10m
 
 
 .PHONY: cli cleancli cli-serve
