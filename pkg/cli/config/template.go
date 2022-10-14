@@ -174,6 +174,8 @@ const KcServerConfigTmpl = `generic:
 authentication:
   authenticateRateLimiterMaxTries: 5
   authenticateRateLimiterDuration: 30m
+  loginHistoryMaximumEntries: {{.LoginHistoryMaximumEntries}}
+  loginHistoryRetentionPeriod: {{.LoginHistoryRetentionPeriod}}
   maximumClockSkew: 10s
   multipleLogin: true
   jwtSecret: {{.JwtSecret}}

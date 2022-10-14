@@ -60,6 +60,12 @@ func (a *AuthenticationOptions) Validate() []error {
 	if len(a.JwtSecret) == 0 {
 		errs = append(errs, errors.New("JWT secret MUST not be empty"))
 	}
+	if a.LoginHistoryMaximumEntries <= 0 {
+		errs = append(errs, errors.New("loginHistoryMaximumEntries must greater than 0"))
+	}
+	if a.LoginHistoryRetentionPeriod < 10*time.Minute {
+		errs = append(errs, errors.New("loginHistoryRetentionPeriod must greater than 10min"))
+	}
 	if a.AuthenticateRateLimiterMaxTries > a.LoginHistoryMaximumEntries {
 		errs = append(errs, errors.New("authenticateRateLimiterMaxTries MUST not be greater than loginHistoryMaximumEntries"))
 	}
