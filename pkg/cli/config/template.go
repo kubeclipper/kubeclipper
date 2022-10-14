@@ -178,8 +178,8 @@ authentication:
   multipleLogin: true
   jwtSecret: {{.JwtSecret}}
 audit:
-  eventLogHistoryRetentionPeriod: {{.EventLogHistoryRetentionPeriod}}
-  eventLogHistoryMaximumEntries: {{.EventLogHistoryMaximumEntries}}
+  retentionPeriod: {{.RetentionPeriod}}
+  maximumEntries: {{.MaximumEntries}}
   auditLevel: {{.AuditLevel}}
 staticServer:
   bindAddress: {{.ServerAddress}}

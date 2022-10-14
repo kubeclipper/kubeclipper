@@ -22,7 +22,6 @@ import (
 	"context"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
@@ -167,14 +166,6 @@ func ObjectMetaFilter(obj metav1.ObjectMeta, key, value string) bool {
 		}
 	case "description":
 		if !strings.Contains(obj.Annotations[common.AnnotationDescription], value) {
-			return false
-		}
-	case "time":
-		t, err := time.Parse(time.RFC3339, value)
-		if err != nil {
-			return false
-		}
-		if !t.After(obj.CreationTimestamp.Time) {
 			return false
 		}
 	}

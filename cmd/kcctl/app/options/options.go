@@ -444,8 +444,8 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	data["ServerPort"] = c.ServerPort
 	// TODO: make auto generate
 	data["JwtSecret"] = c.JWTSecret
-	data["EventLogHistoryRetentionPeriod"] = c.AuditOpts.EventLogHistoryRetentionPeriod
-	data["EventLogHistoryMaximumEntries"] = c.AuditOpts.EventLogHistoryMaximumEntries
+	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod
+	data["MaximumEntries"] = c.AuditOpts.MaximumEntries
 	data["AuditLevel"] = c.AuditOpts.AuditLevel
 	data["StaticServerPort"] = c.StaticServerPort
 	data["StaticServerPath"] = c.StaticServerPath
