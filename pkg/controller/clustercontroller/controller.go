@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -176,12 +177,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ClusterReconciler) updateClusterNode(ctx context.Context, c *v1.Cluster, del bool) error {
 	for _, item := range c.Workers {
-		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleWorker, del); err != nil {
+		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleWorker, del); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
 	for _, item := range c.Masters {
-		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleMaster, del); err != nil {
+		if err := r.updateNodeRoleLabel(ctx, c.Name, item.ID, common.NodeRoleMaster, del); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -230,11 +231,19 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 		kubeconfig string
 		err        error
 	)
-	// get kubeconfig from kc
-	kubeconfig, err = r.getKubeConfig(ctx, c)
+
+	kubeconfig, err = r.getKubeconfigFromProvider(c)
 	if err != nil {
-		log.Error("create cluster client config failed", zap.String("cluster", c.Name), zap.Error(err))
+		log.Error("create cluster client config from provider failed", zap.String("cluster", c.Name), zap.Error(err))
 		return err
+	}
+	if kubeconfig == "" {
+		// get kubeconfig from kc
+		kubeconfig, err = r.getKubeConfig(ctx, c)
+		if err != nil {
+			log.Error("create cluster client config failed", zap.String("cluster", c.Name), zap.Error(err))
+			return err
+		}
 	}
 
 	// needn't update
@@ -266,6 +275,32 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 	}
 	r.mgr.AddClusterClientSet(c.Name, client.NewKubernetesClient(clientcfg, clientset))
 	return nil
+}
+
+func (r *ClusterReconciler) getKubeconfigFromProvider(c *v1.Cluster) (string, error) {
+	// clientset has been init
+	if _, exist := r.mgr.GetClusterClientSet(c.Name); exist {
+		return "", nil
+	}
+
+	// get kubeconfig from provider
+	providerName := c.Labels[common.LabelClusterProviderName]
+	// get kubeconfig from rancher provider
+	provider, err := r.CloudProviderLister.Get(providerName)
+	if err != nil {
+		return "", err
+	}
+
+	cp, err := clustermanage.GetProvider(clustermanage.Operator{}, *provider)
+	if err != nil {
+		return "", err
+	}
+	kubeconfig, err := cp.GetKubeConfig(context.TODO(), c.Name)
+	if err != nil {
+		return "", err
+	}
+	return kubeconfig, nil
+
 }
 
 func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (string, error) {

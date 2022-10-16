@@ -86,9 +86,13 @@ const (
 	// eg: storage
 	LabelCategory = "kubeclipper.io/category"
 	// eg: name
+	AnnotationActualName  = "kubeclipper.io/actual-name"
 	AnnotationDisplayName = "kubeclipper.io/display-name"
 	AnnotationDescription = "kubeclipper.io/description"
 	AnnotationOffline     = "kubeclipper.io/offline"
 
-	AnnotationProviderSyncTime = "kubeclipper.io/providerSyncTime"
+	AnnotationProviderSyncTime  = "kubeclipper.io/providerSyncTime"
+	AnnotationProviderNodeID    = "kubeclipper.io/providerNodeID"    // provider's nodeID,just mark
+	AnnotationOriginNode        = "kubeclipper.io/originNode"        // mark node is from kc or provider,add when join node to provider cluster
+	AnnotationProviderClusterID = "kubeclipper.io/providerClusterID" // match kc cluster to provider cluster
 )

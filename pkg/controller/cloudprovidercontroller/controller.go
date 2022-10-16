@@ -1,3 +1,5 @@
+package cloudprovidercontroller
+
 /*
  *
  *  * Copyright 2021 KubeClipper Authors.
@@ -16,18 +18,14 @@
  *
  */
 
-package cloudpprovidercontroller
-
 import (
 	"context"
 	"reflect"
-	"time"
 
 	pkgerrors "github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/mock"
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller/utils"
 
@@ -55,9 +53,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 )
 
-const cloudProviderInterval = time.Hour * 4
-
-type Reconciler struct {
+type CloudProviderReconciler struct {
 	ClusterLister listerv1.ClusterLister
 	ClusterWriter cluster.ClusterWriter
 
@@ -71,11 +67,24 @@ type Reconciler struct {
 	ConfigmapWriter core.ConfigMapWriter
 }
 
-func (r *Reconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
-	c, err := controller.NewUnmanaged("cloudprovider", controller.Options{
+func (r *CloudProviderReconciler) toOperator() clustermanage.Operator {
+	return clustermanage.Operator{
+		ClusterLister:       r.ClusterLister,
+		ClusterWriter:       r.ClusterWriter,
+		CloudProviderLister: r.CloudProviderLister,
+		CloudProviderWriter: r.CloudProviderWriter,
+		NodeLister:          r.NodeLister,
+		NodeWriter:          r.NodeWriter,
+		ConfigmapLister:     r.ConfigmapLister,
+		ConfigmapWriter:     r.ConfigmapWriter,
+	}
+}
+
+func (r *CloudProviderReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
+	c, err := controller.NewUnmanaged("cloud-provider", controller.Options{
 		MaxConcurrentReconciles: 1, // must run serialize
 		Reconciler:              r,
-		Log:                     mgr.GetLogger().WithName("cloudprovider-controller"),
+		Log:                     mgr.GetLogger().WithName("cloudprovider-kubeadm-controller"),
 		RecoverPanic:            true,
 	})
 	if err != nil {
@@ -90,13 +99,14 @@ func (r *Reconciler) SetupWithManager(mgr manager.Manager, cache informers.Infor
 	return nil
 }
 
-func (r *Reconciler) findObjectsForCloudProvider(objProvider client.Object) []reconcile.Request {
+func (r *CloudProviderReconciler) findObjectsForCloudProvider(objProvider client.Object) []reconcile.Request {
 	provider, err := r.CloudProviderLister.Get(objProvider.GetName())
 	if err != nil {
 		return []reconcile.Request{}
 	}
-	// NOTE: per controller just watch one kind of provider
-	if provider.Type != "mock" {
+
+	_, err = clustermanage.GetProvider(clustermanage.Operator{}, *provider)
+	if err != nil {
 		return []reconcile.Request{}
 	}
 	return []reconcile.Request{
@@ -106,9 +116,9 @@ func (r *Reconciler) findObjectsForCloudProvider(objProvider client.Object) []re
 	}
 }
 
-func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *CloudProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.FromContext(ctx)
-	defer utils.Trace(log, "mock provider reconcile")
+	defer utils.Trace(log, "cloud provider reconcile")
 
 	provider, err := r.CloudProviderLister.Get(req.Name)
 	if err != nil {
@@ -117,12 +127,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		log.Error("failed to get cloud provider", zap.Error(err))
+		logger.Error("failed to get cloud provider", zap.Error(err))
 		return ctrl.Result{}, err
 	}
 
-	mockProvider := mock.NewProvider(provider)
-
+	cp, err := clustermanage.GetProvider(r.toOperator(), *provider)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	if provider.ObjectMeta.DeletionTimestamp.IsZero() {
 		if GetCondition(provider.Status, v1.CloudProviderProgressing) == nil {
 			condition := NewCondition(v1.CloudProviderProgressing, v1.ConditionTrue, v1.CloudProviderCreated, "provider created success")
@@ -162,7 +174,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			}
 
 			// when cloudProvider deleted,we need delete this provider's clusters from kc,and clean kc-agent on all nodes.
-			if err = mockProvider.Cleanup(ctx); err != nil {
+			if err = cp.Cleanup(ctx); err != nil {
 				condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderRemoveFailed, convert(err))
 				log.Error("failed to cleanup", zap.Error(err))
 				newProvider := provider.DeepCopy()
@@ -188,9 +200,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 		return ctrl.Result{}, nil
 	}
-
 	// 	if provider created or updated,we need sync data.
-	if err = mockProvider.Sync(ctx); err != nil {
+	if err = cp.Sync(ctx); err != nil {
 		log.Error("failed to sync", zap.Error(err))
 		newProvider := provider.DeepCopy()
 		condition := NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncFailed, convert(err))
@@ -214,64 +225,4 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		}
 	}
 	return ctrl.Result{RequeueAfter: cloudProviderInterval}, nil
-}
-
-// convert err to a human-readable msg
-func convert(err error) string {
-	return err.Error()
-}
-
-// NewCondition creates a new deployment condition.
-func NewCondition(condType v1.CloudProviderConditionType, status v1.ConditionStatus, reason, message string) *v1.CloudProviderCondition {
-	return &v1.CloudProviderCondition{
-		Type:               condType,
-		Status:             status,
-		LastUpdateTime:     metav1.Now(),
-		LastTransitionTime: metav1.Now(),
-		Reason:             reason,
-		Message:            message,
-	}
-}
-
-// GetCondition returns the condition with the provided type.
-func GetCondition(status v1.CloudProviderStatus, condType v1.CloudProviderConditionType) *v1.CloudProviderCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
-		if c.Type == condType {
-			return &c
-		}
-	}
-	return nil
-}
-
-// SetCondition updates the deployment to include the provided condition. If the condition that
-// we are about to add already exists and has the same status and reason then we are not going to update.
-func SetCondition(status *v1.CloudProviderStatus, condition v1.CloudProviderCondition) {
-	currentCond := GetCondition(*status, condition.Type)
-	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason && currentCond.Message == condition.Message {
-		return
-	}
-	// Do not update lastTransitionTime if the status of the condition doesn't change.
-	if currentCond != nil && currentCond.Status == condition.Status {
-		condition.LastTransitionTime = currentCond.LastTransitionTime
-	}
-	newConditions := filterOutCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
-}
-
-// RemoveCondition removes the deployment condition with the provided type.
-func RemoveCondition(status *v1.CloudProviderStatus, condType v1.CloudProviderConditionType) {
-	status.Conditions = filterOutCondition(status.Conditions, condType)
-}
-
-// filterOutCondition returns a new slice of deployment conditions without conditions with the provided type.
-func filterOutCondition(conditions []v1.CloudProviderCondition, condType v1.CloudProviderConditionType) []v1.CloudProviderCondition {
-	var newConditions []v1.CloudProviderCondition
-	for _, c := range conditions {
-		if c.Type == condType {
-			continue
-		}
-		newConditions = append(newConditions, c)
-	}
-	return newConditions
 }

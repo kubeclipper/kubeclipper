@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 
@@ -104,9 +105,22 @@ func (p *PatchNodes) makeWorkerCompare(cluster *corev1.Cluster) error {
 
 // Must be called after MakeCompare.
 func (p *PatchNodes) MakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
+	pType, ok := cluster.Labels[common.LabelClusterProviderType]
+	if ok {
+		switch pType {
+		case kubeadm.ProviderKubeadm:
+			return p.doMakeOperation(extra, cluster)
+		default:
+			return nil, errors.New("invalid provider type")
+		}
+	}
+	return p.doMakeOperation(extra, cluster)
+}
+
+func (p *PatchNodes) doMakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
 	switch p.Role {
 	case common.NodeRoleMaster:
-		return p.makeMasterOperation(extra, cluster)
+		return nil, fmt.Errorf("no support add or remove master node opertion")
 	case common.NodeRoleWorker:
 		return p.makeWorkerOperation(extra, cluster)
 	default:

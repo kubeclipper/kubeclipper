@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -539,8 +538,8 @@ func GetKubeConfig(ctx context.Context, name string, node component.Node, delive
 	if err != nil {
 		return "", err
 	}
-	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.IPv4)
 
+	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.IPv4)
 	config, err := clientcmd.Write(kubeConfig)
 	if err != nil {
 		return "", err
@@ -768,20 +767,6 @@ func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNo
 	}
 
 	// iptables mode
-	rawCmds := []string{
-		"iptables -F",
-		"iptables -t nat -F",
-		"iptables -t mangle -F",
-		"iptables -X",
-		// append command line here
-	}
-	cmds := make([]v1.Command, len(rawCmds))
-	for i, cmd := range rawCmds {
-		cmds[i] = v1.Command{
-			Type:         v1.CommandShell,
-			ShellCommand: strings.Split(cmd, " "),
-		}
-	}
 	return []v1.Step{
 		{
 			ID:         strutil.GetUUID(),
@@ -789,8 +774,14 @@ func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNo
 			Timeout:    metav1.Duration{Duration: 10 * time.Second},
 			ErrIgnore:  true,
 			RetryTimes: 1,
+			Nodes:      nodes,
 			Action:     v1.ActionUninstall,
-			Commands:   cmds,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", "iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X"},
+				},
+			},
 		},
 	}, nil
 }
@@ -1092,7 +1083,7 @@ func CleanCNI(c *v1.CNI, nodes []v1.StepNode) ([]v1.Step, error) {
 		return ClearCalico(c.Calico, nodes), nil
 	}
 
-	return nil, fmt.Errorf("dose not support cni type: %s", c.Type)
+	return nil, nil
 }
 
 func ClearCalico(calico *v1.Calico, nodes []v1.StepNode) []v1.Step {

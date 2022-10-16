@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
@@ -157,10 +159,19 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error 
 		return err
 	}
 	var certifications []v1.Certification
-	// get certifications from kc
-	certifications, err = s.getCertificationFromKC(clu)
+
+	// get certifications from provider
+	certifications, err = s.getCertificationFromProvider(clu)
 	if err != nil {
 		return err
+	}
+
+	if len(certifications) == 0 {
+		// get certifications from kc
+		certifications, err = s.getCertificationFromKC(clu)
+		if err != nil {
+			return err
+		}
 	}
 
 	clu.Status.Certifications = certifications
@@ -168,6 +179,19 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error 
 		s.log.Warn("update cluster certification status failed", zap.String("cluster", clu.Name), zap.Error(err))
 	}
 	return nil
+}
+
+func (s *ClusterStatusMon) getCertificationFromProvider(clu *v1.Cluster) ([]v1.Certification, error) {
+	providerName := clu.Labels[common.LabelClusterProviderName]
+	provider, err := s.CloudProviderLister.Get(providerName)
+	if err != nil {
+		return nil, err
+	}
+	cp, err := clustermanage.GetProvider(clustermanage.Operator{}, *provider)
+	if err != nil {
+		return nil, err
+	}
+	return cp.GetCertification(context.TODO(), clu.Name)
 }
 
 func (s *ClusterStatusMon) getCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {

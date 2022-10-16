@@ -25,7 +25,6 @@ import (
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
-	apiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -382,7 +381,7 @@ func (cli *Client) CreateRecovery(ctx context.Context, cluName string, recovery 
 	return r, err
 }
 
-func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCluster *apiv1.ClusterUpgrade) error {
+func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCluster *corev1.ClusterUpgrade) error {
 	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, cluName, "upgrade"), nil, upgradeCluster, nil)
 	defer ensureReaderClosed(resp)
 	return err

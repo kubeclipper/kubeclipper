@@ -30,60 +30,42 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/mock"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudpprovidercontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/models/core"
-
-	"github.com/robfig/cron/v3"
-
-	r "k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/client-go/tools/remotecommand"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
-
-	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller"
-	"github.com/kubeclipper/kubeclipper/pkg/oplog"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
-
-	"github.com/gorilla/websocket"
-	"k8s.io/apimachinery/pkg/util/json"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
-
-	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
-
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
-
-	"github.com/google/uuid"
-
-	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/emicklei/go-restful"
-	"go.uber.org/zap"
-
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/controller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/models/core"
+	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
+	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
+	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
+	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/json"
+	r "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 type handler struct {
@@ -266,6 +248,13 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
+		for _, node := range pn.Nodes {
+			_, err = MarkToOriginNode(ctx, h.clusterOperator, node.ID)
+			if err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+		}
 		c.Status.Phase = v1.ClusterUpdating
 		if c, err = h.clusterOperator.UpdateCluster(ctx, c); err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -547,6 +536,11 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	if clu.Annotations != nil && clu.Annotations[common.AnnotationActualName] != "" {
+		extraMeta.ClusterName = clu.Annotations[common.AnnotationActualName]
+	}
+
 	kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
@@ -3164,20 +3158,19 @@ func (h *handler) PreCheckCloudProvider(req *restful.Request, resp *restful.Resp
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
-	switch cp.Type {
-	case "mock":
-		provider := mock.NewProvider(cp)
-		check, err := provider.PreCheck(req.Request.Context())
-		if err != nil {
-			restplus.HandleBadRequest(resp, req, err)
-			return
-		}
-		if !check {
-			restplus.HandleBadRequest(resp, req, errors.New("preCheck failed"))
-			return
-		}
-	default:
-		restplus.HandleBadRequest(resp, req, errors.New("invalid provider type"))
+
+	provider, err := clustermanage.GetProvider(clustermanage.Operator{CloudProviderReader: h.clusterOperator}, *cp)
+	if err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	check, err := provider.PreCheck(req.Request.Context())
+	if err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	if !check {
+		restplus.HandleBadRequest(resp, req, errors.New("preCheck failed"))
 		return
 	}
 
@@ -3191,19 +3184,36 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	if err = h.providerValidate(cp); err != nil {
+	if err = h.providerValidate(req.Request.Context(), cp); err != nil {
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
+
+	provider, err := clustermanage.GetProvider(clustermanage.Operator{CloudProviderReader: h.clusterOperator}, *cp)
+	if err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+	check, err := provider.PreCheck(req.Request.Context())
+	if err != nil {
+		restplus.HandleBadRequest(resp, req, fmt.Errorf("preCheck connect failed: %v", err))
+		return
+	}
+	if !check {
+		restplus.HandleBadRequest(resp, req, errors.New("preCheck failed"))
+		return
+	}
+
 	cp, err = h.clusterOperator.CreateCloudProvider(req.Request.Context(), cp)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
+
 	_ = resp.WriteHeaderAndEntity(http.StatusCreated, cp)
 }
 
-func (h *handler) providerValidate(cp *v1.CloudProvider) error {
+func (h *handler) providerValidate(ctx context.Context, cp *v1.CloudProvider) error {
 	if cp.SSH.PrivateKey != "" && cp.SSH.Password != "" {
 		return errors.New("can't specify both password and privateKey")
 	}
@@ -3218,7 +3228,7 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	if err := h.providerValidate(cp); err != nil {
+	if err := h.providerValidate(req.Request.Context(), cp); err != nil {
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
@@ -3265,8 +3275,8 @@ func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response
 	}
 
 	if !dryRun {
-		conditionReady := cloudpprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "user triggered sync")
-		cloudpprovidercontroller.SetCondition(&cp.Status, *conditionReady)
+		conditionReady := cloudprovidercontroller.NewCondition(v1.CloudProviderReady, v1.ConditionFalse, v1.CloudProviderSyncing, "user triggered sync")
+		cloudprovidercontroller.SetCondition(&cp.Status, *conditionReady)
 		// update annotation to trigger sync
 		if cp.Annotations == nil {
 			cp.Annotations = make(map[string]string)
@@ -3284,7 +3294,7 @@ func (h *handler) SyncCloudProvider(req *restful.Request, resp *restful.Response
 func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Response) {
 	name := req.PathParameter("name")
 	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
-	provider, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
+	_, err := h.clusterOperator.GetCloudProviderEx(req.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(resp, req, err)
@@ -3294,11 +3304,6 @@ func (h *handler) DeleteCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 	if !dryRun {
-		_, err = h.clusterOperator.UpdateCloudProvider(req.Request.Context(), provider)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
 		err = h.clusterOperator.DeleteCloudProvider(req.Request.Context(), name)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)
