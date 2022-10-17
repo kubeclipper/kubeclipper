@@ -25,7 +25,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudpprovidercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
@@ -459,7 +459,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
-	if err = (&cloudpprovidercontroller.Reconciler{
+	if err = (&cloudprovidercontroller.CloudProviderReconciler{
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
 		ClusterWriter:       clusterOperator,
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),

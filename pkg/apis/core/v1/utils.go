@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 
@@ -385,4 +386,16 @@ func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) boo
 		}
 	}
 	return false
+}
+
+func MarkToOriginNode(ctx context.Context, operator cluster.Operator, kcNodeID string) (*v1.Node, error) {
+	node, err := operator.GetNode(ctx, kcNodeID)
+	if err != nil {
+		return nil, err
+	}
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
+	node.Annotations[common.AnnotationOriginNode] = "true"
+	return operator.UpdateNode(ctx, node)
 }

@@ -26,6 +26,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/cmd/kubeclipper-server/app"
 	_ "github.com/kubeclipper/kubeclipper/pkg/authentication/identityprovider/oidc"
+	_ "github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
 	_ "github.com/kubeclipper/kubeclipper/pkg/component/nfs"
 	_ "github.com/kubeclipper/kubeclipper/pkg/component/nfscsi"
 	_ "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
