@@ -183,8 +183,11 @@ func (d *DeployOptions) Complete() error {
 	if d.deployConfig.ServerIPs == nil && d.agents == nil {
 		d.aio = true
 		if d.deployConfig.Pkg == "" {
-			tag, _ := strutil.ParseGitDescribeInfo(version.Get().GitVersion)
-			d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, tag, runtime.GOARCH)
+			v := os.Getenv("KC_VERSION")
+			if v == "" {
+				v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
+			}
+			d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, v, runtime.GOARCH)
 		}
 		// set etcd port to avoid conflicts with k8s
 		d.deployConfig.EtcdConfig.ClientPort = allInOneEtcdClientPort
