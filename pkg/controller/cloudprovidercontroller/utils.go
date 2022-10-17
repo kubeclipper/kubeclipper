@@ -26,9 +26,6 @@ func convert(err error) string {
 	if strings.Contains(err.Error(), "ssh: handshake failed") {
 		return "ssh connect failed,please check your ssh user、password or privateKey"
 	}
-	if strings.Contains(err.Error(), `"status":"401","message":"must authenticate"`) {
-		return "call rancher api failed,please check your apiEndpoint、accessKey and secretKey"
-	}
 
 	return pkgerrors.Cause(err).Error()
 }

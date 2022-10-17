@@ -363,11 +363,11 @@ func (r Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region 
 		logger.Warnf("update deploy-config agent failed: %v", err)
 		return nil
 	}
-	// wget http://192.168.10.123:8081/kc/kubeclipper-agent
+	// download http://192.168.10.123:8081/kc/kubeclipper-agent
 	url := fmt.Sprintf("http://%s:%v/kc/kubeclipper-agent", deployConfig.ServerIPs[0], deployConfig.StaticServerPort)
 	cmdList := []string{
 		"systemctl stop kc-agent || true",
-		fmt.Sprintf("wget %s -O /usr/local/bin/kubeclipper-agent", url),
+		fmt.Sprintf("curl %s -o /usr/local/bin/kubeclipper-agent", url),
 		"chmod +x /usr/local/bin/kubeclipper-agent",
 	}
 

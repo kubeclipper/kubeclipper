@@ -285,7 +285,6 @@ func (r *ClusterReconciler) getKubeconfigFromProvider(c *v1.Cluster) (string, er
 
 	// get kubeconfig from provider
 	providerName := c.Labels[common.LabelClusterProviderName]
-	// get kubeconfig from rancher provider
 	provider, err := r.CloudProviderLister.Get(providerName)
 	if err != nil {
 		return "", err
