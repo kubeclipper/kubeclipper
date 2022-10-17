@@ -204,7 +204,11 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 	}
 
 	if len(nodes) == 0 {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("nodes is already in use"))
+		err = fmt.Errorf("nodes is already in use")
+		if pn.Operation == NodesOperationRemove {
+			err = fmt.Errorf("nodes is already removed")
+		}
+		restplus.HandleBadRequest(response, request, err)
 		return
 	}
 
