@@ -38,6 +38,13 @@ type SSH struct {
 	ConnectionTimeout *time.Duration `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 }
 
+func NewSSH() *SSH {
+	return &SSH{
+		User: "root",
+		Port: 22,
+	}
+}
+
 func (ss *SSH) NewClient(host string) (*ssh.Client, error) {
 	return ss.connect(host)
 }

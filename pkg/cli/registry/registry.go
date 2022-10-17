@@ -151,11 +151,9 @@ var (
 
 func NewRegistryOptions(streams options.IOStreams) *RegistryOptions {
 	return &RegistryOptions{
-		IOStreams:  streams,
-		PrintFlags: printer.NewPrintFlags(),
-		SSHConfig: &sshutils.SSH{
-			User: "root",
-		},
+		IOStreams:      streams,
+		PrintFlags:     printer.NewPrintFlags(),
+		SSHConfig:      sshutils.NewSSH(),
 		DataRoot:       "/var/lib/docker",
 		RegistryVolume: "/opt/registry",
 		RegistryPort:   5000,
