@@ -81,11 +81,9 @@ type UpgradeOptions struct {
 func NewUpgradeOptions(stream options.IOStreams) *UpgradeOptions {
 	return &UpgradeOptions{
 		BaseOptions: BaseOptions{
-			CliOpts: options.NewCliOptions(),
-			client:  nil,
-			SSHConfig: &sshutils.SSH{
-				User: "root",
-			},
+			CliOpts:      options.NewCliOptions(),
+			client:       nil,
+			SSHConfig:    sshutils.NewSSH(),
 			IOStreams:    stream,
 			deployConfig: options.NewDeployOptions(),
 		},
