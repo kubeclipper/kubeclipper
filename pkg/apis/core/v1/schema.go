@@ -120,18 +120,12 @@ func (p *PatchNodes) MakeOperation(extra component.ExtraMetadata, cluster *corev
 func (p *PatchNodes) doMakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
 	switch p.Role {
 	case common.NodeRoleMaster:
-		return nil, fmt.Errorf("no support add or remove master node opertion")
+		return nil, ErrInvalidNodesRole
 	case common.NodeRoleWorker:
 		return p.makeWorkerOperation(extra, cluster)
 	default:
 		return nil, ErrInvalidNodesRole
 	}
-}
-
-func (p *PatchNodes) makeMasterOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
-	// make operation for adding master nodes to cluster
-	// support later
-	return nil, ErrInvalidNodesRole
 }
 
 func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {

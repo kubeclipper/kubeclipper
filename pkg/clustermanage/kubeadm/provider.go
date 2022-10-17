@@ -163,7 +163,11 @@ func (r Kubeadm) Cleanup(ctx context.Context) error {
 		// origin node use deployConfig.ssh,others use provider.ssh
 		if _, isOriginNode := node.Annotations[common.AnnotationOriginNode]; isOriginNode {
 			delete(node.Labels, common.LabelNodeRole)
-			r.Operator.NodeWriter.UpdateNode(ctx, node)
+			_, err = r.Operator.NodeWriter.UpdateNode(ctx, node)
+			if err != nil {
+				log.Errorf("origin node(%s) update failed", node.Name)
+				return err
+			}
 			continue
 		}
 		if err = r.drainAgent(node.Status.Ipv4DefaultIP, node.Name, r.ssh()); err != nil {
