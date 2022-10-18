@@ -72,6 +72,10 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		return
 	}
 	for _, clu := range clusters {
+		err = s.updateClusterCertification(clu.Name)
+		if err != nil {
+			s.log.Error("update cluster certification failed", zap.Error(err))
+		}
 		cc, exist := s.mgr.GetClusterClientSet(clu.Name)
 		if !exist {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
@@ -88,10 +92,6 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentHealthy)
 		} else {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentUnhealthy)
-		}
-		err = s.updateClusterCertification(clu.Name)
-		if err != nil {
-			s.log.Error("update cluster certification failed", zap.Error(err))
 		}
 		for _, com := range clu.Addons {
 			comp, ok := component.Load(fmt.Sprintf(component.RegisterFormat, com.Name, com.Version))
@@ -168,7 +168,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error 
 
 	if len(certifications) == 0 {
 		// get certifications from kc
-		certifications, err = s.getCertificationFromKC(clu)
+		certifications, err = s.GetCertificationFromKC(clu)
 		if err != nil {
 			return err
 		}
@@ -194,7 +194,7 @@ func (s *ClusterStatusMon) getCertificationFromProvider(clu *v1.Cluster) ([]v1.C
 	return cp.GetCertification(context.TODO(), clu.Name)
 }
 
-func (s *ClusterStatusMon) getCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {
+func (s *ClusterStatusMon) GetCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {
 	var cmd []string
 	if clu.KubernetesVersion[1:] < k8s.KubeCertsCluVersion {
 		cmd = []string{"kubeadm", "alpha", "certs", "check-expiration"}
