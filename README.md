@@ -119,10 +119,10 @@ You can download the latest version of kcctl directly with the following command
 
 ```bash
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | bash -
-# In China, you can add cn env, we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
+# In China, you can add env "KC_REGION=cn", we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn bash -
-# The latest version is downloaded by default. You can download the specified version
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | VERSION=v1.2.0 bash -
+# The latest version is downloaded by default. You can download the specified version, for example: v1.2.1
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn VERSION=v1.2.1 bash -
 ```
 
 > You can also download the specified version on the [GitHub Release Page ](https://github.com/kubeclipper-labs/kubeclipper/releases).
