@@ -115,8 +115,8 @@ KubeClipper 提供了命令行工具🔧 kcctl 以简化运维工作，您可以
 # curl -sfL https://oss.kubeclipper.io/kcctl.sh | bash -
 # 如果你在中国，你指定环境变量 KC_REGION=cn, 此时我们会使用 registry.aliyuncs.com/google_containers 代替 k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn bash -
-# 默认会下载最新版本，你可以通过指定 VERSION 环境变量指定所需版本，比如 v1.2.1
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn VERSION=v1.2.1 bash -
+# 默认会下载最新版本，你可以通过指定 KC_VERSION 环境变量指定所需版本，比如 v1.2.1
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn KC_VERSION=v1.2.1 bash -
 ```
 
 > 您也可以在 [GitHub Release Page](https://github.com/kubeclipper-labs/kubeclipper/releases) 下载指定版本。

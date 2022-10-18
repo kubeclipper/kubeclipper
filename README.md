@@ -122,7 +122,7 @@ curl -sfL https://oss.kubeclipper.io/kcctl.sh | bash -
 # In China, you can add env "KC_REGION=cn", we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn bash -
 # The latest version is downloaded by default. You can download the specified version, for example: v1.2.1
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn VERSION=v1.2.1 bash -
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn KC_VERSION=v1.2.1 bash -
 ```
 
 > You can also download the specified version on the [GitHub Release Page ](https://github.com/kubeclipper-labs/kubeclipper/releases).
