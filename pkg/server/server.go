@@ -281,8 +281,13 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		auth.NewOauthAuthenticator(iamOperator, s.Config.AuthenticationOptions), auth.NewMFAAuthenticator(iamOperator, s.cache, s.Config.AuthenticationOptions.MFAOptions)); err != nil {
 		return err
 	}
-
-	ctrl, err := manager.NewControllerManager(s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, s.SetupController)
+	addr := ""
+	if s.Config.GenericServerRunOptions.SecurePort != 0 {
+		addr = fmt.Sprintf("https://%s:%d", s.Config.GenericServerRunOptions.BindAddress, s.Config.GenericServerRunOptions.SecurePort)
+	} else {
+		addr = fmt.Sprintf("http://%s:%d", s.Config.GenericServerRunOptions.BindAddress, s.Config.GenericServerRunOptions.InsecurePort)
+	}
+	ctrl, err := manager.NewControllerManager(addr, s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, s.SetupController)
 	if err != nil {
 		return err
 	}
