@@ -76,6 +76,7 @@ type CreateClusterOptions struct {
 	CRIVersion    string
 	K8sVersion    string
 	CNI           string
+	CNIVersion    string
 	Name          string
 	createdByIP   bool
 }
@@ -126,6 +127,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.CRIVersion, "cri-version", o.CRIVersion, "k8s cri version")
 	cmd.Flags().StringVar(&o.K8sVersion, "k8s-version", o.K8sVersion, "k8s version")
 	cmd.Flags().StringVar(&o.CNI, "cni", o.CNI, "k8s cni type, calico or others")
+	cmd.Flags().StringVar(&o.CNIVersion, "cni-version", o.CNIVersion, "k8s cni version")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -146,6 +148,9 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("cri-version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listCRI(toComplete), cobra.ShellCompDirectiveNoFileComp
+	}))
+	utils.CheckErr(cmd.RegisterFlagCompletionFunc("cni-version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return o.listCNI(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("k8s-version", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listK8s(toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -176,6 +181,14 @@ func (l *CreateClusterOptions) PreRun() error {
 		}
 		l.CRIVersion = cri[0]
 		logger.Infof("use default %s version %s", l.CRI, l.CRIVersion)
+	}
+	if l.CNIVersion == "" {
+		cni := l.listCNI("")
+		if len(cni) == 0 {
+			return errors.New("no valid cni-version")
+		}
+		l.CNIVersion = cni[0]
+		logger.Infof("use default %s version %s", l.CNI, l.CNIVersion)
 	}
 	if l.K8sVersion == "" {
 		k8s := l.listK8s("")
@@ -208,6 +221,10 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	criVersions := l.listCRI("")
 	if !sliceutil.HasString(criVersions, l.CRIVersion) {
 		return utils.UsageErrorf(cmd, "unsupported cri version,support %v now", criVersions)
+	}
+	cniVersions := l.listCNI("")
+	if !sliceutil.HasString(cniVersions, l.CNIVersion) {
+		return utils.UsageErrorf(cmd, "unsupported cni version,support %v now", cniVersions)
 	}
 
 	nodes := make([]string, 0)
@@ -314,7 +331,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		CNI: v1.CNI{
 			LocalRegistry: l.LocalRegistry,
 			Type:          l.CNI,
-			Version:       "v3.21.2",
+			Version:       l.CNIVersion,
 			Calico: &v1.Calico{
 				IPv4AutoDetection: "first-found",
 				IPv6AutoDetection: "first-found",
@@ -390,6 +407,16 @@ func (l *CreateClusterOptions) listCRI(toComplete string) []string {
 		return nil
 	}
 	return l.componentVersions(l.CRI, toComplete)
+}
+
+func (l *CreateClusterOptions) listCNI(toComplete string) []string {
+	utils.CheckErr(l.Complete(l.CliOpts))
+
+	if !allowedCNI.Has(l.CNI) {
+		logger.V(2).Infof("unsupported cni %s,support %s now", l.CNI, allowedCNI)
+		return nil
+	}
+	return l.componentVersions(l.CNI, toComplete)
 }
 
 func (l *CreateClusterOptions) listK8s(toComplete string) []string {
