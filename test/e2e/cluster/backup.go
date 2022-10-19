@@ -103,9 +103,6 @@ func initBackUpPoint() *corev1.BackupPoint {
 
 func initClusterWithBackupPoint(clusterName string, nodeID []string) *corev1.Cluster {
 	return &corev1.Cluster{
-		Provider: corev1.ProviderSpec{
-			Name: corev1.ClusterKubeadm,
-		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
 			APIVersion: corev1.SchemeGroupVersion.String(),

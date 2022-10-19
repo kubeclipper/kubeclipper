@@ -135,9 +135,6 @@ func (c *Cluster) Offline() bool {
 }
 
 func (c *Cluster) Complete() {
-	if c.Provider.Name == "" {
-		c.Provider.Name = ClusterKubeadm
-	}
 	if c.Networking.ProxyMode == "" {
 		c.Networking.ProxyMode = "ipvs"
 	}
