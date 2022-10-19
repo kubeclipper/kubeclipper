@@ -19,6 +19,7 @@
 package sshutils
 
 import (
+	"crypto/x509"
 	"fmt"
 	"os"
 	"strings"
@@ -57,12 +58,21 @@ func (ss *SSH) connect(host string) (*ssh.Client, error) {
 	if ss.PkFile != "" {
 		pkData, err = os.ReadFile(ss.PkFile)
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, fmt.Errorf("privatekey %s not exists", ss.PkFile)
+			}
 			return nil, errors.WithMessage(err, "read private key")
 		}
 		ss.PrivateKey = string(pkData)
 	}
 	auth, err := ss.sshAuthMethod(ss.Password, ss.PrivateKey, ss.PkPassword)
 	if err != nil {
+		if strings.Contains(err.Error(), "ssh: no key found") {
+			return nil, fmt.Errorf("privatekey %s invalid", ss.PkFile)
+		}
+		if err == x509.IncorrectPasswordError {
+			return nil, fmt.Errorf("privatekey %s password incorrect", ss.PkFile)
+		}
 		return nil, errors.WithMessage(err, "get auth method")
 	}
 	config := ssh.Config{
@@ -82,7 +92,14 @@ func (ss *SSH) connect(host string) (*ssh.Client, error) {
 	}
 
 	addr := ss.addrReformat(host)
-	return ssh.Dial("tcp", addr, clientConfig)
+	client, err := ssh.Dial("tcp", addr, clientConfig)
+	if err != nil {
+		if strings.Contains(err.Error(), "ssh: handshake failed: ssh: unable to authenticate") {
+			err = fmt.Errorf("ssh to %s@%s failed,please check user、password or privatekey", ss.User, host)
+		}
+		return nil, err
+	}
+	return client, nil
 }
 
 func (ss *SSH) addrReformat(host string) string {
