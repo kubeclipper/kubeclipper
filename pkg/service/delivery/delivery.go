@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/controller"
+
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -331,6 +333,13 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 	case v1.OperationUpdateCertification:
 		if op.Status.Status == v1.OperationStatusSuccessful {
 			clu.Status.Phase = v1.ClusterRunning
+			var err error
+			clu.Status.Certifications, err = (&controller.ClusterStatusMon{
+				CmdDelivery: s,
+			}).GetCertificationFromKC(clu)
+			if err != nil {
+				logger.Errorf("update expiration error after update certs: %s", err.Error())
+			}
 		} else {
 			clu.Status.Phase = v1.ClusterUpdateFailed
 		}

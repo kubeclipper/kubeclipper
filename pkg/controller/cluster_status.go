@@ -25,9 +25,10 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 
@@ -77,6 +78,10 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
 			continue
 		}
+		err = s.updateClusterCertification(clu.Name)
+		if err != nil {
+			s.log.Error("update cluster certification failed", zap.Error(err))
+		}
 		clientset := cc.Kubernetes()
 		content, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz").Timeout(3 * time.Second).DoRaw(context.TODO())
 		if err != nil {
@@ -88,10 +93,6 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentHealthy)
 		} else {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentUnhealthy)
-		}
-		err = s.updateClusterCertification(clu.Name)
-		if err != nil {
-			s.log.Error("update cluster certification failed", zap.Error(err))
 		}
 		for _, com := range clu.Addons {
 			comp, ok := component.Load(fmt.Sprintf(component.RegisterFormat, com.Name, com.Version))
@@ -168,7 +169,7 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error 
 
 	if len(certifications) == 0 {
 		// get certifications from kc
-		certifications, err = s.getCertificationFromKC(clu)
+		certifications, err = s.GetCertificationFromKC(clu)
 		if err != nil {
 			return err
 		}
@@ -194,7 +195,7 @@ func (s *ClusterStatusMon) getCertificationFromProvider(clu *v1.Cluster) ([]v1.C
 	return cp.GetCertification(context.TODO(), clu.Name)
 }
 
-func (s *ClusterStatusMon) getCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {
+func (s *ClusterStatusMon) GetCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {
 	var cmd []string
 	if clu.KubernetesVersion[1:] < k8s.KubeCertsCluVersion {
 		cmd = []string{"kubeadm", "alpha", "certs", "check-expiration"}
