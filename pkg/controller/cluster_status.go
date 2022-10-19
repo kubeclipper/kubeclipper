@@ -25,9 +25,10 @@ import (
 	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 
@@ -72,14 +73,14 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		return
 	}
 	for _, clu := range clusters {
-		err = s.updateClusterCertification(clu.Name)
-		if err != nil {
-			s.log.Error("update cluster certification failed", zap.Error(err))
-		}
 		cc, exist := s.mgr.GetClusterClientSet(clu.Name)
 		if !exist {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
 			continue
+		}
+		err = s.updateClusterCertification(clu.Name)
+		if err != nil {
+			s.log.Error("update cluster certification failed", zap.Error(err))
 		}
 		clientset := cc.Kubernetes()
 		content, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz").Timeout(3 * time.Second).DoRaw(context.TODO())
