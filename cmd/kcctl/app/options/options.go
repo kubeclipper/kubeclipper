@@ -185,12 +185,29 @@ func (a Agents) ListIP() []string {
 	}
 	return list
 }
+
 func (a Agents) Exists(ip string) bool {
 	_, ok := a[ip]
 	return ok
 }
-func (a Agents) Delete(ip string) {
+
+func (a Agents) ExistsByID(id string) bool {
+	return a.idToIP(id) != ""
+}
+
+func (a Agents) Delete(id string) {
+	ip := a.idToIP(id)
 	delete(a, ip)
+}
+
+func (a Agents) idToIP(id string) string {
+	var ip string
+	for k, v := range a {
+		if v.AgentID == id {
+			ip = k
+		}
+	}
+	return ip
 }
 
 func (a Agents) Add(ip string, metadata Metadata) {
@@ -199,6 +216,7 @@ func (a Agents) Add(ip string, metadata Metadata) {
 
 // Metadata user custom node info,region will use by filter,use label,others use annotation.
 type Metadata struct {
+	AgentID string `json:"agentID" yaml:"agentID,omitempty"`
 	Region  string `json:"region" yaml:"region,omitempty"`
 	FloatIP string `json:"floatIP" yaml:"floatIP,omitempty"`
 
@@ -369,12 +387,11 @@ func (c *DeployConfig) Write() error {
 	if c.Config == "" {
 		path = DefaultDeployConfigPath
 	}
-
 	b, err := yaml.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("dump config failed due to %s", err.Error())
 	}
-	if err := utils.WriteToFile(path, b); err != nil {
+	if err = utils.WriteToFile(path, b); err != nil {
 		return fmt.Errorf("dump config to %s failed due to %s", path, err.Error())
 	}
 	return nil
@@ -495,7 +512,7 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	return buffer.String(), nil
 }
 
-func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata, agentID string) (string, error) {
+func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) (string, error) {
 	tmpl, err := template.New("text").Parse(config.KcAgentConfigTmpl)
 	if err != nil {
 		return "", fmt.Errorf("template parse failed: %s", err.Error())
@@ -506,7 +523,7 @@ func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata, agentI
 	}
 
 	var data = make(map[string]interface{})
-	data["AgentID"] = agentID
+	data["AgentID"] = metadata.AgentID
 	data["Region"] = metadata.Region
 	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = c.IPDetect

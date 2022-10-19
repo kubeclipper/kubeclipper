@@ -406,7 +406,7 @@ func (r Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region 
 	}
 
 	// 2. generate kubeclipper-agent.yaml、systemd conf,then start kc-agent
-	agentConfig, err := deployConfig.GetKcAgentConfigTemplateContent(options.Metadata{Region: region}, node.ID)
+	agentConfig, err := deployConfig.GetKcAgentConfigTemplateContent(options.Metadata{Region: region, AgentID: node.ID})
 	if err != nil {
 		return errors.WithMessage(err, "GetKcAgentConfigTemplateContent")
 	}
@@ -461,7 +461,7 @@ func (r Kubeadm) drainAgent(nodeIP, agentID string, ssh *sshutils.SSH) error {
 		return errors.WithMessage(err, "getDeployConfig")
 	}
 
-	if !deployConfig.Agents.Exists(nodeIP) {
+	if deployConfig.Agents.ExistsByID(nodeIP) {
 		err = r.updateDeployConfigAgents(nodeIP, nil, "del")
 		if err != nil {
 			logger.Errorf("add agent ip to deploy config failed: %v", err)

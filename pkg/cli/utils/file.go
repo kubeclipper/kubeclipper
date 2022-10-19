@@ -20,6 +20,7 @@ package utils
 
 import (
 	"os"
+	"path/filepath"
 )
 
 func FileExist(path string) bool {
@@ -27,8 +28,12 @@ func FileExist(path string) bool {
 	return !os.IsNotExist(err)
 }
 
-func WriteToFile(filePath string, data []byte) error {
-	f, err := os.Create(filePath)
+func WriteToFile(path string, data []byte) error {
+	err := os.MkdirAll(filepath.Dir(path), 0777)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}

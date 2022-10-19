@@ -45,17 +45,17 @@ import (
 const (
 	longDescription = `
   Drain the Kubeclipper server or agent node from the cluster.
-
+ 
   Now only support drain kc-agent node, so the --agent parameter must be valid.`
 	drainExample = `
   # Drain kc-agent from kubeclipper cluster use default deploy-config(~/.kc/deploy-config.yaml) and config(~/.kc/config).
-  kcctl drain --agent 192.168.10.19
+  kcctl drain --agent d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa
 
   # Drain kc-agent from kubeclipper cluster specify deploy config and config.
-  kcctl drain --agent 192.168.10.19 --deploy-config /root/.kc/deploy-config.yaml --config /root/.kc/config
+  kcctl drain --agent d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa --deploy-config /root/.kc/deploy-config.yaml --config /root/.kc/config
 
   # Force drain kc-agent which is in used from kubeclipper cluster
-  kcctl drain  --force --agent=192.168.10.123
+  kcctl drain  --force --agent=d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa
 
   Please read 'kcctl drain -h' get more drain flags.`
 )
@@ -81,7 +81,7 @@ func NewDrainOptions(streams options.IOStreams) *DrainOptions {
 func NewCmdDrain(streams options.IOStreams) *cobra.Command {
 	o := NewDrainOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "drain (--agent <agentIps>) [flags]",
+		Use:                   "drain (--agent <agentIDs>) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "Drain kubeclipper agent node",
 		Long:                  longDescription,
@@ -97,7 +97,7 @@ func NewCmdDrain(streams options.IOStreams) *cobra.Command {
 	}
 
 	o.cliOpts.AddFlags(cmd.Flags())
-	cmd.Flags().StringSliceVar(&o.agents, "agent", o.agents, "drain agent node ip.")
+	cmd.Flags().StringSliceVar(&o.agents, "agent", o.agents, "drain agent node ID.")
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	cmd.Flags().BoolVarP(&o.force, "force", "F", o.force, "force delete in used node.")
 
@@ -160,14 +160,24 @@ func (c *DrainOptions) ValidateArgs() error {
 	if len(c.agents) == 0 {
 		return errors.New("--agent is required")
 	}
+
+	for _, agent := range c.agents {
+		if !isAgentID(agent) {
+			return fmt.Errorf("--agent need a node id, %s is invalid", agent)
+		}
+	}
 	return nil
+}
+
+func isAgentID(id string) bool {
+	return len(id) == 36
 }
 
 func (c *DrainOptions) preCheck() bool {
 	c.agents = sets.NewString(c.agents...).List()
 
 	for _, agent := range c.agents {
-		if !c.deployConfig.Agents.Exists(agent) {
+		if !c.deployConfig.Agents.ExistsByID(agent) {
 			logger.Errorf("agent %s is not in agent nodes", agent)
 			return false
 		}
@@ -211,24 +221,20 @@ func (c *DrainOptions) runDrainAgentNode() error {
 	return nil
 }
 
-func (c *DrainOptions) checkAgentNode(ip string) (*v1.Node, error) {
-	q := query.New()
-	nodeList, err := c.client.ListNodes(context.TODO(), kc.Queries(*q))
+func (c *DrainOptions) checkAgentNode(id string) (*v1.Node, error) {
+	nodeList, err := c.client.DescribeNode(context.TODO(), id)
 	if err != nil {
 		return nil, err
 	}
-	for _, node := range nodeList.Items {
-		// check the node already exists in database
-		if node.Status.Ipv4DefaultIP == ip {
-			// check the node already is used
-			if _, ok := node.Labels[common.LabelNodeRole]; !ok || c.force {
-				return &node, nil
-			}
-			return nil, fmt.Errorf("the node could not be draind. reason: %s is used by the cluster", ip)
-		}
+	if len(nodeList.Items) == 0 {
+		return nil, fmt.Errorf("the node could not be draind. reason: %s does not exist", id)
 	}
-
-	return nil, fmt.Errorf("the node could not be draind. reason: %s does not exist", ip)
+	node := nodeList.Items[0]
+	clusterName, ok := node.Labels[common.LabelClusterName]
+	if !ok || c.force {
+		return &node, nil
+	}
+	return nil, fmt.Errorf("the node could not be draind. reason: %s is used by the cluster %s", id, clusterName)
 }
 
 func (c *DrainOptions) agentFilesAndData(node *v1.Node) error {
@@ -252,7 +258,7 @@ func (c *DrainOptions) agentFilesAndData(node *v1.Node) error {
 	}
 
 	// 	3.rewrite deploy config
-	c.deployConfig.Agents.Delete(node.Status.Ipv4DefaultIP)
+	c.deployConfig.Agents.Delete(node.Name)
 	err = c.deployConfig.Write()
 	if err != nil {
 		return errors.WithMessage(err, "rewrite deploy config")
