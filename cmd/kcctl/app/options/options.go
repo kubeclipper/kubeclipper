@@ -144,6 +144,9 @@ func (c *CliOptions) ToRawConfig() config.Config {
 func (c *CliOptions) Complete() error {
 	var err error
 	c.cfg, err = config.TryLoadFromFile(c.Config)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("auth config %s not exist,please use kcctl login cmd to login first", c.Config)
+	}
 	return err
 }
 
