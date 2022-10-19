@@ -91,9 +91,9 @@ func IsInformerRawQuery(req *http.Request) bool {
 	return false
 }
 
-func InternalRestConfig(username, token string) *rest.Config {
+func InternalRestConfig(address, username, token string) *rest.Config {
 	return &rest.Config{
-		Host:                "http://localhost:8080",
+		Host:                address,
 		APIPath:             "",
 		ContentConfig:       rest.ContentConfig{},
 		Username:            username,
