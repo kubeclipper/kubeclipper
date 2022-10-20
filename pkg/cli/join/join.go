@@ -192,7 +192,10 @@ func (c *JoinOptions) RunJoinNode() error {
 
 func (c *JoinOptions) runJoinAgentNode() error {
 	var err error
-	for ip, metadata := range c.parseAgent {
+	for ip := range c.parseAgent {
+		metadata := c.parseAgent[ip]
+		metadata.AgentID = uuid.New().String()
+		c.parseAgent[ip] = metadata
 		if err = c.agentNodeFiles(ip, metadata); err != nil {
 			return err
 		}
@@ -295,7 +298,7 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata)
 	data["Region"] = metadata.Region
 	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = c.deployConfig.IPDetect
-	data["AgentID"] = uuid.New().String()
+	data["AgentID"] = metadata.AgentID
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.StaticServerPort)
 	if c.deployConfig.Debug {
 		data["LogLevel"] = "debug"

@@ -56,8 +56,6 @@ import (
 	"github.com/sethvargo/go-password/password"
 	"gopkg.in/yaml.v2"
 
-	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
-
 	"github.com/kubeclipper/kubeclipper/pkg/cli/join"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/sudo"
@@ -440,6 +438,8 @@ func (d *DeployOptions) RunDeploy() error {
 	d.deployKcConsole()
 	logger.Infof("------ Delete intermediate files ------")
 	d.removeTempFile()
+	logger.Infof("------ Dump configs ------")
+	d.dumpConfig()
 	logger.Infof("------ Upload configs ------")
 	d.uploadConfig()
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
@@ -697,9 +697,11 @@ func (d *DeployOptions) deployKcConsole() {
 }
 
 func (d *DeployOptions) deployKcAgent() {
-	for agent, metadata := range d.deployConfig.Agents {
-		agentID := uuid.New().String()
-		agentConfig, err := d.deployConfig.GetKcAgentConfigTemplateContent(metadata, agentID)
+	for agent := range d.deployConfig.Agents {
+		metadata := d.deployConfig.Agents[agent]
+		metadata.AgentID = uuid.New().String()
+		d.deployConfig.Agents[agent] = metadata
+		agentConfig, err := d.deployConfig.GetKcAgentConfigTemplateContent(metadata)
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -734,16 +736,8 @@ func (d *DeployOptions) removeTempFile() {
 }
 
 func (d *DeployOptions) dumpConfig() {
-	_, err := cmdutil.RunCmd(false, "mkdir", "-p", filepath.Dir(options.DefaultDeployConfigPath))
-	if err != nil {
-		logger.Fatalf("dump config failed due to %s", err.Error())
-	}
-	b, err := yaml.Marshal(d.deployConfig)
-	if err != nil {
-		logger.Fatalf("dump config failed due to %s", err.Error())
-	}
-	if err = utils.WriteToFile(options.DefaultDeployConfigPath, b); err != nil {
-		logger.Fatalf("dump config to %s failed due to %s", options.DefaultDeployConfigPath, err.Error())
+	if err := d.deployConfig.Write(); err != nil {
+		logger.Fatal(err)
 	}
 	logger.V(2).Infof("dump config to %s", options.DefaultDeployConfigPath)
 }
