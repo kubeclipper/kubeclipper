@@ -225,7 +225,8 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 		err        error
 	)
 
-	if c.Provider.Name != "" && c.Provider.Name != kubeadm.ProviderKubeadm {
+	provider, ok := c.Labels[common.LabelClusterProviderName]
+	if ok && provider != kubeadm.ProviderKubeadm {
 		kubeconfig, err = r.getKubeconfigFromProvider(c)
 		if err != nil {
 			log.Error("create cluster client config from provider failed", zap.String("cluster", c.Name), zap.Error(err))

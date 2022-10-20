@@ -35,7 +35,6 @@ type Cluster struct {
 	// Standard object's metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Provider          ProviderSpec `json:"provider,omitempty"`
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
 	LocalRegistry     string           `json:"localRegistry,omitempty" optional:"true"`
