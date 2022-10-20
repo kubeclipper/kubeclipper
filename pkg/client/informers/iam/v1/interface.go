@@ -26,6 +26,8 @@ import (
 
 type Interface interface {
 	Tokens() TokenInformer
+	Users() UserInformer
+	LoginRecords() LoginRecordInformer
 }
 
 type version struct {
@@ -41,6 +43,20 @@ func New(f internal.SharedInformerFactory, namespace string, tweakListOptions in
 
 func (v *version) Tokens() TokenInformer {
 	return &tokenInformer{
+		factory:          v.factory,
+		tweakListOptions: v.tweakListOptions,
+	}
+}
+
+func (v *version) Users() UserInformer {
+	return &userInformer{
+		factory:          v.factory,
+		tweakListOptions: v.tweakListOptions,
+	}
+}
+
+func (v *version) LoginRecords() LoginRecordInformer {
+	return &loginRecordInformer{
 		factory:          v.factory,
 		tweakListOptions: v.tweakListOptions,
 	}

@@ -29,3 +29,6 @@ type GlobalRoleBindingListerExpansion interface {
 
 type TokenListerExpansion interface {
 }
+
+type LoginRecordListerExpansion interface {
+}

@@ -25,6 +25,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/controller/loginrecordcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/usercontroller"
+
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 
@@ -461,6 +464,23 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	if err = (&tokencontroller.TokenReconciler{
 		TokenLister: informerFactory.Iam().V1().Tokens().Lister(),
 		TokenWriter: iamOperator,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
+	if err = (&usercontroller.UserReconciler{
+		UserLister:            informerFactory.Iam().V1().Users().Lister(),
+		UserWriter:            iamOperator,
+		LoginRecordLister:     informerFactory.Iam().V1().LoginRecords().Lister(),
+		AuthenticationOptions: s.Config.AuthenticationOptions,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
+	if err = (&loginrecordcontroller.LoginRecordReconciler{
+		UserLister:            informerFactory.Iam().V1().Users().Lister(),
+		UserWriter:            iamOperator,
+		LoginRecordLister:     informerFactory.Iam().V1().LoginRecords().Lister(),
+		LoginRecordWriter:     iamOperator,
+		AuthenticationOptions: s.Config.AuthenticationOptions,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}

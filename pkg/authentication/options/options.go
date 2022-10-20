@@ -32,6 +32,7 @@ import (
 type AuthenticationOptions struct {
 	AuthenticateRateLimiterMaxTries int            `json:"authenticateRateLimiterMaxTries" yaml:"authenticateRateLimiterMaxTries"`
 	AuthenticateRateLimiterDuration time.Duration  `json:"authenticateRateLimiterDuration" yaml:"authenticateRateLimiterDuration"`
+	AuthenticateRateLimiterEnable   bool           `json:"authenticateRateLimiterEnable" yaml:"authenticateRateLimiterEnable"`
 	MaximumClockSkew                time.Duration  `json:"maximumClockSkew" yaml:"maximumClockSkew"`
 	LoginHistoryRetentionPeriod     time.Duration  `json:"loginHistoryRetentionPeriod" yaml:"loginHistoryRetentionPeriod"`
 	LoginHistoryMaximumEntries      int            `json:"loginHistoryMaximumEntries" yaml:"loginHistoryMaximumEntries"`
@@ -45,6 +46,7 @@ func NewAuthenticateOptions() *AuthenticationOptions {
 	return &AuthenticationOptions{
 		AuthenticateRateLimiterMaxTries: 5,
 		AuthenticateRateLimiterDuration: time.Minute * 30,
+		AuthenticateRateLimiterEnable:   false,
 		MaximumClockSkew:                10 * time.Second,
 		LoginHistoryRetentionPeriod:     time.Hour * 24 * 7,
 		LoginHistoryMaximumEntries:      100,
@@ -79,6 +81,7 @@ func (a *AuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	a.MFAOptions.AddFlags(fs)
 	fs.IntVar(&a.AuthenticateRateLimiterMaxTries, "authenticate-rate-limiter-max-retries", a.AuthenticateRateLimiterMaxTries, "")
 	fs.DurationVar(&a.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", a.AuthenticateRateLimiterDuration, "")
+	fs.BoolVar(&a.AuthenticateRateLimiterEnable, "authenticate-rate-limiter-enable", a.AuthenticateRateLimiterEnable, "")
 	fs.BoolVar(&a.MultipleLogin, "multiple-login", a.MultipleLogin, "Allow multiple login with the same account, disable means only one user can login at the same time.")
 	fs.StringVar(&a.JwtSecret, "jwt-secret", a.JwtSecret, "Secret to sign jwt token, must not be empty.")
 	fs.DurationVar(&a.LoginHistoryRetentionPeriod, "login-history-retention-period", a.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")

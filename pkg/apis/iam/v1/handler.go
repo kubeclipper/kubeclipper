@@ -107,6 +107,23 @@ func (h *handler) watchToken(req *restful.Request, resp *restful.Response, q *qu
 	restplus.ServeWatch(watcher, iamv1.SchemeGroupVersion.WithKind("Token"), req, resp, timeout)
 }
 
+func (h *handler) watchLoginRecord(req *restful.Request, resp *restful.Response, q *query.Query) {
+	timeout := time.Duration(0)
+	if q.TimeoutSeconds != nil {
+		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 {
+		timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
+	}
+
+	watcher, err := h.iamOperator.WatchLoginRecords(req.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	restplus.ServeWatch(watcher, iamv1.SchemeGroupVersion.WithKind("LoginRecord"), req, resp, timeout)
+}
+
 func (h *handler) ListTokens(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
 	if q.Watch {
@@ -122,6 +139,29 @@ func (h *handler) ListTokens(request *restful.Request, response *restful.Respons
 		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 	} else {
 		result, err := h.iamOperator.ListTokenEx(context.TODO(), q)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
+	}
+}
+
+func (h *handler) ListLoginRecords(request *restful.Request, response *restful.Response) {
+	q := query.ParseQueryParameter(request)
+	if q.Watch {
+		h.watchLoginRecord(request, response, q)
+		return
+	}
+	if clientrest.IsInformerRawQuery(request.Request) {
+		result, err := h.iamOperator.ListLoginRecords(request.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
+	} else {
+		result, err := h.iamOperator.ListLoginRecordEx(context.TODO(), q)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return

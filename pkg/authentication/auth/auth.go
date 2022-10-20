@@ -73,8 +73,14 @@ func (p *passwordAuthenticator) Authenticate(username, password string) (authuse
 		}
 	}
 
+	// check user status
 	if user != nil && (user.Status.State == nil || *user.Status.State != v12.UserActive) {
-		return nil, "", ErrAccountIsNotActive
+		if user.Status.State != nil && *user.Status.State == v12.UserAuthLimitExceeded {
+			return nil, "", ErrRateLimitExceeded
+		} else {
+			// state not active
+			return nil, "", ErrAccountIsNotActive
+		}
 	}
 
 	if user != nil && user.Spec.EncryptedPassword != "" {

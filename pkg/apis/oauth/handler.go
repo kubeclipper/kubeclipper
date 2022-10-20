@@ -128,6 +128,7 @@ func (h *handler) passwordGrant(username string, password string, req *restful.R
 	authenticated, provider, err := h.passwordAuthenticator.Authenticate(username, password)
 	if err != nil {
 		formatErr := fmt.Errorf("incorrect username or password")
+		rateLimitErr := fmt.Errorf("the account has been locked because of excessive password errors. please try again after 30 minutes or contact the administrator to reset your password")
 		switch err {
 		case auth.ErrUserOrPasswordNotValid:
 			restplus.HandleUnauthorized(response, req, formatErr)
@@ -140,7 +141,7 @@ func (h *handler) passwordGrant(username string, password string, req *restful.R
 			restplus.HandleUnauthorized(response, req, formatErr)
 			return
 		case auth.ErrRateLimitExceeded:
-			restplus.HandleTooManyRequests(response, req, err)
+			restplus.HandleTooManyRequests(response, req, rateLimitErr)
 			return
 		case auth.ErrAccountIsNotActive:
 			restplus.HandleForbidden(response, req, err)

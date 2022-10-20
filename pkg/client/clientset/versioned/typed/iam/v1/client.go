@@ -33,6 +33,8 @@ var _ IamV1Interface = (*IamV1Client)(nil)
 type IamV1Interface interface {
 	RESTClient() rest.Interface
 	TokensGetter
+	UsersGetter
+	LoginRecordsGetter
 }
 
 type IamV1Client struct {
@@ -52,6 +54,14 @@ func (c *IamV1Client) RESTClient() rest.Interface {
 
 func (c *IamV1Client) Tokens() TokenInterface {
 	return newTokens(c)
+}
+
+func (c *IamV1Client) Users() UserInterface {
+	return newUsers(c)
+}
+
+func (c *IamV1Client) LoginRecords() LoginRecordInterface {
+	return newLoginRecords(c)
 }
 
 func NewForConfig(c *rest.Config) (*IamV1Client, error) {

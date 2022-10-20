@@ -143,6 +143,30 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, authz author
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
+	webservice.Route(webservice.GET("/loginrecords").
+		To(h.ListLoginRecords).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Doc("List loginrecords.").
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
+
 	webservice.Route(webservice.GET("/users/{name}").
 		To(h.DescribeUser).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
