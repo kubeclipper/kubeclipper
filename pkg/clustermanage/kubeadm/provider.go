@@ -118,6 +118,11 @@ func (r Kubeadm) Sync(ctx context.Context) error {
 		return err
 	}
 
+	err = r.patchCRI(clu)
+	if err != nil {
+		return err
+	}
+
 	err = r.importClusterToKC(ctx, clu)
 	if err != nil {
 		return err
@@ -289,6 +294,7 @@ func (r Kubeadm) syncNode(ctx context.Context, clu *v1.Cluster) error {
 	}
 
 	for _, no := range addNodes {
+		// This function will replace the IP of the node with the ID
 		err = r.deployKCAgent(ctx, no, clu.Labels[common.LabelTopologyRegion])
 		if err != nil {
 			return errors.WithMessagef(err, "node(%s) deploy kc-agent in kc", no.ID)
@@ -329,8 +335,10 @@ func (r Kubeadm) markToFree(ctx context.Context, node *v1.Node) error {
 	return err
 }
 
+// This function will replace the IP of the node with the ID
 func (r Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region string) error {
 	ip := node.ID
+	// This function will replace the IP of the node with the ID
 	node.ID = uuid.New().String()
 	log := logger.FromContext(ctx)
 	log.Debugf("beginning deploy kc agent to node agent:%s ip:%s", node.ID, ip)
@@ -683,6 +691,23 @@ func (r Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction
 		if err != nil && !strings.Contains(err.Error(), "not found") {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (r Kubeadm) patchCRI(clu *v1.Cluster) error {
+	switch clu.ContainerRuntime.Type {
+	// There is a known issue with k8s, where the node cri version information is incorrect when the cri type is docker
+	case v1.CRIDocker:
+		// The value of the field here is temporarily IP
+		res, err := sshutils.SSHCmdWithSudo(r.ssh(), clu.Masters[0].ID, `docker info | grep 'Server Version:'`)
+		if err != nil {
+			return err
+		}
+		clu.ContainerRuntime.Version = strings.ReplaceAll(res.Stdout, "Server Version:", "")
+		clu.ContainerRuntime.Version = strings.ReplaceAll(clu.ContainerRuntime.Version, " ", "")
+		clu.ContainerRuntime.Version = strings.ReplaceAll(clu.ContainerRuntime.Version, "\n", "")
 	}
 
 	return nil
