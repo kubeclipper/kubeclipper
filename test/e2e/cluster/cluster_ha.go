@@ -80,9 +80,6 @@ var _ = SIGDescribe("[Slow] [Serial] HA", func() {
 
 func initHACluster(clusterName string, nodeList corev1.WorkerNodeList) *corev1.Cluster {
 	return &corev1.Cluster{
-		Provider: corev1.ProviderSpec{
-			Name: corev1.ClusterKubeadm,
-		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
 			APIVersion: corev1.SchemeGroupVersion.String(),

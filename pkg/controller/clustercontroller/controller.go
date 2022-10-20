@@ -24,36 +24,28 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-
-	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
-
-	"github.com/kubeclipper/kubeclipper/pkg/service"
-
-	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
-
-	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
-	"github.com/kubeclipper/kubeclipper/pkg/query"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
-
+	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/handler"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/source"
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
 	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -233,12 +225,14 @@ func (r *ClusterReconciler) syncClusterClient(ctx context.Context, log logger.Lo
 		err        error
 	)
 
-	kubeconfig, err = r.getKubeconfigFromProvider(c)
-	if err != nil {
-		log.Error("create cluster client config from provider failed", zap.String("cluster", c.Name), zap.Error(err))
-		return err
-	}
-	if kubeconfig == "" {
+	provider, ok := c.Labels[common.LabelClusterProviderName]
+	if ok && provider != kubeadm.ProviderKubeadm {
+		kubeconfig, err = r.getKubeconfigFromProvider(c)
+		if err != nil {
+			log.Error("create cluster client config from provider failed", zap.String("cluster", c.Name), zap.Error(err))
+			return err
+		}
+	} else {
 		// get kubeconfig from kc
 		kubeconfig, err = r.getKubeConfig(ctx, c)
 		if err != nil {
