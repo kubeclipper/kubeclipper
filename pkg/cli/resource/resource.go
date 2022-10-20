@@ -19,11 +19,16 @@
 package resource
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme"
 
@@ -64,8 +69,7 @@ const (
 	listLongDescription = `
   List offline resource packs
 
-  You can list, push, or delete offline resource packs.
-  The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
+  You can list, push, or delete offline resource packs.`
 	resourceListExample = `
   # List offline resource
   kcctl resource list 
@@ -73,15 +77,11 @@ const (
   # List offline resource use specified output format
   kcctl resource list  --output 'YAML|TABLE|JSON'
 
-  # List offline resource use specified deploy file
-  kcctl resource list --deploy-config /root/.kc/deploy-config.yaml
-
   Please read 'kcctl resource list -h' get more resource list flags`
 	pushLongDescription = `
   Push offline resource packs
 
   You can push a .tar.gz file of the specified type
-  The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.
 
   Naming rules for offline packages: name-version-arch.tar.gz
   Structure of the offline package: 
@@ -96,16 +96,15 @@ const (
   # Push docker offline resource csi
   kcctl resource push --pkg /root/docker-19.03.12-amd64.tar.gz --type cri
 
-  # Push offline resource packs nfs use specified deploy file
-  kcctl resource push --deploy-config /root/.kc/deploy-config.yaml  --pkg /root/nfs-v4.0.2-amd64.tar.gz --type csi
+  # Push offline resource nfs
+  kcctl resource push --pkg /root/nfs-v4.0.2-amd64.tar.gz --type csi
 
   Please read 'kcctl resource push -h' get more resource push flags`
 	deleteLongDescription = `
   Delete offline resource packs
 
   You can delete existing offline packages.
-  You need to specify the name, type, arch of offline packages before deleting.
-  The deploy-config flag is '/root/.kc/deploy-config.yaml' by defualt.`
+  You need to specify the name, type, arch of offline packages before deleting.`
 	resourceDeleteExample = `
   # Delete offline resource packs
   kcctl resource delete --name k8s --version v1.23.6 --arch amd64
@@ -116,8 +115,9 @@ const (
 type ResourceOptions struct {
 	options.IOStreams
 	PrintFlags   *printer.PrintFlags
-	DeployConfig string
 	deployConfig *options.DeployConfig
+	cliOpts      *options.CliOptions
+	client       *kc.Client
 
 	List   string
 	Push   string
@@ -133,6 +133,7 @@ type ResourceOptions struct {
 
 func NewResourceOptions(streams options.IOStreams) *ResourceOptions {
 	return &ResourceOptions{
+		cliOpts:      options.NewCliOptions(),
 		IOStreams:    streams,
 		PrintFlags:   printer.NewPrintFlags(),
 		deployConfig: options.NewDeployOptions(),
@@ -178,11 +179,11 @@ func NewCmdResourceList(o *ResourceOptions) *cobra.Command {
 	}
 
 	o.PrintFlags.AddFlags(cmd)
+	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, "offline resource type.")
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "offline resource name.")
 	cmd.Flags().StringVar(&o.Version, "version", o.Name, "offline resource version.")
 	cmd.Flags().StringVar(&o.Arch, "arch", o.Arch, "offline resource arch.")
-	cmd.Flags().StringVar(&o.DeployConfig, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listType(toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -222,9 +223,9 @@ func NewCmdResourcePush(o *ResourceOptions) *cobra.Command {
 		},
 	}
 
+	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, "offline resource type.")
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "docker service and images pkg.")
-	cmd.Flags().StringVar(&o.DeployConfig, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listType(toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -253,10 +254,10 @@ func NewCmdResourceDelete(o *ResourceOptions) *cobra.Command {
 		},
 	}
 
+	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "offline resource name.")
 	cmd.Flags().StringVar(&o.Version, "version", o.Name, "offline resource version.")
 	cmd.Flags().StringVar(&o.Arch, "arch", o.Arch, "offline resource arch.")
-	cmd.Flags().StringVar(&o.DeployConfig, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listName(toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -275,15 +276,23 @@ func NewCmdResourceDelete(o *ResourceOptions) *cobra.Command {
 }
 
 func (o *ResourceOptions) Complete() error {
-	o.deployConfig.Config = o.DeployConfig
-	err := o.deployConfig.Complete()
-	return err
+	var err error
+	if err = o.cliOpts.Complete(); err != nil {
+		return err
+	}
+	o.client, err = kc.FromConfig(o.cliOpts.ToRawConfig())
+	if err != nil {
+		return err
+	}
+
+	o.deployConfig, err = deploy.GetDeployConfig(context.Background(), o.client, true)
+	if err != nil {
+		return errors.WithMessage(err, "get online deploy-config failed")
+	}
+	return nil
 }
 
 func (o *ResourceOptions) ValidateArgs(cmd *cobra.Command) error {
-	if o.deployConfig.Config == "" {
-		return utils.UsageErrorf(cmd, "the deploy-config.yaml file path is required")
-	}
 	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
 		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)
 	}
@@ -296,9 +305,6 @@ func (o *ResourceOptions) ValidateArgsPush(cmd *cobra.Command) error {
 	}
 	if o.Pkg == "" {
 		return utils.UsageErrorf(cmd, "resource pkg  must be specified")
-	}
-	if o.deployConfig.Config == "" {
-		return utils.UsageErrorf(cmd, "--deploy-config must be specified")
 	}
 	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
 		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)
@@ -315,9 +321,6 @@ func (o *ResourceOptions) ValidateArgsDelete(cmd *cobra.Command) error {
 	}
 	if o.Arch == "" {
 		return utils.UsageErrorf(cmd, "the arch of resource must be specified")
-	}
-	if o.deployConfig.Config == "" {
-		return utils.UsageErrorf(cmd, "--deploy-config is required")
 	}
 	if o.deployConfig.SSHConfig.PkFile == "" && o.deployConfig.SSHConfig.Password == "" {
 		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", o.deployConfig.Config)

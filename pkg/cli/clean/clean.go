@@ -19,11 +19,16 @@
 package clean
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/sudo"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
@@ -37,35 +42,37 @@ import (
 
 const (
 	longDescription = `
-  Uninstall kubeclipper Platform from deploy-config.yaml or cmd flags.
+  Uninstall kubeclipper Platform .
 
-  Uninstall all kubeclipper plug-ins.
-  You can choose to uninstall it directly or using a configuration file.`
+  Uninstall all kubeclipper plug-ins.`
 	cleanExample = `
-  # Uninstall the entire kubeclipper platform use default deploy config(~/.kc/deploy-config.yaml).
+  # Uninstall the entire kubeclipper platform.
   kcctl clean --all
   kcctl clean -A
 
   # Mock uninstall,without -A flag will only do preCheck and config check.
   kcctl clean
-  kcctl clean --config ~/.kc/deploy-config.yaml
 
-  # Specify the deploy-config.yaml path
-  kcctl clean --config ~/.kc/deploy-config.yaml -A
+  # Uninstall the entire kubeclipper platform,use specify the config.
+  kcctl clean -A --config ~/.kc/config
 
   Please read 'kcctl clean -h' get more clean flags`
 )
 
 type CleanOptions struct {
 	options.IOStreams
+	cliOpts      *options.CliOptions
 	deployConfig *options.DeployConfig
+	client       *kc.Client
 	cleanAll     bool
-	allNodes     []string
+
+	allNodes []string
 }
 
 func NewCleanOptions(streams options.IOStreams) *CleanOptions {
 	return &CleanOptions{
 		IOStreams:    streams,
+		cliOpts:      options.NewCliOptions(),
 		deployConfig: options.NewDeployOptions(),
 	}
 }
@@ -73,14 +80,13 @@ func NewCleanOptions(streams options.IOStreams) *CleanOptions {
 func NewCmdClean(streams options.IOStreams) *cobra.Command {
 	o := NewCleanOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "clean [(--config [<configFilePath>])] [flags]",
+		Use:                   "clean [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "Uninstall kubeclipper platform",
 		Long:                  longDescription,
 		Example:               cleanExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
-			o.ValidateArgs()
 			if !o.preCheck() {
 				return
 			}
@@ -88,21 +94,37 @@ func NewCmdClean(streams options.IOStreams) *cobra.Command {
 			fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 		},
 	}
-	cmd.Flags().StringVarP(&o.deployConfig.Config, "config", "c", options.DefaultDeployConfigPath, "Path to the deploy config file to use for clean.")
+	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.cleanAll, "all", "A", o.cleanAll, "clean all components for kubeclipper")
 	return cmd
 }
 
 func (c *CleanOptions) Complete() error {
+	// config Complete
+	var err error
+	if err = c.cliOpts.Complete(); err != nil {
+		return err
+	}
+	c.client, err = kc.FromConfig(c.cliOpts.ToRawConfig())
+	if err != nil {
+		return err
+	}
+
+	// deploy-config Complete
+	dc, err := deploy.GetDeployConfig(context.Background(), c.client, false)
+	if err != nil {
+		logger.Warn("get online deploy-config failed,downgrade to use local deploy-config,reason:", err)
+		if err = c.deployConfig.Complete(); err != nil {
+			return errors.WithMessage(err, "run with local deploy-config failed")
+		}
+	} else {
+		c.deployConfig = dc
+	}
 	c.allNodes = sets.NewString().
 		Insert(c.deployConfig.ServerIPs...).
 		Insert(c.deployConfig.Agents.ListIP()...).
 		List()
-	return c.deployConfig.Complete()
-}
-
-func (c *CleanOptions) ValidateArgs() {
-	// TODO: add validate
+	return nil
 }
 
 func (c *CleanOptions) preCheck() bool {
@@ -117,6 +139,7 @@ func (c *CleanOptions) RunClean() {
 		c.cleanKcConsole()
 		c.cleanBinaries()
 		c.cleanKcEnv()
+		c.cleanKcConfig()
 	}
 	logger.Info("clean successful")
 }
@@ -137,7 +160,7 @@ func (c *CleanOptions) cleanKcAgent() {
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.Agents.ListIP(), cmd, sshutils.DefaultWalk)
 		if err != nil {
-			logger.V(2).Error(err)
+			logger.Warn("clean kc agent failed,reason: ", err)
 		}
 	}
 }
@@ -157,7 +180,7 @@ func (c *CleanOptions) cleanKcProxy() {
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.Proxys, cmd, sshutils.DefaultWalk)
 		if err != nil {
-			logger.V(2).Error(err)
+			logger.Warn("clean kc proxy failed,reason: ", err)
 		}
 	}
 }
@@ -182,7 +205,7 @@ func (c *CleanOptions) cleanKcServer() {
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
 		if err != nil {
-			logger.V(2).Error(err)
+			logger.Warn("clean kc server failed,reason: ", err)
 		}
 	}
 }
@@ -202,7 +225,7 @@ func (c *CleanOptions) cleanKcConsole() {
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
 		if err != nil {
-			logger.V(2).Error(err)
+			logger.Warn("clean kc console failed,reason: ", err)
 		}
 	}
 }
@@ -214,13 +237,13 @@ func (c *CleanOptions) cleanBinaries() {
 	}
 
 	cmdList := []string{
-		"rm -rf /usr/local/bin/kube* && rm -rf /usr/local/bin/etcd* && rm -rf /usr/local/bin/kcctl && rm -rf /usr/local/bin/caddy",
+		"rm -rf /usr/local/bin/kubeclipper* && rm -rf /usr/local/bin/etcd*  && rm -rf /usr/local/bin/caddy",
 	}
 
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.allNodes, cmd, sshutils.DefaultWalk)
 		if err != nil {
-			logger.V(2).Error(err)
+			logger.Warn("clean kc binary failed,reason: ", err)
 		}
 	}
 }
@@ -238,7 +261,13 @@ func (c *CleanOptions) cleanKcEnv() {
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(c.deployConfig.SSHConfig, c.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
 		if err != nil {
-			logger.V(2).Error(err)
+			logger.Warn("clean kc env failed,reason: ", err)
 		}
+	}
+}
+
+func (c *CleanOptions) cleanKcConfig() {
+	if err := sshutils.Cmd("rm", "-rf", filepath.Dir(options.DefaultDeployConfigPath)); err != nil {
+		logger.Warn("clean kc config failed,reason: ", err)
 	}
 }

@@ -26,12 +26,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
-	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
-
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
@@ -335,6 +334,12 @@ func (c *DeployConfig) MergeDeployOptions() {
 	}
 
 }
+
+/*
+NOTE: deploy cmd use local deploy-config,others cmd use online deploy-config.
+and clean cmd use online deploy-config first,if can't get online deploy-config,
+then use local deploy-config as a downgrade.
+*/
 
 func (c *DeployConfig) Complete() error {
 	if c.Config == "" {

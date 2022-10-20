@@ -16,7 +16,7 @@
  *
  */
 
-package join
+package deploy
 
 import (
 	"reflect"

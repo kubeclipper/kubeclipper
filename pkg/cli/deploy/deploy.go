@@ -56,8 +56,6 @@ import (
 	"github.com/sethvargo/go-password/password"
 	"gopkg.in/yaml.v2"
 
-	"github.com/kubeclipper/kubeclipper/pkg/cli/join"
-
 	"github.com/kubeclipper/kubeclipper/pkg/cli/sudo"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
@@ -202,7 +200,7 @@ func (d *DeployOptions) Complete() error {
 
 	// if specify config，ignore flags.
 	if d.deployConfig.Config == "" {
-		if d.deployConfig.Agents, err = join.BuildAgent(d.agents, d.fips, d.deployConfig.DefaultRegion); err != nil {
+		if d.deployConfig.Agents, err = BuildAgent(d.agents, d.fips, d.deployConfig.DefaultRegion); err != nil {
 			return err
 		}
 	}

@@ -19,16 +19,20 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
 	proxyConfig "github.com/kubeclipper/kubeclipper/pkg/proxy/config"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
@@ -47,21 +51,20 @@ const (
   kc-agent can access kc-server by proxy server,kc-server can access kc-agent by proxy server too.`
 
 	deployExample = `
-  # Deploy proxy use default deploy config(~/.kc/deploy-config.yaml)
-  # run proxy server on node 192.168.234.4, add 2 tunnels in 1 agent node.
-  kcctl proxy --proxy 192.168.234.4 --tunnels 16443:192.168.234.5:6443 --tunnels 10022:192.168.234.5:22
+  # Deploy proxy,run proxy server on node 192.168.234.4, add 2 tunnels in 1 agent node.
+  # this means proxy 192.168.234.4's 16443/10022 port to 192.168.234.5's 6443/22 port
+  kcctl proxy --pkg /tmp/kc.tar.gz --proxy 192.168.234.4 --tunnels 16443:192.168.234.5:6443 --tunnels 10022:192.168.234.5:22
 
-  # Deploy proxy specify deploy config path.
-  # run proxy server on node 192.168.234.4, add 4 tunnels in 2 agent node.
-  kcctl proxy --deploy-config /root/.kc/deploy-config --proxy 192.168.234.4 --tunnels 16443:192.168.234.5:6443 --tunnels 10022:192.168.234.5:22 --tunnels 16443:192.168.234.6:6443 --tunnels 10022:192.168.234.6:22`
+  # Deploy proxy,run proxy server on node 192.168.234.4, add 4 tunnels in 2 agent node.
+  kcctl proxy --pkg /tmp/kc.tar.gz --proxy 192.168.234.4 --tunnels 16443:192.168.234.5:6443 --tunnels 10022:192.168.234.5:22 --tunnels 26443:192.168.234.6:6443 --tunnels 20022:192.168.234.6:22`
 )
-
-// kcctl proxy --pkg kc-test.tar.gz --proxy 192.168.20.212 --tunnels 16443:192.168.20.235:6443 --tunnels 10022:192.168.20.235:22 --v 5
 
 type ProxyOptions struct {
 	options.IOStreams
 	deployConfig *options.DeployConfig
 	config       *proxyConfig.Config
+	cliOpts      *options.CliOptions
+	client       *kc.Client
 	pkg          string
 	proxy        string
 	tunnelStr    []string
@@ -70,6 +73,7 @@ type ProxyOptions struct {
 
 func NewProxyOptions(streams options.IOStreams) *ProxyOptions {
 	return &ProxyOptions{
+		cliOpts:      options.NewCliOptions(),
 		IOStreams:    streams,
 		deployConfig: options.NewDeployOptions(),
 	}
@@ -94,17 +98,16 @@ func NewCmdProxy(streams options.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringArrayVar(&o.tunnelStr, "tunnels", o.tunnelStr, "proxy tunnels.")
 	cmd.Flags().StringVar(&o.proxy, "proxy", o.proxy, "kc proxy server")
-	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	cmd.Flags().StringVar(&o.pkg, "pkg", o.deployConfig.Pkg, "kubeclipper package resource url (path or http url)")
 
+	utils.CheckErr(cmd.MarkFlagRequired("pkg"))
+	utils.CheckErr(cmd.MarkFlagRequired("proxy"))
+	utils.CheckErr(cmd.MarkFlagRequired("tunnels"))
 	return cmd
 }
 
 func (d *ProxyOptions) Complete() error {
 	var err error
-	if err = d.deployConfig.Complete(); err != nil {
-		return err
-	}
 	if d.pkg == "" {
 		d.pkg = d.deployConfig.Pkg
 	}
@@ -112,6 +115,18 @@ func (d *ProxyOptions) Complete() error {
 	if err != nil {
 		return err
 	}
+	if err = d.cliOpts.Complete(); err != nil {
+		return err
+	}
+	d.client, err = kc.FromConfig(d.cliOpts.ToRawConfig())
+	if err != nil {
+		return err
+	}
+	d.deployConfig, err = deploy.GetDeployConfig(context.Background(), d.client, true)
+	if err != nil {
+		return errors.WithMessage(err, "get online deploy-config failed")
+	}
+
 	d.config = d.generateProxyConfig()
 	return nil
 }
@@ -136,12 +151,12 @@ func (d *ProxyOptions) RunDeploy() error {
 	d.sendPackage()
 	d.deployProxy()
 	d.removeTempFile()
+
 	if !sliceutil.HasString(d.deployConfig.Proxys, d.proxy) {
 		d.deployConfig.Proxys = append(d.deployConfig.Proxys, d.proxy)
-		err := d.deployConfig.Write()
-		if err != nil {
-			return err
-		}
+	}
+	if err := deploy.UpdateDeployConfig(context.Background(), d.client, d.deployConfig, true); err != nil {
+		return errors.WithMessage(err, "update online deploy-config failed")
 	}
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 	return nil
@@ -180,7 +195,6 @@ func (d *ProxyOptions) deployProxy() {
 	if err != nil {
 		logger.Fatalf("[deploy proxy] marshal proxy config failed due to %s", err.Error())
 	}
-	logger.Info("config data:", string(configData))
 
 	cmdList := []string{
 		sshutils.WrapEcho(config.KcProxyService, "/usr/lib/systemd/system/kc-proxy.service"),

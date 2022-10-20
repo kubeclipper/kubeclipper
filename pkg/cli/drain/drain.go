@@ -27,6 +27,8 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
+
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -48,11 +50,11 @@ const (
  
   Now only support drain kc-agent node, so the --agent parameter must be valid.`
 	drainExample = `
-  # Drain kc-agent from kubeclipper cluster use default deploy-config(~/.kc/deploy-config.yaml) and config(~/.kc/config).
+  # Drain kc-agent from kubeclipper cluster use default config(~/.kc/config).
   kcctl drain --agent d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa
 
-  # Drain kc-agent from kubeclipper cluster specify deploy config and config.
-  kcctl drain --agent d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa --deploy-config /root/.kc/deploy-config.yaml --config /root/.kc/config
+  # Drain kc-agent from kubeclipper cluster specify config.
+  kcctl drain --agent d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa --config /root/.kc/config
 
   # Force drain kc-agent which is in used from kubeclipper cluster
   kcctl drain  --force --agent=d55e10ec-4e7e-4ce9-9ce7-eb491ddc7bfa
@@ -98,7 +100,6 @@ func NewCmdDrain(streams options.IOStreams) *cobra.Command {
 
 	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringSliceVar(&o.agents, "agent", o.agents, "drain agent node ID.")
-	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	cmd.Flags().BoolVarP(&o.force, "force", "F", o.force, "force delete in used node.")
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("agent", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -122,8 +123,8 @@ func (c *DrainOptions) listNode(toComplete string) []string {
 	}
 	set := sets.NewString()
 	for _, node := range nodes.Items {
-		if strings.HasPrefix(node.Status.Ipv4DefaultIP, toComplete) {
-			set.Insert(node.Status.Ipv4DefaultIP)
+		if strings.HasPrefix(node.Name, toComplete) {
+			set.Insert(node.Name)
 		}
 	}
 
@@ -133,18 +134,21 @@ func (c *DrainOptions) listNode(toComplete string) []string {
 func (c *DrainOptions) Complete() error {
 	var err error
 
-	// deploy config Complete
-	if err = c.deployConfig.Complete(); err != nil {
-		return err
-	}
-
 	// config Complete
 	if err = c.cliOpts.Complete(); err != nil {
 		return err
 	}
 	c.client, err = kc.FromConfig(c.cliOpts.ToRawConfig())
+	if err != nil {
+		return err
+	}
 
-	return err
+	// deploy config Complete
+	c.deployConfig, err = deploy.GetDeployConfig(context.Background(), c.client, true)
+	if err != nil {
+		return errors.WithMessage(err, "get online deploy-config failed")
+	}
+	return nil
 }
 
 func (c *DrainOptions) ValidateArgs() error {
@@ -154,9 +158,7 @@ func (c *DrainOptions) ValidateArgs() error {
 	if c.cliOpts.Config == "" {
 		return errors.New("config path cannot be empty")
 	}
-	if c.deployConfig.Config == "" {
-		return errors.New("deploy config path cannot be empty")
-	}
+
 	if len(c.agents) == 0 {
 		return errors.New("--agent is required")
 	}
@@ -178,8 +180,10 @@ func (c *DrainOptions) preCheck() bool {
 
 	for _, agent := range c.agents {
 		if !c.deployConfig.Agents.ExistsByID(agent) {
-			logger.Errorf("agent %s is not in agent nodes", agent)
-			return false
+			_, _ = c.IOStreams.Out.Write([]byte(fmt.Sprintf("agent %s not in deploy config agent list, maybe input a wrong agent id or deploy config is not synced，still drain?  Please input (yes/no)", agent)))
+			if !utils.AskForConfirmation() {
+				return false
+			}
 		}
 	}
 
@@ -216,6 +220,10 @@ func (c *DrainOptions) runDrainAgentNode() error {
 		if err = c.agentFilesAndData(nodeInfo); err != nil {
 			return err
 		}
+	}
+
+	if err := deploy.UpdateDeployConfig(context.Background(), c.client, c.deployConfig, true); err != nil {
+		logger.Warn("drain agent node success,but update online deploy-config failed, you can update manual,err:", err)
 	}
 	logger.Info("agent node drain completed. show command: 'kcctl get node'")
 	return nil
@@ -259,10 +267,6 @@ func (c *DrainOptions) agentFilesAndData(node *v1.Node) error {
 
 	// 	3.rewrite deploy config
 	c.deployConfig.Agents.Delete(node.Name)
-	err = c.deployConfig.Write()
-	if err != nil {
-		return errors.WithMessage(err, "rewrite deploy config")
-	}
 	return nil
 }
 

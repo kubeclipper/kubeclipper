@@ -20,6 +20,7 @@ package join
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -28,7 +29,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 
@@ -45,17 +48,13 @@ const (
 	longDescription = `
   Add Server and Agents nodes on kubeclipper platform.
 
-  At least one Server node must be installed before adding an Agents node.
-  deploy-config.yaml file is used to check whether a node can be added correctly.`
+  At least one Server node must be installed before adding an Agents node.`
 	joinExample = `
-  # Add agent node use default config.
+  # Add agent node.
   kcctl join --agent 192.168.10.123
 
   # Add agent node specify region.
   kcctl join --agent us-west-1:192.168.10.123
-
-  # Add agent node specify config.
-  kcctl join --agent 192.168.10.123 --deploy-config ~/.kc/deploy-config.yaml
 
   # Add multiple agent nodes.
   kcctl join --agent 192.168.10.123,192.168.10.124
@@ -70,8 +69,8 @@ const (
   # this will add 10 agent,1.1.1.1, 1.1.1.2, ... 1.1.1.10.
   kcctl join --agent us-west-1:1.1.1.1-1.1.1.10
 
-  # Add multiple agent nodes and config fip.
-  kcctl join --agent 192.168.10.123,192.168.10.124 --fip 192.168.10.123:172.20.149.199 --fip 192.168.10.124:172.20.149.200
+  # Add multiple agent nodes and config float ip.
+  kcctl join --agent 192.168.10.123,192.168.10.124 --float-ip 192.168.10.123:172.20.149.199 --float-ip 192.168.10.124:172.20.149.200
 
   Please read 'kcctl join -h' get more deploy flags`
 )
@@ -79,16 +78,18 @@ const (
 type JoinOptions struct {
 	options.IOStreams
 	deployConfig *options.DeployConfig
+	cliOpts      *options.CliOptions
+	client       *kc.Client
 
 	agents     []string // user input agents,maybe with region,need to parse.
 	floatIPs   []string // format: ip:floatIP,e.g. 192.168.10.11:172.20.149.199
-	servers    []string
 	ipDetect   string
 	parseAgent options.Agents
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
 	return &JoinOptions{
+		cliOpts:      options.NewCliOptions(),
 		IOStreams:    streams,
 		deployConfig: options.NewDeployOptions(),
 		ipDetect:     autodetection.MethodFirst,
@@ -113,16 +114,16 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunJoinFunc())
 		},
 	}
+	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method.")
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
-	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "kcctl deploy config path")
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))
 	return cmd
 }
 
 func (c *JoinOptions) preCheck() bool {
-	if !sudo.PreCheck("sudo", c.deployConfig.SSHConfig, c.IOStreams, append(c.parseAgent.ListIP(), c.servers...)) {
+	if !sudo.PreCheck("sudo", c.deployConfig.SSHConfig, c.IOStreams, append(c.parseAgent.ListIP(), c.deployConfig.ServerIPs...)) {
 		return false
 	}
 	// check if the node is already added
@@ -135,19 +136,27 @@ func (c *JoinOptions) preCheck() bool {
 }
 
 func (c *JoinOptions) Complete() error {
-	// deploy config Complete
-	if err := c.deployConfig.Complete(); err != nil {
+	var err error
+	if c.parseAgent, err = deploy.BuildAgent(c.agents, c.floatIPs, c.deployConfig.DefaultRegion); err != nil {
 		return err
+	}
+	// config Complete
+	if err = c.cliOpts.Complete(); err != nil {
+		return err
+	}
+	c.client, err = kc.FromConfig(c.cliOpts.ToRawConfig())
+	if err != nil {
+		return err
+	}
+	// deploy config Complete
+	c.deployConfig, err = deploy.GetDeployConfig(context.Background(), c.client, true)
+	if err != nil {
+		return errors.WithMessage(err, "get online deploy-config failed")
 	}
 	// overwrite by specify
 	if c.ipDetect != "" {
 		c.deployConfig.IPDetect = c.ipDetect
 	}
-	var err error
-	if c.parseAgent, err = BuildAgent(c.agents, c.floatIPs, c.deployConfig.DefaultRegion); err != nil {
-		return err
-	}
-	c.servers = sets.NewString(c.servers...).List()
 	return nil
 }
 
@@ -191,17 +200,19 @@ func (c *JoinOptions) RunJoinNode() error {
 }
 
 func (c *JoinOptions) runJoinAgentNode() error {
-	var err error
 	for ip := range c.parseAgent {
 		metadata := c.parseAgent[ip]
 		metadata.AgentID = uuid.New().String()
 		c.parseAgent[ip] = metadata
-		if err = c.agentNodeFiles(ip, metadata); err != nil {
+		if err := c.agentNodeFiles(ip, metadata); err != nil {
 			return err
 		}
-		if err = c.enableAgent(ip, metadata); err != nil {
+		if err := c.enableAgent(ip, metadata); err != nil {
 			return err
 		}
+	}
+	if err := deploy.UpdateDeployConfig(context.Background(), c.client, c.deployConfig, true); err != nil {
+		logger.Warn("drain agent node success,but update online deploy-config failed, you can update manual,err:", err)
 	}
 	logger.Info("agent node join completed. show command: 'kcctl get node'")
 	return nil
@@ -270,9 +281,12 @@ func (c *JoinOptions) enableAgent(node string, metadata options.Metadata) error 
 	if err = ret.Error(); err != nil {
 		return errors.Wrap(err, "enable kc agent")
 	}
-	// update deploy-config.yaml
+	// add deploy-config
+	if c.deployConfig.Agents == nil {
+		c.deployConfig.Agents = make(options.Agents)
+	}
 	c.deployConfig.Agents.Add(node, metadata)
-	return c.deployConfig.Write()
+	return nil
 }
 
 func (c *JoinOptions) runJoinServerNode() error {
