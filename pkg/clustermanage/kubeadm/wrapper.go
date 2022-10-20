@@ -180,6 +180,9 @@ func (w *Wrapper) completeNodes(nodeList *corev1.NodeList, c *v1.Cluster) {
 		// example: "containerd://1.6.4"
 		criInfo := strings.Split(node.Status.NodeInfo.ContainerRuntimeVersion, "://")
 		n := v1.WorkerNode{
+			// Since the kc-agent service has not yet started,
+			// the node ID cannot be obtained, so this field is temporarily put into the IP instead,
+			// and the IP of this field will be replaced with the ID during the execution of the subsequent process
 			ID:     nodeIP,
 			Labels: node.ObjectMeta.Labels,
 			Taints: taints,
