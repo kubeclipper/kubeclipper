@@ -788,6 +788,7 @@ func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNo
 			Name:       "flushRules",
 			Timeout:    metav1.Duration{Duration: 10 * time.Second},
 			ErrIgnore:  true,
+			Nodes:      nodes,
 			RetryTimes: 1,
 			Action:     v1.ActionUninstall,
 			Commands:   cmds,
