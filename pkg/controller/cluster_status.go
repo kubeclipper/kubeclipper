@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
@@ -161,13 +162,14 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error 
 	}
 	var certifications []v1.Certification
 
+	provider, ok := clu.Labels[common.LabelClusterProviderName]
 	// get certifications from provider
-	certifications, err = s.getCertificationFromProvider(clu)
-	if err != nil {
-		return err
-	}
-
-	if len(certifications) == 0 {
+	if ok && provider != kubeadm.ProviderKubeadm {
+		certifications, err = s.getCertificationFromProvider(clu)
+		if err != nil {
+			return err
+		}
+	} else {
 		// get certifications from kc
 		certifications, err = s.GetCertificationFromKC(clu)
 		if err != nil {
