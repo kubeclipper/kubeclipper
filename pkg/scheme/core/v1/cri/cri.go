@@ -25,11 +25,27 @@ import (
 )
 
 func init() {
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeStep), &ContainerdRunnable{}); err != nil {
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeStep),
+		&ContainerdRunnable{}); err != nil {
 		panic(err)
 	}
 
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeStep), &DockerRunnable{}); err != nil {
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeStep),
+		&DockerRunnable{}); err != nil {
+		panic(err)
+	}
+
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeRegistryConfigure),
+		&ContainerdRegistryConfigure{}); err != nil {
+		panic(err)
+	}
+
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeRegistryConfigure),
+		&DockerInsecureRegistryConfigure{}); err != nil {
 		panic(err)
 	}
 }

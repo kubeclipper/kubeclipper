@@ -61,10 +61,9 @@ var (
 			},
 		},
 		ContainerRuntime: v1.ContainerRuntime{
-			Type:             "docker",
-			Version:          "19.03.12",
-			DataRootDir:      "/var/lib/docker",
-			InsecureRegistry: nil,
+			Type:        "docker",
+			Version:     "19.03.12",
+			DataRootDir: "/var/lib/docker",
 		},
 		Addons:    addons,
 		KubeProxy: v1.KubeProxy{},

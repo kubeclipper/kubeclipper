@@ -19,10 +19,11 @@
 package v1
 
 import (
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 )
 
 // +genclient
@@ -38,7 +39,7 @@ type Cluster struct {
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
 	LocalRegistry     string           `json:"localRegistry,omitempty" optional:"true"`
-	Masters           WorkerNodeList   `json:"masters"`
+	Masters           WorkerNodeList   `json:"massters"`
 	Workers           WorkerNodeList   `json:"workers" optional:"true"`
 	KubernetesVersion string           `json:"kubernetesVersion" enum:"v1.20.13"`
 	CertSANs          []string         `json:"certSANs,omitempty" optional:"true"`
@@ -259,10 +260,18 @@ const (
 )
 
 type ContainerRuntime struct {
-	Type             string   `json:"type" enum:"docker|containerd"`
-	Version          string   `json:"version,omitempty" enum:"1.4.4"`
-	DataRootDir      string   `json:"rootDir,omitempty"`
+	Type        string `json:"type" enum:"docker|containerd"`
+	Version     string `json:"version,omitempty" enum:"1.4.4"`
+	DataRootDir string `json:"rootDir,omitempty"`
+	// Deprecated use Registries  insteadof
 	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
+	// When updating
+	Registries []CRIRegistry `json:"registries,omitempty"`
+}
+
+type CRIRegistry struct {
+	InsecureRegistry string  `json:"insecureRegistry"`
+	RegistryRef      *string `json:"registryRef"`
 }
 
 // taint define

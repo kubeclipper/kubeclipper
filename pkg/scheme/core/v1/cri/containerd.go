@@ -21,6 +21,7 @@ package cri
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -304,6 +305,49 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 	return nil
 }
 
+type ContainerdRegistryConfigure struct {
+	Registries []ContainerdRegistry `json:"registries,omitempty"`
+	ConfigDir  string               `json:"configDir"`
+}
+
+func (c *ContainerdRegistryConfigure) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	if opts.DryRun {
+		return nil, nil
+	}
+	entries, err := os.ReadDir(c.ConfigDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read registry config dir:%s failed:%w", c.ConfigDir, err)
+	}
+	oldDirs := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			oldDirs[entry.Name()] = struct{}{}
+		}
+	}
+	for _, r := range c.Registries {
+		err := r.renderConfigs(c.ConfigDir)
+		if err != nil {
+			return nil, fmt.Errorf("renderConfigs to %s failed:%w", c.ConfigDir, err)
+		}
+		delete(oldDirs, r.Server)
+	}
+	for d := range oldDirs {
+		err = os.RemoveAll(d)
+		if err != nil {
+			logger.Errorf("clear old registry config dir: %s failed:%s", d, err)
+		}
+	}
+	return nil, nil
+}
+
+func (c *ContainerdRegistryConfigure) Uninstall(_ context.Context, _ component.Options) ([]byte, error) {
+	return nil, nil
+}
+
+func (c *ContainerdRegistryConfigure) NewInstance() component.ObjectMeta {
+	return new(ContainerdRegistryConfigure)
+}
+
 const (
 	CapabilityPull    = "pull"
 	CapabilityPush    = "push"
@@ -311,6 +355,7 @@ const (
 )
 
 type ContainerdHost struct {
+	Scheme       string // http or https
 	Host         string
 	Capabilities []string
 	SkipVerify   bool
@@ -346,24 +391,17 @@ func (h *ContainerdRegistry) renderConfigs(dir string) error {
 		if len(host.CA) > 0 {
 			caFile = filepath.Join(hostDir, fmt.Sprintf("%s.pem", host.Host))
 			if err = os.WriteFile(caFile, host.CA, 0666); err != nil {
-				return err
+				return fmt.Errorf("write ca file:%s failed:%w", caFile, err)
 			}
 		}
-		hc := HostFileConfig{
+		hostConfig := HostFileConfig{
 			Capabilities: host.Capabilities,
 			SkipVerify:   skipVerify,
 		}
 		if caFile != "" {
-			hc.CACert = caFile
+			hostConfig.CACert = caFile
 		}
-		c.HostConfigs[fmt.Sprintf("https://%s", host.Host)] = hc
-
-		// support http scheme
-		if skipVerify != nil && *skipVerify {
-			c.HostConfigs[fmt.Sprintf("http://%s", host.Host)] = HostFileConfig{
-				Capabilities: host.Capabilities,
-			}
-		}
+		c.HostConfigs[fmt.Sprintf("%s://%s", host.Scheme, host.Host)] = hostConfig
 	}
 	f, err := os.Create(filepath.Join(hostDir, "hosts.toml"))
 	if err != nil {
@@ -417,4 +455,23 @@ type HostFile struct {
 	Server string `toml:"server"`
 	// HostConfigs store the per-host configuration
 	HostConfigs map[string]HostFileConfig `toml:"host"`
+}
+
+func ToContainerdRegistryConfig(registries []v1.Registry) []ContainerdRegistry {
+	cfgs := make([]ContainerdRegistry, 0, len(registries))
+	for _, r := range registries {
+		cfgs = append(cfgs, ContainerdRegistry{
+			Server: r.Host,
+			Hosts: []ContainerdHost{
+				{
+					Host:         r.Host,
+					Capabilities: []string{CapabilityPull, CapabilityResolve},
+					SkipVerify:   r.SkipVerify,
+					CA:           []byte(r.CA),
+				},
+			},
+		},
+		)
+	}
+	return cfgs
 }

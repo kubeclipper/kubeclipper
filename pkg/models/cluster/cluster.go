@@ -55,10 +55,11 @@ type clusterOperator struct {
 	dnsStorage           rest.StandardStorage
 	templateStorage      rest.StandardStorage
 	cloudProviderStorage rest.StandardStorage
+	registryStorage      rest.StandardStorage
 }
 
 func NewClusterOperator(clusterStorage, nodeStorage, regionStorage, backupStorage, recoveryStorage, backupPointStorage,
-	cronBackupStorage, dnsStorage, templateStorage, cloudProviderStorage rest.StandardStorage) Operator {
+	cronBackupStorage, dnsStorage, templateStorage, cloudProviderStorage, registryStorage rest.StandardStorage) Operator {
 	return &clusterOperator{
 		clusterStorage:       clusterStorage,
 		nodeStorage:          nodeStorage,
@@ -70,6 +71,7 @@ func NewClusterOperator(clusterStorage, nodeStorage, regionStorage, backupStorag
 		dnsStorage:           dnsStorage,
 		templateStorage:      templateStorage,
 		cloudProviderStorage: cloudProviderStorage,
+		registryStorage:      registryStorage,
 	}
 }
 
@@ -829,6 +831,83 @@ func (c *clusterOperator) cloudProviderFuzzyFilter(obj runtime.Object, q *query.
 		}
 		if selected {
 			objs = append(objs, &cloudProvider.Items[index])
+		}
+	}
+	return objs
+}
+
+func (c *clusterOperator) GetRegistry(ctx context.Context, name string) (*v1.Registry, error) {
+	return c.GetRegistryEx(ctx, name, "")
+}
+
+func (c *clusterOperator) ListRegistries(ctx context.Context, query *query.Query) (*v1.RegistryList, error) {
+	list, err := models.List(ctx, c.registryStorage, query)
+	if err != nil {
+		return nil, err
+	}
+	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Registry"))
+	return list.(*v1.RegistryList), nil
+}
+
+func (c *clusterOperator) WatchRegistries(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, c.registryStorage, query)
+}
+
+func (c *clusterOperator) GetRegistryEx(ctx context.Context, name string, resourceVersion string) (*v1.Registry, error) {
+	cp, err := models.GetV2(ctx, c.registryStorage, name, resourceVersion, nil)
+	if err != nil {
+		return nil, err
+	}
+	return cp.(*v1.Registry), nil
+}
+
+func (c *clusterOperator) ListRegistriesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	return models.ListExV2(ctx, c.registryStorage, query, c.registryFuzzyFilter, nil, nil)
+}
+
+func (c *clusterOperator) CreateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	obj, err := c.registryStorage.Create(ctx, r, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*v1.Registry), nil
+}
+
+func (c *clusterOperator) UpdateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	obj, wasCreated, err := c.registryStorage.Update(ctx, r.Name, rest.DefaultUpdatedObjectInfo(r),
+		nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if wasCreated {
+		logger.Debug("registry not exist, use create instead of update", zap.String("Registry", r.Name))
+	}
+	return obj.(*v1.Registry), nil
+}
+
+func (c *clusterOperator) DeleteRegistry(ctx context.Context, name string) error {
+	var err error
+	_, _, err = c.registryStorage.Delete(ctx, name, func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}, &metav1.DeleteOptions{})
+	return err
+}
+
+func (c *clusterOperator) registryFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+	registries, ok := obj.(*v1.RegistryList)
+	if !ok {
+		return nil
+	}
+	objs := make([]runtime.Object, 0, len(registries.Items))
+	for index, template := range registries.Items {
+		selected := true
+		for k, v := range q.FuzzySearch {
+			if !models.ObjectMetaFilter(template.ObjectMeta, k, v) {
+				selected = false
+			}
+		}
+		if selected {
+			objs = append(objs, &registries.Items[index])
 		}
 	}
 	return objs

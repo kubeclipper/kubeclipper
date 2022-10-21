@@ -8,9 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 func TestContainerdRunnable_renderTo(t *testing.T) {
@@ -91,11 +92,13 @@ func TestContainerdRegistryRender(t *testing.T) {
 		Server: "docker.io",
 		Hosts: []ContainerdHost{
 			{
+				Scheme:       "https",
 				Host:         "local1.registry.com",
 				Capabilities: []string{CapabilityPull, CapabilityPull},
 				SkipVerify:   true,
 			},
 			{
+				Scheme:       "https",
 				Host:         "local2.registry.com",
 				Capabilities: []string{CapabilityPull, CapabilityPull},
 				CA:           []byte("ca data"),
@@ -112,9 +115,6 @@ func TestContainerdRegistryRender(t *testing.T) {
 	exp := fmt.Sprintf(`server = "docker.io"
 
 [host]
-
-  [host."http://local1.registry.com"]
-    capabilities = ["pull", "pull"]
 
   [host."https://local1.registry.com"]
     capabilities = ["pull", "pull"]

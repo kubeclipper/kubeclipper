@@ -77,6 +77,9 @@ type Operator interface {
 
 	CloudProviderReader
 	CloudProviderWriter
+
+	RegistryReader
+	RegistryWriter
 }
 
 type ClusterReader interface {
@@ -145,7 +148,7 @@ type BackupReaderEx interface {
 }
 
 type BackupWriter interface {
-	CreateBackup(ctc context.Context, backup *v1.Backup) (*v1.Backup, error)
+	CreateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error)
 	UpdateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error)
 	DeleteBackup(ctx context.Context, name string) error
 }
@@ -163,7 +166,7 @@ type RecoveryReaderEx interface {
 }
 
 type RecoveryWriter interface {
-	CreateRecovery(ctc context.Context, recovery *v1.Recovery) (*v1.Recovery, error)
+	CreateRecovery(ctx context.Context, recovery *v1.Recovery) (*v1.Recovery, error)
 	UpdateRecovery(ctx context.Context, recovery *v1.Recovery) (*v1.Recovery, error)
 	DeleteRecovery(ctx context.Context, name string) error
 }
@@ -217,7 +220,7 @@ type DNSReaderEx interface {
 }
 
 type DNSWriter interface {
-	CreateDomain(ctc context.Context, domain *v1.Domain) (*v1.Domain, error)
+	CreateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error)
 	UpdateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error)
 	DeleteDomain(ctx context.Context, name string) error
 }
@@ -235,7 +238,7 @@ type TemplateReaderEx interface {
 }
 
 type TemplateWriter interface {
-	CreateTemplate(ctc context.Context, template *v1.Template) (*v1.Template, error)
+	CreateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error)
 	UpdateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error)
 	DeleteTemplate(ctx context.Context, name string) error
 	DeleteTemplateCollection(ctx context.Context, query *query.Query) error
@@ -254,7 +257,25 @@ type CloudProviderEx interface {
 }
 
 type CloudProviderWriter interface {
-	CreateCloudProvider(ctc context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error)
+	CreateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error)
 	UpdateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error)
 	DeleteCloudProvider(ctx context.Context, name string) error
+}
+
+type RegistryReader interface {
+	GetRegistry(ctx context.Context, name string) (*v1.Registry, error)
+	ListRegistries(ctx context.Context, query *query.Query) (*v1.RegistryList, error)
+	WatchRegistries(ctx context.Context, query *query.Query) (watch.Interface, error)
+	RegistryEx
+}
+
+type RegistryEx interface {
+	GetRegistryEx(ctx context.Context, name string, resourceVersion string) (*v1.Registry, error)
+	ListRegistriesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
+}
+
+type RegistryWriter interface {
+	CreateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error)
+	UpdateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error)
+	DeleteRegistry(ctx context.Context, name string) error
 }

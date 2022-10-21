@@ -21,6 +21,7 @@ package v1
 import (
 	"context"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -3333,4 +3334,161 @@ func (h *handler) watchCloudProvider(req *restful.Request, resp *restful.Respons
 		return
 	}
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("CloudProvider"), req, resp, timeout)
+}
+
+func (h *handler) CreateRegistry(req *restful.Request, resp *restful.Response) {
+	reg := &v1.Registry{}
+	err := req.ReadEntity(reg)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	if err = h.registryValidate(req.Request.Context(), reg); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+
+	reg, err = h.clusterOperator.CreateRegistry(req.Request.Context(), reg)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	_ = resp.WriteHeaderAndEntity(http.StatusCreated, reg)
+}
+
+func (h *handler) UpdateRegistry(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	reg := &v1.Registry{}
+	if err := req.ReadEntity(reg); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+
+	if err := h.registryValidate(req.Request.Context(), reg); err != nil {
+		restplus.HandleBadRequest(resp, req, err)
+		return
+	}
+
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+
+	if name != reg.Name {
+		restplus.HandleBadRequest(resp, req, errors.New("name in url path not same with body"))
+		return
+	}
+
+	_, err := h.clusterOperator.GetRegistryEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	if !dryRun {
+		reg, err = h.clusterOperator.UpdateRegistry(req.Request.Context(), reg)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, reg)
+}
+
+func (h *handler) DescribeRegistry(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter(query.ParameterName)
+	resourceVersion := strutil.StringDefaultIfEmpty("0", req.QueryParameter(query.ParameterResourceVersion))
+	reg, err := h.clusterOperator.GetRegistryEx(req.Request.Context(), name, resourceVersion)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, reg)
+}
+
+func (h *handler) ListRegistry(req *restful.Request, resp *restful.Response) {
+	q := query.ParseQueryParameter(req)
+	if q.Watch {
+		h.watchRegistries(req, resp, q)
+		return
+	}
+	if clientrest.IsInformerRawQuery(req.Request) {
+		result, err := h.clusterOperator.ListRegistries(req.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+	} else {
+		result, err := h.clusterOperator.ListRegistriesEx(req.Request.Context(), q)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
+	}
+}
+
+func (h *handler) watchRegistries(req *restful.Request, resp *restful.Response, q *query.Query) {
+	timeout := time.Duration(0)
+	if q.TimeoutSeconds != nil {
+		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
+	}
+	if timeout == 0 {
+		timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
+	}
+
+	watcher, err := h.clusterOperator.WatchRegistries(req.Request.Context(), q)
+	if err != nil {
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Registry"), req, resp, timeout)
+}
+
+func (h *handler) DeleteRegistry(req *restful.Request, resp *restful.Response) {
+	name := req.PathParameter("name")
+	dryRun := query.GetBoolValueWithDefault(req, query.ParamDryRun, false)
+	_, err := h.clusterOperator.GetRegistryEx(req.Request.Context(), name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	if !dryRun {
+		err = h.clusterOperator.DeleteRegistry(req.Request.Context(), name)
+		if err != nil {
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+	}
+	resp.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) registryValidate(_ context.Context, cp *v1.Registry) error {
+	if cp.Scheme == "" {
+		return fmt.Errorf("scheme cannot be empty")
+	}
+	if cp.Scheme != "http" && cp.Scheme != "https" {
+		return fmt.Errorf("scheme must be http or https")
+	}
+	if cp.Host == "" {
+		return fmt.Errorf("scheme must be http or https")
+	}
+	if cp.CA != "" {
+		p, _ := pem.Decode([]byte(cp.CA))
+		if p == nil {
+			return fmt.Errorf("invalidate certificate")
+		}
+	}
+	return nil
 }

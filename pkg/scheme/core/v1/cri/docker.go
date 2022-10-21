@@ -21,12 +21,19 @@ package cri
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
 	"time"
+
+	"github.com/docker/docker/daemon/config"
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -36,16 +43,14 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type DockerRunnable struct {
 	Base
-
-	installSteps   []v1.Step
-	uninstallSteps []v1.Step
-	upgradeSteps   []v1.Step
+	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
+	installSteps     []v1.Step
+	uninstallSteps   []v1.Step
+	upgradeSteps     []v1.Step
 }
 
 func (runnable *DockerRunnable) InitStep(ctx context.Context, cri *v1.ContainerRuntime, nodes []v1.StepNode) error {
@@ -218,4 +223,84 @@ func (runnable *DockerRunnable) disableDockerService(ctx context.Context, dryRun
 		logger.Warn("disable systemd docker service failed", zap.Error(err))
 	}
 	return nil
+}
+
+type DockerInsecureRegistryConfigure struct {
+	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
+}
+
+const (
+	defaultDaemonConfigFile = "/etc/docker/daemon.json"
+)
+
+func (d *DockerInsecureRegistryConfigure) Install(_ context.Context, opts component.Options) ([]byte, error) {
+	conf := config.Config{}
+	// TODO：Maybe the configuration file is not here
+	configFile := defaultDaemonConfigFile
+	buf, err := os.ReadFile(configFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read config file: %s failed: %w",
+			configFile, err)
+	}
+	if len(buf) != 0 {
+		err = json.Unmarshal(buf, &conf)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshal config file: %s failed: %w",
+				configFile, err)
+		}
+	}
+
+	conf.InsecureRegistries = d.InsecureRegistry
+	configContent, err := json.MarshalIndent(&conf, "", "    ")
+	if err != nil {
+		return nil, fmt.Errorf("encode config: %w:%#v", err, &conf)
+	}
+	if opts.DryRun {
+		logger.Infof("dryRun: render config :%s", configContent)
+	} else {
+		f, err := os.OpenFile(configFile, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("open config file: %s :%w", configFile, err)
+		}
+		defer func() {
+			_ = f.Close()
+		}()
+		_, err = f.Write(configContent)
+		if err != nil {
+			return nil, fmt.Errorf("write config file to: %s :%w", configFile, err)
+		}
+	}
+	return nil, nil
+}
+
+func (d *DockerInsecureRegistryConfigure) Uninstall(_ context.Context, _ component.Options) ([]byte, error) {
+	// nothing
+	return nil, nil
+}
+
+func (d *DockerInsecureRegistryConfigure) NewInstance() component.ObjectMeta {
+	return new(DockerInsecureRegistryConfigure)
+}
+
+func DockerInsecureRegistry(registries []v1.Registry) []string {
+	if len(registries) == 0 {
+		return nil
+	}
+	insecureRegistry := make([]string, 0, len(registries))
+	for _, r := range registries {
+		// registry used validate tls certificate
+		if r.Scheme == "https" && !r.SkipVerify && len(r.CA) == 0 {
+			continue
+		}
+		index, find := sort.Find(len(insecureRegistry), func(i int) int {
+			return strings.Compare(r.Host, insecureRegistry[i])
+		})
+		if find {
+			continue
+		}
+		insecureRegistry = append(insecureRegistry[:index+1], insecureRegistry[:index+1]...)
+		insecureRegistry[index] = r.Host
+
+	}
+	return insecureRegistry
 }
