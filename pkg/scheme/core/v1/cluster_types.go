@@ -39,7 +39,7 @@ type Cluster struct {
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
 	LocalRegistry     string           `json:"localRegistry,omitempty" optional:"true"`
-	Masters           WorkerNodeList   `json:"massters"`
+	Masters           WorkerNodeList   `json:"masters"`
 	Workers           WorkerNodeList   `json:"workers" optional:"true"`
 	KubernetesVersion string           `json:"kubernetesVersion" enum:"v1.20.13"`
 	CertSANs          []string         `json:"certSANs,omitempty" optional:"true"`

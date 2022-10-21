@@ -5723,7 +5723,7 @@
     },
     "v1.Cluster": {
       "required": [
-        "massters",
+        "masters",
         "kubernetesVersion",
         "networking",
         "containerRuntime",
@@ -5780,7 +5780,7 @@
         "localRegistry": {
           "type": "string"
         },
-        "massters": {
+        "masters": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/v1.WorkerNode"
@@ -5791,9 +5791,6 @@
         },
         "networking": {
           "$ref": "#/definitions/v1.Networking"
-        },
-        "provider": {
-          "$ref": "#/definitions/v1.ProviderSpec"
         },
         "status": {
           "$ref": "#/definitions/v1.ClusterStatus"
@@ -6802,16 +6799,6 @@
           "items": {
             "type": "string"
           }
-        }
-      }
-    },
-    "v1.ProviderSpec": {
-      "required": [
-        "name"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
         }
       }
     },
