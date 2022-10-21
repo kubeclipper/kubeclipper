@@ -125,6 +125,8 @@ type ClusterStatus struct {
 	ComponentConditions []ComponentConditions `json:"componentConditions,omitempty"`
 
 	Certifications []Certification `json:"certifications,omitempty"`
+	// Registries all CRI registry
+	Registries []RegistrySpec
 }
 
 func (c *Cluster) Offline() bool {

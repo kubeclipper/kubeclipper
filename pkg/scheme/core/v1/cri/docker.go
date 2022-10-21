@@ -31,7 +31,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/daemon/config"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -234,7 +233,7 @@ const (
 )
 
 func (d *DockerInsecureRegistryConfigure) Install(_ context.Context, opts component.Options) ([]byte, error) {
-	conf := config.Config{}
+	conf := make(map[string]interface{})
 	// TODO：Maybe the configuration file is not here
 	configFile := defaultDaemonConfigFile
 	buf, err := os.ReadFile(configFile)
@@ -250,7 +249,7 @@ func (d *DockerInsecureRegistryConfigure) Install(_ context.Context, opts compon
 		}
 	}
 
-	conf.InsecureRegistries = d.InsecureRegistry
+	conf["insecure-registries"] = d.InsecureRegistry
 	configContent, err := json.MarshalIndent(&conf, "", "    ")
 	if err != nil {
 		return nil, fmt.Errorf("encode config: %w:%#v", err, &conf)
@@ -282,7 +281,7 @@ func (d *DockerInsecureRegistryConfigure) NewInstance() component.ObjectMeta {
 	return new(DockerInsecureRegistryConfigure)
 }
 
-func DockerInsecureRegistry(registries []v1.Registry) []string {
+func ToDockerInsecureRegistry(registries []v1.RegistrySpec) []string {
 	if len(registries) == 0 {
 		return nil
 	}
@@ -298,9 +297,12 @@ func DockerInsecureRegistry(registries []v1.Registry) []string {
 		if find {
 			continue
 		}
-		insecureRegistry = append(insecureRegistry[:index+1], insecureRegistry[:index+1]...)
-		insecureRegistry[index] = r.Host
-
+		if index == len(insecureRegistry) {
+			insecureRegistry = append(insecureRegistry, r.Host)
+		} else {
+			insecureRegistry = append(insecureRegistry[:index+1], insecureRegistry[:index+1]...)
+			insecureRegistry[index] = r.Host
+		}
 	}
 	return insecureRegistry
 }

@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
  *
  *  * Copyright 2021 KubeClipper Authors.
@@ -16,43 +18,8 @@
  *
  */
 
-package v1
+package k8s
 
-type CloudProviderListerExpansion interface {
-}
-
-type ConfigMapListerExpansion interface {
-}
-
-type ClusterListerExpansion interface {
-}
-
-type NodeListerExpansion interface {
-}
-
-type OperationListerExpansion interface {
-}
-
-type RegionListerExpansion interface {
-}
-
-type RegistryListerExpansion interface {
-}
-
-type BackupListerExpansion interface {
-}
-
-type BackupPointListerExpansion interface {
-}
-
-type CronBackupListerExpansion interface {
-}
-
-type RecoveryListerExpansion interface {
-}
-
-type LeaseListerExpansion interface {
-}
-
-type DomainListerExpansion interface {
+func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
+	panic("not implement")
 }

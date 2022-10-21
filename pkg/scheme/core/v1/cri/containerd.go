@@ -210,7 +210,7 @@ func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) string
 func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, dryRun bool) error {
 	// local registry not filled and is in online mode, the default repo mirror proxy will be used
 	if runnable.RegistryConfigDir == "" {
-		runnable.RegistryConfigDir = containerdDefaultRegistryConfigDir
+		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir
 	}
 	if !runnable.Offline && runnable.LocalRegistry == "" {
 		runnable.LocalRegistry = component.GetRepoMirror(ctx)
@@ -457,7 +457,7 @@ type HostFile struct {
 	HostConfigs map[string]HostFileConfig `toml:"host"`
 }
 
-func ToContainerdRegistryConfig(registries []v1.Registry) []ContainerdRegistry {
+func ToContainerdRegistryConfig(registries []v1.RegistrySpec) []ContainerdRegistry {
 	cfgs := make([]ContainerdRegistry, 0, len(registries))
 	for _, r := range registries {
 		cfgs = append(cfgs, ContainerdRegistry{

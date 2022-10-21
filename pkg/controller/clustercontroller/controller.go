@@ -20,12 +20,18 @@ package clustercontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
@@ -35,6 +41,7 @@ import (
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
+	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/handler"
@@ -46,6 +53,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 
 	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
@@ -56,9 +64,10 @@ type ClusterReconciler struct {
 	CmdDelivery         service.CmdDelivery
 	mgr                 manager.Manager
 	ClusterLister       listerv1.ClusterLister
+	ClusterWriter       cluster.ClusterWriter
+	RegistryLister      listerv1.RegistryLister
 	NodeLister          listerv1.NodeLister
 	NodeWriter          cluster.NodeWriter
-	ClusterWriter       cluster.ClusterWriter
 	OperationWriter     operation.Writer
 	CronBackupWriter    cluster.CronBackupWriter
 	CloudProviderLister listerv1.CloudProviderLister
@@ -77,7 +86,13 @@ func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informer
 	if err = c.Watch(source.NewKindWithCache(&v1.Cluster{}, cache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
-	if err = c.Watch(source.NewKindWithCache(&v1.Node{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsForCluster)); err != nil {
+	if err = c.Watch(source.NewKindWithCache(&v1.Node{}, cache),
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForCluster)); err != nil {
+		return err
+	}
+
+	if err = c.Watch(source.NewKindWithCache(&v1.Registry{}, cache),
+		handler.EnqueueRequestsFromMapFunc(r.findRegistryCluster)); err != nil {
 		return err
 	}
 
@@ -108,6 +123,33 @@ func (r *ClusterReconciler) findObjectsForCluster(objNode client.Object) []recon
 		}
 	}
 	return []reconcile.Request{}
+}
+
+func (r *ClusterReconciler) findRegistryCluster(obj client.Object) []reconcile.Request {
+	reg, ok := obj.(*v1.Registry)
+	if !ok {
+		return nil
+	}
+	clusters, err := r.ClusterLister.List(labels.Everything())
+	if err != nil {
+		return nil
+	}
+	var res []reconcile.Request
+	for _, cluster := range clusters {
+		for _, cReg := range cluster.ContainerRuntime.Registries {
+			ref := cReg.RegistryRef
+			if ref != nil && *ref == reg.Name {
+				res = append(res, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: cluster.Namespace,
+						Name:      cluster.Name,
+					},
+				})
+				break
+			}
+		}
+	}
+	return res
 }
 
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -164,6 +206,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	if err = r.updateClusterNode(ctx, clu, false); err != nil {
 		return ctrl.Result{}, err
+	}
+
+	if err := r.updateCRIRegistries(ctx, clu); err != nil {
+		return ctrl.Result{}, fmt.Errorf("updateCRIRegistries:%w", err)
 	}
 
 	return ctrl.Result{}, r.syncClusterClient(ctx, log, clu)
@@ -336,6 +382,180 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 	}
 	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s", apiServer), "kc-server", string(token))
 	return kubeconfig, nil
+}
+
+func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {
+	type mirror struct {
+		ImageRepoMirror string `json:"imageRepoMirror"`
+	}
+	insecureRegistry := append([]string{}, c.ContainerRuntime.InsecureRegistry...)
+	sort.Strings(insecureRegistry)
+	// add addons mirror registry
+	for _, a := range c.Addons {
+		var m mirror
+		err := json.Unmarshal(a.Config.Raw, &m)
+		if err != nil {
+			continue
+		}
+		if m.ImageRepoMirror != "" {
+			idx, ok := sort.Find(len(insecureRegistry), func(i int) int {
+				return strings.Compare(m.ImageRepoMirror, insecureRegistry[i])
+			})
+			if !ok {
+				if idx == len(insecureRegistry) {
+					insecureRegistry = append(insecureRegistry, m.ImageRepoMirror)
+				} else {
+					insecureRegistry = append(insecureRegistry[:idx+1], insecureRegistry[idx:]...)
+					insecureRegistry[idx] = m.ImageRepoMirror
+				}
+			}
+		}
+	}
+
+	registries := make([]v1.RegistrySpec, 0, len(insecureRegistry)*2+len(c.ContainerRuntime.Registries))
+	// insecure registry
+	for _, host := range insecureRegistry {
+		registries = appendUniqueRegistry(registries,
+			v1.RegistrySpec{Scheme: "http", Host: host},
+			v1.RegistrySpec{Scheme: "https", Host: host, SkipVerify: true})
+	}
+
+	validRegistries := c.ContainerRuntime.Registries[:0]
+	for _, reg := range c.ContainerRuntime.Registries {
+		if reg.RegistryRef == nil {
+			registries = appendUniqueRegistry(registries,
+				v1.RegistrySpec{Scheme: "http", Host: reg.InsecureRegistry},
+				v1.RegistrySpec{Scheme: "https", Host: reg.InsecureRegistry, SkipVerify: true})
+			validRegistries = append(validRegistries, reg)
+			continue
+		}
+		registry, err := r.RegistryLister.Get(*reg.RegistryRef)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		registries = appendUniqueRegistry(registries, registry.RegistrySpec)
+		validRegistries = append(validRegistries, reg)
+	}
+	c.ContainerRuntime.Registries = validRegistries
+
+	if !registriesEqual(c.Status.Registries, registries) {
+		c.Status.Registries = registries
+
+		clusterSelector, err := labels.NewRequirement(common.LabelClusterName, selection.Equals, []string{c.Name})
+		if err != nil {
+			return fmt.Errorf("new cluster node selector requirement:%w", err)
+		}
+		nodes, err := r.NodeLister.List(labels.NewSelector().Add(*clusterSelector))
+		if err != nil {
+			return fmt.Errorf("list")
+		}
+
+		o, err := criRegistryUpdateOperation(c, registries, nodes)
+		if err != nil {
+			return fmt.Errorf("criRegistryUpdateOperation:%w", err)
+		}
+		err = r.CmdDelivery.DeliverTaskOperation(ctx, o, &service.Options{DryRun: false})
+		if err != nil {
+			return fmt.Errorf("DeliverTaskOperation:%w", err)
+		}
+		c, err = r.ClusterWriter.UpdateCluster(ctx, c)
+		if err != nil {
+			return fmt.Errorf("update cluster:%w", err)
+		}
+	}
+	return nil
+}
+
+func criRegistryUpdateOperation(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Operation, error) {
+	var (
+		step     component.StepRunnable
+		identity string
+	)
+	switch cluster.ContainerRuntime.Type {
+	case v1.CRIDocker:
+		identity = cri.DockerInsecureRegistryConfigureIdentity
+		step = &cri.DockerInsecureRegistryConfigure{
+			InsecureRegistry: cri.ToDockerInsecureRegistry(registries),
+		}
+	case v1.CRIContainerd:
+		identity = cri.ContainerdRegistryConfigureIdentity
+		step = &cri.ContainerdRegistryConfigure{
+			Registries: cri.ToContainerdRegistryConfig(registries),
+			// TODO: get from config
+			ConfigDir: cri.ContainerdDefaultRegistryConfigDir,
+		}
+	default:
+		return nil, fmt.Errorf("unknown CRI type:%s", cluster.ContainerRuntime.Type)
+	}
+	stepData, err := json.Marshal(step)
+	if err != nil {
+		return nil, fmt.Errorf("step marshal:%w", err)
+	}
+	var allNodes []v1.StepNode
+	for _, node := range nodes {
+		allNodes = append(allNodes, v1.StepNode{
+			ID:       node.Name,
+			IPv4:     node.Status.Ipv4DefaultIP,
+			Hostname: node.Labels[common.LabelHostname],
+		})
+	}
+	return &v1.Operation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   uuid.New().String(),
+			Labels: nil,
+		},
+		Steps: []v1.Step{
+			{
+				Name:   "update-cri-registry-config",
+				Nodes:  nil,
+				Action: v1.ActionUpgrade,
+				Timeout: metav1.Duration{
+					Duration: time.Second * 30,
+				},
+				Commands: []v1.Command{
+					{
+						Type:          v1.CommandCustom,
+						Identity:      identity,
+						CustomCommand: stepData,
+					},
+				},
+			},
+		},
+	}, nil
+}
+
+// Use scheme and host as unique key
+func appendUniqueRegistry(s []v1.RegistrySpec, items ...v1.RegistrySpec) []v1.RegistrySpec {
+	for _, r := range items {
+		key := r.Scheme + r.Host
+		idx, ok := sort.Find(len(s), func(i int) int {
+			return strings.Compare(key, s[i].Scheme+s[i].Host)
+		})
+		if !ok {
+			if idx == len(s) {
+				s = append(s, r)
+			} else {
+				s = append(s[:idx+1], s[idx:]...)
+				s[idx] = r
+			}
+		}
+	}
+	return s
+}
+
+func registriesEqual(a, b []v1.RegistrySpec) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 var kubeconfigFormat = `
