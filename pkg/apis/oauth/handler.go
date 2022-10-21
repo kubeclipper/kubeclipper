@@ -327,10 +327,7 @@ func (h *handler) rateLimiterCounter(username string) error {
 			return err
 		}
 		count++
-		if err = h.cache.Update(key, strconv.Itoa(count)); err != nil {
-			return err
-		}
-		return nil
+		return h.cache.Update(key, strconv.Itoa(count))
 	}
 	return h.cache.Set(key, "1", h.authOptions.AuthenticateRateLimiterDuration)
 }

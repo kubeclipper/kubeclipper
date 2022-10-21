@@ -172,7 +172,6 @@ const KcServerConfigTmpl = `generic:
   tlsCertFile: ""
   tlsPrivateKey: ""
 authentication:
-  authenticateRateLimiterEnable: {{.AuthenticateRateLimiterEnable}}
   authenticateRateLimiterMaxTries: {{.AuthenticateRateLimiterMaxTries}}
   authenticateRateLimiterDuration: {{.AuthenticateRateLimiterDuration}}
   loginHistoryMaximumEntries: {{.LoginHistoryMaximumEntries}}

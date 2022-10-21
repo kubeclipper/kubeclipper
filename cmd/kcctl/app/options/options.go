@@ -472,7 +472,6 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod
 	data["MaximumEntries"] = c.AuditOpts.MaximumEntries
 	data["AuditLevel"] = c.AuditOpts.AuditLevel
-	data["AuthenticateRateLimiterEnable"] = c.AuthenticationOpts.AuthenticateRateLimiterEnable
 	data["AuthenticateRateLimiterMaxTries"] = c.AuthenticationOpts.AuthenticateRateLimiterMaxTries
 	data["AuthenticateRateLimiterDuration"] = c.AuthenticationOpts.AuthenticateRateLimiterDuration
 	data["LoginHistoryMaximumEntries"] = c.AuthenticationOpts.LoginHistoryMaximumEntries
