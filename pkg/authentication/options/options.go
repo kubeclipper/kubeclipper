@@ -30,6 +30,7 @@ import (
 )
 
 type AuthenticationOptions struct {
+	AuthenticateRateLimiterEnable   bool           `json:"authenticateRateLimiterEnable" yaml:"authenticateRateLimiterEnable"`
 	AuthenticateRateLimiterMaxTries int            `json:"authenticateRateLimiterMaxTries" yaml:"authenticateRateLimiterMaxTries"`
 	AuthenticateRateLimiterDuration time.Duration  `json:"authenticateRateLimiterDuration" yaml:"authenticateRateLimiterDuration"`
 	MaximumClockSkew                time.Duration  `json:"maximumClockSkew" yaml:"maximumClockSkew"`
@@ -43,6 +44,7 @@ type AuthenticationOptions struct {
 
 func NewAuthenticateOptions() *AuthenticationOptions {
 	return &AuthenticationOptions{
+		AuthenticateRateLimiterEnable:   false,
 		AuthenticateRateLimiterMaxTries: 5,
 		AuthenticateRateLimiterDuration: time.Minute * 30,
 		MaximumClockSkew:                10 * time.Second,
@@ -77,6 +79,7 @@ func (a *AuthenticationOptions) Validate() []error {
 
 func (a *AuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	a.MFAOptions.AddFlags(fs)
+	fs.BoolVar(&a.AuthenticateRateLimiterEnable, "authenticate-rate-limiter-enable", a.AuthenticateRateLimiterEnable, "")
 	fs.IntVar(&a.AuthenticateRateLimiterMaxTries, "authenticate-rate-limiter-max-retries", a.AuthenticateRateLimiterMaxTries, "")
 	fs.DurationVar(&a.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", a.AuthenticateRateLimiterDuration, "")
 	fs.BoolVar(&a.MultipleLogin, "multiple-login", a.MultipleLogin, "Allow multiple login with the same account, disable means only one user can login at the same time.")
