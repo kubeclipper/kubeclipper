@@ -278,7 +278,9 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 
 	if err := oauth.AddToContainer(s.container, iamOperator, tokenOperator,
 		auth.NewPasswordAuthenticator(iamOperator, s.Config.AuthenticationOptions),
-		auth.NewOauthAuthenticator(iamOperator, s.Config.AuthenticationOptions), auth.NewMFAAuthenticator(iamOperator, s.cache, s.Config.AuthenticationOptions.MFAOptions)); err != nil {
+		auth.NewOauthAuthenticator(iamOperator, s.Config.AuthenticationOptions),
+		auth.NewMFAAuthenticator(iamOperator, s.cache, s.Config.AuthenticationOptions.MFAOptions),
+		s.Config.AuthenticationOptions, s.cache); err != nil {
 		return err
 	}
 	addr := ""

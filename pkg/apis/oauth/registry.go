@@ -19,6 +19,8 @@
 package oauth
 
 import (
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
 	"net/http"
 
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
@@ -37,13 +39,14 @@ const (
 )
 
 func AddToContainer(c *restful.Container, operator iam.Operator, tokenOperator auth.TokenManagementInterface,
-	passwordAuthenticator auth.PasswordAuthenticator, oauth2Authenticator auth.OAuthAuthenticator, mfaAuthenticator auth.MFAAuthenticator) error {
+	passwordAuthenticator auth.PasswordAuthenticator, oauth2Authenticator auth.OAuthAuthenticator,
+	mfaAuthenticator auth.MFAAuthenticator, authOptions *options.AuthenticationOptions, cache cache.Interface) error {
 	ws := &restful.WebService{}
 	ws.Path("/oauth").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	h := newHandler(operator, tokenOperator, passwordAuthenticator, oauth2Authenticator, mfaAuthenticator)
+	h := newHandler(operator, tokenOperator, passwordAuthenticator, oauth2Authenticator, mfaAuthenticator, authOptions, cache)
 
 	ws.Route(ws.POST("/token").
 		Consumes("application/x-www-form-urlencoded").

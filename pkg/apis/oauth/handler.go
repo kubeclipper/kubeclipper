@@ -20,9 +20,13 @@ package oauth
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -44,6 +48,7 @@ const (
 	passwordGrantType     = "password"
 	refreshTokenGrantType = "refresh_token"
 	verificationCodeType  = "mfa"
+	rateLimitPrefix       = "auth-rate-limit-%s"
 )
 
 type LoginRequest struct {
@@ -57,17 +62,21 @@ type handler struct {
 	passwordAuthenticator auth.PasswordAuthenticator
 	oauth2Authenticator   auth.OAuthAuthenticator
 	mfaAuthenticator      auth.MFAAuthenticator
+	authOptions           *options.AuthenticationOptions
+	cache                 cache.Interface
 }
 
 func newHandler(operator iam.Operator, tokenOperator auth.TokenManagementInterface,
 	passwordAuthenticator auth.PasswordAuthenticator, oauth2Authenticator auth.OAuthAuthenticator,
-	mfaAuthenticator auth.MFAAuthenticator) *handler {
+	mfaAuthenticator auth.MFAAuthenticator, authOptions *options.AuthenticationOptions, cache cache.Interface) *handler {
 	return &handler{
 		iamOperator:           operator,
 		tokenOperator:         tokenOperator,
 		passwordAuthenticator: passwordAuthenticator,
 		oauth2Authenticator:   oauth2Authenticator,
 		mfaAuthenticator:      mfaAuthenticator,
+		authOptions:           authOptions,
+		cache:                 cache,
 	}
 }
 
@@ -125,6 +134,14 @@ func (h *handler) SendVerificationCode(req *restful.Request, response *restful.R
 }
 
 func (h *handler) passwordGrant(username string, password string, req *restful.Request, response *restful.Response) {
+	if err := h.rateLimiterChecker(username); err != nil {
+		if errors.Is(err, auth.ErrRateLimitExceeded) {
+			restplus.HandleTooManyRequests(response, req, fmt.Errorf("too many password errors, please try again in %d minutes", int(h.authOptions.AuthenticateRateLimiterDuration.Minutes())))
+			return
+		}
+		restplus.HandleInternalError(response, req, err)
+		return
+	}
 	authenticated, provider, err := h.passwordAuthenticator.Authenticate(username, password)
 	if err != nil {
 		formatErr := fmt.Errorf("incorrect username or password")
@@ -136,7 +153,8 @@ func (h *handler) passwordGrant(username string, password string, req *restful.R
 			restplus.HandleUnauthorized(response, req, formatErr)
 			return
 		case auth.ErrIncorrectPassword:
-			go h.recordLogin(username, iamv1.TokenLogin, provider, netutil.GetRequestIP(req.Request), req.Request.UserAgent(), err)
+			_ = h.rateLimiterCounter(username)
+			h.recordLogin(username, iamv1.TokenLogin, provider, netutil.GetRequestIP(req.Request), req.Request.UserAgent(), err)
 			restplus.HandleUnauthorized(response, req, formatErr)
 			return
 		case auth.ErrRateLimitExceeded:
@@ -169,6 +187,7 @@ func (h *handler) passwordGrant(username string, password string, req *restful.R
 	logger.Debug("user auth successful", zap.String("username", username),
 		zap.String("provider", provider), zap.Strings("user_groups", authenticated.GetGroups()))
 
+	_ = h.rateLimiterFinalizer(username)
 	go h.recordLogin(username, iamv1.TokenLogin, provider, netutil.GetRequestIP(req.Request), req.Request.UserAgent(), nil)
 	_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 }
@@ -271,4 +290,48 @@ func (h *handler) callback(req *restful.Request, response *restful.Response) {
 	}
 	go h.recordLogin(authenticated.GetName(), iamv1.OAuthLogin, provider, netutil.GetRequestIP(req.Request), req.Request.UserAgent(), nil)
 	_ = response.WriteEntity(result)
+}
+
+func (h *handler) rateLimiterChecker(username string) error {
+	key := fmt.Sprintf(rateLimitPrefix, username)
+	str, err := h.cache.Get(key)
+	if err != nil {
+		if cache.IsNotExists(err) {
+			return nil
+		}
+		return err
+	}
+	count, err := strconv.Atoi(str)
+	if err != nil {
+		return err
+	}
+	if count >= h.authOptions.AuthenticateRateLimiterMaxTries {
+		return auth.ErrRateLimitExceeded
+	}
+	return nil
+}
+
+func (h *handler) rateLimiterCounter(username string) error {
+	key := fmt.Sprintf(rateLimitPrefix, username)
+	exist, err := h.cache.Exist(key)
+	if err != nil {
+		return err
+	}
+	if exist {
+		str, err := h.cache.Get(key)
+		if err != nil {
+			return err
+		}
+		count, err := strconv.Atoi(str)
+		if err != nil {
+			return err
+		}
+		count++
+		return h.cache.Update(key, strconv.Itoa(count))
+	}
+	return h.cache.Set(key, "1", h.authOptions.AuthenticateRateLimiterDuration)
+}
+
+func (h *handler) rateLimiterFinalizer(username string) error {
+	return h.cache.Remove(fmt.Sprintf(rateLimitPrefix, username))
 }

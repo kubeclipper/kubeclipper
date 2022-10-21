@@ -160,6 +160,8 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
 	cmd.Flags().StringArrayVar(&o.fips, "float-ip", o.fips, "Kc agent ip and float ip.")
+	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterMaxTries, "authenticate-rate-limiter-max-retries", o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterMaxTries, "maximum number of retry times within the valid period")
+	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "specifies the lock duration of the user")
 	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period", o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")
 	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries", o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
 	o.deployConfig.AddFlags(cmd.Flags())

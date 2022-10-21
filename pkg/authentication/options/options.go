@@ -44,7 +44,7 @@ type AuthenticationOptions struct {
 func NewAuthenticateOptions() *AuthenticationOptions {
 	return &AuthenticationOptions{
 		AuthenticateRateLimiterMaxTries: 5,
-		AuthenticateRateLimiterDuration: time.Minute * 30,
+		AuthenticateRateLimiterDuration: time.Minute * 10,
 		MaximumClockSkew:                10 * time.Second,
 		LoginHistoryRetentionPeriod:     time.Hour * 24 * 7,
 		LoginHistoryMaximumEntries:      100,
