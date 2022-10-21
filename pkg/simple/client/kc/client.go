@@ -20,10 +20,13 @@ package kc
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
 )
 
 const (
@@ -40,13 +43,25 @@ type Client struct {
 func FromConfig(c config.Config) (*Client, error) {
 	ctx := c.Contexts[c.CurrentContext]
 
-	return NewClientWithOpts(WithHost(c.Servers[ctx.Server].Server),
+	cli, err := NewClientWithOpts(WithHost(c.Servers[ctx.Server].Server),
 		WithScheme("http"),
 		WithBearerAuth(c.AuthInfos[ctx.AuthInfo].Token))
+	if err != nil {
+		return nil, err
+	}
+
+	// call api to  check is token valid
+	q := query.New()
+	if _, err = cli.ListConfigMaps(context.TODO(), Queries(*q)); err != nil {
+		if strings.Contains(err.Error(), "Unauthorized") {
+			return nil, errors.New("unauthorized,please use kcctl login cmd to login first")
+		}
+		return nil, err
+	}
+	return cli, nil
 }
 
 func NewClientWithOpts(opts ...Opt) (*Client, error) {
-
 	c := &Client{
 		client: http.DefaultClient,
 		scheme: defaultHTTPScheme,

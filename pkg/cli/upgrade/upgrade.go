@@ -9,7 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
 
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
@@ -49,7 +52,7 @@ const (
   kcctl upgrade agent --pkg /tmp/kc-agent.tar.gz
 
   # Upgrade agent of kubeclipper platform use your own binary file
-  kcctl upgrade agent --pkg /tmp/kubeclipper-server --binary`
+  kcctl upgrade agent --pkg /tmp/kubeclipper-agent --binary`
 )
 
 var (
@@ -104,7 +107,6 @@ func NewCmdUpgrade(stream options.IOStreams) *cobra.Command {
 			utils.CheckErr(o.RunUpgrade())
 		},
 	}
-	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "deploy-config file path.")
 	cmd.Flags().StringVar(&o.pkg, "pkg", o.pkg, "Path to the package used for the upgrade")
 	cmd.Flags().BoolVar(&o.binary, "binary", o.binary, "Upgrade with the specified binary file")
 	cmd.Flags().BoolVar(&o.online, "online", o.online, "upgrade with online package")
@@ -114,20 +116,19 @@ func NewCmdUpgrade(stream options.IOStreams) *cobra.Command {
 }
 
 func (o *UpgradeOptions) Complete() error {
-	if err := o.deployConfig.Complete(); err != nil {
-		return nil
-	}
-	if o.deployConfig.ServerIPs == nil {
-		return fmt.Errorf("server node can't be empty, please check deploy-config file")
-	}
-	if err := o.CliOpts.Complete(); err != nil {
+	var err error
+	if err = o.CliOpts.Complete(); err != nil {
 		return err
 	}
-	c, err := kc.FromConfig(o.CliOpts.ToRawConfig())
+	o.client, err = kc.FromConfig(o.CliOpts.ToRawConfig())
 	if err != nil {
 		return err
 	}
-	o.client = c
+
+	o.deployConfig, err = deploy.GetDeployConfig(context.Background(), o.client, true)
+	if err != nil {
+		return errors.WithMessage(err, "get online deploy-config failed")
+	}
 	return nil
 }
 

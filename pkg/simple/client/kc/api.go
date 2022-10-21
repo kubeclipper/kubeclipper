@@ -436,7 +436,7 @@ func (cli *Client) DeleteConfigMap(ctx context.Context, name string) error {
 }
 
 func (cli *Client) UpdateConfigMap(ctx context.Context, cm *v1.ConfigMap) (*ConfigMapList, error) {
-	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", configmapPath, cm.Name), nil, nil, nil)
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", configmapPath, cm.Name), nil, cm, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
