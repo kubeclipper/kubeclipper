@@ -25,11 +25,27 @@ import (
 )
 
 func init() {
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeStep), &ContainerdRunnable{}); err != nil {
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeStep),
+		&ContainerdRunnable{}); err != nil {
 		panic(err)
 	}
 
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeStep), &DockerRunnable{}); err != nil {
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeStep),
+		&DockerRunnable{}); err != nil {
+		panic(err)
+	}
+
+	if err := component.RegisterAgentStep(
+		ContainerdRegistryConfigureIdentity,
+		&ContainerdRegistryConfigure{}); err != nil {
+		panic(err)
+	}
+
+	if err := component.RegisterAgentStep(
+		DockerInsecureRegistryConfigureIdentity,
+		&DockerInsecureRegistryConfigure{}); err != nil {
 		panic(err)
 	}
 }
@@ -49,9 +65,16 @@ const (
 
 	// containerdDefaultVersion    = "1.6.4"
 	containerdDefaultConfigDir         = "/etc/containerd"
-	containerdDefaultRegistryConfigDir = "/etc/containerd/certs.d"
+	ContainerdDefaultRegistryConfigDir = "/etc/containerd/certs.d"
 	// containerdDefaultSystemdDir = "/etc/systemd/system"
 	containerdDefaultDataDir = "/var/lib/containerd"
+)
+
+var (
+	DockerInsecureRegistryConfigureIdentity = fmt.Sprintf(
+		component.RegisterStepKeyFormat, criDocker, criVersion, component.TypeRegistryConfigure)
+	ContainerdRegistryConfigureIdentity = fmt.Sprintf(
+		component.RegisterStepKeyFormat, criContainerd, criVersion, component.TypeRegistryConfigure)
 )
 
 var k8sMatchPauseVersion = map[string]string{

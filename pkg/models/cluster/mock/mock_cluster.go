@@ -587,18 +587,18 @@ func (m *MockOperatorWriter) EXPECT() *MockOperatorWriterMockRecorder {
 }
 
 // CreateBackup mocks base method.
-func (m *MockOperatorWriter) CreateBackup(ctc context.Context, backup *v1.Backup) (*v1.Backup, error) {
+func (m *MockOperatorWriter) CreateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBackup", ctc, backup)
+	ret := m.ctrl.Call(m, "CreateBackup", ctx, backup)
 	ret0, _ := ret[0].(*v1.Backup)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateBackup indicates an expected call of CreateBackup.
-func (mr *MockOperatorWriterMockRecorder) CreateBackup(ctc, backup interface{}) *gomock.Call {
+func (mr *MockOperatorWriterMockRecorder) CreateBackup(ctx, backup interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockOperatorWriter)(nil).CreateBackup), ctc, backup)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockOperatorWriter)(nil).CreateBackup), ctx, backup)
 }
 
 // CreateBackupPoint mocks base method.
@@ -647,18 +647,18 @@ func (mr *MockOperatorWriterMockRecorder) CreateCronBackup(ctx, cronBackup inter
 }
 
 // CreateDomain mocks base method.
-func (m *MockOperatorWriter) CreateDomain(ctc context.Context, domain *v1.Domain) (*v1.Domain, error) {
+func (m *MockOperatorWriter) CreateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateDomain", ctc, domain)
+	ret := m.ctrl.Call(m, "CreateDomain", ctx, domain)
 	ret0, _ := ret[0].(*v1.Domain)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateDomain indicates an expected call of CreateDomain.
-func (mr *MockOperatorWriterMockRecorder) CreateDomain(ctc, domain interface{}) *gomock.Call {
+func (mr *MockOperatorWriterMockRecorder) CreateDomain(ctx, domain interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDomain", reflect.TypeOf((*MockOperatorWriter)(nil).CreateDomain), ctc, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDomain", reflect.TypeOf((*MockOperatorWriter)(nil).CreateDomain), ctx, domain)
 }
 
 // CreateNode mocks base method.
@@ -917,18 +917,18 @@ func (m *MockOperator) EXPECT() *MockOperatorMockRecorder {
 }
 
 // CreateBackup mocks base method.
-func (m *MockOperator) CreateBackup(ctc context.Context, backup *v1.Backup) (*v1.Backup, error) {
+func (m *MockOperator) CreateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBackup", ctc, backup)
+	ret := m.ctrl.Call(m, "CreateBackup", ctx, backup)
 	ret0, _ := ret[0].(*v1.Backup)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateBackup indicates an expected call of CreateBackup.
-func (mr *MockOperatorMockRecorder) CreateBackup(ctc, backup interface{}) *gomock.Call {
+func (mr *MockOperatorMockRecorder) CreateBackup(ctx, backup interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockOperator)(nil).CreateBackup), ctc, backup)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockOperator)(nil).CreateBackup), ctx, backup)
 }
 
 // CreateBackupPoint mocks base method.
@@ -947,18 +947,18 @@ func (mr *MockOperatorMockRecorder) CreateBackupPoint(ctx, backupPoint interface
 }
 
 // CreateCloudProvider mocks base method.
-func (m *MockOperator) CreateCloudProvider(ctc context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+func (m *MockOperator) CreateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateCloudProvider", ctc, domain)
+	ret := m.ctrl.Call(m, "CreateCloudProvider", ctx, cp)
 	ret0, _ := ret[0].(*v1.CloudProvider)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateCloudProvider indicates an expected call of CreateCloudProvider.
-func (mr *MockOperatorMockRecorder) CreateCloudProvider(ctc, domain interface{}) *gomock.Call {
+func (mr *MockOperatorMockRecorder) CreateCloudProvider(ctx, cp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudProvider", reflect.TypeOf((*MockOperator)(nil).CreateCloudProvider), ctc, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudProvider", reflect.TypeOf((*MockOperator)(nil).CreateCloudProvider), ctx, cp)
 }
 
 // CreateCluster mocks base method.
@@ -992,18 +992,18 @@ func (mr *MockOperatorMockRecorder) CreateCronBackup(ctx, cronBackup interface{}
 }
 
 // CreateDomain mocks base method.
-func (m *MockOperator) CreateDomain(ctc context.Context, domain *v1.Domain) (*v1.Domain, error) {
+func (m *MockOperator) CreateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateDomain", ctc, domain)
+	ret := m.ctrl.Call(m, "CreateDomain", ctx, domain)
 	ret0, _ := ret[0].(*v1.Domain)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateDomain indicates an expected call of CreateDomain.
-func (mr *MockOperatorMockRecorder) CreateDomain(ctc, domain interface{}) *gomock.Call {
+func (mr *MockOperatorMockRecorder) CreateDomain(ctx, domain interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDomain", reflect.TypeOf((*MockOperator)(nil).CreateDomain), ctc, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDomain", reflect.TypeOf((*MockOperator)(nil).CreateDomain), ctx, domain)
 }
 
 // CreateNode mocks base method.
@@ -1036,19 +1036,34 @@ func (mr *MockOperatorMockRecorder) CreateRegion(ctx, region interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRegion", reflect.TypeOf((*MockOperator)(nil).CreateRegion), ctx, region)
 }
 
-// CreateTemplate mocks base method.
-func (m *MockOperator) CreateTemplate(ctc context.Context, template *v1.Template) (*v1.Template, error) {
+// CreateRegistry mocks base method.
+func (m *MockOperator) CreateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateTemplate", ctc, template)
+	ret := m.ctrl.Call(m, "CreateRegistry", ctx, r)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRegistry indicates an expected call of CreateRegistry.
+func (mr *MockOperatorMockRecorder) CreateRegistry(ctx, r interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRegistry", reflect.TypeOf((*MockOperator)(nil).CreateRegistry), ctx, r)
+}
+
+// CreateTemplate mocks base method.
+func (m *MockOperator) CreateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateTemplate", ctx, template)
 	ret0, _ := ret[0].(*v1.Template)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateTemplate indicates an expected call of CreateTemplate.
-func (mr *MockOperatorMockRecorder) CreateTemplate(ctc, template interface{}) *gomock.Call {
+func (mr *MockOperatorMockRecorder) CreateTemplate(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTemplate", reflect.TypeOf((*MockOperator)(nil).CreateTemplate), ctc, template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTemplate", reflect.TypeOf((*MockOperator)(nil).CreateTemplate), ctx, template)
 }
 
 // DeleteBackup mocks base method.
@@ -1175,6 +1190,20 @@ func (m *MockOperator) DeleteRegion(ctx context.Context, name string) error {
 func (mr *MockOperatorMockRecorder) DeleteRegion(ctx, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRegion", reflect.TypeOf((*MockOperator)(nil).DeleteRegion), ctx, name)
+}
+
+// DeleteRegistry mocks base method.
+func (m *MockOperator) DeleteRegistry(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRegistry", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRegistry indicates an expected call of DeleteRegistry.
+func (mr *MockOperatorMockRecorder) DeleteRegistry(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRegistry", reflect.TypeOf((*MockOperator)(nil).DeleteRegistry), ctx, name)
 }
 
 // DeleteTemplate mocks base method.
@@ -1428,6 +1457,36 @@ func (m *MockOperator) GetRegionEx(ctx context.Context, name, resourceVersion st
 func (mr *MockOperatorMockRecorder) GetRegionEx(ctx, name, resourceVersion interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegionEx", reflect.TypeOf((*MockOperator)(nil).GetRegionEx), ctx, name, resourceVersion)
+}
+
+// GetRegistry mocks base method.
+func (m *MockOperator) GetRegistry(ctx context.Context, name string) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistry", ctx, name)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegistry indicates an expected call of GetRegistry.
+func (mr *MockOperatorMockRecorder) GetRegistry(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistry", reflect.TypeOf((*MockOperator)(nil).GetRegistry), ctx, name)
+}
+
+// GetRegistryEx mocks base method.
+func (m *MockOperator) GetRegistryEx(ctx context.Context, name, resourceVersion string) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistryEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegistryEx indicates an expected call of GetRegistryEx.
+func (mr *MockOperatorMockRecorder) GetRegistryEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistryEx", reflect.TypeOf((*MockOperator)(nil).GetRegistryEx), ctx, name, resourceVersion)
 }
 
 // GetTemplate mocks base method.
@@ -1715,6 +1774,36 @@ func (mr *MockOperatorMockRecorder) ListRegions(ctx, query interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegions", reflect.TypeOf((*MockOperator)(nil).ListRegions), ctx, query)
 }
 
+// ListRegistries mocks base method.
+func (m *MockOperator) ListRegistries(ctx context.Context, query *query.Query) (*v1.RegistryList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRegistries", ctx, query)
+	ret0, _ := ret[0].(*v1.RegistryList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRegistries indicates an expected call of ListRegistries.
+func (mr *MockOperatorMockRecorder) ListRegistries(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegistries", reflect.TypeOf((*MockOperator)(nil).ListRegistries), ctx, query)
+}
+
+// ListRegistriesEx mocks base method.
+func (m *MockOperator) ListRegistriesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRegistriesEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRegistriesEx indicates an expected call of ListRegistriesEx.
+func (mr *MockOperatorMockRecorder) ListRegistriesEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegistriesEx", reflect.TypeOf((*MockOperator)(nil).ListRegistriesEx), ctx, query)
+}
+
 // ListTemplates mocks base method.
 func (m *MockOperator) ListTemplates(ctx context.Context, query *query.Query) (*v1.TemplateList, error) {
 	m.ctrl.T.Helper()
@@ -1776,18 +1865,18 @@ func (mr *MockOperatorMockRecorder) UpdateBackupPoint(ctx, backupPoint interface
 }
 
 // UpdateCloudProvider mocks base method.
-func (m *MockOperator) UpdateCloudProvider(ctx context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+func (m *MockOperator) UpdateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateCloudProvider", ctx, domain)
+	ret := m.ctrl.Call(m, "UpdateCloudProvider", ctx, cp)
 	ret0, _ := ret[0].(*v1.CloudProvider)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateCloudProvider indicates an expected call of UpdateCloudProvider.
-func (mr *MockOperatorMockRecorder) UpdateCloudProvider(ctx, domain interface{}) *gomock.Call {
+func (mr *MockOperatorMockRecorder) UpdateCloudProvider(ctx, cp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudProvider", reflect.TypeOf((*MockOperator)(nil).UpdateCloudProvider), ctx, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudProvider", reflect.TypeOf((*MockOperator)(nil).UpdateCloudProvider), ctx, cp)
 }
 
 // UpdateCluster mocks base method.
@@ -1848,6 +1937,21 @@ func (m *MockOperator) UpdateNode(ctx context.Context, node *v1.Node) (*v1.Node,
 func (mr *MockOperatorMockRecorder) UpdateNode(ctx, node interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNode", reflect.TypeOf((*MockOperator)(nil).UpdateNode), ctx, node)
+}
+
+// UpdateRegistry mocks base method.
+func (m *MockOperator) UpdateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRegistry", ctx, r)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRegistry indicates an expected call of UpdateRegistry.
+func (mr *MockOperatorMockRecorder) UpdateRegistry(ctx, r interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRegistry", reflect.TypeOf((*MockOperator)(nil).UpdateRegistry), ctx, r)
 }
 
 // UpdateTemplate mocks base method.
@@ -1983,6 +2087,21 @@ func (m *MockOperator) WatchRegions(ctx context.Context, query *query.Query) (wa
 func (mr *MockOperatorMockRecorder) WatchRegions(ctx, query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchRegions", reflect.TypeOf((*MockOperator)(nil).WatchRegions), ctx, query)
+}
+
+// WatchRegistries mocks base method.
+func (m *MockOperator) WatchRegistries(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchRegistries", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchRegistries indicates an expected call of WatchRegistries.
+func (mr *MockOperatorMockRecorder) WatchRegistries(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchRegistries", reflect.TypeOf((*MockOperator)(nil).WatchRegistries), ctx, query)
 }
 
 // WatchTemplates mocks base method.
@@ -2814,18 +2933,18 @@ func (m *MockBackupWriter) EXPECT() *MockBackupWriterMockRecorder {
 }
 
 // CreateBackup mocks base method.
-func (m *MockBackupWriter) CreateBackup(ctc context.Context, backup *v1.Backup) (*v1.Backup, error) {
+func (m *MockBackupWriter) CreateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBackup", ctc, backup)
+	ret := m.ctrl.Call(m, "CreateBackup", ctx, backup)
 	ret0, _ := ret[0].(*v1.Backup)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateBackup indicates an expected call of CreateBackup.
-func (mr *MockBackupWriterMockRecorder) CreateBackup(ctc, backup interface{}) *gomock.Call {
+func (mr *MockBackupWriterMockRecorder) CreateBackup(ctx, backup interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockBackupWriter)(nil).CreateBackup), ctc, backup)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBackup", reflect.TypeOf((*MockBackupWriter)(nil).CreateBackup), ctx, backup)
 }
 
 // DeleteBackup mocks base method.
@@ -3032,18 +3151,18 @@ func (m *MockRecoveryWriter) EXPECT() *MockRecoveryWriterMockRecorder {
 }
 
 // CreateRecovery mocks base method.
-func (m *MockRecoveryWriter) CreateRecovery(ctc context.Context, recovery *v1.Recovery) (*v1.Recovery, error) {
+func (m *MockRecoveryWriter) CreateRecovery(ctx context.Context, recovery *v1.Recovery) (*v1.Recovery, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRecovery", ctc, recovery)
+	ret := m.ctrl.Call(m, "CreateRecovery", ctx, recovery)
 	ret0, _ := ret[0].(*v1.Recovery)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateRecovery indicates an expected call of CreateRecovery.
-func (mr *MockRecoveryWriterMockRecorder) CreateRecovery(ctc, recovery interface{}) *gomock.Call {
+func (mr *MockRecoveryWriterMockRecorder) CreateRecovery(ctx, recovery interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRecovery", reflect.TypeOf((*MockRecoveryWriter)(nil).CreateRecovery), ctc, recovery)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRecovery", reflect.TypeOf((*MockRecoveryWriter)(nil).CreateRecovery), ctx, recovery)
 }
 
 // DeleteRecovery mocks base method.
@@ -3700,18 +3819,18 @@ func (m *MockDNSWriter) EXPECT() *MockDNSWriterMockRecorder {
 }
 
 // CreateDomain mocks base method.
-func (m *MockDNSWriter) CreateDomain(ctc context.Context, domain *v1.Domain) (*v1.Domain, error) {
+func (m *MockDNSWriter) CreateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateDomain", ctc, domain)
+	ret := m.ctrl.Call(m, "CreateDomain", ctx, domain)
 	ret0, _ := ret[0].(*v1.Domain)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateDomain indicates an expected call of CreateDomain.
-func (mr *MockDNSWriterMockRecorder) CreateDomain(ctc, domain interface{}) *gomock.Call {
+func (mr *MockDNSWriterMockRecorder) CreateDomain(ctx, domain interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDomain", reflect.TypeOf((*MockDNSWriter)(nil).CreateDomain), ctc, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDomain", reflect.TypeOf((*MockDNSWriter)(nil).CreateDomain), ctx, domain)
 }
 
 // DeleteDomain mocks base method.
@@ -3918,18 +4037,18 @@ func (m *MockTemplateWriter) EXPECT() *MockTemplateWriterMockRecorder {
 }
 
 // CreateTemplate mocks base method.
-func (m *MockTemplateWriter) CreateTemplate(ctc context.Context, template *v1.Template) (*v1.Template, error) {
+func (m *MockTemplateWriter) CreateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateTemplate", ctc, template)
+	ret := m.ctrl.Call(m, "CreateTemplate", ctx, template)
 	ret0, _ := ret[0].(*v1.Template)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateTemplate indicates an expected call of CreateTemplate.
-func (mr *MockTemplateWriterMockRecorder) CreateTemplate(ctc, template interface{}) *gomock.Call {
+func (mr *MockTemplateWriterMockRecorder) CreateTemplate(ctx, template interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTemplate", reflect.TypeOf((*MockTemplateWriter)(nil).CreateTemplate), ctc, template)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateTemplate", reflect.TypeOf((*MockTemplateWriter)(nil).CreateTemplate), ctx, template)
 }
 
 // DeleteTemplate mocks base method.
@@ -4150,18 +4269,18 @@ func (m *MockCloudProviderWriter) EXPECT() *MockCloudProviderWriterMockRecorder 
 }
 
 // CreateCloudProvider mocks base method.
-func (m *MockCloudProviderWriter) CreateCloudProvider(ctc context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+func (m *MockCloudProviderWriter) CreateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateCloudProvider", ctc, domain)
+	ret := m.ctrl.Call(m, "CreateCloudProvider", ctx, cp)
 	ret0, _ := ret[0].(*v1.CloudProvider)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateCloudProvider indicates an expected call of CreateCloudProvider.
-func (mr *MockCloudProviderWriterMockRecorder) CreateCloudProvider(ctc, domain interface{}) *gomock.Call {
+func (mr *MockCloudProviderWriterMockRecorder) CreateCloudProvider(ctx, cp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).CreateCloudProvider), ctc, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).CreateCloudProvider), ctx, cp)
 }
 
 // DeleteCloudProvider mocks base method.
@@ -4179,16 +4298,234 @@ func (mr *MockCloudProviderWriterMockRecorder) DeleteCloudProvider(ctx, name int
 }
 
 // UpdateCloudProvider mocks base method.
-func (m *MockCloudProviderWriter) UpdateCloudProvider(ctx context.Context, domain *v1.CloudProvider) (*v1.CloudProvider, error) {
+func (m *MockCloudProviderWriter) UpdateCloudProvider(ctx context.Context, cp *v1.CloudProvider) (*v1.CloudProvider, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateCloudProvider", ctx, domain)
+	ret := m.ctrl.Call(m, "UpdateCloudProvider", ctx, cp)
 	ret0, _ := ret[0].(*v1.CloudProvider)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateCloudProvider indicates an expected call of UpdateCloudProvider.
-func (mr *MockCloudProviderWriterMockRecorder) UpdateCloudProvider(ctx, domain interface{}) *gomock.Call {
+func (mr *MockCloudProviderWriterMockRecorder) UpdateCloudProvider(ctx, cp interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).UpdateCloudProvider), ctx, domain)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudProvider", reflect.TypeOf((*MockCloudProviderWriter)(nil).UpdateCloudProvider), ctx, cp)
+}
+
+// MockRegistryReader is a mock of RegistryReader interface.
+type MockRegistryReader struct {
+	ctrl     *gomock.Controller
+	recorder *MockRegistryReaderMockRecorder
+}
+
+// MockRegistryReaderMockRecorder is the mock recorder for MockRegistryReader.
+type MockRegistryReaderMockRecorder struct {
+	mock *MockRegistryReader
+}
+
+// NewMockRegistryReader creates a new mock instance.
+func NewMockRegistryReader(ctrl *gomock.Controller) *MockRegistryReader {
+	mock := &MockRegistryReader{ctrl: ctrl}
+	mock.recorder = &MockRegistryReaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRegistryReader) EXPECT() *MockRegistryReaderMockRecorder {
+	return m.recorder
+}
+
+// GetRegistry mocks base method.
+func (m *MockRegistryReader) GetRegistry(ctx context.Context, name string) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistry", ctx, name)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegistry indicates an expected call of GetRegistry.
+func (mr *MockRegistryReaderMockRecorder) GetRegistry(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistry", reflect.TypeOf((*MockRegistryReader)(nil).GetRegistry), ctx, name)
+}
+
+// GetRegistryEx mocks base method.
+func (m *MockRegistryReader) GetRegistryEx(ctx context.Context, name, resourceVersion string) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistryEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegistryEx indicates an expected call of GetRegistryEx.
+func (mr *MockRegistryReaderMockRecorder) GetRegistryEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistryEx", reflect.TypeOf((*MockRegistryReader)(nil).GetRegistryEx), ctx, name, resourceVersion)
+}
+
+// ListRegistries mocks base method.
+func (m *MockRegistryReader) ListRegistries(ctx context.Context, query *query.Query) (*v1.RegistryList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRegistries", ctx, query)
+	ret0, _ := ret[0].(*v1.RegistryList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRegistries indicates an expected call of ListRegistries.
+func (mr *MockRegistryReaderMockRecorder) ListRegistries(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegistries", reflect.TypeOf((*MockRegistryReader)(nil).ListRegistries), ctx, query)
+}
+
+// ListRegistriesEx mocks base method.
+func (m *MockRegistryReader) ListRegistriesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRegistriesEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRegistriesEx indicates an expected call of ListRegistriesEx.
+func (mr *MockRegistryReaderMockRecorder) ListRegistriesEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegistriesEx", reflect.TypeOf((*MockRegistryReader)(nil).ListRegistriesEx), ctx, query)
+}
+
+// WatchRegistries mocks base method.
+func (m *MockRegistryReader) WatchRegistries(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchRegistries", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchRegistries indicates an expected call of WatchRegistries.
+func (mr *MockRegistryReaderMockRecorder) WatchRegistries(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchRegistries", reflect.TypeOf((*MockRegistryReader)(nil).WatchRegistries), ctx, query)
+}
+
+// MockRegistryEx is a mock of RegistryEx interface.
+type MockRegistryEx struct {
+	ctrl     *gomock.Controller
+	recorder *MockRegistryExMockRecorder
+}
+
+// MockRegistryExMockRecorder is the mock recorder for MockRegistryEx.
+type MockRegistryExMockRecorder struct {
+	mock *MockRegistryEx
+}
+
+// NewMockRegistryEx creates a new mock instance.
+func NewMockRegistryEx(ctrl *gomock.Controller) *MockRegistryEx {
+	mock := &MockRegistryEx{ctrl: ctrl}
+	mock.recorder = &MockRegistryExMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRegistryEx) EXPECT() *MockRegistryExMockRecorder {
+	return m.recorder
+}
+
+// GetRegistryEx mocks base method.
+func (m *MockRegistryEx) GetRegistryEx(ctx context.Context, name, resourceVersion string) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistryEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRegistryEx indicates an expected call of GetRegistryEx.
+func (mr *MockRegistryExMockRecorder) GetRegistryEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistryEx", reflect.TypeOf((*MockRegistryEx)(nil).GetRegistryEx), ctx, name, resourceVersion)
+}
+
+// ListRegistriesEx mocks base method.
+func (m *MockRegistryEx) ListRegistriesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRegistriesEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRegistriesEx indicates an expected call of ListRegistriesEx.
+func (mr *MockRegistryExMockRecorder) ListRegistriesEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRegistriesEx", reflect.TypeOf((*MockRegistryEx)(nil).ListRegistriesEx), ctx, query)
+}
+
+// MockRegistryWriter is a mock of RegistryWriter interface.
+type MockRegistryWriter struct {
+	ctrl     *gomock.Controller
+	recorder *MockRegistryWriterMockRecorder
+}
+
+// MockRegistryWriterMockRecorder is the mock recorder for MockRegistryWriter.
+type MockRegistryWriterMockRecorder struct {
+	mock *MockRegistryWriter
+}
+
+// NewMockRegistryWriter creates a new mock instance.
+func NewMockRegistryWriter(ctrl *gomock.Controller) *MockRegistryWriter {
+	mock := &MockRegistryWriter{ctrl: ctrl}
+	mock.recorder = &MockRegistryWriterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRegistryWriter) EXPECT() *MockRegistryWriterMockRecorder {
+	return m.recorder
+}
+
+// CreateRegistry mocks base method.
+func (m *MockRegistryWriter) CreateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRegistry", ctx, r)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRegistry indicates an expected call of CreateRegistry.
+func (mr *MockRegistryWriterMockRecorder) CreateRegistry(ctx, r interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRegistry", reflect.TypeOf((*MockRegistryWriter)(nil).CreateRegistry), ctx, r)
+}
+
+// DeleteRegistry mocks base method.
+func (m *MockRegistryWriter) DeleteRegistry(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRegistry", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRegistry indicates an expected call of DeleteRegistry.
+func (mr *MockRegistryWriterMockRecorder) DeleteRegistry(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRegistry", reflect.TypeOf((*MockRegistryWriter)(nil).DeleteRegistry), ctx, name)
+}
+
+// UpdateRegistry mocks base method.
+func (m *MockRegistryWriter) UpdateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRegistry", ctx, r)
+	ret0, _ := ret[0].(*v1.Registry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRegistry indicates an expected call of UpdateRegistry.
+func (mr *MockRegistryWriterMockRecorder) UpdateRegistry(ctx, r interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRegistry", reflect.TypeOf((*MockRegistryWriter)(nil).UpdateRegistry), ctx, r)
 }

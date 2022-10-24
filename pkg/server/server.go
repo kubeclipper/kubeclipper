@@ -248,6 +248,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		s.storageFactory.DNSDomains(),
 		s.storageFactory.Template(),
 		s.storageFactory.CloudProvider(),
+		s.storageFactory.Registry(),
 	)
 	coreOperator := core.NewOperator(s.storageFactory.ConfigMaps())
 	leaseOperator := lease.NewLeaseOperator(s.storageFactory.Leases())
@@ -388,6 +389,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		storageFactory.DNSDomains(),
 		storageFactory.Template(),
 		storageFactory.CloudProvider(),
+		storageFactory.Registry(),
 	)
 	coreOperator := core.NewOperator(storageFactory.ConfigMaps())
 	opOperator := operation.NewOperationOperator(storageFactory.Operations())

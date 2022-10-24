@@ -313,8 +313,8 @@ var Roles = []iamv1.GlobalRole{
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
-				APIGroups: []string{"config.kubeclipper.io"}, // TODO change to core group
-				Resources: []string{"template"},
+				APIGroups: []string{"core.kubeclipper.io"}, // TODO change to core group
+				Resources: []string{"registries"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 		},
@@ -339,9 +339,9 @@ var Roles = []iamv1.GlobalRole{
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
-				APIGroups: []string{"config.kubeclipper.io"},
-				Resources: []string{"template"},
-				Verbs:     []string{"update", "patch"},
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"registries"},
+				Verbs:     []string{"create", "update", "patch", "delete"},
 			},
 		},
 	},

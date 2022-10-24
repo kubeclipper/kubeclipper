@@ -19,10 +19,11 @@
 package v1
 
 import (
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 )
 
 // +genclient
@@ -124,6 +125,8 @@ type ClusterStatus struct {
 	ComponentConditions []ComponentConditions `json:"componentConditions,omitempty"`
 
 	Certifications []Certification `json:"certifications,omitempty"`
+	// Registries all CRI registry
+	Registries []RegistrySpec
 }
 
 func (c *Cluster) Offline() bool {
@@ -259,10 +262,18 @@ const (
 )
 
 type ContainerRuntime struct {
-	Type             string   `json:"type" enum:"docker|containerd"`
-	Version          string   `json:"version,omitempty" enum:"1.4.4"`
-	DataRootDir      string   `json:"rootDir,omitempty"`
+	Type        string `json:"type" enum:"docker|containerd"`
+	Version     string `json:"version,omitempty" enum:"1.4.4"`
+	DataRootDir string `json:"rootDir,omitempty"`
+	// Deprecated use Registries  insteadof
 	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
+	// When updating
+	Registries []CRIRegistry `json:"registries,omitempty"`
+}
+
+type CRIRegistry struct {
+	InsecureRegistry string  `json:"insecureRegistry"`
+	RegistryRef      *string `json:"registryRef"`
 }
 
 // taint define

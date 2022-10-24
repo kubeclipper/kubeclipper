@@ -20,7 +20,6 @@ package k8s
 
 import (
 	"context"
-	"os"
 	"strings"
 	"syscall"
 	"time"
@@ -28,13 +27,13 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 )
 
 func getJoinCmdFromStdOut(output string, cutBegin string) string {
@@ -137,29 +136,5 @@ func deleteContainer(namespace string) error {
 		}
 	}
 
-	return nil
-}
-
-// unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory
-func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
-	raw, err := os.ReadFile("/proc/mounts")
-	if err != nil {
-		return err
-	}
-	if !strings.HasSuffix(absoluteKubeletRunDirectory, "/") {
-		// trailing "/" is needed to ensure that possibly mounted /var/lib/kubelet is skipped
-		absoluteKubeletRunDirectory += "/"
-	}
-
-	mounts := strings.Split(string(raw), "\n")
-	for _, mount := range mounts {
-		m := strings.Split(mount, " ")
-		if len(m) < 2 || !strings.HasPrefix(m[1], absoluteKubeletRunDirectory) {
-			continue
-		}
-		if err = syscall.Unmount(m[1], 0); err != nil {
-			klog.Warningf("[reset] Failed to unmount mounted directory in %s: %s", absoluteKubeletRunDirectory, m[1])
-		}
-	}
 	return nil
 }

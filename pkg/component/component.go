@@ -28,8 +28,9 @@ import (
 const (
 	RegisterFormat = "%s/%s"
 
-	TypeStep     = "step"
-	TypeTemplate = "template"
+	TypeStep              = "step"
+	TypeTemplate          = "template"
+	TypeRegistryConfigure = "registryConfigure"
 )
 
 var (

@@ -3220,6 +3220,211 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/registries": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "List Registries.",
+        "operationId": "ListRegistry",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "watch request",
+            "name": "watch",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 60,
+            "description": "watch timeout seconds",
+            "name": "timeoutSeconds",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create registry.",
+        "operationId": "CreateRegistry",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Registry"
+            }
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create registry",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Registry"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/registries/{name}": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Update registry.",
+        "operationId": "UpdateRegistry",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Registry"
+            }
+          },
+          {
+            "type": "string",
+            "description": "registry name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run update registry",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Delete registry.",
+        "operationId": "DeleteRegistry",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "registry name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run delete registry",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/registry/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Describe registry.",
+        "operationId": "DescribeRegistry",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "registry name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Registry"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/templates": {
       "get": {
         "produces": [
@@ -4949,6 +5154,7 @@
         "unique",
         "template",
         "category",
+        "deprecated",
         "name",
         "version",
         "dependence",
@@ -4964,6 +5170,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "deprecated": {
+          "type": "boolean"
         },
         "description": {
           "type": "string"
@@ -5367,6 +5576,20 @@
         }
       }
     },
+    "v1.CRIRegistry": {
+      "required": [
+        "insecureRegistry",
+        "registryRef"
+      ],
+      "properties": {
+        "insecureRegistry": {
+          "type": "string"
+        },
+        "registryRef": {
+          "type": "string"
+        }
+      }
+    },
     "v1.Calico": {
       "required": [
         "IPv4AutoDetection",
@@ -5430,6 +5653,9 @@
       }
     },
     "v1.CloudProvider": {
+      "required": [
+        "status"
+      ],
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -5459,20 +5685,39 @@
         }
       }
     },
-    "v1.CloudProviderStatus": {
+    "v1.CloudProviderCondition": {
       "required": [
-        "reason",
-        "detail"
+        "type",
+        "status"
       ],
       "properties": {
-        "detail": {
+        "lastTransitionTime": {
           "type": "string"
         },
-        "phase": {
+        "lastUpdateTime": {
+          "type": "string"
+        },
+        "message": {
           "type": "string"
         },
         "reason": {
           "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.CloudProviderStatus": {
+      "properties": {
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.CloudProviderCondition"
+          }
         }
       }
     },
@@ -5547,9 +5792,6 @@
         "networking": {
           "$ref": "#/definitions/v1.Networking"
         },
-        "provider": {
-          "$ref": "#/definitions/v1.ProviderSpec"
-        },
         "status": {
           "$ref": "#/definitions/v1.ClusterStatus"
         },
@@ -5562,7 +5804,16 @@
       }
     },
     "v1.ClusterStatus": {
+      "required": [
+        "Registries"
+      ],
       "properties": {
+        "Registries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.RegistrySpec"
+          }
+        },
         "certifications": {
           "type": "array",
           "items": {
@@ -5710,6 +5961,12 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "registries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.CRIRegistry"
           }
         },
         "rootDir": {
@@ -6554,16 +6811,6 @@
         }
       }
     },
-    "v1.ProviderSpec": {
-      "required": [
-        "name"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      }
-    },
     "v1.Record": {
       "properties": {
         "createTime": {
@@ -6622,6 +6869,49 @@
         },
         "metadata": {
           "$ref": "#/definitions/v1.ObjectMeta"
+        }
+      }
+    },
+    "v1.Registry": {
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "ca": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "skipVerify": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1.RegistrySpec": {
+      "properties": {
+        "ca": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "skipVerify": {
+          "type": "boolean"
         }
       }
     },

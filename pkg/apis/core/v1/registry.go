@@ -1066,6 +1066,73 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.CloudProvider{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
+	webservice.Route(webservice.GET("/registries").
+		To(h.ListRegistry).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("List Registries.").
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
+
+	webservice.Route(webservice.POST("/registries").
+		To(h.CreateRegistry).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Create registry.").
+		Reads(corev1.Registry{}).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create registry").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Registry{}))
+
+	webservice.Route(webservice.PUT("/registries/{name}").
+		To(h.UpdateRegistry).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Update registry.").
+		Reads(corev1.Registry{}).
+		Param(webservice.PathParameter("name", "registry name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run update registry").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
+	webservice.Route(webservice.DELETE("/registries/{name}").
+		To(h.DeleteRegistry).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Delete registry.").
+		Param(webservice.PathParameter("name", "registry name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete registry").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
+	webservice.Route(webservice.GET("/registry/{name}").
+		To(h.DescribeRegistry).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Describe registry.").
+		Param(webservice.PathParameter(query.ParameterName, "registry name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
+			Required(false).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Registry{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
 	return webservice
 }
 
