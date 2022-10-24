@@ -502,6 +502,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Registries != nil {
+		in, out := &in.Registries, &out.Registries
+		*out = make([]RegistrySpec, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

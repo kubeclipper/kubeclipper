@@ -5804,7 +5804,16 @@
       }
     },
     "v1.ClusterStatus": {
+      "required": [
+        "Registries"
+      ],
       "properties": {
+        "Registries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.RegistrySpec"
+          }
+        },
         "certifications": {
           "type": "array",
           "items": {
@@ -6881,6 +6890,22 @@
         },
         "metadata": {
           "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "skipVerify": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1.RegistrySpec": {
+      "properties": {
+        "ca": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
         },
         "scheme": {
           "type": "string"
