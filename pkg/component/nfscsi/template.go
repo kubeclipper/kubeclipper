@@ -43,6 +43,19 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get"]
+  # for attacher https://github.com/kubernetes-csi/external-attacher/blob/c3741eaae2974a2292e562221a2d7ea684275366/deploy/kubernetes/rbac.yaml
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
 ---
 
 kind: ClusterRoleBinding
@@ -195,7 +208,7 @@ kind: CSIDriver
 metadata:
   name: nfs.csi.k8s.io
 spec:
-  attachRequired: false
+  attachRequired: true
   volumeLifecycleModes:
     - Persistent
     - Ephemeral
@@ -269,6 +282,21 @@ spec:
             requests:
               cpu: 10m
               memory: 20Mi
+        #add attacher to support rwo
+        - name: csi-attacher
+          image: {{with .ImageRepoMirror}}{{.}}/{{end}}caas4/csi-attacher:v3.2.1
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--retry-interval-start=500ms"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
         - name: nfs
           image: {{with .ImageRepoMirror}}{{.}}/{{end}}caas4/nfsplugin:v4.1.0
           securityContext:
