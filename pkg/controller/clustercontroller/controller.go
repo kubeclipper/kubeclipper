@@ -91,10 +91,10 @@ func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informer
 		return err
 	}
 
-	if err = c.Watch(source.NewKindWithCache(&v1.Registry{}, cache),
-		handler.EnqueueRequestsFromMapFunc(r.findRegistryCluster)); err != nil {
-		return err
-	}
+	// if err = c.Watch(source.NewKindWithCache(&v1.Registry{}, cache),
+	// 	handler.EnqueueRequestsFromMapFunc(r.findRegistryCluster)); err != nil {
+	// 	return err
+	// }
 
 	r.mgr = mgr
 	mgr.AddRunnable(c)
@@ -125,6 +125,7 @@ func (r *ClusterReconciler) findObjectsForCluster(objNode client.Object) []recon
 	return []reconcile.Request{}
 }
 
+//nolint:unused
 func (r *ClusterReconciler) findRegistryCluster(obj client.Object) []reconcile.Request {
 	reg, ok := obj.(*v1.Registry)
 	if !ok {
@@ -208,9 +209,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	if err := r.updateCRIRegistries(ctx, clu); err != nil {
+	/*	if err := r.updateCRIRegistries(ctx, clu); err != nil {
 		return ctrl.Result{}, fmt.Errorf("updateCRIRegistries:%w", err)
-	}
+	}*/
 
 	return ctrl.Result{}, r.syncClusterClient(ctx, log, clu)
 }
@@ -384,6 +385,7 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 	return kubeconfig, nil
 }
 
+//nolint:unused
 func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {
 	type mirror struct {
 		ImageRepoMirror string `json:"imageRepoMirror"`
@@ -461,14 +463,16 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 		if err != nil {
 			return fmt.Errorf("DeliverTaskOperation:%w", err)
 		}
-		c, err = r.ClusterWriter.UpdateCluster(ctx, c)
+		newSpec, err := r.ClusterWriter.UpdateCluster(ctx, c)
 		if err != nil {
 			return fmt.Errorf("update cluster:%w", err)
 		}
+		*c = *newSpec
 	}
 	return nil
 }
 
+//nolint:unused
 func criRegistryUpdateOperation(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Operation, error) {
 	var (
 		step     component.StepRunnable
@@ -504,13 +508,12 @@ func criRegistryUpdateOperation(cluster *v1.Cluster, registries []v1.RegistrySpe
 	}
 	return &v1.Operation{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   uuid.New().String(),
-			Labels: nil,
+			Name: uuid.New().String(),
 		},
 		Steps: []v1.Step{
 			{
 				Name:   "update-cri-registry-config",
-				Nodes:  nil,
+				Nodes:  allNodes,
 				Action: v1.ActionUpgrade,
 				Timeout: metav1.Duration{
 					Duration: time.Second * 30,
@@ -528,6 +531,8 @@ func criRegistryUpdateOperation(cluster *v1.Cluster, registries []v1.RegistrySpe
 }
 
 // Use scheme and host as unique key
+
+//nolint:unused
 func appendUniqueRegistry(s []v1.RegistrySpec, items ...v1.RegistrySpec) []v1.RegistrySpec {
 	for _, r := range items {
 		key := r.Scheme + r.Host
@@ -546,6 +551,7 @@ func appendUniqueRegistry(s []v1.RegistrySpec, items ...v1.RegistrySpec) []v1.Re
 	return s
 }
 
+//nolint:unused
 func registriesEqual(a, b []v1.RegistrySpec) bool {
 	if len(a) != len(b) {
 		return false

@@ -19,9 +19,10 @@
 package oauth
 
 import (
+	"net/http"
+
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
-	"net/http"
 
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
 
