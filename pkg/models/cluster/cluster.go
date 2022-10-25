@@ -550,12 +550,25 @@ func (c *clusterOperator) nodeFuzzyFilter(obj runtime.Object, q *query.Query) []
 			if !models.ObjectMetaFilter(node.ObjectMeta, k, v) {
 				selected = false
 			}
+			if !nodeCustomFilter(&nodes.Items[index], k, v) {
+				selected = false
+			}
 		}
 		if selected {
 			objs = append(objs, &nodes.Items[index])
 		}
 	}
 	return objs
+}
+
+func nodeCustomFilter(node *v1.Node, key, value string) bool {
+	switch key {
+	case "default-ip":
+		if !strings.Contains(node.Status.Ipv4DefaultIP, value) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *clusterOperator) regionFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {

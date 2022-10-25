@@ -54,7 +54,7 @@ func Test_platformOperator_eventFilter(t *testing.T) {
 						},
 					},
 				},
-				in1: nil,
+				in1: query.New(),
 			},
 			want: []runtime.Object{
 				&v1.Event{
