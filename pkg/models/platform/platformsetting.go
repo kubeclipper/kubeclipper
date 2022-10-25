@@ -20,6 +20,7 @@ package platform
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -138,14 +139,36 @@ func (p *platformOperator) ListEventsEx(ctx context.Context, query *query.Query)
 	return models.ListExV2(ctx, p.eventStorage, query, p.eventFilter, nil, nil)
 }
 
-func (p *platformOperator) eventFilter(obj runtime.Object, _ *query.Query) []runtime.Object {
+func (p *platformOperator) eventFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	records, ok := obj.(*v1.EventList)
 	if !ok {
 		return nil
 	}
 	objs := make([]runtime.Object, 0, len(records.Items))
 	for index := range records.Items {
-		objs = append(objs, &records.Items[index])
+		selected := true
+		for k, v := range q.FuzzySearch {
+			if !eventCustomFilter(&records.Items[index], k, v) {
+				selected = false
+			}
+		}
+		if selected {
+			objs = append(objs, &records.Items[index])
+		}
 	}
 	return objs
+}
+
+func eventCustomFilter(ev *v1.Event, key, value string) bool {
+	switch key {
+	case "ip":
+		if !strings.Contains(ev.SourceIP, value) {
+			return false
+		}
+	case "username":
+		if !strings.Contains(ev.Username, value) {
+			return false
+		}
+	}
+	return true
 }
