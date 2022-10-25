@@ -1,0 +1,55 @@
+name: test
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ '1.14' ]
+    
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Get branch name
+        id: extract_branch
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+      - name: Build
+        if: github.event_name == 'pull_request'
+        run:
+          KUBE_BUILD_PLATFORMS="linux/amd64 " make build
+      - name: deploy pre
+        run: curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn sudo bash -
+      - name: deploy
+        run: sudo kcctl deploy
+      - name: update kcctl
+        run: sudo cp ./dist/kcctl /usr/local/bin/
+      - name: update kc-server
+        run: |
+          sudo systemctl stop kc-server
+          sudo cp ./dist/kubeclipper-server /usr/local/bin/
+          sudo systemctl start kc-server
+      - name: update kc-agent
+        run: |
+          sudo systemctl stop kc-agent
+          sudo cp ./dist/kubeclipper-agent /usr/local/bin/
+          sudo systemctl start kc-agent
+      - name: login
+        run: sudo kcctl login -H http://localhost  -u admin -p Thinkbig1
+      -name: get node
+        run: NODE=$(sudo kcctl get node -o yaml|grep ipv4DefaultIP:|sed 's/ipv4DefaultIP: //')
+      - name: create aio
+        run: sudo kcctl create cluster --master $NODE --name demo --untaint-master
