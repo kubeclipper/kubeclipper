@@ -118,7 +118,7 @@ func (r Kubeadm) Sync(ctx context.Context) error {
 		return err
 	}
 
-	err = r.patchCRI(clu)
+	err = r.patch(clu)
 	if err != nil {
 		return err
 	}
@@ -696,6 +696,21 @@ func (r Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction
 	return nil
 }
 
+func (r Kubeadm) patch(clu *v1.Cluster) error {
+	err := r.patchCRI(clu)
+	if err != nil {
+		return err
+	}
+
+	err = r.patchKubelet(clu)
+	if err != nil {
+		logger.Warnf("patch kubelet failed: %v", err)
+		clu.Kubelet.RootDir = "unknown"
+	}
+
+	return nil
+}
+
 func (r Kubeadm) patchCRI(clu *v1.Cluster) error {
 	switch clu.ContainerRuntime.Type {
 	// There is a known issue with k8s, where the node cri version information is incorrect when the cri type is docker
@@ -710,5 +725,31 @@ func (r Kubeadm) patchCRI(clu *v1.Cluster) error {
 		clu.ContainerRuntime.Version = strings.ReplaceAll(clu.ContainerRuntime.Version, "\n", "")
 	}
 
+	return nil
+}
+
+func (r Kubeadm) patchKubelet(clu *v1.Cluster) error {
+	rootDirPrx := "--root-dir="
+	res, err := sshutils.SSHCmdWithSudo(r.ssh(), clu.Masters[0].ID, fmt.Sprintf(`cat /var/lib/kubelet/kubeadm-flags.env | grep -e %s`, rootDirPrx))
+	if err != nil {
+		return err
+	}
+	if err = res.Error(); err != nil {
+		return err
+	}
+	out := res.StdoutToString("")
+	if out == "" {
+		clu.Kubelet.RootDir = "/var/lib/kubelet"
+		return nil
+	}
+	out = strings.ReplaceAll(out, "KUBELET_KUBEADM_ARGS=", "")
+	out = strings.ReplaceAll(out, `"`, "")
+	arr := strings.Split(out, " ")
+	for _, val := range arr {
+		if strings.Contains(val, rootDirPrx) {
+			clu.Kubelet.RootDir = strings.ReplaceAll(val, rootDirPrx, "")
+			break
+		}
+	}
 	return nil
 }
