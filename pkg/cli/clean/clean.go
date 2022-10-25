@@ -53,8 +53,11 @@ const (
   # Mock uninstall,without -A flag will only do preCheck and config check.
   kcctl clean
 
-  # Uninstall the entire kubeclipper platform,use specify the config.
+  # Uninstall the entire kubeclipper platform,use specify the auth config.
   kcctl clean -A --config ~/.kc/config
+
+  # Uninstall the entire kubeclipper platform,use local deploy config when kc-server is not health.
+  kcctl clean -A -f
 
   Please read 'kcctl clean -h' get more clean flags`
 )
@@ -65,6 +68,7 @@ type CleanOptions struct {
 	deployConfig *options.DeployConfig
 	client       *kc.Client
 	cleanAll     bool
+	force        bool
 
 	allNodes []string
 }
@@ -96,30 +100,35 @@ func NewCmdClean(streams options.IOStreams) *cobra.Command {
 	}
 	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.cleanAll, "all", "A", o.cleanAll, "clean all components for kubeclipper")
+	cmd.Flags().BoolVarP(&o.force, "fore", "f", o.force, "force use local deploy config to clean kubeclipper when kc-server not health")
+	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "path to the deploy config file to use for clean,just work with force flag.")
 	return cmd
 }
 
 func (c *CleanOptions) Complete() error {
-	// config Complete
-	var err error
-	if err = c.cliOpts.Complete(); err != nil {
-		return err
-	}
-	c.client, err = kc.FromConfig(c.cliOpts.ToRawConfig())
-	if err != nil {
-		return err
-	}
 
-	// deploy-config Complete
-	dc, err := deploy.GetDeployConfig(context.Background(), c.client, false)
-	if err != nil {
-		logger.Warn("get online deploy-config failed,downgrade to use local deploy-config,reason:", err)
-		if err = c.deployConfig.Complete(); err != nil {
-			return errors.WithMessage(err, "run with local deploy-config failed")
+	if c.force {
+		if err := c.deployConfig.Complete(); err != nil {
+			return errors.WithMessage(err, "get local deploy-config failed")
 		}
 	} else {
-		c.deployConfig = dc
+		// config Complete
+		var err error
+		if err = c.cliOpts.Complete(); err != nil {
+			return err
+		}
+		c.client, err = kc.FromConfig(c.cliOpts.ToRawConfig())
+		if err != nil {
+			return err
+		}
+
+		// deploy-config Complete
+		c.deployConfig, err = deploy.GetDeployConfig(context.Background(), c.client, false)
+		if err != nil {
+			return errors.WithMessage(err, "get online deploy-config failed")
+		}
 	}
+
 	c.allNodes = sets.NewString().
 		Insert(c.deployConfig.ServerIPs...).
 		Insert(c.deployConfig.Agents.ListIP()...).
