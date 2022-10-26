@@ -45,6 +45,8 @@ const (
 
 	LabelClusterProviderType = "kubeclipper.io/clusterProviderType"
 	LabelClusterProviderName = "kubeclipper.io/clusterProviderName"
+
+	LabelProject = "kubeclipper.io/project"
 )
 
 const (
