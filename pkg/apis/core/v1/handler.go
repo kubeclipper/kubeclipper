@@ -470,9 +470,10 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-
+		// update fields
 		clu.Labels = c.Labels
 		clu.Annotations = c.Annotations
+		clu.ContainerRuntime.Registries = c.ContainerRuntime.Registries
 		_, err = h.clusterOperator.UpdateCluster(context.TODO(), clu)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
