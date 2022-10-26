@@ -272,8 +272,8 @@ type ContainerRuntime struct {
 }
 
 type CRIRegistry struct {
-	InsecureRegistry string  `json:"insecureRegistry"`
-	RegistryRef      *string `json:"registryRef"`
+	InsecureRegistry string  `json:"insecureRegistry,omitempty"`
+	RegistryRef      *string `json:"registryRef,omitempty"`
 }
 
 // taint define

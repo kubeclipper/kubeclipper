@@ -43,6 +43,7 @@ type CoreV1Interface interface {
 	DomainsGetter
 	ConfigMapsGetter
 	CloudProvidersGetter
+	RegistriesGetter
 }
 
 type CoreV1Client struct {
@@ -102,6 +103,10 @@ func (c *CoreV1Client) ConfigMaps() ConfigMapsInterface {
 
 func (c *CoreV1Client) CloudProviders() CloudProvidersInterface {
 	return newCloudProviders(c)
+}
+
+func (c *CoreV1Client) Registries() RegistriesInterface {
+	return newRegistries(c)
 }
 
 func NewForConfig(c *rest.Config) (*CoreV1Client, error) {

@@ -424,9 +424,10 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	if err = (&clustercontroller.ClusterReconciler{
 		CmdDelivery:         mgr.GetCmdDelivery(),
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
+		ClusterWriter:       clusterOperator,
+		RegistryLister:      informerFactory.Core().V1().Registries().Lister(),
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:          clusterOperator,
-		ClusterWriter:       clusterOperator,
 		OperationWriter:     opOperator,
 		CronBackupWriter:    clusterOperator,
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),

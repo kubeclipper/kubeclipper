@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,12 +207,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = r.updateClusterNode(ctx, clu, false); err != nil {
 		return ctrl.Result{}, err
 	}
-
-	/*	if err := r.updateCRIRegistries(ctx, clu); err != nil {
-		return ctrl.Result{}, fmt.Errorf("updateCRIRegistries:%w", err)
-	}*/
-
-	return ctrl.Result{}, r.syncClusterClient(ctx, log, clu)
+	if err = r.syncClusterClient(ctx, log, clu); err != nil {
+		return ctrl.Result{}, nil
+	}
+	return ctrl.Result{}, r.updateCRIRegistries(ctx, clu)
 }
 
 func (r *ClusterReconciler) updateClusterNode(ctx context.Context, c *v1.Cluster, del bool) error {
@@ -387,6 +384,9 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 
 //nolint:unused
 func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {
+	if c.Status.Phase != v1.ClusterRunning {
+		return nil
+	}
 	type mirror struct {
 		ImageRepoMirror string `json:"imageRepoMirror"`
 	}
@@ -424,7 +424,9 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 
 	validRegistries := c.ContainerRuntime.Registries[:0]
 	for _, reg := range c.ContainerRuntime.Registries {
-		if reg.RegistryRef == nil {
+		if reg.RegistryRef == nil || *reg.RegistryRef == "" {
+			// fix reg.RegistryRef=""
+			reg.RegistryRef = nil
 			registries = appendUniqueRegistry(registries,
 				v1.RegistrySpec{Scheme: "http", Host: reg.InsecureRegistry},
 				v1.RegistrySpec{Scheme: "https", Host: reg.InsecureRegistry, SkipVerify: true})
@@ -455,11 +457,11 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 			return fmt.Errorf("list")
 		}
 
-		o, err := criRegistryUpdateOperation(c, registries, nodes)
+		step, err := criRegistryUpdateStep(c, registries, nodes)
 		if err != nil {
 			return fmt.Errorf("criRegistryUpdateOperation:%w", err)
 		}
-		err = r.CmdDelivery.DeliverTaskOperation(ctx, o, &service.Options{DryRun: false})
+		err = r.CmdDelivery.DeliverStep(ctx, step, &service.Options{DryRun: false})
 		if err != nil {
 			return fmt.Errorf("DeliverTaskOperation:%w", err)
 		}
@@ -473,7 +475,7 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 }
 
 //nolint:unused
-func criRegistryUpdateOperation(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Operation, error) {
+func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Step, error) {
 	var (
 		step     component.StepRunnable
 		identity string
@@ -506,25 +508,18 @@ func criRegistryUpdateOperation(cluster *v1.Cluster, registries []v1.RegistrySpe
 			Hostname: node.Labels[common.LabelHostname],
 		})
 	}
-	return &v1.Operation{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: uuid.New().String(),
+	return &v1.Step{
+		Name:   "update-cri-registry-config",
+		Nodes:  allNodes,
+		Action: v1.ActionInstall,
+		Timeout: metav1.Duration{
+			Duration: time.Second * 30,
 		},
-		Steps: []v1.Step{
+		Commands: []v1.Command{
 			{
-				Name:   "update-cri-registry-config",
-				Nodes:  allNodes,
-				Action: v1.ActionUpgrade,
-				Timeout: metav1.Duration{
-					Duration: time.Second * 30,
-				},
-				Commands: []v1.Command{
-					{
-						Type:          v1.CommandCustom,
-						Identity:      identity,
-						CustomCommand: stepData,
-					},
-				},
+				Type:          v1.CommandCustom,
+				Identity:      identity,
+				CustomCommand: stepData,
 			},
 		},
 	}, nil
