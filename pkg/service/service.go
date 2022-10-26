@@ -47,6 +47,7 @@ type IDelivery interface {
 
 type CmdDelivery interface {
 	DeliverTaskOperation(ctx context.Context, operation *v1.Operation, opts *Options) error
+	DeliverStep(ctx context.Context, operation *v1.Step, opts *Options) error
 	DeliverCmd(ctx context.Context, toNode string, cmds []string, timeout time.Duration) ([]byte, error)
 }
 

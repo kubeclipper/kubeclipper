@@ -36,6 +36,7 @@ type Interface interface {
 	Domains() DomainInformer
 	CloudProviders() CloudProviderInformer
 	ConfigMaps() ConfigMapInformer
+	Registries() RegistryInformer
 }
 
 type version struct {
@@ -121,6 +122,13 @@ func (v *version) CloudProviders() CloudProviderInformer {
 
 func (v *version) ConfigMaps() ConfigMapInformer {
 	return &configMapInformer{
+		factory:          v.factory,
+		tweakListOptions: v.tweakListOptions,
+	}
+}
+
+func (v *version) Registries() RegistryInformer {
+	return &registryInformer{
 		factory:          v.factory,
 		tweakListOptions: v.tweakListOptions,
 	}

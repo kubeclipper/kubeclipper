@@ -91,6 +91,44 @@ func (s *Service) runTaskStep(ctx context.Context, payload *service.MsgPayload, 
 	return replyData, nil
 }
 
+func (s *Service) runStep(ctx context.Context, payload *service.MsgPayload, subject string) ([]byte, *errors.StatusError) {
+	// stepKey to distinguish which step the log file belongs to
+	stepKey := fmt.Sprintf("%s-%s", payload.Step.ID, payload.Step.Name)
+	ctx = component.WithStepID(ctx, stepKey) // put step ID into context
+	ctx = component.WithOplog(ctx, s.oplog)  // put operation log object into context
+	ctx = component.WithRepoMirror(ctx, s.repoMirror)
+
+	cmds := make([]v1.Command, len(payload.Step.BeforeRunCommands)+len(payload.Step.Commands)+len(payload.Step.AfterRunCommands))
+	cmds = append(cmds, payload.Step.BeforeRunCommands...)
+	cmds = append(cmds, payload.Step.Commands...)
+	cmds = append(cmds, payload.Step.AfterRunCommands...)
+	var replyData []byte
+	for _, c := range cmds {
+		switch c.Type {
+		case v1.CommandShell:
+			logger.Debug("run shell command", zap.Strings("cmd", c.ShellCommand))
+			if err := runShellCommand(ctx, c.ShellCommand, payload.DryRun); err != nil {
+				errMsg := "run shell command error"
+				return nil, doStatusError(errMsg, errMsg, errors.ShellCommand, 500, err)
+			}
+		case v1.CommandCustom:
+			var statusError *errors.StatusError
+			if payload.LastTaskReply != nil {
+				// Put join command into context
+				ctx = component.WithExtraData(ctx, payload.LastTaskReply)
+			}
+			if replyData, statusError = runCustomCommand(ctx, &payload.Step, c.Identity, c.CustomCommand, payload.DryRun); statusError != nil {
+				return nil, statusError
+			}
+		case v1.CommandTemplateRender:
+			if statusError := runTemplateRenderCommand(ctx, c.Template, payload.DryRun); statusError != nil {
+				return nil, statusError
+			}
+		}
+	}
+	return replyData, nil
+}
+
 func (s *Service) msgHandler(msg *nats.Msg) {
 	go s.taskHandler(msg)
 }
@@ -162,6 +200,20 @@ func (s *Service) taskHandler(msg *nats.Msg) {
 				break
 			}
 			logger.Debug("run task step failed", zap.String("step", payload.Step.Name), zap.Int("retry", i), zap.Int32("maxRetry", payload.Step.RetryTimes))
+		}
+		responseMessage(msg, replyData, statusError)
+	case service.OperationRunStep:
+		var replyData []byte
+		for i := 0; i <= int(payload.Step.RetryTimes); i++ {
+			// reset retry field
+			if i > 0 {
+				payload.Retry = true
+			}
+			replyData, statusError = s.runStep(ctx, payload, msg.Subject)
+			if statusError == nil {
+				break
+			}
+			logger.Debug("run step failed", zap.String("step", payload.Step.Name), zap.Int("retry", i), zap.Int32("maxRetry", payload.Step.RetryTimes))
 		}
 		responseMessage(msg, replyData, statusError)
 	default:

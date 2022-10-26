@@ -489,6 +489,32 @@ func (s *Service) DeliverLogRequest(ctx context.Context, operation *service.LogO
 	return
 }
 
+func (s *Service) DeliverStep(ctx context.Context, step *v1.Step, opts *service.Options) error {
+	if opts == nil {
+		opts = &service.Options{DryRun: false}
+	}
+	errChan := make(chan error, len(step.Nodes))
+	defer close(errChan)
+	wg := &sync.WaitGroup{}
+	status := new(v1.StepStatus)
+	payloadBytes, err := initPayload("", service.OperationRunStep, step, nil, nil, opts.DryRun, component.GetRetry(ctx))
+
+	for _, node := range step.Nodes {
+		wg.Add(1)
+		go s.deliveryStepToNode(wg, node.ID, payloadBytes, step.Timeout.Duration+2*time.Second, status, errChan)
+	}
+
+	wg.Wait()
+
+	logger.Debug("after delivery task step", zap.Error(err))
+	if err != nil {
+		logger.Error("delivery task step error", zap.Error(err), zap.String("step", step.Name))
+		return err
+	}
+
+	return nil
+}
+
 func (s *Service) DeliverCmd(ctx context.Context, toNode string, cmds []string, timeout time.Duration) ([]byte, error) {
 	payload, err := initPayload("", service.OperationRunCmd, &v1.Step{Timeout: metav1.Duration{Duration: timeout}}, nil, cmds, false, component.GetRetry(ctx))
 	if err != nil {

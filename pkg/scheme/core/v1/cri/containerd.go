@@ -306,8 +306,8 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 }
 
 type ContainerdRegistryConfigure struct {
-	Registries []ContainerdRegistry `json:"registries,omitempty"`
-	ConfigDir  string               `json:"configDir"`
+	Registries map[string]*ContainerdRegistry `json:"registries,omitempty"`
+	ConfigDir  string                         `json:"configDir"`
 }
 
 func (c *ContainerdRegistryConfigure) Install(ctx context.Context, opts component.Options) ([]byte, error) {
@@ -457,21 +457,23 @@ type HostFile struct {
 	HostConfigs map[string]HostFileConfig `toml:"host"`
 }
 
-func ToContainerdRegistryConfig(registries []v1.RegistrySpec) []ContainerdRegistry {
-	cfgs := make([]ContainerdRegistry, 0, len(registries))
+func ToContainerdRegistryConfig(registries []v1.RegistrySpec) map[string]*ContainerdRegistry {
+	cfgs := make(map[string]*ContainerdRegistry, len(registries))
 	for _, r := range registries {
-		cfgs = append(cfgs, ContainerdRegistry{
-			Server: r.Host,
-			Hosts: []ContainerdHost{
-				{
-					Host:         r.Host,
-					Capabilities: []string{CapabilityPull, CapabilityResolve},
-					SkipVerify:   r.SkipVerify,
-					CA:           []byte(r.CA),
-				},
-			},
-		},
-		)
+		cfg, ok := cfgs[r.Host]
+		if !ok {
+			cfg = &ContainerdRegistry{
+				Server: r.Host,
+			}
+			cfgs[r.Host] = cfg
+		}
+		cfg.Hosts = append(cfg.Hosts, ContainerdHost{
+			Scheme:       r.Scheme,
+			Host:         r.Host,
+			Capabilities: []string{CapabilityPull, CapabilityResolve},
+			SkipVerify:   r.SkipVerify,
+			CA:           []byte(r.CA),
+		})
 	}
 	return cfgs
 }

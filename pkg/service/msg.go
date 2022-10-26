@@ -40,6 +40,7 @@ const (
 	OperationBackup
 	OperationRecovery
 	OperationRunCmd
+	OperationRunStep
 )
 
 const (

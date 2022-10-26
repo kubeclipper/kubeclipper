@@ -232,7 +232,7 @@ const (
 	defaultDaemonConfigFile = "/etc/docker/daemon.json"
 )
 
-func (d *DockerInsecureRegistryConfigure) Install(_ context.Context, opts component.Options) ([]byte, error) {
+func (d *DockerInsecureRegistryConfigure) Install(ctx context.Context, opts component.Options) ([]byte, error) {
 	conf := make(map[string]interface{})
 	// TODO：Maybe the configuration file is not here
 	configFile := defaultDaemonConfigFile
@@ -267,6 +267,10 @@ func (d *DockerInsecureRegistryConfigure) Install(_ context.Context, opts compon
 		_, err = f.Write(configContent)
 		if err != nil {
 			return nil, fmt.Errorf("write config file to: %s :%w", configFile, err)
+		}
+		_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "systemctl reload docker")
+		if err != nil {
+			return nil, fmt.Errorf("reload docker:%w", err)
 		}
 	}
 	return nil, nil
