@@ -734,7 +734,7 @@ func (r Kubeadm) patchKubelet(clu *v1.Cluster) error {
 	if err != nil {
 		return err
 	}
-	if err = res.Error(); err != nil {
+	if err = res.Error(); err != nil && res.Stderr != "" {
 		return err
 	}
 	out := res.StdoutToString("")
