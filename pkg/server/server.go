@@ -27,6 +27,7 @@ import (
 
 	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/projectcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
@@ -404,7 +405,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		storageFactory.GlobalRoleBindings(),
 		storageFactory.Tokens(),
 		storageFactory.LoginRecords())
-
+	projectOperator := tenant.NewProjectOperator(storageFactory.Project())
 	if err = (&nodecontroller.NodeReconciler{
 		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
 		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
@@ -483,6 +484,14 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		NodeWriter:          clusterOperator,
 		ConfigmapLister:     informerFactory.Core().V1().ConfigMaps().Lister(),
 		ConfigmapWriter:     coreOperator,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
+	if err = (&projectcontroller.ProjectReconciler{
+		ProjectLister: informerFactory.Tenant().V1().Projects().Lister(),
+		ProjectWriter: projectOperator,
+		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
+		NodeWriter:    clusterOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
