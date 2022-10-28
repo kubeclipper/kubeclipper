@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
+
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
@@ -36,6 +38,7 @@ var (
 	localSchemeBuilder = runtime.SchemeBuilder{
 		corev1.AddToScheme,
 		iamv1.AddToScheme,
+		tenantv1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 )

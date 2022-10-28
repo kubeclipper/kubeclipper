@@ -16,7 +16,7 @@
  *
  */
 
-package GENERIC_PACKAGE_NAME
+package project
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,7 +24,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 )
 
 func NewStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (rest.StandardStorage, error) {
@@ -32,12 +32,12 @@ func NewStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (r
 
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object {
-			return &v1.GENERIC_KIND{}
+			return &v1.Project{}
 		},
 		NewListFunc: func() runtime.Object {
-			return &v1.GENERIC_KINDList{}
+			return &v1.ProjectList{}
 		},
-		DefaultQualifiedResource: v1.Resource("GENERIC_PACKAGE_NAMEs"),
+		DefaultQualifiedResource: v1.Resource("projects"),
 		KeyRootFunc:              nil,
 		KeyFunc:                  nil,
 		ObjectNameFunc:           nil,
@@ -56,7 +56,7 @@ func NewStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (r
 		AfterDelete:              nil,
 		ReturnDeletedObject:      false,
 		ShouldDeleteDuringUpdate: nil,
-		TableConvertor:           rest.NewDefaultTableConvertor(v1.Resource("GENERIC_PACKAGE_NAMEs")),
+		TableConvertor:           rest.NewDefaultTableConvertor(v1.Resource("projects")),
 		ResetFieldsStrategy:      nil,
 		Storage:                  genericregistry.DryRunnableStorage{},
 		StorageVersioner:         nil,

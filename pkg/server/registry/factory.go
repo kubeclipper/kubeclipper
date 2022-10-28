@@ -22,8 +22,10 @@ import (
 	"reflect"
 	"sync"
 
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/cloudprovider"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/configmap"
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/project"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/registry"
 
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/cronbackup"
@@ -81,6 +83,7 @@ type SharedStorageFactory interface {
 	ConfigMaps() rest.StandardStorage
 	CloudProvider() rest.StandardStorage
 	Registry() rest.StandardStorage
+	Project() rest.StandardStorage
 }
 
 var _ SharedStorageFactory = (*sharedStorageFactory)(nil)
@@ -198,4 +201,8 @@ func (s *sharedStorageFactory) CloudProvider() rest.StandardStorage {
 
 func (s *sharedStorageFactory) Registry() rest.StandardStorage {
 	return s.StorageFor(&corev1.Registry{}, registry.NewStorage)
+}
+
+func (s *sharedStorageFactory) Project() rest.StandardStorage {
+	return s.StorageFor(&tenantv1.Project{}, project.NewStorage)
 }

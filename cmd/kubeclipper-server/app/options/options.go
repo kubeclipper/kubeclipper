@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
+
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -94,7 +96,7 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 
 func (s *ServerOptions) CompleteEtcdOptions() *etcdRESTOptions.SimpleRestOptionsFactory {
 	// grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
-	gvks := []schema.GroupVersion{corev1.SchemeGroupVersion, iamv1.SchemeGroupVersion}
+	gvks := []schema.GroupVersion{corev1.SchemeGroupVersion, iamv1.SchemeGroupVersion, tenantv1.SchemeGroupVersion}
 	c := storagebackend.NewDefaultConfig(s.EtcdOptions.Prefix, scheme.Codecs.CodecForVersions(scheme.Encoder, scheme.Codecs.UniversalDeserializer(), schema.GroupVersions(gvks), schema.GroupVersions(gvks)))
 	c.Transport.ServerList = s.EtcdOptions.ServerList
 	c.Transport.CertFile = s.EtcdOptions.CertFile
