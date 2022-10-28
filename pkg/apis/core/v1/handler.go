@@ -791,6 +791,8 @@ func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*compo
 		KubeVersion:        c.KubernetesVersion,
 		KubeletDataDir:     c.Kubelet.RootDir,
 		ControlPlaneStatus: c.Status.ControlPlaneHealth,
+		CNI:                c.CNI.Type,
+		CNINamespace:       c.CNI.Namespace,
 	}
 	masters, err := h.getNodeInfo(ctx, c.Masters)
 	if err != nil {

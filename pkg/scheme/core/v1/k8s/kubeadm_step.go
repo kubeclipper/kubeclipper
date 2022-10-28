@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -196,8 +197,18 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 		installSteps = append(installSteps, steps...)
 	}
 
-	cn := CNIInfo{}
-	steps, err = cn.InitStepper(&c.CNI, &c.Networking).InstallSteps(nodes, []v1.StepNode{masters[0]}, false)
+	//cn := CNIInfo{}
+	cf, err := cni.Load(c.CNI.Type)
+	if err != nil {
+		return nil, err
+	}
+	cniStepper := cf.Create().InitStep(metadata, &c.CNI, &c.Networking)
+	steps, err = cniStepper.LoadImage(nodes)
+	if err != nil {
+		return nil, err
+	}
+	installSteps = append(installSteps, steps...)
+	steps, err = cniStepper.InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
@@ -273,8 +284,12 @@ func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) 
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	// clean virtual network interfaces
-	cn := CNIInfo{}
-	steps, err = cn.InitStepper(&c.CNI, &c.Networking).UninstallSteps(nodes)
+	cf, err := cni.Load(c.CNI.Type)
+	if err != nil {
+		return nil, err
+	}
+	cniStepper := cf.Create().InitStep(metadata, &c.CNI, &c.Networking)
+	steps, err = cniStepper.UninstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -576,103 +591,6 @@ func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1
 }
 
 func (stepper *ClusterNode) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
-	return nil, nil
-}
-
-func (stepper *CNIInfo) InitStepper(c *v1.CNI, networking *v1.Networking) *CNIInfo {
-	ipv6 := ""
-	if networking.IPFamily == v1.IPFamilyDualStack {
-		ipv6 = networking.Pods.CIDRBlocks[1]
-	}
-	stepper = &CNIInfo{
-		CNI:         *c,
-		DualStack:   networking.IPFamily == v1.IPFamilyDualStack,
-		PodIPv4CIDR: networking.Pods.CIDRBlocks[0],
-		PodIPv6CIDR: ipv6,
-	}
-	return stepper
-}
-
-func (stepper *CNIInfo) InstallSteps(allNodes, firstMasterNodes []v1.StepNode, onlyLoad bool) ([]v1.Step, error) {
-	var steps []v1.Step
-	bytes, err := json.Marshal(stepper)
-	if err != nil {
-		return nil, err
-	}
-	if stepper.CNI.Offline && stepper.CNI.LocalRegistry == "" {
-		steps = []v1.Step{
-			{
-				ID:         strutil.GetUUID(),
-				Name:       "cniImageLoader",
-				Timeout:    metav1.Duration{Duration: 5 * time.Minute},
-				ErrIgnore:  false,
-				RetryTimes: 1,
-				Nodes:      allNodes,
-				Action:     v1.ActionInstall,
-				Commands: []v1.Command{
-					{
-						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, cniInfo, version, component.TypeStep),
-						CustomCommand: bytes,
-					},
-				},
-			},
-		}
-	}
-
-	// only load images for some special scenarios, such as JoinNode
-	if onlyLoad {
-		return steps, nil
-	}
-
-	return append(steps, v1.Step{
-		ID:         strutil.GetUUID(),
-		Name:       "installCNI",
-		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
-		ErrIgnore:  false,
-		RetryTimes: 1,
-		Nodes:      firstMasterNodes,
-		Commands: []v1.Command{
-			{
-				Type: v1.CommandTemplateRender,
-				Template: &v1.TemplateCommand{
-					Identity: fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate),
-					Data:     bytes,
-				},
-			},
-			{
-				Type:         v1.CommandShell,
-				ShellCommand: []string{"kubectl", "apply", "-f", filepath.Join(ManifestDir, "cni.yaml")},
-			},
-		},
-	}), nil
-}
-
-func (stepper *CNIInfo) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
-	bytes, err := json.Marshal(stepper)
-	if err != nil {
-		return nil, err
-	}
-	if stepper.CNI.Offline && stepper.CNI.LocalRegistry == "" {
-		return []v1.Step{
-			{
-				ID:         strutil.GetUUID(),
-				Name:       "cniImageUninstaller",
-				Timeout:    metav1.Duration{Duration: 1 * time.Minute},
-				ErrIgnore:  false,
-				RetryTimes: 1,
-				Nodes:      nodes,
-				Action:     v1.ActionUninstall,
-				Commands: []v1.Command{
-					{
-						Type:          v1.CommandCustom,
-						Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, cniInfo, version, component.TypeStep),
-						CustomCommand: bytes,
-					},
-				},
-			},
-		}, nil
-	}
 	return nil, nil
 }
 

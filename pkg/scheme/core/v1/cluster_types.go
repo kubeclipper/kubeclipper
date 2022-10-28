@@ -158,6 +158,7 @@ func (c *Cluster) Complete() {
 	c.CNI.LocalRegistry = c.LocalRegistry
 	c.CNI.CriType = c.ContainerRuntime.Type
 	c.CNI.Offline = c.Offline()
+	c.CNI.Namespace = "kube-system"
 }
 
 type Certification struct {
@@ -231,11 +232,13 @@ var (
 
 type CNI struct {
 	LocalRegistry string `json:"localRegistry" optional:"true"`
-	Type          string `json:"type" enum:"calico"`
-	Version       string
-	CriType       string
-	Offline       bool
-	Calico        *Calico `json:"calico" optional:"true"`
+	// TODO: Cluster multiple cni plugins are not supported at this time
+	Type      string `json:"type" enum:"calico"`
+	Version   string
+	CriType   string
+	Offline   bool
+	Namespace string  `json:"namespace"`
+	Calico    *Calico `json:"calico" optional:"true"`
 }
 
 type Calico struct {
