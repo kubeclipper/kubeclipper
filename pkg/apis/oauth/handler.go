@@ -154,7 +154,10 @@ func (h *handler) passwordGrant(username string, password string, req *restful.R
 			restplus.HandleUnauthorized(response, req, formatErr)
 			return
 		case auth.ErrIncorrectPassword:
-			_ = h.rateLimiterCounter(username)
+			err = h.rateLimiterCounter(username)
+			if err != nil && err.Error() == auth.ErrRateLimitExceeded.Error() {
+				formatErr = err
+			}
 			h.recordLogin(username, iamv1.TokenLogin, provider, netutil.GetRequestIP(req.Request), req.Request.UserAgent(), err)
 			restplus.HandleUnauthorized(response, req, formatErr)
 			return
@@ -328,7 +331,14 @@ func (h *handler) rateLimiterCounter(username string) error {
 			return err
 		}
 		count++
-		return h.cache.Update(key, strconv.Itoa(count))
+		err = h.cache.Update(key, strconv.Itoa(count))
+		if err != nil {
+			return err
+		}
+		if count == h.authOptions.AuthenticateRateLimiterMaxTries {
+			return auth.ErrRateLimitExceeded
+		}
+		return nil
 	}
 	return h.cache.Set(key, "1", h.authOptions.AuthenticateRateLimiterDuration)
 }
