@@ -272,6 +272,12 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 			Server: regHost,
 			Hosts: []ContainerdHost{
 				{
+					Scheme:       "http",
+					Host:         regHost,
+					Capabilities: []string{CapabilityPull, CapabilityResolve},
+				},
+				{
+					Scheme:       "https",
 					Host:         regHost,
 					Capabilities: []string{CapabilityPull, CapabilityResolve},
 					SkipVerify:   true,
@@ -288,6 +294,12 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 				Server: runnable.LocalRegistry,
 				Hosts: []ContainerdHost{
 					{
+						Scheme:       "http",
+						Host:         runnable.LocalRegistry,
+						Capabilities: []string{CapabilityPull, CapabilityResolve},
+					},
+					{
+						Scheme:       "https",
 						Host:         runnable.LocalRegistry,
 						Capabilities: []string{CapabilityPull, CapabilityResolve},
 						SkipVerify:   true,
@@ -332,7 +344,7 @@ func (c *ContainerdRegistryConfigure) Install(ctx context.Context, opts componen
 		delete(oldDirs, r.Server)
 	}
 	for d := range oldDirs {
-		err = os.RemoveAll(d)
+		err = os.RemoveAll(filepath.Join(c.ConfigDir, d))
 		if err != nil {
 			logger.Errorf("clear old registry config dir: %s failed:%s", d, err)
 		}
