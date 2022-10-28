@@ -4525,6 +4525,268 @@
         }
       }
     },
+    "/api/tenant.kubeclipper.io/v1/projects": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "List projects.",
+        "operationId": "ListProjects",
+        "parameters": [
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "watch request",
+            "name": "watch",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 60,
+            "description": "watch timeout seconds",
+            "name": "timeoutSeconds",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "foo~bar,bar~baz",
+            "description": "fuzzy search conditions",
+            "name": "fuzzy",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "Create project.",
+        "operationId": "CreateProject",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Project"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Project"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant.kubeclipper.io/v1/projects/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "Describe project.",
+        "operationId": "DescribeProject",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Project"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "Update projects profile.",
+        "operationId": "UpdateProject",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Project"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Project"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "Delete project.",
+        "operationId": "DeleteProject",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/tenant.kubeclipper.io/v1/projects/{name}/nodes": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "Add or remove node to project.",
+        "operationId": "AddOrRemoveNode",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.PatchNodes"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/oauth/cb/{callback}": {
       "get": {
         "consumes": [
@@ -6749,21 +7011,21 @@
     },
     "v1.PatchNodes": {
       "required": [
-        "operation",
         "nodes",
-        "role"
+        "project",
+        "op"
       ],
       "properties": {
         "nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/v1.WorkerNode"
+            "type": "string"
           }
         },
-        "operation": {
+        "op": {
           "type": "string"
         },
-        "role": {
+        "project": {
           "type": "string"
         }
       }
@@ -6808,6 +7070,66 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "v1.Project": {
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/v1.ProjectSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/v1.ProjectStatus"
+        }
+      }
+    },
+    "v1.ProjectCount": {
+      "required": [
+        "cluster",
+        "node"
+      ],
+      "properties": {
+        "cluster": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "node": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "v1.ProjectSpec": {
+      "properties": {
+        "manager": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "v1.ProjectStatus": {
+      "required": [
+        "count"
+      ],
+      "properties": {
+        "count": {
+          "$ref": "#/definitions/v1.ProjectCount"
         }
       }
     },

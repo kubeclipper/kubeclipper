@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers/iam"
+	"github.com/kubeclipper/kubeclipper/pkg/client/informers/tenant"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/internal"
 
@@ -123,6 +124,7 @@ type SharedInformerFactory interface {
 	InformerCache
 	Core() core.Interface
 	Iam() iam.Interface
+	Tenant() tenant.Interface
 }
 
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
@@ -192,4 +194,8 @@ func (f *sharedInformerFactory) Core() core.Interface {
 
 func (f *sharedInformerFactory) Iam() iam.Interface {
 	return iam.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Tenant() tenant.Interface {
+	return tenant.New(f, f.namespace, f.tweakListOptions)
 }
