@@ -1169,7 +1169,11 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 	backup.Status.KubernetesVersion = c.KubernetesVersion
 	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
-	backup.Annotations[common.AnnotationDescription] = ""
+	_, ok := backup.Annotations[common.AnnotationDescription]
+	if !ok {
+		backup.Annotations[common.AnnotationDescription] = ""
+	}
+
 	// check preferred node in cluster
 	if backup.PreferredNode == "" {
 		backup.PreferredNode = c.Masters[0].ID
