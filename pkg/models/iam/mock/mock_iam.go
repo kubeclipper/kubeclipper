@@ -824,6 +824,21 @@ func (mr *MockOperatorMockRecorder) WatchLoginRecords(ctx, query interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchLoginRecords", reflect.TypeOf((*MockOperator)(nil).WatchLoginRecords), ctx, query)
 }
 
+// WatchProjectRole mocks base method.
+func (m *MockOperator) WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchProjectRole", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchProjectRole indicates an expected call of WatchProjectRole.
+func (mr *MockOperatorMockRecorder) WatchProjectRole(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchProjectRole", reflect.TypeOf((*MockOperator)(nil).WatchProjectRole), ctx, query)
+}
+
 // WatchProjectRoleBinding mocks base method.
 func (m *MockOperator) WatchProjectRoleBinding(ctx context.Context, query *query.Query) (watch.Interface, error) {
 	m.ctrl.T.Helper()
@@ -2143,6 +2158,21 @@ func (m *MockProjectRoleReader) ListProjectRoles(ctx context.Context, query *que
 func (mr *MockProjectRoleReaderMockRecorder) ListProjectRoles(ctx, query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoles", reflect.TypeOf((*MockProjectRoleReader)(nil).ListProjectRoles), ctx, query)
+}
+
+// WatchProjectRole mocks base method.
+func (m *MockProjectRoleReader) WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchProjectRole", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchProjectRole indicates an expected call of WatchProjectRole.
+func (mr *MockProjectRoleReaderMockRecorder) WatchProjectRole(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchProjectRole", reflect.TypeOf((*MockProjectRoleReader)(nil).WatchProjectRole), ctx, query)
 }
 
 // MockProjectRoleReaderEx is a mock of ProjectRoleReaderEx interface.

@@ -150,6 +150,7 @@ type LoginRecordWriter interface {
 type ProjectRoleReader interface {
 	ListProjectRoles(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleList, error)
 	GetProjectRole(ctx context.Context, name string) (*iamv1.ProjectRole, error)
+	WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error)
 	ProjectRoleReaderEx
 }
 

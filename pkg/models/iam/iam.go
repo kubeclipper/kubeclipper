@@ -545,6 +545,10 @@ func (i *iamOperator) GetProjectRole(ctx context.Context, name string) (*iamv1.P
 	return i.GetProjectRoleEx(ctx, name, "0")
 }
 
+func (i *iamOperator) WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, i.projectRoleStorage, query)
+}
+
 func (i *iamOperator) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
 	return models.ListExV2(ctx, i.roleStorage, query, i.projectRoleFuzzyFilter, nil, nil)
 }
