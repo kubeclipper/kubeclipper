@@ -38,13 +38,8 @@ import (
 )
 
 const (
-	CoreIAMTag = "Core-Tenant"
+	CoreTenantTag = "Core-Tenant"
 )
-
-type PasswordReset struct {
-	CurrentPassword string `json:"currentPassword"`
-	NewPassword     string `json:"newPassword"`
-}
 
 func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, clusterOperator cluster.Operator, iamOperator iam.Operator) error {
 
@@ -54,7 +49,7 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 
 	webservice.Route(webservice.POST("/projects").
 		To(h.CreateProject).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
 		Doc("Create project.").
 		Reads(tenantv1.Project{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), tenantv1.Project{}).
@@ -63,7 +58,7 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 
 	webservice.Route(webservice.GET("/projects/{name}").
 		To(h.DescribeProject).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
 		Doc("Describe project.").
 		Param(webservice.PathParameter(query.ParameterName, "project name").
 			Required(true).
@@ -76,7 +71,7 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 
 	webservice.Route(webservice.PUT("/projects/{name}").
 		To(h.UpdateProject).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
 		Doc("Update projects profile.").
 		Reads(tenantv1.Project{}).
 		Param(webservice.PathParameter("name", "project name")).
@@ -85,7 +80,7 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 
 	webservice.Route(webservice.DELETE("/projects/{name}").
 		To(h.DeleteProject).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
 		Doc("Delete project.").
 		Param(webservice.PathParameter("name", "project name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
@@ -93,7 +88,7 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 
 	webservice.Route(webservice.GET("/projects").
 		To(h.ListProjects).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
 		Doc("List projects.").
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
@@ -119,7 +114,17 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	c.Add(webservice)
+	webservice.Route(webservice.PUT("/projects/{name}/nodes").
+		To(h.AddOrRemoveNode).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
+		Doc("Add or remove node to project.").
+		Reads(PatchNodes{}).
+		Param(webservice.PathParameter(query.ParameterName, "project name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
+	c.Add(webservice)
 	return nil
 }

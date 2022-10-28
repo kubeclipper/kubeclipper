@@ -10,13 +10,23 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 type Project struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              ProjectSpec `json:"spec,omitempty"`
+	Spec              ProjectSpec   `json:"spec,omitempty"`
+	Status            ProjectStatus `json:"status,omitempty"`
 }
 
 // ProjectSpec defines the desired state of Project
 type ProjectSpec struct {
 	Manager string   `json:"manager,omitempty"`
 	Nodes   []string `json:"nodes,omitempty"`
+}
+
+type ProjectStatus struct {
+	Count ProjectCount `json:"count"`
+}
+
+type ProjectCount struct {
+	Cluster int64 `json:"cluster"`
+	Node    int64 `json:"node"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

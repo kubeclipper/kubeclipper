@@ -4750,6 +4750,43 @@
         }
       }
     },
+    "/api/tenant.kubeclipper.io/v1/projects/{name}/nodes": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Tenant"
+        ],
+        "summary": "Add or remove node to project.",
+        "operationId": "AddOrRemoveNode",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.PatchNodes"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/oauth/cb/{callback}": {
       "get": {
         "consumes": [
@@ -6974,21 +7011,21 @@
     },
     "v1.PatchNodes": {
       "required": [
-        "operation",
         "nodes",
-        "role"
+        "project",
+        "op"
       ],
       "properties": {
         "nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/v1.WorkerNode"
+            "type": "string"
           }
         },
-        "operation": {
+        "op": {
           "type": "string"
         },
-        "role": {
+        "project": {
           "type": "string"
         }
       }
@@ -7051,6 +7088,25 @@
         },
         "spec": {
           "$ref": "#/definitions/v1.ProjectSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/v1.ProjectStatus"
+        }
+      }
+    },
+    "v1.ProjectCount": {
+      "required": [
+        "cluster",
+        "node"
+      ],
+      "properties": {
+        "cluster": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "node": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },
@@ -7059,11 +7115,21 @@
         "manager": {
           "type": "string"
         },
-        "regions": {
+        "nodes": {
           "type": "array",
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "v1.ProjectStatus": {
+      "required": [
+        "count"
+      ],
+      "properties": {
+        "count": {
+          "$ref": "#/definitions/v1.ProjectCount"
         }
       }
     },
