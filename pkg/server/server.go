@@ -119,7 +119,7 @@ func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 		s.cache, err = cache.NewMemory()
 	case cache.ProviderEtcd:
 		iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-			s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
+			s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
 		s.cache, err = cache.NewEtcd(iamOperator, iamOperator)
 	case cache.ProviderRedis:
 		s.cache, err = cache.NewRedis(s.Config.CacheOptions.RedisOptions)
@@ -193,7 +193,7 @@ func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 	s.container.Filter(filters.WithRequestInfo(&request.InfoFactory{APIPrefixes: sets.NewString("api")}))
 
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
+		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
 	tokenOperator := auth.NewTokenOperator(iamOperator, s.Config.AuthenticationOptions)
 
 	authnPathAuthenticator, err := authnpath.NewAuthenticator([]string{"/oauth/login", "/version", "/metrics", "/healthz"})
@@ -257,7 +257,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	leaseOperator := lease.NewLeaseOperator(s.storageFactory.Leases())
 	opOperator := operation.NewOperationOperator(s.storageFactory.Operations())
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
+		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
 	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator)
 
 	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator)
@@ -316,7 +316,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 
 func (s *APIServer) migrate() error {
 	operator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
+		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
 	if err := s.migrateRole(operator); err != nil {
 		return err
 	}
@@ -400,11 +400,8 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	)
 	coreOperator := core.NewOperator(storageFactory.ConfigMaps())
 	opOperator := operation.NewOperationOperator(storageFactory.Operations())
-	iamOperator := iam.NewOperator(storageFactory.Users(),
-		storageFactory.GlobalRoles(),
-		storageFactory.GlobalRoleBindings(),
-		storageFactory.Tokens(),
-		storageFactory.LoginRecords())
+	iamOperator := iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(), storageFactory.GlobalRoleBindings(),
+		storageFactory.Tokens(), storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
 	projectOperator := tenant.NewProjectOperator(storageFactory.Project())
 	if err = (&nodecontroller.NodeReconciler{
 		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
@@ -513,7 +510,9 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		AuditOptions:  s.Config.AuditOptions,
 	}).SetupWithManager(mgr)
 	(&controller.IAMStatusMon{
-		IAMOperator:        iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(), storageFactory.GlobalRoleBindings(), storageFactory.Tokens(), storageFactory.LoginRecords()),
+		IAMOperator: iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(),
+			storageFactory.GlobalRoleBindings(), storageFactory.Tokens(), storageFactory.LoginRecords(),
+			s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding()),
 		AuthenticationOpts: s.Config.AuthenticationOptions,
 	}).SetupWithManager(mgr)
 	return nil

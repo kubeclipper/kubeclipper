@@ -53,6 +53,36 @@ func (mr *MockOperatorMockRecorder) CreateLoginRecord(ctx, record interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateLoginRecord", reflect.TypeOf((*MockOperator)(nil).CreateLoginRecord), ctx, record)
 }
 
+// CreateProjectRole mocks base method.
+func (m *MockOperator) CreateProjectRole(ctx context.Context, role *v1.ProjectRole) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateProjectRole", ctx, role)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateProjectRole indicates an expected call of CreateProjectRole.
+func (mr *MockOperatorMockRecorder) CreateProjectRole(ctx, role interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProjectRole", reflect.TypeOf((*MockOperator)(nil).CreateProjectRole), ctx, role)
+}
+
+// CreateProjectRoleBinding mocks base method.
+func (m *MockOperator) CreateProjectRoleBinding(ctx context.Context, user *v1.ProjectRoleBinding) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateProjectRoleBinding", ctx, user)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateProjectRoleBinding indicates an expected call of CreateProjectRoleBinding.
+func (mr *MockOperatorMockRecorder) CreateProjectRoleBinding(ctx, user interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProjectRoleBinding", reflect.TypeOf((*MockOperator)(nil).CreateProjectRoleBinding), ctx, user)
+}
+
 // CreateRole mocks base method.
 func (m *MockOperator) CreateRole(ctx context.Context, role *v1.GlobalRole) (*v1.GlobalRole, error) {
 	m.ctrl.T.Helper()
@@ -139,6 +169,34 @@ func (m *MockOperator) DeleteLoginRecordCollection(ctx context.Context, query *q
 func (mr *MockOperatorMockRecorder) DeleteLoginRecordCollection(ctx, query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLoginRecordCollection", reflect.TypeOf((*MockOperator)(nil).DeleteLoginRecordCollection), ctx, query)
+}
+
+// DeleteProjectRole mocks base method.
+func (m *MockOperator) DeleteProjectRole(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProjectRole", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProjectRole indicates an expected call of DeleteProjectRole.
+func (mr *MockOperatorMockRecorder) DeleteProjectRole(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectRole", reflect.TypeOf((*MockOperator)(nil).DeleteProjectRole), ctx, name)
+}
+
+// DeleteProjectRoleBinding mocks base method.
+func (m *MockOperator) DeleteProjectRoleBinding(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProjectRoleBinding", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProjectRoleBinding indicates an expected call of DeleteProjectRoleBinding.
+func (mr *MockOperatorMockRecorder) DeleteProjectRoleBinding(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectRoleBinding", reflect.TypeOf((*MockOperator)(nil).DeleteProjectRoleBinding), ctx, name)
 }
 
 // DeleteRole mocks base method.
@@ -239,6 +297,66 @@ func (m *MockOperator) GetLoginRecordEx(ctx context.Context, name, resourceVersi
 func (mr *MockOperatorMockRecorder) GetLoginRecordEx(ctx, name, resourceVersion interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLoginRecordEx", reflect.TypeOf((*MockOperator)(nil).GetLoginRecordEx), ctx, name, resourceVersion)
+}
+
+// GetProjectRole mocks base method.
+func (m *MockOperator) GetProjectRole(ctx context.Context, name string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRole", ctx, name)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRole indicates an expected call of GetProjectRole.
+func (mr *MockOperatorMockRecorder) GetProjectRole(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRole", reflect.TypeOf((*MockOperator)(nil).GetProjectRole), ctx, name)
+}
+
+// GetProjectRoleBinding mocks base method.
+func (m *MockOperator) GetProjectRoleBinding(ctx context.Context, name string) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleBinding", ctx, name)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleBinding indicates an expected call of GetProjectRoleBinding.
+func (mr *MockOperatorMockRecorder) GetProjectRoleBinding(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleBinding", reflect.TypeOf((*MockOperator)(nil).GetProjectRoleBinding), ctx, name)
+}
+
+// GetProjectRoleBindingEx mocks base method.
+func (m *MockOperator) GetProjectRoleBindingEx(ctx context.Context, name, resourceVersion string) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleBindingEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleBindingEx indicates an expected call of GetProjectRoleBindingEx.
+func (mr *MockOperatorMockRecorder) GetProjectRoleBindingEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleBindingEx", reflect.TypeOf((*MockOperator)(nil).GetProjectRoleBindingEx), ctx, name, resourceVersion)
+}
+
+// GetProjectRoleEx mocks base method.
+func (m *MockOperator) GetProjectRoleEx(ctx context.Context, name, resourceVersion string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleEx indicates an expected call of GetProjectRoleEx.
+func (mr *MockOperatorMockRecorder) GetProjectRoleEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleEx", reflect.TypeOf((*MockOperator)(nil).GetProjectRoleEx), ctx, name, resourceVersion)
 }
 
 // GetRole mocks base method.
@@ -406,6 +524,66 @@ func (mr *MockOperatorMockRecorder) ListLoginRecords(ctx, query interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListLoginRecords", reflect.TypeOf((*MockOperator)(nil).ListLoginRecords), ctx, query)
 }
 
+// ListProjectRoleBinding mocks base method.
+func (m *MockOperator) ListProjectRoleBinding(ctx context.Context, query *query.Query) (*v1.ProjectRoleBindingList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleBinding", ctx, query)
+	ret0, _ := ret[0].(*v1.ProjectRoleBindingList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleBinding indicates an expected call of ListProjectRoleBinding.
+func (mr *MockOperatorMockRecorder) ListProjectRoleBinding(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleBinding", reflect.TypeOf((*MockOperator)(nil).ListProjectRoleBinding), ctx, query)
+}
+
+// ListProjectRoleBindingEx mocks base method.
+func (m *MockOperator) ListProjectRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleBindingEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleBindingEx indicates an expected call of ListProjectRoleBindingEx.
+func (mr *MockOperatorMockRecorder) ListProjectRoleBindingEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleBindingEx", reflect.TypeOf((*MockOperator)(nil).ListProjectRoleBindingEx), ctx, query)
+}
+
+// ListProjectRoleEx mocks base method.
+func (m *MockOperator) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleEx indicates an expected call of ListProjectRoleEx.
+func (mr *MockOperatorMockRecorder) ListProjectRoleEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleEx", reflect.TypeOf((*MockOperator)(nil).ListProjectRoleEx), ctx, query)
+}
+
+// ListProjectRoles mocks base method.
+func (m *MockOperator) ListProjectRoles(ctx context.Context, query *query.Query) (*v1.ProjectRoleList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoles", ctx, query)
+	ret0, _ := ret[0].(*v1.ProjectRoleList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoles indicates an expected call of ListProjectRoles.
+func (mr *MockOperatorMockRecorder) ListProjectRoles(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoles", reflect.TypeOf((*MockOperator)(nil).ListProjectRoles), ctx, query)
+}
+
 // ListRoleBindingEx mocks base method.
 func (m *MockOperator) ListRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
 	m.ctrl.T.Helper()
@@ -541,6 +719,36 @@ func (mr *MockOperatorMockRecorder) ListUsersByRole(ctx, query, role interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsersByRole", reflect.TypeOf((*MockOperator)(nil).ListUsersByRole), ctx, query, role)
 }
 
+// UpdateProjectRole mocks base method.
+func (m *MockOperator) UpdateProjectRole(ctx context.Context, role *v1.ProjectRole) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProjectRole", ctx, role)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProjectRole indicates an expected call of UpdateProjectRole.
+func (mr *MockOperatorMockRecorder) UpdateProjectRole(ctx, role interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectRole", reflect.TypeOf((*MockOperator)(nil).UpdateProjectRole), ctx, role)
+}
+
+// UpdateProjectRoleBinding mocks base method.
+func (m *MockOperator) UpdateProjectRoleBinding(ctx context.Context, roleBinding *v1.ProjectRoleBinding) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProjectRoleBinding", ctx, roleBinding)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProjectRoleBinding indicates an expected call of UpdateProjectRoleBinding.
+func (mr *MockOperatorMockRecorder) UpdateProjectRoleBinding(ctx, roleBinding interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectRoleBinding", reflect.TypeOf((*MockOperator)(nil).UpdateProjectRoleBinding), ctx, roleBinding)
+}
+
 // UpdateRole mocks base method.
 func (m *MockOperator) UpdateRole(ctx context.Context, role *v1.GlobalRole) (*v1.GlobalRole, error) {
 	m.ctrl.T.Helper()
@@ -614,6 +822,21 @@ func (m *MockOperator) WatchLoginRecords(ctx context.Context, query *query.Query
 func (mr *MockOperatorMockRecorder) WatchLoginRecords(ctx, query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchLoginRecords", reflect.TypeOf((*MockOperator)(nil).WatchLoginRecords), ctx, query)
+}
+
+// WatchProjectRoleBinding mocks base method.
+func (m *MockOperator) WatchProjectRoleBinding(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchProjectRoleBinding", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchProjectRoleBinding indicates an expected call of WatchProjectRoleBinding.
+func (mr *MockOperatorMockRecorder) WatchProjectRoleBinding(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchProjectRoleBinding", reflect.TypeOf((*MockOperator)(nil).WatchProjectRoleBinding), ctx, query)
 }
 
 // WatchRoleBindings mocks base method.
@@ -1837,4 +2060,425 @@ func (m *MockLoginRecordWriter) DeleteLoginRecordCollection(ctx context.Context,
 func (mr *MockLoginRecordWriterMockRecorder) DeleteLoginRecordCollection(ctx, query interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLoginRecordCollection", reflect.TypeOf((*MockLoginRecordWriter)(nil).DeleteLoginRecordCollection), ctx, query)
+}
+
+// MockProjectRoleReader is a mock of ProjectRoleReader interface.
+type MockProjectRoleReader struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectRoleReaderMockRecorder
+}
+
+// MockProjectRoleReaderMockRecorder is the mock recorder for MockProjectRoleReader.
+type MockProjectRoleReaderMockRecorder struct {
+	mock *MockProjectRoleReader
+}
+
+// NewMockProjectRoleReader creates a new mock instance.
+func NewMockProjectRoleReader(ctrl *gomock.Controller) *MockProjectRoleReader {
+	mock := &MockProjectRoleReader{ctrl: ctrl}
+	mock.recorder = &MockProjectRoleReaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectRoleReader) EXPECT() *MockProjectRoleReaderMockRecorder {
+	return m.recorder
+}
+
+// GetProjectRole mocks base method.
+func (m *MockProjectRoleReader) GetProjectRole(ctx context.Context, name string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRole", ctx, name)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRole indicates an expected call of GetProjectRole.
+func (mr *MockProjectRoleReaderMockRecorder) GetProjectRole(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRole", reflect.TypeOf((*MockProjectRoleReader)(nil).GetProjectRole), ctx, name)
+}
+
+// GetProjectRoleEx mocks base method.
+func (m *MockProjectRoleReader) GetProjectRoleEx(ctx context.Context, name, resourceVersion string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleEx indicates an expected call of GetProjectRoleEx.
+func (mr *MockProjectRoleReaderMockRecorder) GetProjectRoleEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleEx", reflect.TypeOf((*MockProjectRoleReader)(nil).GetProjectRoleEx), ctx, name, resourceVersion)
+}
+
+// ListProjectRoleEx mocks base method.
+func (m *MockProjectRoleReader) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleEx indicates an expected call of ListProjectRoleEx.
+func (mr *MockProjectRoleReaderMockRecorder) ListProjectRoleEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleEx", reflect.TypeOf((*MockProjectRoleReader)(nil).ListProjectRoleEx), ctx, query)
+}
+
+// ListProjectRoles mocks base method.
+func (m *MockProjectRoleReader) ListProjectRoles(ctx context.Context, query *query.Query) (*v1.ProjectRoleList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoles", ctx, query)
+	ret0, _ := ret[0].(*v1.ProjectRoleList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoles indicates an expected call of ListProjectRoles.
+func (mr *MockProjectRoleReaderMockRecorder) ListProjectRoles(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoles", reflect.TypeOf((*MockProjectRoleReader)(nil).ListProjectRoles), ctx, query)
+}
+
+// MockProjectRoleReaderEx is a mock of ProjectRoleReaderEx interface.
+type MockProjectRoleReaderEx struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectRoleReaderExMockRecorder
+}
+
+// MockProjectRoleReaderExMockRecorder is the mock recorder for MockProjectRoleReaderEx.
+type MockProjectRoleReaderExMockRecorder struct {
+	mock *MockProjectRoleReaderEx
+}
+
+// NewMockProjectRoleReaderEx creates a new mock instance.
+func NewMockProjectRoleReaderEx(ctrl *gomock.Controller) *MockProjectRoleReaderEx {
+	mock := &MockProjectRoleReaderEx{ctrl: ctrl}
+	mock.recorder = &MockProjectRoleReaderExMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectRoleReaderEx) EXPECT() *MockProjectRoleReaderExMockRecorder {
+	return m.recorder
+}
+
+// GetProjectRoleEx mocks base method.
+func (m *MockProjectRoleReaderEx) GetProjectRoleEx(ctx context.Context, name, resourceVersion string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleEx indicates an expected call of GetProjectRoleEx.
+func (mr *MockProjectRoleReaderExMockRecorder) GetProjectRoleEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleEx", reflect.TypeOf((*MockProjectRoleReaderEx)(nil).GetProjectRoleEx), ctx, name, resourceVersion)
+}
+
+// ListProjectRoleEx mocks base method.
+func (m *MockProjectRoleReaderEx) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleEx indicates an expected call of ListProjectRoleEx.
+func (mr *MockProjectRoleReaderExMockRecorder) ListProjectRoleEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleEx", reflect.TypeOf((*MockProjectRoleReaderEx)(nil).ListProjectRoleEx), ctx, query)
+}
+
+// MockProjectRoleWriter is a mock of ProjectRoleWriter interface.
+type MockProjectRoleWriter struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectRoleWriterMockRecorder
+}
+
+// MockProjectRoleWriterMockRecorder is the mock recorder for MockProjectRoleWriter.
+type MockProjectRoleWriterMockRecorder struct {
+	mock *MockProjectRoleWriter
+}
+
+// NewMockProjectRoleWriter creates a new mock instance.
+func NewMockProjectRoleWriter(ctrl *gomock.Controller) *MockProjectRoleWriter {
+	mock := &MockProjectRoleWriter{ctrl: ctrl}
+	mock.recorder = &MockProjectRoleWriterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectRoleWriter) EXPECT() *MockProjectRoleWriterMockRecorder {
+	return m.recorder
+}
+
+// CreateProjectRole mocks base method.
+func (m *MockProjectRoleWriter) CreateProjectRole(ctx context.Context, role *v1.ProjectRole) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateProjectRole", ctx, role)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateProjectRole indicates an expected call of CreateProjectRole.
+func (mr *MockProjectRoleWriterMockRecorder) CreateProjectRole(ctx, role interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProjectRole", reflect.TypeOf((*MockProjectRoleWriter)(nil).CreateProjectRole), ctx, role)
+}
+
+// DeleteProjectRole mocks base method.
+func (m *MockProjectRoleWriter) DeleteProjectRole(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProjectRole", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProjectRole indicates an expected call of DeleteProjectRole.
+func (mr *MockProjectRoleWriterMockRecorder) DeleteProjectRole(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectRole", reflect.TypeOf((*MockProjectRoleWriter)(nil).DeleteProjectRole), ctx, name)
+}
+
+// UpdateProjectRole mocks base method.
+func (m *MockProjectRoleWriter) UpdateProjectRole(ctx context.Context, role *v1.ProjectRole) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProjectRole", ctx, role)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProjectRole indicates an expected call of UpdateProjectRole.
+func (mr *MockProjectRoleWriterMockRecorder) UpdateProjectRole(ctx, role interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectRole", reflect.TypeOf((*MockProjectRoleWriter)(nil).UpdateProjectRole), ctx, role)
+}
+
+// MockProjectRoleBindingReader is a mock of ProjectRoleBindingReader interface.
+type MockProjectRoleBindingReader struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectRoleBindingReaderMockRecorder
+}
+
+// MockProjectRoleBindingReaderMockRecorder is the mock recorder for MockProjectRoleBindingReader.
+type MockProjectRoleBindingReaderMockRecorder struct {
+	mock *MockProjectRoleBindingReader
+}
+
+// NewMockProjectRoleBindingReader creates a new mock instance.
+func NewMockProjectRoleBindingReader(ctrl *gomock.Controller) *MockProjectRoleBindingReader {
+	mock := &MockProjectRoleBindingReader{ctrl: ctrl}
+	mock.recorder = &MockProjectRoleBindingReaderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectRoleBindingReader) EXPECT() *MockProjectRoleBindingReaderMockRecorder {
+	return m.recorder
+}
+
+// GetProjectRoleBinding mocks base method.
+func (m *MockProjectRoleBindingReader) GetProjectRoleBinding(ctx context.Context, name string) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleBinding", ctx, name)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleBinding indicates an expected call of GetProjectRoleBinding.
+func (mr *MockProjectRoleBindingReaderMockRecorder) GetProjectRoleBinding(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleBinding", reflect.TypeOf((*MockProjectRoleBindingReader)(nil).GetProjectRoleBinding), ctx, name)
+}
+
+// GetProjectRoleBindingEx mocks base method.
+func (m *MockProjectRoleBindingReader) GetProjectRoleBindingEx(ctx context.Context, name, resourceVersion string) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleBindingEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleBindingEx indicates an expected call of GetProjectRoleBindingEx.
+func (mr *MockProjectRoleBindingReaderMockRecorder) GetProjectRoleBindingEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleBindingEx", reflect.TypeOf((*MockProjectRoleBindingReader)(nil).GetProjectRoleBindingEx), ctx, name, resourceVersion)
+}
+
+// ListProjectRoleBinding mocks base method.
+func (m *MockProjectRoleBindingReader) ListProjectRoleBinding(ctx context.Context, query *query.Query) (*v1.ProjectRoleBindingList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleBinding", ctx, query)
+	ret0, _ := ret[0].(*v1.ProjectRoleBindingList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleBinding indicates an expected call of ListProjectRoleBinding.
+func (mr *MockProjectRoleBindingReaderMockRecorder) ListProjectRoleBinding(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleBinding", reflect.TypeOf((*MockProjectRoleBindingReader)(nil).ListProjectRoleBinding), ctx, query)
+}
+
+// ListProjectRoleBindingEx mocks base method.
+func (m *MockProjectRoleBindingReader) ListProjectRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleBindingEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleBindingEx indicates an expected call of ListProjectRoleBindingEx.
+func (mr *MockProjectRoleBindingReaderMockRecorder) ListProjectRoleBindingEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleBindingEx", reflect.TypeOf((*MockProjectRoleBindingReader)(nil).ListProjectRoleBindingEx), ctx, query)
+}
+
+// WatchProjectRoleBinding mocks base method.
+func (m *MockProjectRoleBindingReader) WatchProjectRoleBinding(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchProjectRoleBinding", ctx, query)
+	ret0, _ := ret[0].(watch.Interface)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WatchProjectRoleBinding indicates an expected call of WatchProjectRoleBinding.
+func (mr *MockProjectRoleBindingReaderMockRecorder) WatchProjectRoleBinding(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchProjectRoleBinding", reflect.TypeOf((*MockProjectRoleBindingReader)(nil).WatchProjectRoleBinding), ctx, query)
+}
+
+// MockProjectRoleBindingReaderEx is a mock of ProjectRoleBindingReaderEx interface.
+type MockProjectRoleBindingReaderEx struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectRoleBindingReaderExMockRecorder
+}
+
+// MockProjectRoleBindingReaderExMockRecorder is the mock recorder for MockProjectRoleBindingReaderEx.
+type MockProjectRoleBindingReaderExMockRecorder struct {
+	mock *MockProjectRoleBindingReaderEx
+}
+
+// NewMockProjectRoleBindingReaderEx creates a new mock instance.
+func NewMockProjectRoleBindingReaderEx(ctrl *gomock.Controller) *MockProjectRoleBindingReaderEx {
+	mock := &MockProjectRoleBindingReaderEx{ctrl: ctrl}
+	mock.recorder = &MockProjectRoleBindingReaderExMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectRoleBindingReaderEx) EXPECT() *MockProjectRoleBindingReaderExMockRecorder {
+	return m.recorder
+}
+
+// GetProjectRoleBindingEx mocks base method.
+func (m *MockProjectRoleBindingReaderEx) GetProjectRoleBindingEx(ctx context.Context, name, resourceVersion string) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleBindingEx", ctx, name, resourceVersion)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleBindingEx indicates an expected call of GetProjectRoleBindingEx.
+func (mr *MockProjectRoleBindingReaderExMockRecorder) GetProjectRoleBindingEx(ctx, name, resourceVersion interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleBindingEx", reflect.TypeOf((*MockProjectRoleBindingReaderEx)(nil).GetProjectRoleBindingEx), ctx, name, resourceVersion)
+}
+
+// ListProjectRoleBindingEx mocks base method.
+func (m *MockProjectRoleBindingReaderEx) ListProjectRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectRoleBindingEx", ctx, query)
+	ret0, _ := ret[0].(*models.PageableResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectRoleBindingEx indicates an expected call of ListProjectRoleBindingEx.
+func (mr *MockProjectRoleBindingReaderExMockRecorder) ListProjectRoleBindingEx(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectRoleBindingEx", reflect.TypeOf((*MockProjectRoleBindingReaderEx)(nil).ListProjectRoleBindingEx), ctx, query)
+}
+
+// MockProjectRoleBindingWriter is a mock of ProjectRoleBindingWriter interface.
+type MockProjectRoleBindingWriter struct {
+	ctrl     *gomock.Controller
+	recorder *MockProjectRoleBindingWriterMockRecorder
+}
+
+// MockProjectRoleBindingWriterMockRecorder is the mock recorder for MockProjectRoleBindingWriter.
+type MockProjectRoleBindingWriterMockRecorder struct {
+	mock *MockProjectRoleBindingWriter
+}
+
+// NewMockProjectRoleBindingWriter creates a new mock instance.
+func NewMockProjectRoleBindingWriter(ctrl *gomock.Controller) *MockProjectRoleBindingWriter {
+	mock := &MockProjectRoleBindingWriter{ctrl: ctrl}
+	mock.recorder = &MockProjectRoleBindingWriterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProjectRoleBindingWriter) EXPECT() *MockProjectRoleBindingWriterMockRecorder {
+	return m.recorder
+}
+
+// CreateProjectRoleBinding mocks base method.
+func (m *MockProjectRoleBindingWriter) CreateProjectRoleBinding(ctx context.Context, user *v1.ProjectRoleBinding) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateProjectRoleBinding", ctx, user)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateProjectRoleBinding indicates an expected call of CreateProjectRoleBinding.
+func (mr *MockProjectRoleBindingWriterMockRecorder) CreateProjectRoleBinding(ctx, user interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProjectRoleBinding", reflect.TypeOf((*MockProjectRoleBindingWriter)(nil).CreateProjectRoleBinding), ctx, user)
+}
+
+// DeleteProjectRoleBinding mocks base method.
+func (m *MockProjectRoleBindingWriter) DeleteProjectRoleBinding(ctx context.Context, name string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProjectRoleBinding", ctx, name)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProjectRoleBinding indicates an expected call of DeleteProjectRoleBinding.
+func (mr *MockProjectRoleBindingWriterMockRecorder) DeleteProjectRoleBinding(ctx, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectRoleBinding", reflect.TypeOf((*MockProjectRoleBindingWriter)(nil).DeleteProjectRoleBinding), ctx, name)
+}
+
+// UpdateProjectRoleBinding mocks base method.
+func (m *MockProjectRoleBindingWriter) UpdateProjectRoleBinding(ctx context.Context, roleBinding *v1.ProjectRoleBinding) (*v1.ProjectRoleBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateProjectRoleBinding", ctx, roleBinding)
+	ret0, _ := ret[0].(*v1.ProjectRoleBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateProjectRoleBinding indicates an expected call of UpdateProjectRoleBinding.
+func (mr *MockProjectRoleBindingWriterMockRecorder) UpdateProjectRoleBinding(ctx, roleBinding interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectRoleBinding", reflect.TypeOf((*MockProjectRoleBindingWriter)(nil).UpdateProjectRoleBinding), ctx, roleBinding)
 }

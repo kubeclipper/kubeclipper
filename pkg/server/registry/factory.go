@@ -53,6 +53,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/node"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/platformsetting"
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/projectrole"
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/projectrolebinding"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/recovery"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/region"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/token"
@@ -72,6 +74,8 @@ type SharedStorageFactory interface {
 	Tokens() rest.StandardStorage
 	Users() rest.StandardStorage
 	LoginRecords() rest.StandardStorage
+	ProjectRole() rest.StandardStorage
+	ProjectRoleBinding() rest.StandardStorage
 	PlatformSettings() rest.StandardStorage
 	Events() rest.StandardStorage
 	Backups() rest.StandardStorage
@@ -158,6 +162,14 @@ func (s *sharedStorageFactory) Users() rest.StandardStorage {
 
 func (s *sharedStorageFactory) LoginRecords() rest.StandardStorage {
 	return s.StorageFor(&iamv1.LoginRecord{}, loginrecord.NewStorage)
+}
+
+func (s *sharedStorageFactory) ProjectRole() rest.StandardStorage {
+	return s.StorageFor(&iamv1.ProjectRole{}, projectrole.NewStorage)
+}
+
+func (s *sharedStorageFactory) ProjectRoleBinding() rest.StandardStorage {
+	return s.StorageFor(&iamv1.ProjectRoleBinding{}, projectrolebinding.NewStorage)
 }
 
 func (s *sharedStorageFactory) PlatformSettings() rest.StandardStorage {

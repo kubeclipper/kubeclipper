@@ -302,6 +302,38 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, authz author
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.GlobalRole{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
+	webservice.Route(webservice.GET("/project/user").
+		To(h.ListProjectUser).
+		Doc("list user under project").
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("name", "project name")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), []*iamv1.User{}).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
+
+	webservice.Route(webservice.POST("/project/{name}/user").
+		To(h.CreateProjectUser).
+		Doc("add user to project").
+		Reads([]iamv1.Member{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("name", "project name")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), []*iamv1.ProjectRoleBinding{}).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
+
+	webservice.Route(webservice.DELETE("/project/{project}/user/{user}").
+		To(h.DeleteProjectUser).
+		Doc("delete user under project").
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("user", "user name")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
+
 	c.Add(webservice)
 
 	return nil
