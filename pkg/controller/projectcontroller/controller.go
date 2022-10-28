@@ -20,14 +20,16 @@ package projectcontroller
 
 import (
 	"context"
+	"reflect"
 
-	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 	pkgerrors "github.com/pkg/errors"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
 	corev1lister "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/handler"
@@ -52,6 +54,8 @@ type ProjectReconciler struct {
 
 	NodeLister corev1lister.NodeLister
 	NodeWriter cluster.NodeWriter
+
+	ClusterLister corev1lister.ClusterLister
 	// TODO projectRole & projectRoleBinding
 }
 
@@ -133,6 +137,12 @@ func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error("failed to sync node label", zap.Error(err))
 		return ctrl.Result{}, err
 	}
+
+	if err = r.count(ctx, project); err != nil {
+		log.Error("failed to count project", zap.Error(err))
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -196,6 +206,31 @@ func (r *ProjectReconciler) syncNodeLabel(ctx context.Context, p *tenantv1.Proje
 			if _, err = r.NodeWriter.UpdateNode(ctx, node); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (r *ProjectReconciler) count(ctx context.Context, p *tenantv1.Project) error {
+	requirement, err := labels.NewRequirement(common.LabelProject, selection.Equals, []string{p.Name})
+	if err != nil {
+		return err
+	}
+	selector := labels.NewSelector().Add(*requirement)
+	cp := p.DeepCopy()
+
+	// 	count cluster
+	clusters, err := r.ClusterLister.List(selector)
+	if err != nil {
+		return err
+	}
+	cp.Status.Count.Cluster = int64(len(clusters))
+	// 	count node
+	cp.Status.Count.Node = int64(len(p.Spec.Nodes))
+
+	if !reflect.DeepEqual(p, cp) {
+		if _, err = r.ProjectWriter.UpdateProject(ctx, cp); err != nil {
+			return err
 		}
 	}
 	return nil

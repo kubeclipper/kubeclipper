@@ -493,6 +493,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		ProjectWriter: projectOperator,
 		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:    clusterOperator,
+		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
