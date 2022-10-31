@@ -277,7 +277,7 @@ type TokenList struct {
 }
 
 type Member struct {
-	UserName string `json:"userName"`
+	Username string `json:"username"`
 	Role     string `json:"role"`
 }
 

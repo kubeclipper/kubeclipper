@@ -550,7 +550,7 @@ func (i *iamOperator) WatchProjectRole(ctx context.Context, query *query.Query) 
 }
 
 func (i *iamOperator) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, i.roleStorage, query, i.projectRoleFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, i.projectRoleStorage, query, i.projectRoleFuzzyFilter, nil, nil)
 }
 
 func (i *iamOperator) GetProjectRoleEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRole, error) {
@@ -578,7 +578,7 @@ func (i *iamOperator) DeleteProjectRole(ctx context.Context, name string) error 
 }
 
 func (i *iamOperator) UpdateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error) {
-	obj, wasCreated, err := i.roleStorage.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role),
+	obj, wasCreated, err := i.projectRoleStorage.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
@@ -635,7 +635,7 @@ func (i *iamOperator) DeleteProjectRoleBinding(ctx context.Context, name string)
 }
 
 func (i *iamOperator) UpdateProjectRoleBinding(ctx context.Context, roleBinding *iamv1.ProjectRoleBinding) (*iamv1.ProjectRoleBinding, error) {
-	obj, wasCreated, err := i.roleBindingStorage.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding),
+	obj, wasCreated, err := i.projectRoleBindingStorage.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err

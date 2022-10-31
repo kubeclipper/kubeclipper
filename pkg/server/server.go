@@ -272,10 +272,12 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 
 	tokenOperator := auth.NewTokenOperator(iamOperator, s.Config.AuthenticationOptions)
 
-	if err := iamv1.AddToContainer(s.container, iamOperator, s.rbacAuthorizer, tokenOperator); err != nil {
+	tenantOperator := tenant.NewProjectOperator(s.storageFactory.Project())
+
+	if err := iamv1.AddToContainer(s.container, iamOperator, tenantOperator, s.rbacAuthorizer, tokenOperator); err != nil {
 		return err
 	}
-	tenantOperator := tenant.NewProjectOperator(s.storageFactory.Project())
+
 	if err := tenantv1.AddToContainer(s.container, tenantOperator, clusterOperator, iamOperator); err != nil {
 		return err
 	}
