@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -54,6 +55,7 @@ const (
 type ClusterStatusMon struct {
 	ClusterWriter       cluster.ClusterWriter
 	ClusterLister       listerv1.ClusterLister
+	NodeLister          listerv1.NodeLister
 	CmdDelivery         service.CmdDelivery
 	mgr                 manager.Manager
 	log                 logger.Logging
@@ -79,6 +81,10 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		if !exist {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
 			continue
+		}
+		err = s.updateClusterControlPlaneStatus(clu.DeepCopy())
+		if err != nil {
+			s.log.Error("update cluster control plane status failed", zap.Error(err))
 		}
 		err = s.updateClusterCertification(clu.Name)
 		if err != nil {
@@ -254,4 +260,60 @@ func getClusterComponentIndex(clu *v1.Cluster, component string) int {
 		}
 	}
 	return -1
+}
+
+func (s *ClusterStatusMon) updateClusterControlPlaneStatus(clu *v1.Cluster) error {
+	controlplanestatus := make([]v1.ControlPlaneHealth, len(clu.Masters))
+	for index, id := range clu.Masters.GetNodeIDs() {
+		node, err := s.NodeLister.Get(id)
+		if err != nil {
+			s.log.Error("get master node error", zap.String("node", id), zap.String("cluster", clu.Name))
+			return err
+		}
+		proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
+		floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
+		apiServer := node.Status.Ipv4DefaultIP + ":6443"
+		if floatIP != "" {
+			apiServer = floatIP + ":6443"
+		}
+		if proxyAPIServer != "" {
+			apiServer = proxyAPIServer
+		}
+		health := v1.ControlPlaneHealth{
+			ID:       id,
+			Hostname: node.Labels[common.LabelHostname],
+			Address:  apiServer,
+		}
+		resp, _, respErr := httputil.CommonRequest(fmt.Sprintf("https://%s/livez", apiServer), "GET", nil, nil, nil)
+		if respErr != nil {
+			health.Status = v1.ComponentUnKnown
+		}
+		if string(resp) == "ok" {
+			health.Status = v1.ComponentHealthy
+		} else {
+			health.Status = v1.ComponentUnhealthy
+		}
+		controlplanestatus[index] = health
+	}
+	if isControlPlaneHealthChange(clu.Status.ControlPlaneHealth, controlplanestatus) {
+		clu.Status.ControlPlaneHealth = controlplanestatus
+		_, err := s.ClusterWriter.UpdateCluster(context.TODO(), clu)
+		return err
+	}
+	s.log.Debug("control plane status has no change, skip update", zap.String("cluster", clu.Name))
+	return nil
+}
+
+func isControlPlaneHealthChange(a, b []v1.ControlPlaneHealth) bool {
+	if len(a) != len(b) {
+		return true
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return true
+		}
+	}
+
+	return false
 }

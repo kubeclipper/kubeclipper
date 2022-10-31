@@ -100,7 +100,7 @@ func NewCmdClean(streams options.IOStreams) *cobra.Command {
 	}
 	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.cleanAll, "all", "A", o.cleanAll, "clean all components for kubeclipper")
-	cmd.Flags().BoolVarP(&o.force, "fore", "f", o.force, "force use local deploy config to clean kubeclipper when kc-server not health")
+	cmd.Flags().BoolVarP(&o.force, "force", "f", o.force, "force use local deploy config to clean kubeclipper when kc-server not health")
 	cmd.Flags().StringVar(&o.deployConfig.Config, "deploy-config", options.DefaultDeployConfigPath, "path to the deploy config file to use for clean,just work with force flag.")
 	return cmd
 }

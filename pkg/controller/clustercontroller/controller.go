@@ -341,6 +341,8 @@ func (r *ClusterReconciler) getKubeconfigFromProvider(c *v1.Cluster) (string, er
 
 }
 
+// TODO: need redesign
+// clientset need local lb
 func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (string, error) {
 	log := logger.FromContext(ctx)
 

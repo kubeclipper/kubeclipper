@@ -784,12 +784,13 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
-		ClusterName:    c.Name,
-		Offline:        c.Offline(),
-		LocalRegistry:  c.LocalRegistry,
-		CRI:            c.ContainerRuntime.Type,
-		KubeVersion:    c.KubernetesVersion,
-		KubeletDataDir: c.Kubelet.RootDir,
+		ClusterName:        c.Name,
+		Offline:            c.Offline(),
+		LocalRegistry:      c.LocalRegistry,
+		CRI:                c.ContainerRuntime.Type,
+		KubeVersion:        c.KubernetesVersion,
+		KubeletDataDir:     c.Kubelet.RootDir,
+		ControlPlaneStatus: c.Status.ControlPlaneHealth,
 	}
 	masters, err := h.getNodeInfo(ctx, c.Masters)
 	if err != nil {
