@@ -3171,7 +3171,7 @@ func (h *handler) PreCheckCloudProvider(req *restful.Request, resp *restful.Resp
 		return
 	}
 
-	provider, err := clustermanage.GetProvider(clustermanage.Operator{CloudProviderReader: h.clusterOperator}, *cp)
+	provider, err := clustermanage.GetProvider(clustermanage.Operator{ClusterReader: h.clusterOperator, CloudProviderReader: h.clusterOperator}, *cp)
 	if err != nil {
 		restplus.HandleBadRequest(resp, req, err)
 		return
@@ -3201,7 +3201,7 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		return
 	}
 
-	provider, err := clustermanage.GetProvider(clustermanage.Operator{CloudProviderReader: h.clusterOperator}, *cp)
+	provider, err := clustermanage.GetProvider(clustermanage.Operator{ClusterReader: h.clusterOperator, CloudProviderReader: h.clusterOperator}, *cp)
 	if err != nil {
 		restplus.HandleBadRequest(resp, req, err)
 		return

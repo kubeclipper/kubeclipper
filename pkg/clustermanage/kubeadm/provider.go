@@ -521,6 +521,14 @@ func (r Kubeadm) getDeployConfig() (*options.DeployConfig, error) {
 }
 
 func (r Kubeadm) PreCheck(ctx context.Context) (bool, error) {
+	clu, err := r.Operator.ClusterReader.GetCluster(ctx, r.Config.ClusterName)
+	if err != nil && !apimachineryErrors.IsNotFound(err) {
+		return false, err
+	}
+	if clu != nil {
+		return false, fmt.Errorf("cluster %s already exists", clu.Name)
+	}
+
 	providers, err := r.Operator.CloudProviderReader.ListCloudProviders(ctx, &query.Query{})
 	if err != nil {
 		return false, err

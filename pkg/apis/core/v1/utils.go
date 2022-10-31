@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
