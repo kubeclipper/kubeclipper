@@ -484,6 +484,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	(&controller.ClusterStatusMon{
 		ClusterWriter:       clusterOperator,
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
+		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
 		CmdDelivery:         mgr.GetCmdDelivery(),
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
 	}).SetupWithManager(mgr)

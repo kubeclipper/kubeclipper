@@ -20,6 +20,8 @@ package component
 
 import (
 	"context"
+
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 type (
@@ -33,15 +35,16 @@ type (
 )
 
 type ExtraMetadata struct {
-	Masters        NodeList
-	Workers        NodeList
-	Offline        bool
-	LocalRegistry  string
-	CRI            string
-	ClusterName    string
-	KubeVersion    string
-	OperationType  string
-	KubeletDataDir string
+	Masters            NodeList
+	Workers            NodeList
+	Offline            bool
+	LocalRegistry      string
+	CRI                string
+	ClusterName        string
+	KubeVersion        string
+	OperationType      string
+	KubeletDataDir     string
+	ControlPlaneStatus []v1.ControlPlaneHealth
 }
 
 type Node struct {
@@ -93,6 +96,8 @@ func (e ExtraMetadata) GetWorkerHostname(id string) string {
 	return ""
 }
 
+// GetMasterNodeIDs
+// Deprecated. Use GetAvailableMasterNodes() instead
 func (e ExtraMetadata) GetMasterNodeIDs() []string {
 	var nodes []string
 	for _, node := range e.Masters {
@@ -121,6 +126,16 @@ func (e ExtraMetadata) GetWorkerNodeIP() map[string]string {
 	nodes := make(map[string]string)
 	for _, node := range e.Workers {
 		nodes[node.ID] = node.IPv4
+	}
+	return nodes
+}
+
+func (e ExtraMetadata) GetAvailableMasterNodes() []string {
+	var nodes []string
+	for _, node := range e.ControlPlaneStatus {
+		if node.Status == v1.ComponentHealthy {
+			nodes = append(nodes, node.ID)
+		}
 	}
 	return nodes
 }
