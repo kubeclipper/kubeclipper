@@ -304,9 +304,9 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.GlobalRole{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.GET("/projects/{project}/projectrole").
+	webservice.Route(webservice.GET("/projects/{project}/projectroles").
 		To(h.ListProjectRole).
-		Doc("list user under project").
+		Doc("List roles under specified project").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
 		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
@@ -316,53 +316,56 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), &models.PageableResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.POST("/projects/{project}/projectrole").
+	webservice.Route(webservice.POST("/projects/{project}/projectroles").
 		To(h.CreateProjectRole).
-		Doc("Create role in specify project").
+		Doc("Create role in specified project").
 		Reads(iamv1.ProjectRole{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
 		Param(webservice.PathParameter("project", "project name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.ProjectRole{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.GET("/projects/projectrole/{role}").
+	webservice.Route(webservice.GET("/projects/{project}/projectroles/{projectrole}").
 		To(h.DescribeProjectRole).
 		Doc("Describe role info").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
-		Param(webservice.PathParameter("role", "role name")).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("projectrole", "role name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.ProjectRole{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.PUT("/projects/projectrole").
+	webservice.Route(webservice.PUT("/projects/{project}/projectroles").
 		To(h.UpdateProjectRole).
 		Doc("Update role info").
 		Reads(iamv1.ProjectRole{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.ProjectRole{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.DELETE("/projects/projectrole/{role}").
+	webservice.Route(webservice.DELETE("/projects/{project}/projectroles/{projectrole}").
 		To(h.DeleteProjectRole).
 		Doc("Delete specified role").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
-		Param(webservice.PathParameter("role", "role name")).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("projectrole", "role name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
 	webservice.Route(webservice.GET("/projects/{project}/projectmembers").
-		To(h.ListProjectUser).
-		Doc("List user under project").
+		To(h.ListProjectMember).
+		Doc("List member under specified project").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
 		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
 			DataFormat("limit=%d,page=%d").
 			DefaultValue("limit=10,page=1")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), &models.PageableResponse{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), []*iamv1.User{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.POST("/projects/{project}/projectmember").
-		To(h.CreateProjectUser).
+	webservice.Route(webservice.POST("/projects/{project}/projectmembers").
+		To(h.CreateProjectMember).
 		Doc("Add user to project").
 		Reads([]iamv1.Member{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
@@ -370,26 +373,29 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), []*iamv1.ProjectRoleBinding{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.GET("/projects/projectmembers/{member}").
-		To(h.DescribeProjectRoleBinding).
+	webservice.Route(webservice.GET("/projects/{project}/projectmembers/{member}").
+		To(h.DescribeProjectMember).
 		Doc("Describe project member info").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter("member", "project member name")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), &iamv1.User{}).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
+
+	webservice.Route(webservice.PUT("/projects/{project}/projectmembers").
+		To(h.UpdateProjectMember).
+		Doc("Update member info in specified project").
+		Reads(iamv1.Member{}).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.ProjectRoleBinding{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.PUT("/projects/projectmembers").
-		To(h.UpdateProjectRoleBinding).
-		Doc("Update user info in specified project").
-		Reads(iamv1.ProjectRoleBinding{}).
+	webservice.Route(webservice.DELETE("/projects/{project}/projectmembers/{member}").
+		To(h.DeleteProjectMember).
+		Doc("Remove member from specified project").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.ProjectRoleBinding{}).
-		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
-
-	webservice.Route(webservice.DELETE("/projects/projectmembers/{member}").
-		To(h.DeleteProjectUser).
-		Doc("delete user under project").
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter("member", "project member name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
