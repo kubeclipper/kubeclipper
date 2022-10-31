@@ -35,6 +35,7 @@ type ProviderFactory interface {
 }
 
 type Operator struct {
+	ClusterReader cluster.ClusterReader
 	ClusterLister listerv1.ClusterLister
 	ClusterWriter cluster.ClusterWriter
 
