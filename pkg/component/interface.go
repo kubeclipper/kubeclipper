@@ -149,4 +149,5 @@ type OperationLogFile interface {
 	GetStepLogContent(opID, stepID string, offset int64, length int) (content []byte, deliverySize int64, logSize int64, err error)
 	CreateStepLogFileAndAppend(opID, stepID string, data []byte) error
 	TruncateStepLogFile(opID, stepID string) error
+	AppendLogFileContent(path string, data []byte) error
 }

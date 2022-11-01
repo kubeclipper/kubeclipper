@@ -45,8 +45,9 @@ type ExtraMetadata struct {
 	OperationType      string
 	KubeletDataDir     string
 	ControlPlaneStatus []v1.ControlPlaneHealth
-	CNI                string
-	CNINamespace       string
+
+	CNI          string
+	CNINamespace string
 }
 
 type Node struct {
@@ -140,6 +141,15 @@ func (e ExtraMetadata) GetAvailableMasterNodes() []string {
 		}
 	}
 	return nodes
+}
+
+func (e ExtraMetadata) MasterAllAvailable() bool {
+	for _, node := range e.ControlPlaneStatus {
+		if node.Status != v1.ComponentHealthy {
+			return false
+		}
+	}
+	return true
 }
 
 func WithExtraData(ctx context.Context, data []byte) context.Context {
