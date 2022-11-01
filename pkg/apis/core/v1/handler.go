@@ -2727,12 +2727,13 @@ func (h *handler) UpdateBackupPoint(req *restful.Request, resp *restful.Response
 
 	if bp.StorageType == bs.FSStorage && obp.StorageType == bs.FSStorage && bp.S3Config == nil {
 		// only fs backup point description can be modified
-		obp.FsConfig.Description = bp.FsConfig.Description
+		obp.Description = bp.Description
 	}
 
 	if bp.StorageType == bs.S3Storage && obp.StorageType == bs.S3Storage && bp.FsConfig == nil {
 		obp.S3Config.AccessKeyID = bp.S3Config.AccessKeyID
 		obp.S3Config.AccessKeySecret = bp.S3Config.AccessKeySecret
+		obp.Description = bp.Description
 	}
 
 	_, err = h.clusterOperator.UpdateBackupPoint(req.Request.Context(), obp)
