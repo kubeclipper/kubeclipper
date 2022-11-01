@@ -355,6 +355,28 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 			},
 		},
 	}...)
+
+	if metadata.OperationType != v1.OperationDeleteCluster {
+		n.uninstallSteps = append(n.uninstallSteps, []v1.Step{
+			rs,
+			{
+				ID:         strutil.GetUUID(),
+				Name:       "removeNFSProvisioner",
+				Timeout:    metav1.Duration{Duration: 10 * time.Minute},
+				ErrIgnore:  true,
+				RetryTimes: 1,
+				Nodes:      stepMaster0,
+				Action:     v1.ActionInstall,
+				Commands: []v1.Command{
+					{
+						Type:         v1.CommandShell,
+						ShellCommand: []string{"kubectl", "delete", "-f", filepath.Join(n.ManifestsDir, fmt.Sprintf(defaultFilenameFormat, n.StorageClassName))},
+					},
+				},
+			},
+		}...)
+	}
+
 	return nil
 }
 
