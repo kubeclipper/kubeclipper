@@ -20,9 +20,11 @@ package registry
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -121,6 +123,7 @@ const (
 type RegistryOptions struct {
 	options.IOStreams
 	PrintFlags *printer.PrintFlags
+	Client     *kc.Client
 
 	Deploy string
 	Clean  string
@@ -355,6 +358,15 @@ func (o *RegistryOptions) Complete() error {
 	if o.Arch == "" {
 		o.Arch = "amd64"
 	}
+	opts := options.NewCliOptions()
+	if err := opts.Complete(); err != nil {
+		return err
+	}
+	c, err := kc.FromConfig(opts.ToRawConfig())
+	if err != nil {
+		return err
+	}
+	o.Client = c
 	return nil
 }
 
@@ -733,9 +745,23 @@ func (o *RegistryOptions) installDocker() error {
 	if err != nil {
 		return err
 	}
+	metas, err := o.Client.GetComponentMeta(context.TODO())
+	if err != nil {
+		return fmt.Errorf("get component meta failed: %s. please check .kc/config", err)
+	}
+	var dockerVersion string
+	for _, v := range metas.Addons {
+		if v.Name == "docker" && v.Arch == o.Arch {
+			dockerVersion = v.Version
+			break
+		}
+	}
+	if dockerVersion == "" {
+		return fmt.Errorf("docker version does not meet installation requirements")
+	}
 	cmdList := []string{
 		// cp docker service file
-		fmt.Sprintf("tar -zxvf %s/kc/resource/docker/19.03.12/%s/configs.tar.gz -C /", config.DefaultPkgPath, o.Arch),
+		fmt.Sprintf("tar -zxvf %s/kc/resource/docker/%s/%s/configs.tar.gz -C /", config.DefaultPkgPath, dockerVersion, o.Arch),
 		"mkdir -pv /etc/docker",
 		// write daemon.json
 		sshutils.WrapEcho(data, "/etc/docker/daemon.json"),
