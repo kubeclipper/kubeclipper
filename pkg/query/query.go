@@ -54,6 +54,7 @@ const (
 	ParamOffline                  = "offline"
 	ParameterSubDomain            = "subdomain"
 	ParameterFuzzySearch          = "fuzzy"
+	ParameterForce                = "force"
 )
 
 const (
