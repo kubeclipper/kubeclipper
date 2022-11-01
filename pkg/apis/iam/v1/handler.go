@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
+
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -63,16 +65,18 @@ const (
 )
 
 type handler struct {
-	iamOperator   iam.Operator
-	authz         authorizer.Authorizer
-	tokenOperator auth.TokenManagementInterface
+	iamOperator    iam.Operator
+	tenantOperator tenant.Operator
+	authz          authorizer.Authorizer
+	tokenOperator  auth.TokenManagementInterface
 }
 
-func newHandler(iamOperator iam.Operator, authz authorizer.Authorizer, tokenOperator auth.TokenManagementInterface) *handler {
+func newHandler(iamOperator iam.Operator, tenantOperator tenant.Operator, authz authorizer.Authorizer, tokenOperator auth.TokenManagementInterface) *handler {
 	return &handler{
-		iamOperator:   iamOperator,
-		authz:         authz,
-		tokenOperator: tokenOperator,
+		iamOperator:    iamOperator,
+		tenantOperator: tenantOperator,
+		authz:          authz,
+		tokenOperator:  tokenOperator,
 	}
 }
 
@@ -400,6 +404,394 @@ func (h *handler) CheckRolesExist(request *restful.Request, response *restful.Re
 		response.Header().Set(resourceExistCheckerHeader, "true")
 	} else {
 		response.Header().Set(resourceExistCheckerHeader, "false")
+	}
+	response.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) ListProjectRole(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter("project")
+	q := query.ParseQueryParameter(request)
+	q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, name)})
+	roles, err := h.iamOperator.ListProjectRoleEx(context.TODO(), q)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteEntity(roles)
+}
+
+func (h *handler) CreateProjectRole(request *restful.Request, response *restful.Response) {
+	projectName := request.PathParameter("project")
+	role := &iamv1.ProjectRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: make(map[string]string),
+			Labels:      make(map[string]string),
+		},
+	}
+	if err := request.ReadEntity(role); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if _, err := h.tenantOperator.GetProjectEx(context.TODO(), projectName, "0"); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	actualName := fmt.Sprintf("%s-%s", projectName, role.Name)
+	_, err := h.iamOperator.GetProjectRoleEx(context.TODO(), actualName, "0")
+	if err == nil {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("project role exist"))
+		return
+	} else if !apimachineryErrors.IsNotFound(err) {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	role.Labels[common.LabelProject] = projectName
+	role.Annotations[common.AnnotationDisplayName] = role.Name
+	role.Name = actualName
+
+	role.Rules = make([]rbacv1.PolicyRule, 0)
+	if aggregateRoles := h.getAggregateRoles(role.ObjectMeta); aggregateRoles != nil {
+		for _, roleName := range aggregateRoles {
+			aggregationRole, err := h.iamOperator.GetProjectRoleEx(request.Request.Context(), roleName, "0")
+			if err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+			role.Rules = append(role.Rules, aggregationRole.Rules...)
+		}
+	}
+
+	projectRole, err := h.iamOperator.CreateProjectRole(context.TODO(), role)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteEntity(projectRole)
+}
+
+func (h *handler) DescribeProjectRole(request *restful.Request, response *restful.Response) {
+	project := request.PathParameter("project")
+	roleName := request.PathParameter("projectrole")
+	role, err := h.iamOperator.GetProjectRoleEx(context.TODO(), roleName, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if project != role.Labels[common.LabelProject] {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the project of request path and role dose not match"))
+		return
+	}
+	_ = response.WriteEntity(role)
+}
+
+func (h *handler) UpdateProjectRole(request *restful.Request, response *restful.Response) {
+	project := request.PathParameter("project")
+	newRole := &iamv1.ProjectRole{}
+	if err := request.ReadEntity(newRole); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	oldRole, err := h.iamOperator.GetProjectRoleEx(context.TODO(), newRole.Name, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if _, ok := oldRole.Annotations[common.AnnotationInternal]; ok {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("internal role can not be updated"))
+		return
+	}
+
+	if project != newRole.Labels[common.LabelProject] {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the project of request path and request body dose not match"))
+		return
+	}
+
+	oldRole.Annotations[common.AnnotationDescription] = newRole.Annotations[common.AnnotationDescription]
+	rules := make([]rbacv1.PolicyRule, 0)
+	if aggregateRoles := h.getAggregateRoles(newRole.ObjectMeta); aggregateRoles != nil {
+		for _, roleName := range aggregateRoles {
+			aggregationRole, err := h.iamOperator.GetProjectRoleEx(request.Request.Context(), roleName, "0")
+			if err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+			rules = append(rules, aggregationRole.Rules...)
+		}
+	}
+	oldRole.Rules = rules
+
+	result, err := h.iamOperator.UpdateProjectRole(context.TODO(), oldRole)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteEntity(result)
+}
+
+func (h *handler) DeleteProjectRole(request *restful.Request, response *restful.Response) {
+	project := request.PathParameter("project")
+	roleName := request.PathParameter("projectrole")
+	role, err := h.iamOperator.GetProjectRoleEx(context.TODO(), roleName, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if project != role.Labels[common.LabelProject] {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the project of request path and role dose not match"))
+		return
+	}
+
+	roleBindings, err := h.iamOperator.ListProjectRoleBinding(context.TODO(), &query.Query{LabelSelector: fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	for _, roleBinding := range roleBindings.Items {
+		if roleBinding.RoleRef.Name == role.Name {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("role [%s] still in use", roleName))
+			return
+		}
+	}
+
+	if err := h.iamOperator.DeleteProjectRole(context.TODO(), roleName); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	response.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) ListProjectMember(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter("project")
+	roleBindings, err := h.iamOperator.ListProjectRoleBinding(context.TODO(), &query.Query{LabelSelector: fmt.Sprintf("%s=%s", common.LabelProject, name)})
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	users := make([]*iamv1.User, 0)
+	// TODO: add user selector filter
+	// q := query.ParseQueryParameter(request)
+	for _, roleBinding := range roleBindings.Items {
+		user, err := h.getProjectMember(&roleBinding)
+		if err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		if user != nil {
+			users = append(users, user)
+		}
+	}
+	_ = response.WriteEntity(users)
+}
+
+func (h *handler) CreateProjectMember(request *restful.Request, response *restful.Response) {
+	projectName := request.PathParameter("project")
+	var members []iamv1.Member
+	if err := request.ReadEntity(&members); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	var roleBindings []*iamv1.ProjectRoleBinding
+	for _, member := range members {
+		newRoleBinding, err := h.createProjectMember(projectName, member)
+		if err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		roleBindings = append(roleBindings, newRoleBinding)
+	}
+
+	_ = response.WriteEntity(roleBindings)
+}
+
+func (h *handler) DescribeProjectMember(request *restful.Request, response *restful.Response) {
+	project := request.PathParameter("project")
+	member := request.PathParameter("member")
+	roleBinding, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", project, member), "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if project != roleBinding.Labels[common.LabelProject] {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the project of request path and member dose not match"))
+		return
+	}
+
+	var user *iamv1.User
+	user, err = h.getProjectMember(roleBinding)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if user == nil {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("user [%s] dose not exist", member))
+		return
+	}
+
+	_ = response.WriteEntity(user)
+}
+
+func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv1.User, error) {
+	if len(roleBinding.Subjects) == 0 {
+		return nil, fmt.Errorf("list member error: rolebinding [%s] subject is empty", roleBinding.Name)
+	}
+	if roleBinding.Subjects[0].Kind != rbacv1.UserKind {
+		return nil, nil
+	}
+	user, err := h.iamOperator.GetUser(context.TODO(), roleBinding.Subjects[0].Name)
+	if err != nil {
+		return nil, err
+	}
+	if user.Annotations == nil {
+		user.Annotations = make(map[string]string)
+	}
+	user.Annotations[common.RoleAnnotation] = roleBinding.RoleRef.Name
+	iam.DesensitizationUserPassword(user)
+	return user, nil
+}
+
+func (h *handler) createProjectMember(projectName string, member iamv1.Member) (*iamv1.ProjectRoleBinding, error) {
+	if _, err := h.iamOperator.GetUserEx(context.TODO(), member.Username, "0", true, false); err != nil {
+		return nil, err
+	}
+	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), member.Role, "0"); err != nil {
+		return nil, err
+	}
+	if _, err := h.tenantOperator.GetProjectEx(context.TODO(), projectName, "0"); err != nil {
+		return nil, err
+	}
+
+	roleBinding, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", projectName, member.Username), "0")
+	if err == nil {
+		// already exist with same role, return directly
+		if roleBinding.RoleRef.Name == member.Role {
+			return roleBinding, nil
+		}
+		// user already exist with other role, delete
+		if err = h.iamOperator.DeleteProjectRoleBinding(context.TODO(), fmt.Sprintf("%s-%s", projectName, member.Username)); err != nil {
+			return nil, err
+		}
+	} else if !apimachineryErrors.IsNotFound(err) {
+		// error except NotFound, return error
+		return nil, err
+	}
+	// create new rolebinding
+	newRoleBinding := &iamv1.ProjectRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ProjectRoleBinding",
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", projectName, member.Username),
+			Annotations: map[string]string{
+				common.AnnotationDisplayName: member.Username,
+			},
+			Labels: map[string]string{
+				common.LabelProject: projectName,
+			},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup: rbacv1.SchemeGroupVersion.String(),
+				Kind:     rbacv1.UserKind,
+				Name:     member.Username,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: iamv1.SchemeGroupVersion.Group,
+			Kind:     "ProjectRole",
+			Name:     member.Role,
+		},
+	}
+	result, err := h.iamOperator.CreateProjectRoleBinding(context.TODO(), newRoleBinding)
+	return result, err
+}
+
+func (h *handler) UpdateProjectMember(request *restful.Request, response *restful.Response) {
+	project := request.PathParameter("project")
+	member := &iamv1.Member{}
+	if err := request.ReadEntity(member); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	oldRoleBinding, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", project, member.Username), "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), member.Role, "0"); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("there is no role named [%s]", member.Role))
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	oldRoleBinding.RoleRef.Name = member.Role
+	newRoleBinding, err := h.iamOperator.UpdateProjectRoleBinding(context.TODO(), oldRoleBinding)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteEntity(newRoleBinding)
+}
+
+func (h *handler) DeleteProjectMember(request *restful.Request, response *restful.Response) {
+	project := request.PathParameter("project")
+	member := request.PathParameter("member")
+	if _, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", project, member), "0"); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	err := h.iamOperator.DeleteProjectRoleBinding(context.TODO(), fmt.Sprintf("%s-%s", project, member))
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
 	}
 	response.WriteHeader(http.StatusOK)
 }

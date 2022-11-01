@@ -36,6 +36,6 @@ func (l userList) Less(i, j int) bool {
 	}
 }
 
-func desensitizationUserPassword(user *iamv1.User) {
+func DesensitizationUserPassword(user *iamv1.User) {
 	user.Spec.EncryptedPassword = ""
 }
