@@ -558,6 +558,19 @@ func (h *handler) DeleteProjectRole(request *restful.Request, response *restful.
 		restplus.HandleBadRequest(response, request, fmt.Errorf("the project of request path and role dose not match"))
 		return
 	}
+
+	roleBindings, err := h.iamOperator.ListProjectRoleBinding(context.TODO(), &query.Query{LabelSelector: fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	for _, roleBinding := range roleBindings.Items {
+		if roleBinding.RoleRef.Name == role.Name {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("role [%s] still in use", roleName))
+			return
+		}
+	}
+
 	if err := h.iamOperator.DeleteProjectRole(context.TODO(), roleName); err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
