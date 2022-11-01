@@ -93,9 +93,9 @@ func initBackUpPoint() *corev1.BackupPoint {
 			Name: backupPointName,
 		},
 		StorageType: "FS",
+		Description: "",
 		FsConfig: &corev1.FsConfig{
 			BackupRootDir: "/tmp",
-			Description:   "",
 		},
 		S3Config: nil,
 	}

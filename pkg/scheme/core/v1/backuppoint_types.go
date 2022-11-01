@@ -31,6 +31,7 @@ type BackupPoint struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	StorageType       string    `json:"storageType,omitempty"`
+	Description       string    `json:"description,omitempty"`
 	FsConfig          *FsConfig `json:"fsConfig,omitempty"`
 	S3Config          *S3Config `json:"s3Config,omitempty"`
 }
@@ -48,7 +49,6 @@ type BackupPointList struct {
 
 type FsConfig struct {
 	BackupRootDir string `json:"backupRootDir,omitempty" yaml:"backupRootDir,omitempty"`
-	Description   string `json:"description,omitempty"`
 }
 
 type S3Config struct {
