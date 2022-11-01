@@ -46,6 +46,12 @@ type Operator interface {
 
 	LoginRecordReader
 	LoginRecordWriter
+
+	ProjectRoleReader
+	ProjectRoleWriter
+
+	ProjectRoleBindingReader
+	ProjectRoleBindingWriter
 }
 
 type UserReader interface {
@@ -139,4 +145,40 @@ type LoginRecordWriter interface {
 	CreateLoginRecord(ctx context.Context, record *iamv1.LoginRecord) (*iamv1.LoginRecord, error)
 	DeleteLoginRecord(ctx context.Context, name string) error
 	DeleteLoginRecordCollection(ctx context.Context, query *query.Query) error
+}
+
+type ProjectRoleReader interface {
+	ListProjectRoles(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleList, error)
+	GetProjectRole(ctx context.Context, name string) (*iamv1.ProjectRole, error)
+	WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error)
+	ProjectRoleReaderEx
+}
+
+type ProjectRoleReaderEx interface {
+	ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
+	GetProjectRoleEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRole, error)
+}
+
+type ProjectRoleWriter interface {
+	CreateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error)
+	DeleteProjectRole(ctx context.Context, name string) error
+	UpdateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error)
+}
+
+type ProjectRoleBindingReader interface {
+	ListProjectRoleBinding(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleBindingList, error)
+	GetProjectRoleBinding(ctx context.Context, name string) (*iamv1.ProjectRoleBinding, error)
+	WatchProjectRoleBinding(ctx context.Context, query *query.Query) (watch.Interface, error)
+	ProjectRoleBindingReaderEx
+}
+
+type ProjectRoleBindingReaderEx interface {
+	ListProjectRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
+	GetProjectRoleBindingEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRoleBinding, error)
+}
+
+type ProjectRoleBindingWriter interface {
+	CreateProjectRoleBinding(ctx context.Context, user *iamv1.ProjectRoleBinding) (*iamv1.ProjectRoleBinding, error)
+	DeleteProjectRoleBinding(ctx context.Context, name string) error
+	UpdateProjectRoleBinding(ctx context.Context, roleBinding *iamv1.ProjectRoleBinding) (*iamv1.ProjectRoleBinding, error)
 }
