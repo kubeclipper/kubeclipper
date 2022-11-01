@@ -436,7 +436,7 @@ func (h *handler) CreateProjectRole(request *restful.Request, response *restful.
 	actualName := fmt.Sprintf("%s-%s", projectName, role.Name)
 	_, err := h.iamOperator.GetProjectRoleEx(context.TODO(), actualName, "0")
 	if err == nil {
-		restplus.HandleInternalError(response, request, fmt.Errorf("project role exist"))
+		restplus.HandleBadRequest(response, request, fmt.Errorf("project role exist"))
 		return
 	} else if !apimachineryErrors.IsNotFound(err) {
 		restplus.HandleInternalError(response, request, err)
@@ -476,7 +476,7 @@ func (h *handler) DescribeProjectRole(request *restful.Request, response *restfu
 			restplus.HandleNotFound(response, request, err)
 			return
 		}
-		restplus.HandleBadRequest(response, request, err)
+		restplus.HandleInternalError(response, request, err)
 		return
 	}
 	if project != role.Labels[common.LabelProject] {
@@ -573,6 +573,10 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 	for _, roleBinding := range roleBindings.Items {
 		user, err := h.getProjectMember(&roleBinding)
 		if err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -593,6 +597,10 @@ func (h *handler) CreateProjectMember(request *restful.Request, response *restfu
 	for _, member := range members {
 		newRoleBinding, err := h.createProjectMember(projectName, member)
 		if err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -622,6 +630,10 @@ func (h *handler) DescribeProjectMember(request *restful.Request, response *rest
 	var user *iamv1.User
 	user, err = h.getProjectMember(roleBinding)
 	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
@@ -632,6 +644,9 @@ func (h *handler) DescribeProjectMember(request *restful.Request, response *rest
 func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv1.User, error) {
 	if len(roleBinding.Subjects) == 0 {
 		return nil, fmt.Errorf("list member error: rolebinding [%s] subject is empty", roleBinding.Name)
+	}
+	if roleBinding.Subjects[0].Kind != rbacv1.UserKind {
+		return nil, fmt.Errorf("wrong object kind, [%s] dose not be recognized", roleBinding.Subjects[0].Kind)
 	}
 	user, err := h.iamOperator.GetUser(context.TODO(), roleBinding.Subjects[0].Name)
 	if err != nil {
