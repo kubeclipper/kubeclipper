@@ -580,7 +580,9 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		users = append(users, user)
+		if user != nil {
+			users = append(users, user)
+		}
 	}
 	_ = response.WriteEntity(users)
 }
@@ -637,6 +639,9 @@ func (h *handler) DescribeProjectMember(request *restful.Request, response *rest
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+	if user == nil {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("user [%s] dose not exist", member))
+	}
 
 	_ = response.WriteEntity(user)
 }
@@ -646,7 +651,7 @@ func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv
 		return nil, fmt.Errorf("list member error: rolebinding [%s] subject is empty", roleBinding.Name)
 	}
 	if roleBinding.Subjects[0].Kind != rbacv1.UserKind {
-		return nil, fmt.Errorf("wrong object kind, [%s] dose not be recognized", roleBinding.Subjects[0].Kind)
+		return nil, nil
 	}
 	user, err := h.iamOperator.GetUser(context.TODO(), roleBinding.Subjects[0].Name)
 	if err != nil {
