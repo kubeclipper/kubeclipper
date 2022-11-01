@@ -432,7 +432,14 @@ func (h *handler) CreateProjectRole(request *restful.Request, response *restful.
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-
+	if _, err := h.tenantOperator.GetProjectEx(context.TODO(), projectName, "0"); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
 	actualName := fmt.Sprintf("%s-%s", projectName, role.Name)
 	_, err := h.iamOperator.GetProjectRoleEx(context.TODO(), actualName, "0")
 	if err == nil {
@@ -566,8 +573,8 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	var users []*iamv1.User
 
+	users := make([]*iamv1.User, 0)
 	// TODO: add user selector filter
 	// q := query.ParseQueryParameter(request)
 	for _, roleBinding := range roleBindings.Items {
@@ -641,6 +648,7 @@ func (h *handler) DescribeProjectMember(request *restful.Request, response *rest
 	}
 	if user == nil {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("user [%s] dose not exist", member))
+		return
 	}
 
 	_ = response.WriteEntity(user)
@@ -661,6 +669,7 @@ func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv
 		user.Annotations = make(map[string]string)
 	}
 	user.Annotations[common.RoleAnnotation] = roleBinding.RoleRef.Name
+	iam.DesensitizationUserPassword(user)
 	return user, nil
 }
 
@@ -668,7 +677,7 @@ func (h *handler) createProjectMember(projectName string, member iamv1.Member) (
 	if _, err := h.iamOperator.GetUserEx(context.TODO(), member.Username, "0", true, false); err != nil {
 		return nil, err
 	}
-	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), fmt.Sprintf("%s-%s", projectName, member.Role), "0"); err != nil {
+	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), member.Role, "0"); err != nil {
 		return nil, err
 	}
 	if _, err := h.tenantOperator.GetProjectEx(context.TODO(), projectName, "0"); err != nil {
@@ -737,6 +746,15 @@ func (h *handler) UpdateProjectMember(request *restful.Request, response *restfu
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), member.Role, "0"); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("there is no role named [%s]", member.Role))
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
 	oldRoleBinding.RoleRef.Name = member.Role
 	newRoleBinding, err := h.iamOperator.UpdateProjectRoleBinding(context.TODO(), oldRoleBinding)
 	if err != nil {

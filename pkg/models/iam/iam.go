@@ -133,7 +133,7 @@ func (i *iamOperator) GetUserEx(ctx context.Context, name string, resourceVersio
 			}
 
 			if desensitization {
-				desensitizationUserPassword(user)
+				DesensitizationUserPassword(user)
 			}
 			if includeRole {
 				role, err := i.GetRoleOfUser(ctx, user.Name)
@@ -209,7 +209,7 @@ func (i *iamOperator) ListUserEx(ctx context.Context, query *query.Query, desens
 		}
 
 		if desensitization {
-			desensitizationUserPassword(user)
+			DesensitizationUserPassword(user)
 		}
 		if includeRole {
 			role, err := i.GetRoleOfUser(ctx, user.Name)
