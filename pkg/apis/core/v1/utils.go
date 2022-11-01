@@ -227,6 +227,7 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 		ClusterName: c.Name,
 		Masters:     masters,
 		Workers:     workers,
+		CNI:         c.CNI.Type,
 	}
 	ctx := component.WithExtraMetadata(context.TODO(), meta)
 

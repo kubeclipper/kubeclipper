@@ -29,6 +29,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"go.uber.org/zap"
@@ -115,8 +116,12 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes 
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
 
-		cn := CNIInfo{}
-		steps, err = cn.InitStepper(&stepper.Cluster.CNI, &stepper.Cluster.Networking).InstallSteps(patchNodes, nil, true)
+		cf, err := cni.Load(stepper.Cluster.CNI.Type)
+		if err != nil {
+			return err
+		}
+		cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
+		steps, err = cniStepper.LoadImage(patchNodes)
 		if err != nil {
 			return err
 		}
@@ -174,8 +179,12 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes 
 		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 
 		// clean CNI config
-		cn := CNIInfo{}
-		steps, err = cn.InitStepper(&stepper.Cluster.CNI, &stepper.Cluster.Networking).UninstallSteps(patchNodes)
+		cf, err := cni.Load(stepper.Cluster.CNI.Type)
+		if err != nil {
+			return err
+		}
+		cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
+		steps, err = cniStepper.UninstallSteps(patchNodes)
 		if err != nil {
 			return err
 		}

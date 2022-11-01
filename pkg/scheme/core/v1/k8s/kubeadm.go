@@ -63,12 +63,6 @@ func init() {
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, clusterNode, version, component.TypeStep), &ClusterNode{}); err != nil {
 		panic(err)
 	}
-	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, cniInfo, version, component.TypeTemplate), &CNIInfo{}); err != nil {
-		panic(err)
-	}
-	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, cniInfo, version, component.TypeStep), &CNIInfo{}); err != nil {
-		panic(err)
-	}
 	if err := component.RegisterTemplate(fmt.Sprintf(component.RegisterTemplateKeyFormat, kubectlTerminal, version, component.TypeTemplate), &KubectlTerminal{}); err != nil {
 		panic(err)
 	}
@@ -89,12 +83,10 @@ var (
 	_ component.StepRunnable   = (*KubeadmConfig)(nil)
 	_ component.StepRunnable   = (*ControlPlane)(nil)
 	_ component.StepRunnable   = (*ClusterNode)(nil)
-	_ component.TemplateRender = (*CNIInfo)(nil)
 	_ component.TemplateRender = (*KubectlTerminal)(nil)
 	_ component.StepRunnable   = (*Health)(nil)
 	_ component.StepRunnable   = (*Container)(nil)
 	_ component.StepRunnable   = (*Kubectl)(nil)
-	_ component.StepRunnable   = (*CNIInfo)(nil)
 )
 
 type Package struct {
@@ -143,13 +135,6 @@ type ClusterNode struct {
 	APIServerDomainName string
 	JoinMasterIP        string
 	EtcdDataPath        string
-}
-
-type CNIInfo struct {
-	CNI         v1.CNI
-	DualStack   bool
-	PodIPv4CIDR string
-	PodIPv6CIDR string
 }
 
 type Health struct{}
@@ -746,82 +731,6 @@ func (stepper *ClusterNode) generatesIPSOCareStaticPod(ctx context.Context) erro
 func (stepper *ClusterNode) renderIPVSCarePod(w io.Writer) error {
 	_, err := tmplutil.New().RenderTo(w, lvscareV111, stepper)
 	return err
-}
-
-func (stepper *CNIInfo) NewInstance() component.ObjectMeta {
-	return &CNIInfo{}
-}
-
-func (stepper *CNIInfo) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	instance, err := downloader.NewInstance(ctx, stepper.CNI.Type, stepper.CNI.Version, runtime.GOARCH, !stepper.CNI.Offline, opts.DryRun)
-	if err != nil {
-		return nil, err
-	}
-	dstFile, err := instance.DownloadImages()
-	if err != nil {
-		return nil, err
-	}
-	// load image package
-	if err = utils.LoadImage(ctx, opts.DryRun, dstFile, stepper.CNI.CriType); err == nil {
-		logger.Info("calico packages offline install successfully")
-	}
-
-	return nil, err
-}
-
-func (stepper *CNIInfo) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	instance, err := downloader.NewInstance(ctx, stepper.CNI.Type, stepper.CNI.Version, runtime.GOARCH, !stepper.CNI.Offline, opts.DryRun)
-	if err != nil {
-		return nil, err
-	}
-	if err = instance.RemoveImages(); err != nil {
-		logger.Error("remove calico images compressed file failed", zap.Error(err))
-	}
-	return nil, nil
-}
-
-func (stepper *CNIInfo) Render(ctx context.Context, opts component.Options) error {
-	switch stepper.CNI.Type {
-	case CniCalico:
-		return stepper.renderCalico(ctx, opts.DryRun)
-	default:
-		return fmt.Errorf("unsupported %s cni type", stepper.CNI.Type)
-	}
-}
-
-func (stepper *CNIInfo) renderCalicoTo(w io.Writer) error {
-	at := tmplutil.New()
-	calicoTemp, err := stepper.CalicoTemplate()
-	if err != nil {
-		return err
-	}
-	if _, err := at.RenderTo(w, calicoTemp, stepper); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (stepper *CNIInfo) CalicoTemplate() (string, error) {
-	switch stepper.CNI.Version {
-	case "v3.11.2":
-		return calicoV3112, nil
-	case "v3.16.10":
-		return calicoV31610, nil
-	case "v3.21.2":
-		return calicoV3212, nil
-	case "v3.22.4":
-		return calicoV3224, nil
-	}
-	return "", fmt.Errorf("calico dose not support version: %s", stepper.CNI.Version)
-}
-
-func (stepper *CNIInfo) renderCalico(ctx context.Context, dryRun bool) error {
-	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
-		return err
-	}
-	manifestFile := filepath.Join(ManifestDir, "cni.yaml")
-	return fileutil.WriteFileWithContext(ctx, manifestFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
-		stepper.renderCalicoTo, dryRun)
 }
 
 func (stepper *Health) NewInstance() component.ObjectMeta {
