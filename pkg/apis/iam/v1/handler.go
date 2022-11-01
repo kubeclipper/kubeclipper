@@ -504,8 +504,7 @@ func (h *handler) UpdateProjectRole(request *restful.Request, response *restful.
 	oldRole, err := h.iamOperator.GetProjectRoleEx(context.TODO(), newRole.Name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
-			logger.Debug("user has already not exist when delete", zap.String("role", newRole.Name))
-			restplus.HandleNotFound(response, request, err)
+			restplus.HandleBadRequest(response, request, err)
 			return
 		}
 		restplus.HandleInternalError(response, request, err)
@@ -750,6 +749,7 @@ func (h *handler) UpdateProjectMember(request *restful.Request, response *restfu
 	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), member.Role, "0"); err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(response, request, fmt.Errorf("there is no role named [%s]", member.Role))
+			return
 		}
 		restplus.HandleInternalError(response, request, err)
 		return
