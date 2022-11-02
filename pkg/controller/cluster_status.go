@@ -49,7 +49,7 @@ import (
 )
 
 const (
-	clusterStatusMonitorPeriod = 10 * time.Second
+	clusterStatusMonitorPeriod = 3 * time.Minute
 )
 
 type ClusterStatusMon struct {
