@@ -82,5 +82,6 @@ type LogOperation struct {
 }
 
 type Options struct {
-	DryRun bool
+	DryRun         bool
+	ForceSkipError bool
 }

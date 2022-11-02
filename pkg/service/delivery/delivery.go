@@ -446,7 +446,7 @@ func (s *Service) DeliverTaskOperation(ctx context.Context, operation *v1.Operat
 		logger.Debug("after delivery task step", zap.Error(err))
 		if err != nil {
 			logger.Error("delivery task step error", zap.Error(err), zap.String("step", step.Name))
-			if step.ErrIgnore {
+			if step.ErrIgnore || opts.ForceSkipError {
 				logger.Debug("delivery task step, ignore the error", zap.Error(err), zap.String("step", step.Name))
 				// reset error
 				err = nil

@@ -304,6 +304,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		timeoutSecs = v1.DefaultOperationTimeoutSecs
 	}
 	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	force := query.GetBoolValueWithDefault(request, query.ParameterForce, false)
 	c, err := h.clusterOperator.GetClusterEx(request.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
@@ -366,7 +367,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		if err := h.delivery.DeliverTaskOperation(context.TODO(), o, opts); err != nil {
 			logger.Error("delivery task error", zap.Error(err))
 		}
-	}(op, &service.Options{DryRun: dryRun})
+	}(op, &service.Options{DryRun: dryRun, ForceSkipError: force})
 	response.WriteHeader(http.StatusOK)
 }
 

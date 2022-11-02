@@ -121,6 +121,8 @@ func SetupWebService(h *handler) *restful.WebService {
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Delete clusters.").
 		Param(webservice.PathParameter("name", "cluster name")).
+		Param(webservice.QueryParameter(query.ParameterForce, "force delete cluster, will ignore operation error").
+			Required(false).DataType("boolean").DefaultValue("false")).
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete clusters").
 			Required(false).DataType("boolean")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))

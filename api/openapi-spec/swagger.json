@@ -1281,6 +1281,13 @@
           },
           {
             "type": "boolean",
+            "default": false,
+            "description": "force delete cluster, will ignore operation error",
+            "name": "force",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
             "description": "dry run delete clusters",
             "name": "dryRun",
             "in": "query"
@@ -5550,7 +5557,8 @@
         "type",
         "Version",
         "CriType",
-        "Offline"
+        "Offline",
+        "namespace"
       ],
       "properties": {
         "CriType": {
@@ -5568,6 +5576,9 @@
         "localRegistry": {
           "type": "string"
         },
+        "namespace": {
+          "type": "string"
+        },
         "type": {
           "type": "string",
           "enum": [
@@ -5577,10 +5588,6 @@
       }
     },
     "v1.CRIRegistry": {
-      "required": [
-        "insecureRegistry",
-        "registryRef"
-      ],
       "properties": {
         "insecureRegistry": {
           "type": "string"
@@ -5826,6 +5833,12 @@
             "$ref": "#/definitions/v1.ComponentConditions"
           }
         },
+        "controlPlaneHealth": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.ControlPlaneHealth"
+          }
+        },
         "phase": {
           "type": "string"
         },
@@ -5984,6 +5997,22 @@
           "enum": [
             "1.4.4"
           ]
+        }
+      }
+    },
+    "v1.ControlPlaneHealth": {
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
         }
       }
     },
