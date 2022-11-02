@@ -46,8 +46,8 @@ func reverseComponents(components []v1.Addon) {
 	}
 }
 
-func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepAction, nodes []v1.StepNode) ([]v1.Step, error) {
-	switch c.Type {
+func getCriStep(ctx context.Context, c *v1.Cluster, action v1.StepAction, nodes []v1.StepNode) ([]v1.Step, error) {
+	switch c.ContainerRuntime.Type {
 	case v1.CRIDocker:
 		r := cri.DockerRunnable{}
 		err := r.InitStep(ctx, c, nodes)
@@ -63,7 +63,7 @@ func getCriStep(ctx context.Context, c *v1.ContainerRuntime, action v1.StepActio
 		}
 		return r.GetActionSteps(action), nil
 	}
-	return nil, fmt.Errorf("%v type CRI is not supported", c.Type)
+	return nil, fmt.Errorf("%v type CRI is not supported", c.ContainerRuntime.Type)
 }
 
 func getK8sSteps(ctx context.Context, c *v1.Cluster, action v1.StepAction) ([]v1.Step, error) {
@@ -103,7 +103,7 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	// Container runtime should be installed on all nodes.
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
 	stepNodes := utils.UnwrapNodeList(extraMetadata.GetAllNodes())
-	cSteps, err := getCriStep(ctx, &c.ContainerRuntime, action, stepNodes)
+	cSteps, err := getCriStep(ctx, c, action, stepNodes)
 	if err != nil {
 		return nil, err
 	}

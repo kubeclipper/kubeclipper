@@ -34,10 +34,19 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 			name: "set insecure registry",
 			fields: fields{
 				Base: Base{
-					Version:          "1.6.4",
-					Offline:          true,
-					DataRootDir:      "/var/lib/containerd",
-					InsecureRegistry: []string{"127.0.0.1:5000", "127.0.0.1:6000"},
+					Version:     "1.6.4",
+					Offline:     true,
+					DataRootDir: "/var/lib/containerd",
+					Registies: []v1.RegistrySpec{
+						{
+							Scheme: "http",
+							Host:   "127.0.0.1:5000",
+						},
+						{
+							Scheme: "http",
+							Host:   "127.0.0.1:6000",
+						},
+					},
 				},
 				LocalRegistry: "",
 				KubeVersion:   "1.23.6",
@@ -48,10 +57,15 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 			name: "use local registry",
 			fields: fields{
 				Base: Base{
-					Version:          "1.6.4",
-					Offline:          true,
-					DataRootDir:      "/var/lib/containerd",
-					InsecureRegistry: []string{"127.0.0.1:5000"},
+					Version:     "1.6.4",
+					Offline:     true,
+					DataRootDir: "/var/lib/containerd",
+					Registies: []v1.RegistrySpec{
+						{
+							Scheme: "http",
+							Host:   "127.0.0.1:5000",
+						},
+					},
 				},
 				LocalRegistry: "127.0.0.1:5000",
 				KubeVersion:   "1.23.6",

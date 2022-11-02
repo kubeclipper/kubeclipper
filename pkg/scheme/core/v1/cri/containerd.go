@@ -56,13 +56,14 @@ type ContainerdRunnable struct {
 	upgradeSteps   []v1.Step
 }
 
-func (runnable *ContainerdRunnable) InitStep(ctx context.Context, containerd *v1.ContainerRuntime, nodes []v1.StepNode) error {
+func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cluster, nodes []v1.StepNode) error {
 	metadata := component.GetExtraMetadata(ctx)
-	runnable.Version = containerd.Version
+	runnable.Version = cluster.ContainerRuntime.Version
 	runnable.Offline = metadata.Offline
-	runnable.DataRootDir = strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, containerd.DataRootDir)
+	runnable.DataRootDir = strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, cluster.ContainerRuntime.DataRootDir)
 	runnable.LocalRegistry = metadata.LocalRegistry
-	runnable.InsecureRegistry = containerd.InsecureRegistry
+	runnable.Registies = cluster.Status.Registries
+
 	runnable.PauseVersion = runnable.matchPauseVersion(metadata.KubeVersion)
 	runtimeBytes, err := json.Marshal(runnable)
 	if err != nil {
@@ -212,10 +213,6 @@ func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, d
 	if runnable.RegistryConfigDir == "" {
 		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir
 	}
-	if !runnable.Offline && runnable.LocalRegistry == "" {
-		runnable.LocalRegistry = component.GetRepoMirror(ctx)
-		logger.Info("render containerd config, the default repo mirror proxy will be used", zap.String("local_registry", runnable.LocalRegistry))
-	}
 	cf := filepath.Join(containerdDefaultConfigDir, "config.toml")
 	if err := os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
 		return err
@@ -265,50 +262,7 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 	if dryRun {
 		return nil
 	}
-	regCfgs := make([]ContainerdRegistry, 0, len(runnable.InsecureRegistry)+1)
-
-	for _, regHost := range runnable.InsecureRegistry {
-		regCfgs = append(regCfgs, ContainerdRegistry{
-			Server: regHost,
-			Hosts: []ContainerdHost{
-				{
-					Scheme:       "http",
-					Host:         regHost,
-					Capabilities: []string{CapabilityPull, CapabilityResolve},
-				},
-				{
-					Scheme:       "https",
-					Host:         regHost,
-					Capabilities: []string{CapabilityPull, CapabilityResolve},
-					SkipVerify:   true,
-				},
-			},
-		},
-		)
-	}
-
-	if runnable.LocalRegistry != "" {
-		regCfgs = append(
-			regCfgs,
-			ContainerdRegistry{
-				Server: runnable.LocalRegistry,
-				Hosts: []ContainerdHost{
-					{
-						Scheme:       "http",
-						Host:         runnable.LocalRegistry,
-						Capabilities: []string{CapabilityPull, CapabilityResolve},
-					},
-					{
-						Scheme:       "https",
-						Host:         runnable.LocalRegistry,
-						Capabilities: []string{CapabilityPull, CapabilityResolve},
-						SkipVerify:   true,
-					},
-				},
-			},
-		)
-	}
-
+	regCfgs := ToContainerdRegistryConfig(runnable.Registies)
 	for _, cfg := range regCfgs {
 		if err := cfg.renderConfigs(runnable.RegistryConfigDir); err != nil {
 			return err
