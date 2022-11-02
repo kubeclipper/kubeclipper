@@ -49,7 +49,7 @@ import (
 )
 
 const (
-	clusterStatusMonitorPeriod = 3 * time.Minute
+	clusterStatusMonitorPeriod = 10 * time.Second
 )
 
 type ClusterStatusMon struct {
@@ -77,14 +77,14 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		return
 	}
 	for _, clu := range clusters {
+		err = s.updateClusterControlPlaneStatus(clu.DeepCopy())
+		if err != nil {
+			s.log.Error("update cluster control plane status failed", zap.Error(err))
+		}
 		cc, exist := s.mgr.GetClusterClientSet(clu.Name)
 		if !exist {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
 			continue
-		}
-		err = s.updateClusterControlPlaneStatus(clu.DeepCopy())
-		if err != nil {
-			s.log.Error("update cluster control plane status failed", zap.Error(err))
 		}
 		err = s.updateClusterCertification(clu.Name)
 		if err != nil {
@@ -295,11 +295,13 @@ func (s *ClusterStatusMon) updateClusterControlPlaneStatus(clu *v1.Cluster) erro
 		}
 		controlplanestatus[index] = health
 	}
+
 	if isControlPlaneHealthChange(clu.Status.ControlPlaneHealth, controlplanestatus) {
 		clu.Status.ControlPlaneHealth = controlplanestatus
 		_, err := s.ClusterWriter.UpdateCluster(context.TODO(), clu)
 		return err
 	}
+
 	s.log.Debug("control plane status has no change, skip update", zap.String("cluster", clu.Name))
 	return nil
 }
