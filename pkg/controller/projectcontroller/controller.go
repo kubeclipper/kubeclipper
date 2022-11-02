@@ -20,14 +20,21 @@ package projectcontroller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	pkgerrors "github.com/pkg/errors"
 	"go.uber.org/zap"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
@@ -56,7 +63,12 @@ type ProjectReconciler struct {
 	NodeWriter cluster.NodeWriter
 
 	ClusterLister corev1lister.ClusterLister
-	// TODO projectRole & projectRoleBinding
+	IAMOperator   iam.Operator
+
+	// ProjectRoleReader iam.ProjectRoleReader
+	// ProjectRoleWriter iam.ProjectRoleWriter
+	// ProjectRoleBindingReader iam.ProjectRoleBindingReader
+	// ProjectRoleBindingWrite  iam.ProjectRoleBindingWriter
 }
 
 func (r *ProjectReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
@@ -149,9 +161,35 @@ func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ProjectReconciler) initProjectRole(ctx context.Context, p *tenantv1.Project) error {
 	log := logger.FromContext(ctx)
 	log.Info("initProjectRole")
-	// TODO：initProjectRole
-	// check if all base role exist,if not creat it
 
+	// check if all base role exist,if not creat it
+	for _, rule := range ProjectRoles {
+		// rule := ru
+		if rule.Labels == nil {
+			rule.Labels = make(map[string]string)
+		}
+		rule.Labels[common.LabelProject] = p.Name
+		rule.Name = fmt.Sprintf("%s-%s", p.Name, rule.Name)
+		projectRole, err := r.IAMOperator.GetProjectRole(ctx, rule.Name)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				if _, err = r.IAMOperator.CreateProjectRole(ctx, &rule); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+		// 	if role exist,do equal check
+		if !reflect.DeepEqual(rule.Labels, projectRole.Labels) ||
+			!reflect.DeepEqual(rule.Annotations, projectRole.Annotations) ||
+			!reflect.DeepEqual(rule.Rules, projectRole.Rules) {
+
+			if _, err = r.IAMOperator.UpdateProjectRole(ctx, &rule); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -159,9 +197,63 @@ func (r *ProjectReconciler) initManagerRoleBinding(ctx context.Context, p *tenan
 	log := logger.FromContext(ctx)
 	log.Info("initManagerRoleBinding")
 
-	// TODO：bind admin role to project manager
+	// bind admin role to project manager
 	// check if projectRoleBinding for project.manager exist,if not creat it
-	// ManagerRoleBinding use a fixed name($projectName-admin),if project.manager changed,we just update it.
+	// ManagerRoleBinding use a fixed name({project}-{username}),if project.manager changed,we just update it.
+	// name := fmt.Sprintf("internal-%s-manager", p.Name)
+	target := &iamv1.ProjectRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRoleBinding,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("%s-%s", p.Name, p.Spec.Manager),
+			Annotations: map[string]string{
+				"kubeclipper.io/internal": "true",
+			},
+			Labels: map[string]string{
+				common.LabelProject:                   p.Name,
+				common.LabelProjectRoleBindingManager: "true",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "iam.kubeclipper.io",
+			Kind:     iamv1.KindProjectRole,
+			Name:     fmt.Sprintf("%s-admin", p.Name),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     iamv1.KindUser,
+				Name:     p.Spec.Manager,
+			},
+		},
+	}
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProjectRoleBindingManager, "true")
+	roleBinding, err := r.IAMOperator.ListProjectRoleBinding(ctx, q)
+	if err != nil {
+		return err
+	}
+	// not exist,creat it
+	if len(roleBinding.Items) == 0 {
+		if _, err = r.IAMOperator.CreateProjectRoleBinding(ctx, target); err != nil {
+			return err
+		}
+		return nil
+	}
+	// if exist,check subject name is ok
+	// in normal,there just one robeBingind with label common.LabelProjectRoleBindingManager
+	for _, item := range roleBinding.Items {
+		if len(item.Subjects) == 0 || item.Subjects[0].Name != p.Spec.Manager {
+			if err = r.IAMOperator.DeleteProjectRoleBinding(ctx, item.Name); err != nil {
+				return err
+			}
+			if _, err = r.IAMOperator.CreateProjectRoleBinding(ctx, target); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
@@ -169,9 +261,30 @@ func (r *ProjectReconciler) initManagerRoleBinding(ctx context.Context, p *tenan
 func (r *ProjectReconciler) deleteRoleAndRoleBinding(ctx context.Context, p *tenantv1.Project) error {
 	log := logger.FromContext(ctx)
 	log.Info("deleteRoleAndRoleBinding")
-
-	// TODO: delete projectRole and RoleBinding
 	// delete projectRole and projectRoleBinding which in this project
+
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s-%s", common.LabelProject, p.Name)
+	roles, err := r.IAMOperator.ListProjectRoles(ctx, q)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles.Items {
+		if err = r.IAMOperator.DeleteRole(ctx, role.Name); err != nil {
+			return err
+		}
+	}
+
+	roleBindings, err := r.IAMOperator.ListProjectRoleBinding(ctx, q)
+	if err != nil {
+		return err
+	}
+	for _, roleBinding := range roleBindings.Items {
+		if err = r.IAMOperator.DeleteRoleBinding(ctx, roleBinding.Name); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -234,4 +347,76 @@ func (r *ProjectReconciler) count(ctx context.Context, p *tenantv1.Project) erro
 		}
 	}
 	return nil
+}
+
+var ProjectRoles = []iamv1.ProjectRole{
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-access-clusters\",\"role-template-view-backuppoints\",\"role-template-edit-backuppoints\",\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-create-roles\",\"role-template-edit-roles\",\"role-template-delete-roles\",\"role-template-create-users\",\"role-template-edit-users\",\"role-template-delete-users\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-edit-platform\",\"role-template-view-audit\",\"role-template-create-dns\",\"role-template-edit-dns\",\"role-template-delete-dns\",\"role-template-view-dns\"]",
+				"kubeclipper.io/internal":          "true",
+			},
+			Name: "admin", // real name will generate when creating,format is {project}-admin
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+			{
+				NonResourceURLs: []string{"*"},
+				Verbs:           []string{"*"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-access-clusters\",\"role-template-view-backuppoints\",\"role-template-edit-backuppoints\",\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\"]",
+				"kubeclipper.io/internal":          "true",
+			},
+			Name: "user",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"clusters", "nodes", "regions", "operations"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions", "operations"},
+				Verbs:     []string{"*"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-cloudproviders\",\"role-template-view-backuppoints\",\"role-template-view-registries\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-view-audit\",\"role-template-view-dns\"]",
+				"kubeclipper.io/internal":          "true",
+			},
+			Name: "view",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
 }
