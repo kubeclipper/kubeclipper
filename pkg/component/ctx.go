@@ -143,7 +143,7 @@ func (e ExtraMetadata) GetAvailableMasterNodes() []string {
 	return nodes
 }
 
-func (e ExtraMetadata) MasterAllAvailable() bool {
+func (e ExtraMetadata) IsAllMasterAvailable() bool {
 	for _, node := range e.ControlPlaneStatus {
 		if node.Status != v1.ComponentHealthy {
 			return false

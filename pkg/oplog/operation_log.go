@@ -149,12 +149,3 @@ func (op *OperationLog) TruncateStepLogFile(opID, stepID string) error {
 	}
 	return os.Truncate(path, 0)
 }
-
-func (op *OperationLog) AppendLogFileContent(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, os.ModeAppend|os.ModePerm)
-	if err != nil {
-		return err
-	}
-	_, err = f.Write(data)
-	return err
-}

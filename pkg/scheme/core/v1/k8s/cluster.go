@@ -696,7 +696,7 @@ func (stepper *Recovery) GetInstallSteps() []v1.Step {
 }
 
 func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *component.ExtraMetadata) error {
-	if !metadata.MasterAllAvailable() {
+	if !metadata.IsAllMasterAvailable() {
 		return errors.New("there is an unavailable master node in the cluster, please check the cluster master node status")
 	}
 	rBytes, err := json.Marshal(stepper)
@@ -791,7 +791,7 @@ func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *compone
 	stepper.installSteps = append(stepper.installSteps, restart)
 
 	if unSupport {
-		if ok := stepper.appendFile(ctx, metadata.CNI); ok == nil {
+		if ok := stepper.appendFile(ctx, metadata.CNI, restart.Name); ok == nil {
 			return nil
 		}
 	}
@@ -812,16 +812,14 @@ func (stepper *Recovery) RecoveryCNICmd(metadata *component.ExtraMetadata) (unSu
 	return
 }
 
-func (stepper *Recovery) appendFile(ctx context.Context, cni string) error {
+func (stepper *Recovery) appendFile(ctx context.Context, cni string, stepName string) error {
+	stepKey := fmt.Sprintf("%s-%s", component.GetStepID(ctx), stepName)
 	operationID := component.GetOperationID(ctx)
-	stepID := component.GetStepID(ctx)
 	opLog := component.GetOplog(ctx)
-	path, err := opLog.GetStepLogFile(operationID, stepID)
-	if err != nil {
-		return err
-	}
+
 	note := fmt.Sprintf("\n ===== The daemon-set of this cni(%s) cannot be restarted, please use kubectl to restart the daemon-set service of this cni(%s) ===== \n\n", cni, cni)
-	err = opLog.AppendLogFileContent(path, []byte(note))
+	err := opLog.CreateStepLogFileAndAppend(operationID, stepKey, []byte(note))
+	logger.Debugf("Ccreate step log file error: %v", err)
 	return err
 }
 
