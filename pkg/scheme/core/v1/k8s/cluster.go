@@ -666,7 +666,7 @@ func (stepper *Recovery) InitSteps(ctx context.Context) error {
 	}
 
 	if len(stepper.installSteps) == 0 {
-		if err := stepper.MakeInstallSteps(&extraMetadata); err != nil {
+		if err := stepper.MakeInstallSteps(ctx, &extraMetadata); err != nil {
 			return err
 		}
 	}
@@ -695,7 +695,10 @@ func (stepper *Recovery) GetInstallSteps() []v1.Step {
 	return stepper.installSteps
 }
 
-func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) error {
+func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *component.ExtraMetadata) error {
+	if !metadata.IsAllMasterAvailable() {
+		return errors.New("there is an unavailable master node in the cluster, please check the cluster master node status")
+	}
 	rBytes, err := json.Marshal(stepper)
 	if err != nil {
 		return err
@@ -735,40 +738,89 @@ func (stepper *Recovery) MakeInstallSteps(metadata *component.ExtraMetadata) err
 				},
 			})
 	}
-	stepper.installSteps = append(stepper.installSteps,
-		v1.Step{
-			ID:         strutil.GetUUID(),
-			Name:       "restartCniAndKubeProxy",
-			Timeout:    metav1.Duration{Duration: 5 * time.Minute},
-			ErrIgnore:  false,
-			RetryTimes: 1,
-			Nodes:      []v1.StepNode{utils.UnwrapNodeList(metadata.Masters)[0]},
-			Action:     v1.ActionInstall,
-			Commands: []v1.Command{
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", "while true; do kubectl get po -n kube-system && break;sleep 5; done"},
-				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube | grep -v Running ;fi ; done"},
-				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", "kubectl rollout restart ds calico-node -n kube-system && kubectl rollout restart ds kube-proxy -n kube-system"},
-				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep calico | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep calico | grep -v Running ; fi ; done"},
-				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube-proxy | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube-proxy | grep -v Running ; fi ; done"},
-				},
+
+	restart := v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       "restartCniAndKubeProxy",
+		Timeout:    metav1.Duration{Duration: 5 * time.Minute},
+		ErrIgnore:  false,
+		RetryTimes: 1,
+		Nodes:      []v1.StepNode{utils.UnwrapNodeList(metadata.Masters)[0]},
+		Action:     v1.ActionInstall,
+		Commands: []v1.Command{
+			{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"/bin/bash", "-c", "while true; do kubectl get po -n kube-system && break;sleep 5; done"},
 			},
+			{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"/bin/bash", "-c", "while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube | grep -v Running ;fi ; done"},
+			},
+		},
+	}
+
+	unSupport, cmdList := stepper.RecoveryCNICmd(metadata)
+
+	if !unSupport {
+		restart.Commands = append(restart.Commands, v1.Command{
+			Type:         v1.CommandShell,
+			ShellCommand: []string{"/bin/bash", "-c", cmdList["restart"]},
 		})
+	}
+
+	restart.Commands = append(restart.Commands, v1.Command{
+		Type:         v1.CommandShell,
+		ShellCommand: []string{"/bin/bash", "-c", "kubectl rollout restart ds kube-proxy -n kube-system"},
+	})
+
+	if !unSupport {
+		restart.Commands = append(restart.Commands, v1.Command{
+			Type: v1.CommandShell,
+			// since the daemon-set controller restarts the pods asynchronously, we try to get the pod status running 3 times in a row and the restart is considered complete
+			// for((i=1;i<=3;i++));do sleep 5;while true; do if [ 0 == $(kubectl get po -n kube-system | grep calico | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep calico | grep -v Running ; fi ; done;done;
+			ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("for((i=1;i<=3;i++));do sleep 5;while true; do if [ 0 == $(%s | grep -v Running | wc -l) ]; then break; else sleep 5 && %s | grep -v Running ; fi ; done;done;", cmdList["get"], cmdList["get"])},
+		})
+	}
+
+	restart.Commands = append(restart.Commands, v1.Command{
+		Type: v1.CommandShell,
+		// Since the daemon-set controller restarts the pods asynchronously, we try to get the pod status running 3 times in a row and the restart is considered complete
+		ShellCommand: []string{"/bin/bash", "-c", "for((i=1;i<=3;i++));do sleep 5;while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube-proxy | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube-proxy | grep -v Running ; fi ; done;done;"},
+	})
+
+	stepper.installSteps = append(stepper.installSteps, restart)
+
+	if unSupport {
+		if ok := stepper.appendFile(ctx, metadata.CNI, restart.Name); ok == nil {
+			return nil
+		}
+	}
 
 	return nil
+}
+
+func (stepper *Recovery) RecoveryCNICmd(metadata *component.ExtraMetadata) (unSupport bool, cmdList map[string]string) {
+	cmdList = make(map[string]string)
+	switch metadata.CNI {
+	case CniCalico:
+		cmdList["get"] = fmt.Sprintf("kubectl get po -n %s | grep calico", metadata.CNINamespace)
+		cmdList["restart"] = fmt.Sprintf("kubectl rollout restart ds calico-node -n %s", metadata.CNINamespace)
+	default:
+		unSupport = true
+	}
+
+	return
+}
+
+func (stepper *Recovery) appendFile(ctx context.Context, cni string, stepName string) error {
+	stepKey := fmt.Sprintf("%s-%s", component.GetStepID(ctx), stepName)
+	operationID := component.GetOperationID(ctx)
+	opLog := component.GetOplog(ctx)
+
+	note := fmt.Sprintf("\n ===== The daemon-set of this cni(%s) cannot be restarted, please use kubectl to restart the daemon-set service of this cni(%s) ===== \n\n", cni, cni)
+	err := opLog.CreateStepLogFileAndAppend(operationID, stepKey, []byte(note))
+	logger.Debugf("Ccreate step log file error: %v", err)
+	return err
 }
 
 func (stepper *Recovery) Install(ctx context.Context, opts component.Options) ([]byte, error) {
