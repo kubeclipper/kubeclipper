@@ -161,13 +161,13 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		// check nodes in cluster
 		// nodes to be added
 
-		//p.Nodes = cluster.Workers.Complement(p.Nodes...)
-		//cluster.Workers = append(cluster.Workers, p.Nodes...)
+		// p.Nodes = cluster.Workers.Complement(p.Nodes...)
+		// cluster.Workers = append(cluster.Workers, p.Nodes...)
 		action = corev1.ActionInstall
 		op.Labels[common.LabelOperationAction] = corev1.OperationAddNodes
 
 		// container runtime
-		steps, err := getCriStep(ctx, &cluster.ContainerRuntime, action, stepNodes)
+		steps, err := getCriStep(ctx, cluster, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}
@@ -209,7 +209,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Steps = append(op.Steps, steps...)
 
 		// container runtime
-		steps, err = getCriStep(ctx, &cluster.ContainerRuntime, action, stepNodes)
+		steps, err = getCriStep(ctx, cluster, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}
