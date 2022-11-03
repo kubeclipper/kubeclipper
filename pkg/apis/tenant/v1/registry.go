@@ -25,6 +25,8 @@ import (
 	restfulspec "github.com/emicklei/go-restful-openapi"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
+
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
 
@@ -41,11 +43,11 @@ const (
 	CoreTenantTag = "Core-Tenant"
 )
 
-func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, clusterOperator cluster.Operator, iamOperator iam.Operator) error {
+func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, clusterOperator cluster.Operator, iamOperator iam.Operator, authorizer authorizer.Authorizer) error {
 
 	webservice := runtime.NewWebService(schema.GroupVersion{Group: "tenant.kubeclipper.io", Version: "v1"})
 
-	h := newHandler(tenantOperator, clusterOperator, iamOperator)
+	h := newHandler(tenantOperator, clusterOperator, iamOperator, authorizer)
 
 	webservice.Route(webservice.POST("/projects").
 		To(h.CreateProject).

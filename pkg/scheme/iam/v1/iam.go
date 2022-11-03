@@ -24,11 +24,13 @@ import (
 )
 
 const (
-	KindUser              = "User"
-	KindToken             = "Token"
-	KindLoginRecord       = "LoginRecord"
-	KindGlobalRole        = "GlobalRole"
-	KindGlobalRoleBinding = "GlobalRoleBinding"
+	KindUser               = "User"
+	KindToken              = "Token"
+	KindLoginRecord        = "LoginRecord"
+	KindGlobalRole         = "GlobalRole"
+	KindGlobalRoleBinding  = "GlobalRoleBinding"
+	KindProjectRole        = "ProjectRole"
+	KindProjectRoleBinding = "ProjectRoleBinding"
 )
 
 // +genclient

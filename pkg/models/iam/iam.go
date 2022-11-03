@@ -222,7 +222,7 @@ func (i *iamOperator) ListUserEx(ctx context.Context, query *query.Query, desens
 		return user
 	}
 
-	return models.ListExV2(ctx, i.userStorage, query, i.userFuzzyFilter, nil, mutatingFunc)
+	return models.ListExV2(ctx, i.userStorage, query, UserFuzzyFilter, nil, mutatingFunc)
 }
 
 // ListUsersByRole
@@ -646,7 +646,7 @@ func (i *iamOperator) UpdateProjectRoleBinding(ctx context.Context, roleBinding 
 	return obj.(*iamv1.ProjectRoleBinding), nil
 }
 
-func (i *iamOperator) userFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func UserFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	users, ok := obj.(*iamv1.UserList)
 	if !ok {
 		return nil
