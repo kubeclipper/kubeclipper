@@ -283,7 +283,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	}
 
 	backup.Status.KubernetesVersion = c.KubernetesVersion
-	backup.Status.FileName = fmt.Sprintf("%s-%s", c.Name, backup.Name)
+	backup.Status.FileName = backup.Name
 	backup.BackupPointName = c.Labels[common.LabelBackupPoint]
 	// check preferred node in cluster
 	if backup.PreferredNode == "" {
