@@ -1,0 +1,83 @@
+name: test
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ '1.19' ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Get branch name
+        id: extract_branch
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+      - name: Build
+        if: github.event_name == 'pull_request'
+        run:
+          KUBE_BUILD_PLATFORMS="linux/amd64" make build
+      - name: deploy pre
+        run: curl -sfL https://oss.kubeclipper.io/kcctl.sh | sudo KC_VERSION=master KC_REGION=cn bash -
+      - name: deploy
+        run: sudo kcctl deploy --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
+      - name: update kc assembly
+        run: |
+          sudo cp ./dist/kcctl /usr/local/bin/
+          sudo systemctl stop kc-agent
+          sudo systemctl stop kc-server
+          sudo cp ./dist/kubeclipper-agent /usr/local/bin/
+          sudo cp ./dist/kubeclipper-server /usr/local/bin/
+          sudo systemctl start kc-server
+          sudo systemctl start kc-agent
+      - name: login
+        run: |
+          sleep 20s
+          sudo kcctl login -H http://localhost  -u admin -p Thinkbig1
+      - name: get node and create cluster
+        run: |
+          NODE=$(sudo kcctl get node -o yaml|grep ipv4DefaultIP:|sed 's/ipv4DefaultIP: //'|awk '{gsub(/^\s+|\s+$/, "");print}')
+          echo $NODE
+          sudo kcctl create cluster --master $NODE --name demo --untaint-master
+      - name: pass or fail 
+        run: |     
+          status=$(sudo kcctl get cluster -o yaml|grep "phase:" | awk -F" " '{print $2}')
+          count=0
+          while [[ $status ==  "Installing" ]] && [[ $count -lt 60 ]]
+          do 
+          sleep 5s ;
+          status=$(sudo kcctl get cluster -o yaml|grep "phase:" | awk -F" " '{print $2}') ; 
+          count=$[$count+1] ; 
+          done
+          case $status in
+          Installing)
+          echo Installation time exceeds 5mins, installation status is $status
+          exit 101
+          ;;
+          InstallFailed)
+          echo InstallFailed, installation status is $status
+          exit 102
+          ;;
+          Running)
+          echo Creating a cluster Successfully
+          exit 0
+          ;;
+          *)
+          echo InstallFailed, installation status is $status
+          exit 103
+          ;;
+          esac
