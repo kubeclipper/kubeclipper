@@ -101,7 +101,7 @@ func (stepper *GenNode) InitStepper(metadata *component.ExtraMetadata, cluster *
 	return stepper
 }
 
-func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes []v1.StepNode, role string) error {
+func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patchNodes []v1.StepNode, role string) error {
 	err := stepper.Validate()
 	if err != nil {
 		return err
@@ -116,16 +116,18 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes 
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
 
-		cf, err := cni.Load(stepper.Cluster.CNI.Type)
-		if err != nil {
-			return err
+		if metadata.Offline {
+			cf, err := cni.Load(stepper.Cluster.CNI.Type)
+			if err != nil {
+				return err
+			}
+			cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
+			steps, err = cniStepper.LoadImage(patchNodes)
+			if err != nil {
+				return err
+			}
+			stepper.installSteps = append(stepper.installSteps, steps...)
 		}
-		cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
-		steps, err = cniStepper.LoadImage(patchNodes)
-		if err != nil {
-			return err
-		}
-		stepper.installSteps = append(stepper.installSteps, steps...)
 
 		joinCmd := JoinCmd{}
 		steps, err = joinCmd.InitStepper(stepper.Cluster.ContainerRuntime.Type).InstallSteps([]v1.StepNode{masters[0]})
@@ -150,6 +152,16 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes 
 		stepper.installSteps = append(stepper.installSteps, steps...)
 	}
 
+	return nil
+}
+
+// MakeUninstallSteps make uninstall-steps
+func (stepper *GenNode) MakeUninstallSteps(metadata *component.ExtraMetadata, patchNodes []v1.StepNode) error {
+	err := stepper.Validate()
+	if err != nil {
+		return err
+	}
+	masters := utils.UnwrapNodeList(metadata.Masters)
 	if len(stepper.uninstallSteps) == 0 {
 		args := []string{"--ignore-daemonsets", "--delete-local-data"}
 		for _, node := range patchNodes {
@@ -179,16 +191,18 @@ func (stepper *GenNode) MakeSteps(metadata *component.ExtraMetadata, patchNodes 
 		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 
 		// clean CNI config
-		cf, err := cni.Load(stepper.Cluster.CNI.Type)
-		if err != nil {
-			return err
+		if metadata.Offline {
+			cf, err := cni.Load(stepper.Cluster.CNI.Type)
+			if err != nil {
+				return err
+			}
+			cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
+			steps, err = cniStepper.UninstallSteps(patchNodes)
+			if err != nil {
+				return err
+			}
+			stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 		}
-		cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
-		steps, err = cniStepper.UninstallSteps(patchNodes)
-		if err != nil {
-			return err
-		}
-		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 
 		steps, err = CleanCNI(&stepper.Cluster.CNI, patchNodes)
 		if err != nil {
