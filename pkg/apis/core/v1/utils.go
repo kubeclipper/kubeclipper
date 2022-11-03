@@ -224,11 +224,12 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 
 func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir string, masters, workers []component.Node, nodeNames, nodeIPs []string, action v1.StepAction) (steps []v1.Step, err error) {
 	meta := component.ExtraMetadata{
-		ClusterName:  c.Name,
-		Masters:      masters,
-		Workers:      workers,
-		CNI:          c.CNI.Type,
-		CNINamespace: c.CNI.Namespace,
+		ClusterName:        c.Name,
+		Masters:            masters,
+		Workers:            workers,
+		CNI:                c.CNI.Type,
+		CNINamespace:       c.CNI.Namespace,
+		ControlPlaneStatus: c.Status.ControlPlaneHealth,
 	}
 	ctx := component.WithExtraMetadata(context.TODO(), meta)
 

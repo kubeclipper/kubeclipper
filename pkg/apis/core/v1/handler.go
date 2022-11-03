@@ -1571,6 +1571,13 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 	o.Labels[common.LabelRecoveryName] = rName
 	o.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
 	o.Status.Status = v1.OperationStatusRunning
+	restoreDir := filepath.Join("/var/lib/kube-restore", c.Name)
+	steps, err := h.parseRecoverySteps(c, b, restoreDir, v1.ActionInstall)
+	if err != nil {
+		restplus.HandleInternalError(response, request, fmt.Errorf("recovery failed: %v", err))
+		return
+	}
+	o.Steps = steps
 
 	// add recovery
 	r.Name = rName
@@ -1588,13 +1595,6 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 
 	go func(c *v1.Cluster, op *v1.Operation, r *v1.Recovery, b *v1.Backup) {
 		var err error
-		restoreDir := filepath.Join("/var/lib/kube-restore", c.Name)
-		steps, err := h.parseRecoverySteps(c, b, restoreDir, v1.ActionInstall)
-		if err != nil {
-			logger.Errorf("recovery step parse failed: %s", err.Error())
-			return
-		}
-		op.Steps = steps
 		newOP, err := h.opOperator.CreateOperation(context.TODO(), op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
