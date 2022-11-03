@@ -203,11 +203,13 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 		return nil, err
 	}
 	cniStepper := cf.Create().InitStep(metadata, &c.CNI, &c.Networking)
-	steps, err = cniStepper.LoadImage(nodes)
-	if err != nil {
-		return nil, err
+	if metadata.Offline {
+		steps, err = cniStepper.LoadImage(nodes)
+		if err != nil {
+			return nil, err
+		}
+		installSteps = append(installSteps, steps...)
 	}
-	installSteps = append(installSteps, steps...)
 	steps, err = cniStepper.InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err

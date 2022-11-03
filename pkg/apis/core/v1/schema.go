@@ -181,11 +181,12 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Steps = append(op.Steps, steps...)
 
 		// join component
-		steps, err = p.makeWorkerNodeSteps(&extra, cluster, stepNodes, corev1.ActionInstall)
+		gen := k8s.GenNode{}
+		err = gen.InitStepper(&extra, cluster, p.Role.String()).MakeInstallSteps(&extra, stepNodes, p.Role.String())
 		if err != nil {
 			return nil, err
 		}
-		op.Steps = append(op.Steps, steps...)
+		op.Steps = append(op.Steps, gen.GetSteps(action)...)
 	case NodesOperationRemove:
 		// // remove nodes from cluster
 		// // filter nodes in cluster
@@ -195,14 +196,15 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		action = corev1.ActionUninstall
 		op.Labels[common.LabelOperationAction] = corev1.OperationRemoveNodes
 
-		steps, err := p.makeWorkerNodeSteps(&extra, cluster, stepNodes, corev1.ActionUninstall)
+		gen := k8s.GenNode{}
+		err := gen.InitStepper(&extra, cluster, p.Role.String()).MakeUninstallSteps(&extra, stepNodes)
 		if err != nil {
 			return nil, err
 		}
-		op.Steps = append(op.Steps, steps...)
+		op.Steps = append(op.Steps, gen.GetSteps(action)...)
 
 		// kubernetes
-		steps, err = p.getPackageSteps(cluster, action, stepNodes)
+		steps, err := p.getPackageSteps(cluster, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}
@@ -233,17 +235,6 @@ func (p *PatchNodes) getPackageSteps(cluster *corev1.Cluster, action corev1.Step
 	}
 
 	return nil, fmt.Errorf("packageSteps dose not support action: %s", action)
-}
-
-func (p *PatchNodes) makeWorkerNodeSteps(extra *component.ExtraMetadata, c *corev1.Cluster, patchNodes []corev1.StepNode, action corev1.StepAction) ([]corev1.Step, error) {
-	role := p.Role.String()
-	gen := k8s.GenNode{}
-	err := gen.InitStepper(extra, c, role).MakeSteps(extra, patchNodes, role)
-	if err != nil {
-		return nil, err
-	}
-
-	return gen.GetSteps(action), nil
 }
 
 // checkComponent check whether the component is installed in the current cluster
