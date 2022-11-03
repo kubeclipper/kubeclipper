@@ -74,7 +74,7 @@ func (p *projectOperator) GetProjectEx(ctx context.Context, name string, resourc
 }
 
 func (p *projectOperator) ListProjectsEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, p.storage, query, p.projectFilter, nil, nil)
+	return models.ListExV2(ctx, p.storage, query, ProjectFilter, nil, nil)
 }
 
 func (p *projectOperator) CreateProject(ctx context.Context, project *v1.Project) (*v1.Project, error) {
@@ -104,7 +104,7 @@ func (p *projectOperator) DeleteProject(ctx context.Context, name string) error 
 	return err
 }
 
-func (p *projectOperator) projectFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func ProjectFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	projects, ok := obj.(*v1.ProjectList)
 	if !ok {
 		return nil

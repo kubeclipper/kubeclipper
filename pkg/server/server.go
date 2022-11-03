@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/projectcontroller"
@@ -50,6 +52,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
 
+	schemecorev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
@@ -190,7 +193,13 @@ func (s *APIServer) Run(stopCh <-chan struct{}) (err error) {
 }
 
 func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
-	s.container.Filter(filters.WithRequestInfo(&request.InfoFactory{APIPrefixes: sets.NewString("api")}))
+	infoFactory := &request.InfoFactory{
+		APIPrefixes: sets.NewString("api"),
+		GlobalResources: []schema.GroupResource{
+			schemecorev1.Resource("projects"),
+		},
+	}
+	s.container.Filter(filters.WithRequestInfo(infoFactory))
 
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
 		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
@@ -278,7 +287,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	if err := tenantv1.AddToContainer(s.container, tenantOperator, clusterOperator, iamOperator); err != nil {
+	if err := tenantv1.AddToContainer(s.container, tenantOperator, clusterOperator, iamOperator, s.rbacAuthorizer); err != nil {
 		return err
 	}
 
@@ -338,7 +347,13 @@ func (s *APIServer) migrateRole(operator iam.Operator) error {
 	}
 
 	for index := range Roles {
-		if _, err := operator.CreateRole(context.TODO(), &Roles[index]); err != nil {
+		if _, err = operator.CreateRole(context.TODO(), &Roles[index]); err != nil {
+			return err
+		}
+	}
+
+	for index := range ProjectRolesTemplate {
+		if _, err = operator.CreateProjectRole(context.TODO(), &ProjectRolesTemplate[index]); err != nil {
 			return err
 		}
 	}
@@ -493,6 +508,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:    clusterOperator,
 		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
+		IAMOperator:   iamOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}

@@ -354,10 +354,10 @@ func (h *handler) CreateRoles(request *restful.Request, response *restful.Respon
 	}
 	// TODO: add creator label to object meta
 	// TODO: add role validation
-	//if errs := validation.ValidateUser(u); len(errs) > 0 {
+	// if errs := validation.ValidateUser(u); len(errs) > 0 {
 	//	restplus.HandleBadRequest(response, request, errs.ToAggregate())
 	//	return
-	//}
+	// }
 
 	globalRole.Rules = make([]rbacv1.PolicyRule, 0)
 	if aggregateRoles := h.getAggregateRoles(globalRole.ObjectMeta); aggregateRoles != nil {
@@ -411,7 +411,10 @@ func (h *handler) CheckRolesExist(request *restful.Request, response *restful.Re
 func (h *handler) ListProjectRole(request *restful.Request, response *restful.Response) {
 	name := request.PathParameter("project")
 	q := query.ParseQueryParameter(request)
-	q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, name)})
+	// if query template role,don't add project label filter.
+	if q.LabelSelector != fmt.Sprintf("%s=%s", common.LabelRoleTemplate, "true") {
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, name)})
+	}
 	roles, err := h.iamOperator.ListProjectRoleEx(context.TODO(), q)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
@@ -580,13 +583,15 @@ func (h *handler) DeleteProjectRole(request *restful.Request, response *restful.
 
 func (h *handler) ListProjectMember(request *restful.Request, response *restful.Response) {
 	name := request.PathParameter("project")
+	q := query.ParseQueryParameter(request)
+
 	roleBindings, err := h.iamOperator.ListProjectRoleBinding(context.TODO(), &query.Query{LabelSelector: fmt.Sprintf("%s=%s", common.LabelProject, name)})
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
-	users := make([]*iamv1.User, 0)
+	users := make([]iamv1.User, 0)
 	// TODO: add user selector filter
 	// q := query.ParseQueryParameter(request)
 	for _, roleBinding := range roleBindings.Items {
@@ -600,10 +605,19 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 			return
 		}
 		if user != nil {
-			users = append(users, user)
+			users = append(users, *user)
 		}
 	}
-	_ = response.WriteEntity(users)
+	list := &iamv1.UserList{
+		Items: users,
+	}
+
+	defaultList, err := models.DefaultList(list.DeepCopyObject(), q, iam.UserFuzzyFilter, nil, nil)
+	if err != nil {
+		return
+	}
+
+	_ = response.WriteEntity(defaultList)
 }
 
 func (h *handler) CreateProjectMember(request *restful.Request, response *restful.Response) {

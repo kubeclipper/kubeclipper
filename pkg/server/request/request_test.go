@@ -23,7 +23,10 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	schemecorev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 var (
@@ -34,6 +37,8 @@ var (
 	req5, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/nodes?watch=true&fieldSelector=metadata.name=node1", nil)
 	req6, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/nodes/node1/terminal", nil)
 	req7, _ = http.NewRequest("DELETE", "/api/core.kubeclipper.io/v1/nodes/node1/plugins/plugin1", nil)
+	req8, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/projects/demo1/nodes/node1", nil)
+	req9, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/projects", nil)
 )
 
 func TestInfoFactory_NewRequestInfo(t *testing.T) {
@@ -57,6 +62,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				APIGroup:          "core.kubeclipper.io",
 				APIVersion:        "v1",
 				Resource:          "nodes",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
@@ -71,6 +77,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				APIGroup:          "core.kubeclipper.io",
 				APIVersion:        "v1",
 				Resource:          "nodes",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
@@ -86,6 +93,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				APIVersion:        "v1",
 				Resource:          "nodes",
 				Name:              "node1",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
@@ -100,6 +108,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				APIGroup:          "core.kubeclipper.io",
 				APIVersion:        "v1",
 				Resource:          "nodes",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
@@ -115,6 +124,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				APIVersion:        "v1",
 				Resource:          "nodes",
 				Name:              "node1",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
@@ -131,6 +141,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				Resource:          "nodes",
 				Name:              "node1",
 				Subresource:       "terminal",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
@@ -147,13 +158,51 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 				Resource:          "nodes",
 				Name:              "node1",
 				Subresource:       "plugins",
+				ResourceScope:     GlobalScope,
+			},
+			wantErr: false,
+		},
+		{
+			name: "",
+			args: args{req: req8},
+			want: &Info{
+				IsResourceRequest: true,
+				Path:              req8.URL.Path,
+				Verb:              "get",
+				APIPrefix:         "api",
+				APIGroup:          "core.kubeclipper.io",
+				APIVersion:        "v1",
+				Project:           "demo1",
+				Resource:          "nodes",
+				Name:              "node1",
+				Subresource:       "",
+				ResourceScope:     ProjectScope,
+			},
+			wantErr: false,
+		},
+		{
+			name: "",
+			args: args{req: req9},
+			want: &Info{
+				IsResourceRequest: true,
+				Path:              req9.URL.Path,
+				Verb:              "list",
+				APIPrefix:         "api",
+				APIGroup:          "core.kubeclipper.io",
+				APIVersion:        "v1",
+				Resource:          "projects",
+				ResourceScope:     GlobalScope,
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i := &InfoFactory{APIPrefixes: sets.NewString("api")}
+			i := &InfoFactory{
+				APIPrefixes: sets.NewString("api"),
+				GlobalResources: []schema.GroupResource{
+					schemecorev1.Resource("projects"),
+				}}
 			got, err := i.NewRequestInfo(tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewRequestInfo() error = %v, wantErr %v", err, tt.wantErr)

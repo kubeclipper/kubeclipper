@@ -35,6 +35,8 @@ type AttributesRecord struct {
 	Name            string
 	ResourceRequest bool
 	Path            string
+	Project         string
+	ResourceScope   string
 }
 
 func (a *AttributesRecord) GetVerb() string {
@@ -71,4 +73,12 @@ func (a *AttributesRecord) GetPath() string {
 
 func (a *AttributesRecord) GetUser() user.Info {
 	return a.User
+}
+
+func (a *AttributesRecord) GetProject() string {
+	return a.Project
+}
+
+func (a AttributesRecord) GetResourceScope() string {
+	return a.ResourceScope
 }

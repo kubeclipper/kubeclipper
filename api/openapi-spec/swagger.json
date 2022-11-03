@@ -3670,6 +3670,423 @@
         }
       }
     },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectmembers": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "List member under specified project",
+        "operationId": "ListProjectMember",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/*v1.User"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Update member info in specified project",
+        "operationId": "UpdateProjectMember",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Member"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRoleBinding"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Add user to project",
+        "operationId": "CreateProjectMember",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/v1.Member"
+              }
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/*v1.ProjectRoleBinding"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectmembers/{member}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Describe project member info",
+        "operationId": "DescribeProjectMember",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "project member name",
+            "name": "member",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.User"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Remove member from specified project",
+        "operationId": "DeleteProjectMember",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "project member name",
+            "name": "member",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectroles": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "List roles under specified project",
+        "operationId": "ListProjectRole",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Update role info",
+        "operationId": "UpdateProjectRole",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Create role in specified project",
+        "operationId": "CreateProjectRole",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectroles/{projectrole}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Describe role info",
+        "operationId": "DescribeProjectRole",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "role name",
+            "name": "projectrole",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Delete specified role",
+        "operationId": "DeleteProjectRole",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "role name",
+            "name": "projectrole",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
     "/api/iam.kubeclipper.io/v1/roles": {
       "get": {
         "produces": [
@@ -5067,6 +5484,8 @@
     }
   },
   "definitions": {
+    "*v1.ProjectRoleBinding": {},
+    "*v1.User": {},
     "api.AuthInfo": {
       "required": [
         "LocationOfOrigin"
@@ -5839,10 +6258,6 @@
       }
     },
     "v1.CRIRegistry": {
-      "required": [
-        "insecureRegistry",
-        "registryRef"
-      ],
       "properties": {
         "insecureRegistry": {
           "type": "string"
@@ -6572,6 +6987,20 @@
         }
       }
     },
+    "v1.Member": {
+      "required": [
+        "username",
+        "role"
+      ],
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        }
+      }
+    },
     "v1.NetworkRanges": {
       "required": [
         "cidrBlocks"
@@ -7110,6 +7539,57 @@
         }
       }
     },
+    "v1.ProjectRole": {
+      "required": [
+        "rules"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.PolicyRule"
+          }
+        }
+      }
+    },
+    "v1.ProjectRoleBinding": {
+      "required": [
+        "roleRef"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "roleRef": {
+          "$ref": "#/definitions/v1.RoleRef"
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.Subject"
+          }
+        }
+      }
+    },
     "v1.ProjectSpec": {
       "properties": {
         "manager": {
@@ -7234,6 +7714,28 @@
         },
         "skipVerify": {
           "type": "boolean"
+        }
+      }
+    },
+    "v1.RoleRef": {
+      "description": "RoleRef contains information that points to the role being used",
+      "required": [
+        "apiGroup",
+        "kind",
+        "name"
+      ],
+      "properties": {
+        "apiGroup": {
+          "description": "APIGroup is the group for the resource being referenced",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is the type of resource being referenced",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name is the name of resource being referenced",
+          "type": "string"
         }
       }
     },
@@ -7395,6 +7897,31 @@
           "type": "string"
         },
         "status": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.Subject": {
+      "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
+      "required": [
+        "kind",
+        "name"
+      ],
+      "properties": {
+        "apiGroup": {
+          "description": "APIGroup holds the API group of the referenced subject. Defaults to \"\" for ServiceAccount subjects. Defaults to \"rbac.authorization.k8s.io\" for User and Group subjects.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the object being referenced.",
+          "type": "string"
+        },
+        "namespace": {
+          "description": "Namespace of the referenced object.  If the object kind is non-namespace, such as \"User\" or \"Group\", and this value is not empty the Authorizer should report an error.",
           "type": "string"
         }
       }
