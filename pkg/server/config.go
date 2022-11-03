@@ -740,7 +740,7 @@ var Roles = []iamv1.GlobalRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-project\",\"role-template-delete-project\",\"role-template-create-project\",\"role-template-edit-project\",\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-access-clusters\",\"role-template-view-backuppoints\",\"role-template-edit-backuppoints\",\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-create-roles\",\"role-template-edit-roles\",\"role-template-delete-roles\",\"role-template-create-users\",\"role-template-edit-users\",\"role-template-delete-users\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-edit-platform\",\"role-template-view-audit\",\"role-template-create-dns\",\"role-template-edit-dns\",\"role-template-delete-dns\",\"role-template-view-dns\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-projects\",\"role-template-delete-projects\",\"role-template-create-projects\",\"role-template-edit-projects\",\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-access-clusters\",\"role-template-view-backuppoints\",\"role-template-edit-backuppoints\",\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-create-roles\",\"role-template-edit-roles\",\"role-template-delete-roles\",\"role-template-create-users\",\"role-template-edit-users\",\"role-template-delete-users\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-edit-platform\",\"role-template-view-audit\",\"role-template-create-dns\",\"role-template-edit-dns\",\"role-template-delete-dns\",\"role-template-view-dns\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "platform-admin",
@@ -911,20 +911,20 @@ var Roles = []iamv1.GlobalRole{
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       iamv1.KindProjectRole,
+			Kind:       iamv1.KindGlobalRole,
 			APIVersion: iamv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/module":              "Project",
-				"kubeclipper.io/role-template-rules": "{\"project\": \"view\"}",
+				"kubeclipper.io/role-template-rules": "{\"projects\": \"view\"}",
 				"kubeclipper.io/alias-name":          "Project View",
 				"kubeclipper.io/internal":            "true",
 			},
 			Labels: map[string]string{
 				"kubeclipper.io/role-template": "true",
 			},
-			Name: "role-template-view-project",
+			Name: "role-template-view-projects",
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -936,21 +936,21 @@ var Roles = []iamv1.GlobalRole{
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       iamv1.KindProjectRole,
+			Kind:       iamv1.KindGlobalRole,
 			APIVersion: iamv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-project\"]",
 				"kubeclipper.io/module":              "Project",
-				"kubeclipper.io/role-template-rules": "{\"project\": \"delete\"}",
+				"kubeclipper.io/role-template-rules": "{\"projects\": \"delete\"}",
 				"kubeclipper.io/alias-name":          "Project Delete",
 				"kubeclipper.io/internal":            "true",
 			},
 			Labels: map[string]string{
 				"kubeclipper.io/role-template": "true",
 			},
-			Name: "role-template-delete-project",
+			Name: "role-template-delete-projects",
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -962,21 +962,21 @@ var Roles = []iamv1.GlobalRole{
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       iamv1.KindProjectRole,
+			Kind:       iamv1.KindGlobalRole,
 			APIVersion: iamv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-project\"]",
 				"kubeclipper.io/module":              "Project",
-				"kubeclipper.io/role-template-rules": "{\"project\": \"create\"}",
+				"kubeclipper.io/role-template-rules": "{\"projects\": \"create\"}",
 				"kubeclipper.io/alias-name":          "Project Create",
 				"kubeclipper.io/internal":            "true",
 			},
 			Labels: map[string]string{
 				"kubeclipper.io/role-template": "true",
 			},
-			Name: "role-template-create-project",
+			Name: "role-template-create-projects",
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -988,21 +988,21 @@ var Roles = []iamv1.GlobalRole{
 	},
 	{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       iamv1.KindProjectRole,
+			Kind:       iamv1.KindGlobalRole,
 			APIVersion: iamv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-project\"]",
 				"kubeclipper.io/module":              "Project",
-				"kubeclipper.io/role-template-rules": "{\"project\": \"edit\"}",
+				"kubeclipper.io/role-template-rules": "{\"projects\": \"edit\"}",
 				"kubeclipper.io/alias-name":          "Project Edit",
 				"kubeclipper.io/internal":            "true",
 			},
 			Labels: map[string]string{
 				"kubeclipper.io/role-template": "true",
 			},
-			Name: "role-template-edit-project",
+			Name: "role-template-edit-projects",
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
