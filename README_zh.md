@@ -10,19 +10,22 @@
 
 <p align="center">
   <img alt="repo status" src="https://img.shields.io/badge/-Repo_Status_>-000000?style=flat-square&logo=github&logoColor=white" />
-  <img alt="last commit" src="https://img.shields.io/github/last-commit/kubeclipper-labs/kubeclipper?style=flat-square">
-  <img alt="Issues" src="https://img.shields.io/github/issues/kubeclipper-labs/kubeclipper?style=flat-square&labelColor=343b41"/>
-  <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/kubeclipper-labs/kubeclipper?style=flat-square&labelColor=343b41"/>
-  <img alt="contributors" src="https://img.shields.io/github/contributors/kubeclipper-labs/kubeclipper?style=flat-square"/>
+  <a href="https://codecov.io/gh/kubeclipper/kubeclipper" target="_blank"><img alt="coverage" src="https://codecov.io/gh/kubeclipper/kubeclipper/branch/master/graph/badge.svg"/></a>
+  <img alt="Go Report Card" src="https://goreportcard.com/badge/github.com/kubeclipper/kubeclipper"/>
+  <a href="https://www.codacy.com/gh/kubeclipper/kubeclipper/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=kubeclipper/kubeclipper&amp;utm_campaign=Badge_Grade"><img src="https://app.codacy.com/project/badge/Grade/6d077c30cb3e4e269b891380c22d5fc0"/></a>
+  <img alt="last commit" src="https://img.shields.io/github/last-commit/kubeclipper/kubeclipper?style=flat-square">
+  <img alt="Issues" src="https://img.shields.io/github/issues/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
+  <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
+  <img alt="contributors" src="https://img.shields.io/github/contributors/kubeclipper/kubeclipper?style=flat-square"/>
   <img alt="apache2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" />
-  <img alt="Stars" src="https://img.shields.io/github/stars/kubeclipper-labs/kubeclipper?style=flat-square&labelColor=343b41"/>
-  <img alt="Forks" src="https://img.shields.io/github/forks/kubeclipper-labs/kubeclipper?style=flat-square&labelColor=343b41"/>
+  <img alt="Stars" src="https://img.shields.io/github/stars/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
+  <img alt="Forks" src="https://img.shields.io/github/forks/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
 </p>
 
 <p align="center">
   <img alt="github actions" src="https://img.shields.io/badge/-Github_Actions_>-000000?style=flat-square&logo=github-actions&logoColor=white" />
-  <img alt="code-check-test" src="https://github.com/kubeclipper-labs/kubeclipper/actions/workflows/code-check-test.yml/badge.svg" />
-  <img alt="build-kc" src="https://github.com/kubeclipper-labs/kubeclipper/actions/workflows/build-kc.yml/badge.svg" />
+  <img alt="code-check-test" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/code-check-test.yml/badge.svg" />
+  <img alt="build-kc" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/build-kc.yml/badge.svg" />
 </p>
 
 ---
@@ -112,14 +115,15 @@ KubeClipper 本身并不会占用太多资源，但是为了后续更好的运�
 KubeClipper 提供了命令行工具🔧 kcctl 以简化运维工作，您可以直接使用以下命令下载最新版 kcctl：
 
 ```bash
-# curl -sfL https://oss.kubeclipper.io/kcctl.sh | bash -
-# 如果你在中国，你指定环境变量 KC_REGION=cn, 此时我们会使用 registry.aliyuncs.com/google_containers 代替 k8s.gcr.io
+# 安装最新的 release 版本
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | bash -
+# 如果你在中国，你可以在安装时使用 cn  环境变量, 此时我们会使用 registry.aliyuncs.com/google_containers 代替 k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn bash -
-# 默认会下载最新版本，你可以通过指定 KC_VERSION 环境变量指定所需版本，比如 v1.2.1
-curl -sfL https://oss.kubeclipper.io/kcctl.sh | KC_REGION=cn KC_VERSION=v1.2.1 bash -
+# 默认会下载最新版本，你可以通过指定VERSION下载所需版本. 比如指定安装 master 开发版本 (现在可选择的版本 master / v1.2.1 / v1.2.0)
+curl -sfL https://oss.kubeclipper.io/kcctl.sh | VERSION=master bash -
 ```
 
-> 您也可以在 [GitHub Release Page](https://github.com/kubeclipper-labs/kubeclipper/releases) 下载指定版本。
+> 您也可以在 **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)** 下载指定版本。
 
 通过以下命令检测是否安装成功:
 
@@ -129,25 +133,18 @@ kcctl version
 
 #### 开始安装
 
-在本快速入门教程中，您只需执行一个命令即可安装 KubeClipper，其模板如下所示：
+在本快速入门教程中，您只需执行一个命令即可安装 KubeClipper：
+
+如果想运行 AIO 模式
 
 ```bash
-kcctl deploy  [--user root] (--passwd SSH_PASSWD | --pk-file SSH_PRIVATE_KEY)
+# 安装默认版本
+kcctl deploy
+# 通过指定 KC_VERSION 的值，指定安装的版本，比如安装 master 分支
+KC_VERSION=master kcctl deploy
 ```
 
-若使用 ssh passwd 方式则命令如下所示:
-
-```bash
-kcctl deploy --user root --passwd $SSH_PASSWD
-```
-
-私钥方式如下：
-
-```bash
-kcctl deploy --user root --pk-file $SSH_PRIVATE_KEY
-```
-
-> 您只需要提供 ssh user 以及 ssh passwd 或者 ssh 私钥即可在本机部署 KubeClipper。
+如果想安装多个节点，可以使用 `kcctl deploy -h` 获取更多帮助信息
 
 执行该命令后，Kcctl 将检查您的安装环境，若满足条件将会进入安装流程。在打印出如下的 KubeClipper banner 后即表示安装完成。
 
@@ -179,7 +176,9 @@ kcctl deploy --user root --pk-file $SSH_PRIVATE_KEY
 首先使用默认帐号密码进行登录获取 token，便于后续 kcctl 和 kc-server 进行交互。
 
 ```bash
-kcctl login -H http://localhost -u admin -p Thinkbig1
+# 如果您运行 kc-server 的节点 ip 是 192.168.234.3
+# 在实际执行时你应该替换成您自己的 kc-server 节点 ip
+kcctl login -H http://192.168.234.3:8080 -u admin -p Thinkbig1
 ```
 
 然后使用以下命令创建 k8s 集群:
@@ -233,4 +232,4 @@ kcctl get cluster -o yaml|grep status -A5
 
 ## Contributing
 
-请参考 [Community](https://github.com/kubeclipper-labs/community) 的相关文档，加入我们
+请参考 [Community](https://github.com/kubeclipper/community) 的相关文档，加入我们
