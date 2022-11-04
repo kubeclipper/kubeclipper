@@ -185,9 +185,9 @@ func (r *Kubeadm) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	err = r.clusterServiceAccount(ctx, v1.ActionUninstall)
-	if err != nil {
-		return err
+	if err = r.clusterServiceAccount(ctx, v1.ActionUninstall); err != nil {
+		// the failure to delete the service account due to an exception is tolerated, so ignore this error
+		log.Errorf("deleting the cluster %s's service accounts failed: %v", clu.Name, err)
 	}
 
 	// 3. delete cluster
