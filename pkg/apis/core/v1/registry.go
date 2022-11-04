@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
+	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -84,10 +85,48 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
 
+	webservice.Route(webservice.GET("/projects/{project}/clusters").
+		To(h.ListClusters).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("List clusters in project.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
+
 	webservice.Route(webservice.GET("/clusters/{name}/terminal").
 		To(h.SSHToPod).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("kubectl web terminal").
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(ParameterToken, "auth token").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
+	webservice.Route(webservice.GET("/projects/{project}/clusters/{name}/terminal").
+		To(h.SSHToPod).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("kubectl web terminal").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
@@ -104,6 +143,15 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
 			Required(false).DataType("boolean")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}))
+	webservice.Route(webservice.POST("/projects/{project}/clusters").
+		To(h.CreateClusters).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Create clusters.").
+		Reads(corev1.Cluster{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}))
 
 	webservice.Route(webservice.PUT("/clusters/{name}").
 		To(h.UpdateClusters).
@@ -113,6 +161,24 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter("name", "cluster name")).
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run update clusters").
 			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+	webservice.Route(webservice.PUT("/projects/{project}/clusters/{name}").
+		To(h.UpdateClusters).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Update clusters.").
+		Reads(corev1.Cluster{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("name", "cluster name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run update clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+	webservice.Route(webservice.PUT("/projects/{project}/clusters/{cluster}/join").
+		To(h.JoinProject).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Join cluster to project.").
+		Reads(corev1.Cluster{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("cluster", "cluster name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
 
 	webservice.Route(webservice.DELETE("/clusters/{name}").
@@ -124,11 +190,33 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete clusters").
 			Required(false).DataType("boolean")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+	webservice.Route(webservice.DELETE("/projects/{project}/clusters/{name}").
+		To(h.DeleteCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Delete clusters.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("name", "cluster name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
 
 	webservice.Route(webservice.GET("/clusters/{name}").
 		To(h.DescribeCluster).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Describe cluster.").
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
+			Required(false).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.GET("/projects/{project}/clusters/{name}").
+		To(h.DescribeCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Describe cluster.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
@@ -148,12 +236,34 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.POST("/projects/{project}/clusters/{name}/certification").
+		To(h.UpdateClusterCertification).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Update certification of cluster.").
+		Reads(corev1.Cluster{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.GET("/clusters/{name}/kubeconfig").
 		To(h.GetKubeConfig).
 		Produces("text/plain", restful.MIME_JSON).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Get kubeconfig file").
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), clientcmdapi.Config{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.GET("/projects/{project}/clusters/{name}/kubeconfig").
+		To(h.GetKubeConfig).
+		Produces("text/plain", restful.MIME_JSON).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Get kubeconfig file").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
@@ -170,11 +280,36 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.PUT("/projects/{project}/clusters/{name}/nodes").
+		To(h.AddOrRemoveNodes).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Add or remove cluster node.").
+		Reads(PatchNodes{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.GET("/clusters/{name}/backups").
 		To(h.ListBackupsWithCluster).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("List backups.").
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.GET("/projects/{project}/clusters/{name}/backups").
+		To(h.ListBackupsWithCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("List backups.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
@@ -197,11 +332,35 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false).DataType("boolean")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Backup{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.POST("/projects/{project}/clusters/{name}/backups").
+		To(h.CreateBackup).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Create backups.").
+		Reads(corev1.Backup{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Backup{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.DELETE("/clusters/{cluster}/backups/{backup}").
 		To(h.DeleteBackup).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Delete backups.").
+		Param(webservice.PathParameter("cluster", "cluster name")).
+		Param(webservice.PathParameter("backup", "backup name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
+			Required(false).DataType("boolean")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.DELETE("/projects/{project}/clusters/{cluster}/backups/{backup}").
+		To(h.DeleteBackup).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Delete backups.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter("cluster", "cluster name")).
 		Param(webservice.PathParameter("backup", "backup name")).
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run create clusters").
@@ -217,12 +376,30 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter("backup", "backup name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Backup{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.PUT("/projects/{project}/clusters/{cluster}/backups/{backup}").
+		To(h.UpdateBackup).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Update backups.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("cluster", "cluster name")).
+		Param(webservice.PathParameter("backup", "backup name")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Backup{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.POST("/clusters/{cluster}/recovery").
 		To(h.CreateRecovery).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("create recovery.").
 		Reads(corev1.Recovery{}).
+		Param(webservice.PathParameter("cluster", "cluster name")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Recovery{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.POST("/projects/{project}/clusters/{cluster}/recovery").
+		To(h.CreateRecovery).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("create recovery.").
+		Reads(corev1.Recovery{}).
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter("cluster", "cluster name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Recovery{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
@@ -235,11 +412,44 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter("cluster", "cluster name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.PATCH("/projects/{project}/clusters/{cluster}/plugins").
+		To(h.InstallOrUninstallPlugins).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Install or uninstall plugins").
+		Reads(PatchComponents{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter("cluster", "cluster name")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.GET("/nodes").
 		To(h.ListNodes).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
 		Doc("List nodes.").
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
+	webservice.Route(webservice.GET("/projects/{project}/nodes").
+		To(h.ListNodes).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("List nodes.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
 			DataFormat("limit=%d,page=%d").
@@ -309,6 +519,19 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.GET("/projects/{project}/nodes/{name}").
+		To(h.DescribeNode).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("Describe nodes.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter(query.ParameterName, "node name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
+			Required(false).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.PATCH("/nodes/{name}/disable").
 		To(h.DisableNode).
@@ -319,11 +542,31 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.PATCH("/projects/{project}/nodes/{name}/disable").
+		To(h.DisableNode).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("Disable nodes.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.PathParameter(query.ParameterName, "node name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
 	webservice.Route(webservice.PATCH("/nodes/{name}/enable").
 		To(h.EnableNode).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
 		Doc("Enable nodes.").
+		Param(webservice.PathParameter(query.ParameterName, "node name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.PATCH("/projects/{project}/nodes/{name}/enable").
+		To(h.EnableNode).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("Enable nodes.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "node name").
 			Required(true).
 			DataType("string")).
@@ -358,7 +601,25 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataFormat("offset=%s")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), StepLog{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
-
+	webservice.Route(webservice.GET("/projects/{project}/logs").
+		To(h.GetOperationLog).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Get operation log on node.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.ParameterNode, "node name").
+			Required(true).
+			DataFormat("node=%s")).
+		Param(webservice.QueryParameter(query.ParameterOperation, "operation id").
+			Required(true).
+			DataFormat("operation=%s")).
+		Param(webservice.QueryParameter(query.ParameterStep, "step id").
+			Required(true).
+			DataFormat("step=%s")).
+		Param(webservice.QueryParameter(query.ParameterOffset, "offset").
+			Required(false).
+			DataFormat("offset=%s")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), StepLog{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 	webservice.Route(webservice.GET("/operations").
 		To(h.ListOperations).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
@@ -382,11 +643,47 @@ func SetupWebService(h *handler) *restful.WebService {
 			DefaultValue("60").
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.OperationList{}))
-
+	webservice.Route(webservice.GET("/projects/{project}/operations").
+		To(h.ListOperations).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("List operations.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.OperationList{}))
 	webservice.Route(webservice.GET("/operations/{name}").
 		To(h.DescribeOperation).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
 		Doc("Describe operations.").
+		Param(webservice.PathParameter(query.ParameterName, "operation name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
+			Required(false).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Operation{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+	webservice.Route(webservice.GET("/projects/{project}/operations/{name}").
+		To(h.DescribeOperation).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("Describe operations.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "operation name").
 			Required(true).
 			DataType("string")).
@@ -406,6 +703,17 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(true).
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}))
+	webservice.Route(webservice.POST("/projects/{project}/operations/{name}/retry").
+		To(h.RetryCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("clusters retry operation.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run clusters retry operation.").
+			Required(false).DataType("boolean")).
+		Param(webservice.PathParameter(query.ParameterName, "operation name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}))
 
 	webservice.Route(webservice.POST("/clusters/{name}/upgrade").
 		To(h.UpgradeCluster).
@@ -418,11 +726,34 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(true).
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+	webservice.Route(webservice.POST("projects/{project}/clusters/{name}/upgrade").
+		To(h.UpgradeCluster).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("upgrade cluster.").
+		Reads(ClusterUpgrade{}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run upgrade cluster.").
+			Required(false).DataType("boolean")).
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
 
 	webservice.Route(webservice.PATCH("/clusters/{name}/status").
 		To(h.ResetClusterStatus).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("reset cluster status.").
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run upgrade cluster.").
+			Required(false).DataType("boolean")).
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+	webservice.Route(webservice.PATCH("/projects/{project}/clusters/{name}/status").
+		To(h.ResetClusterStatus).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("reset cluster status.").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run upgrade cluster.").
 			Required(false).DataType("boolean")).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
@@ -508,6 +839,31 @@ func SetupWebService(h *handler) *restful.WebService {
 		To(h.SSHToNode).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreRegionTag}).
 		Doc("connector node with ssh protocol").
+		Param(webservice.PathParameter(query.ParameterName, "node name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(ParameterToken, "auth token").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(ParameterMsg, "user name, password, port").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter(ParameterCols, "terminal cols").
+			Required(false).
+			DefaultValue("150").
+			DataType("string")).
+		Param(webservice.QueryParameter(ParameterRows, "terminal rows").
+			Required(false).
+			DefaultValue("35").
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
+		Returns(http.StatusExpectationFailed, http.StatusText(http.StatusExpectationFailed), errors.HTTPError{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), errors.HTTPError{}))
+	webservice.Route(webservice.GET("/projects/{project}/nodes/{name}/terminal").
+		To(h.SSHToNode).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreRegionTag}).
+		Doc("connector node with ssh protocol").
+		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "node name").
 			Required(true).
 			DataType("string")).
@@ -1137,8 +1493,8 @@ func SetupWebService(h *handler) *restful.WebService {
 }
 
 func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator,
-	leaseOperator lease.Operator, coreOperator core.Operator, delivery service.IDelivery) error {
-	h := newHandler(clusterOperator, op, leaseOperator, platform, coreOperator, delivery)
+	leaseOperator lease.Operator, coreOperator core.Operator, delivery service.IDelivery, tenantOperator tenant.Operator) error {
+	h := newHandler(clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tenantOperator)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

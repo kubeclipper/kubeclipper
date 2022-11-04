@@ -43,6 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/remotecommand"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
+	reqpkg "github.com/kubeclipper/kubeclipper/pkg/server/request"
+
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -77,6 +80,7 @@ type handler struct {
 	platformOperator platform.Operator
 	coreOperator     core.Operator
 	delivery         service.IDelivery
+	tenantOperator   tenant.Operator
 }
 
 const (
@@ -92,7 +96,7 @@ var (
 )
 
 func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery) *handler {
+	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery, tenantOperator tenant.Operator) *handler {
 	return &handler{
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
@@ -100,6 +104,7 @@ func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOp
 		platformOperator: platform,
 		leaseOperator:    leaseOperator,
 		coreOperator:     coreOperator,
+		tenantOperator:   tenantOperator,
 	}
 }
 
@@ -109,6 +114,13 @@ func (h *handler) ListClusters(request *restful.Request, response *restful.Respo
 		h.watchCluster(request, response, q)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	}
+
 	if clientrest.IsInformerRawQuery(request.Request) {
 		result, err := h.clusterOperator.ListClusters(request.Request.Context(), q)
 		if err != nil {
@@ -138,6 +150,15 @@ func (h *handler) DescribeCluster(request *restful.Request, response *restful.Re
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleNotFound(response, request, fmt.Errorf("cluster %s not belong to project %s", name, project))
+			return
+		}
+	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
@@ -165,7 +186,19 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clu, project))
+			return
+		}
+	}
 
+	if err = h.checkNode(ctx, c.Labels[common.LabelProject], pn.Nodes.GetNodeIDs()); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
 	// backing up old masters and workers
 	nodeSet := c.GetAllNodes()
 
@@ -180,7 +213,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		return
 	}
 
-	if err := pn.MakeCompare(c); err != nil {
+	if err = pn.MakeCompare(c); err != nil {
 		if errors.Is(err, ErrInvalidNodesOperation) || errors.Is(err, ErrInvalidNodesRole) {
 			restplus.HandleBadRequest(response, request, err)
 			return
@@ -314,6 +347,15 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		return
 	}
 
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster not belong to project %s", project))
+			return
+		}
+	}
+
 	if _, ok := c.Labels[common.LabelClusterProviderName]; ok {
 		restplus.HandleBadRequest(response, request, errors.New("can't delete cluster which belongs to provider"))
 		return
@@ -374,6 +416,45 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	c := v1.Cluster{}
 	if err := request.ReadEntity(&c); err != nil {
 		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	ctx := request.Request.Context()
+	info, _ := reqpkg.InfoFrom(ctx)
+
+	// create cluster in manager platform,must select a project
+	if !info.IsProjectScope() {
+		if _, ok := c.Labels[common.LabelProject]; !ok {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster must belong to a project"))
+			return
+		}
+	}
+	// create in project scope,add label
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels == nil {
+			c.Labels = make(map[string]string)
+		}
+		c.Labels[common.LabelProject] = project
+	}
+	project := c.Labels[common.LabelProject]
+	if err := h.checkNode(ctx, project, c.GetAllNodes().List()); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	// mutate name and add display-name
+	actualName := fmt.Sprintf("%s-%s", project, c.Name)
+	if c.Annotations == nil {
+		c.Annotations = make(map[string]string)
+	}
+	c.Annotations[common.AnnotationDisplayName] = c.Name
+	c.Name = actualName
+
+	if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
@@ -443,6 +524,31 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
+// checkNode check is cluster's node all belong to same project
+func (h *handler) checkNode(ctx context.Context, project string, nodeIDs []string) error {
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProject, project)
+	list, err := h.clusterOperator.ListNodes(ctx, q)
+	if err != nil {
+		return err
+	}
+	m := make(map[string]v1.Node)
+	for _, node := range list.Items {
+		m[node.Name] = node
+	}
+
+	for _, clusterNode := range nodeIDs {
+		node, ok := m[clusterNode]
+		if !ok {
+			return fmt.Errorf("node %s not belong to project %s", clusterNode, project)
+		}
+		if node.Labels == nil || node.Labels[common.LabelProject] != project {
+			return fmt.Errorf("node %s not belong to project %s", clusterNode, project)
+		}
+	}
+	return nil
+}
+
 func (h *handler) UpdateClusters(request *restful.Request, response *restful.Response) {
 	name := request.PathParameter("name")
 	c := v1.Cluster{}
@@ -451,6 +557,24 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		return
 	}
 	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+
+	ctx := request.Request.Context()
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels == nil || c.Labels[common.LabelProject] == "" {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster must belong to one project"))
+			return
+		}
+		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleBadRequest(response, request, err)
+				return
+			}
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+	}
 
 	// TODO: vlidate update-cluster struct
 	if ip, ok := c.Labels[common.LabelExternalIP]; ok {
@@ -470,6 +594,13 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+
+		oldProject, ok := clu.Labels[common.LabelProject]
+		if ok && oldProject != c.Labels[common.LabelProject] {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster already belong to project %s", oldProject))
+			return
+		}
+
 		// update fields
 		clu.Labels = c.Labels
 		clu.Annotations = c.Annotations
@@ -484,6 +615,52 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 	response.WriteHeader(http.StatusOK)
 }
 
+func (h *handler) JoinProject(request *restful.Request, response *restful.Response) {
+	clusterName := request.PathParameter("cluster")
+	projectName := request.PathParameter("project")
+	ctx := request.Request.Context()
+	clu, err := h.clusterOperator.GetCluster(ctx, clusterName)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if oldProject, ok := clu.Labels[common.LabelProject]; !ok {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s already belong to project %s,can't edit", clusterName, oldProject))
+		return
+	}
+	project, err := h.tenantOperator.GetProject(ctx, projectName)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	set := sets.NewString(project.Spec.Nodes...)
+	set.Insert(clu.GetAllNodes().List()...)
+	project.Spec.Nodes = set.List()
+	if _, err = h.tenantOperator.UpdateProject(ctx, project); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if clu.Labels == nil {
+		clu.Labels = make(map[string]string)
+	}
+	clu.Labels[common.LabelProject] = projectName
+	if _, err = h.clusterOperator.UpdateCluster(ctx, clu); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	response.WriteHeader(http.StatusOK)
+}
+
 func (h *handler) UpdateClusterCertification(request *restful.Request, response *restful.Response) {
 	cluName := request.PathParameter(query.ParameterName)
 	ctx := request.Request.Context()
@@ -492,6 +669,14 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 	if err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
+	}
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", cluName, project))
+			return
+		}
 	}
 
 	extraMeta, err := h.getClusterMetadata(ctx, c)
@@ -538,6 +723,16 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if clu.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", name, project))
+			return
+		}
+	}
+
 	extraMeta, err := h.getClusterMetadata(ctx, clu)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
@@ -563,6 +758,13 @@ func (h *handler) ListNodes(request *restful.Request, response *restful.Response
 		h.watchNodes(request, response, q)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	}
+
 	if clientrest.IsInformerRawQuery(request.Request) {
 		result, err := h.clusterOperator.ListNodes(request.Request.Context(), q)
 		if err != nil {
@@ -593,6 +795,15 @@ func (h *handler) DescribeNode(request *restful.Request, response *restful.Respo
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleNotFound(response, request, fmt.Errorf("node %s not belong to project %s", name, project))
+			return
+		}
+	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
@@ -609,6 +820,15 @@ func (h *handler) DisableNode(request *restful.Request, response *restful.Respon
 		}
 		restplus.HandleInternalError(response, request, err)
 		return
+	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if node.Labels[common.LabelProject] != project {
+			restplus.HandleNotFound(response, request, fmt.Errorf("node %s not belong to project %s", name, project))
+			return
+		}
 	}
 
 	err = h.syncNodeDisable(node, true)
@@ -641,6 +861,15 @@ func (h *handler) EnableNode(request *restful.Request, response *restful.Respons
 		}
 		restplus.HandleInternalError(response, request, err)
 		return
+	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if node.Labels[common.LabelProject] != project {
+			restplus.HandleNotFound(response, request, fmt.Errorf("node %s not belong to project %s", name, project))
+			return
+		}
 	}
 
 	err = h.syncNodeDisable(node, false)
@@ -1132,6 +1361,15 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
+			return
+		}
+	}
+
 	if c.Status.Phase != v1.ClusterRunning {
 		restplus.HandleInternalError(response, request, fmt.Errorf("cluster %s current is %s, can't back up",
 			c.Name, c.Status.Phase))
@@ -1267,6 +1505,16 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
+			return
+		}
+	}
+
 	if b.PreferredNode != "" {
 		_, err = h.clusterOperator.GetNodeEx(ctx, b.PreferredNode, "0")
 		if err != nil {
@@ -1326,13 +1574,23 @@ func (h *handler) UpdateBackup(request *restful.Request, response *restful.Respo
 	// cluster name in path
 	clusterName := request.PathParameter("cluster")
 	ctx := request.Request.Context()
-	if _, err := h.clusterOperator.GetClusterEx(ctx, clusterName, "0"); err != nil {
+	clu, err := h.clusterOperator.GetClusterEx(ctx, clusterName, "0")
+	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleNotFound(response, request, err)
 			return
 		}
 		restplus.HandleInternalError(response, request, err)
 		return
+	}
+
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if clu.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
+			return
+		}
 	}
 
 	// backup name in path
@@ -1503,6 +1761,15 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 		return
 	}
 
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if c.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
+			return
+		}
+	}
+
 	q := query.New()
 	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, c.Name)
 	nodeList, err := h.clusterOperator.ListNodes(context.TODO(), q)
@@ -1626,6 +1893,15 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if clu.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
+			return
+		}
+	}
+
 	// We need IP addresses of all master nodes later.
 	extraMeta, err := h.getClusterMetadata(ctx, clu)
 	if err != nil {
@@ -1717,6 +1993,16 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if clu.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", name, project))
+			return
+		}
+	}
+
 	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
 	// TODO: validate cluster struct
 	timeoutSecs := v1.DefaultOperationTimeoutSecs
@@ -1788,6 +2074,16 @@ func (h *handler) ResetClusterStatus(request *restful.Request, response *restful
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+
+	info, _ := reqpkg.InfoFrom(request.Request.Context())
+	if info.IsProjectScope() {
+		project := request.PathParameter("project")
+		if clu.Labels[common.LabelProject] != project {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", cluName, project))
+			return
+		}
+	}
+
 	switch clu.Status.Phase {
 	case v1.ClusterInstalling, v1.ClusterInstallFailed,
 		v1.ClusterUpdating, v1.ClusterUpdateFailed,

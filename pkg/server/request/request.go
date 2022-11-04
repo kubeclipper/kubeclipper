@@ -62,6 +62,10 @@ type Info struct {
 	ResourceScope string
 }
 
+func (info Info) IsProjectScope() bool {
+	return info.ResourceScope == ProjectScope
+}
+
 type InfoFactory struct {
 	APIPrefixes     sets.String
 	GlobalResources []schema.GroupResource
