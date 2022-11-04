@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -286,12 +287,7 @@ func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) 
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	// clean virtual network interfaces
-	cf, err := cni.Load(c.CNI.Type)
-	if err != nil {
-		return nil, err
-	}
-	cniStepper := cf.Create().InitStep(metadata, &c.CNI, &c.Networking)
-	steps, err = cniStepper.UninstallSteps(nodes)
+	steps, err = CleanCNI(metadata, &c.CNI, &c.Networking, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -386,6 +382,9 @@ func (stepper *Package) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.ExtraMetadata) *KubeadmConfig {
 	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 	cpEndpoint := fmt.Sprintf("%s:6443", apiServerDomain)
+	if _, ok := c.Labels[common.LabelClusterProviderName]; ok {
+		cpEndpoint = fmt.Sprintf("%s:6443", metadata.Masters[0].IPv4)
+	}
 
 	stepper.ClusterConfigAPIVersion = ""
 	stepper.ContainerRuntime = c.ContainerRuntime.Type
@@ -997,54 +996,15 @@ func Clear(c *v1.Cluster, metadata *component.ExtraMetadata) ([]v1.Step, error) 
 	return steps, nil
 }
 
-func CleanCNI(c *v1.CNI, nodes []v1.StepNode) ([]v1.Step, error) {
-	switch c.Type {
-	case "calico":
-		return ClearCalico(c.Calico, nodes), nil
+// CleanCNI clean cni image and cni network veth
+func CleanCNI(metadata *component.ExtraMetadata, c *v1.CNI, networking *v1.Networking, nodes []v1.StepNode) ([]v1.Step, error) {
+	cf, err := cni.Load(c.Type)
+	if err != nil {
+		logger.Debugf("clean cni error: %v", err)
+		return nil, nil
 	}
 
-	return nil, nil
-}
-
-func ClearCalico(calico *v1.Calico, nodes []v1.StepNode) []v1.Step {
-	var steps []v1.Step
-
-	switch calico.Mode {
-	case CalicoNetworkIPIPAll, CalicoNetworkIPIPSubnet:
-		steps = append(steps, v1.Step{
-			ID:         strutil.GetUUID(),
-			Name:       "removeTunl",
-			Timeout:    metav1.Duration{Duration: 5 * time.Second},
-			ErrIgnore:  true,
-			Nodes:      nodes,
-			Action:     v1.ActionUninstall,
-			RetryTimes: 1,
-			Commands: []v1.Command{
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"modprobe", "-r", "ipip"},
-				},
-			},
-		})
-	case CalicoNetworkVXLANAll, CalicoNetworkVXLANSubnet:
-		steps = append(steps, v1.Step{
-			ID:         strutil.GetUUID(),
-			Name:       "removeVtep",
-			Timeout:    metav1.Duration{Duration: 5 * time.Second},
-			ErrIgnore:  true,
-			Nodes:      nodes,
-			Action:     v1.ActionUninstall,
-			RetryTimes: 1,
-			Commands: []v1.Command{
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"ip", "link", "delete", "vxlan.calico"},
-				},
-			},
-		})
-	}
-
-	return steps
+	return cf.Create().InitStep(metadata, c, networking).UninstallSteps(nodes)
 }
 
 func RemoveHostname(c *v1.Cluster, nodes []v1.StepNode) ([]v1.Step, error) {

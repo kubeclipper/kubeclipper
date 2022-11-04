@@ -49,6 +49,7 @@ type Stepper interface {
 	LoadImage(nodes []v1.StepNode) ([]v1.Step, error)
 	InstallSteps(nodes []v1.StepNode) ([]v1.Step, error)
 	UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error)
+	CmdList(namespace string) map[string]string
 }
 
 func (runnable *BaseCni) NewInstance() component.ObjectMeta {
@@ -81,4 +82,20 @@ func (runnable *BaseCni) Uninstall(ctx context.Context, opts component.Options) 
 		logger.Error("remove calico images compressed file failed", zap.Error(err))
 	}
 	return nil, nil
+}
+
+// RecoveryCNICmd get recovery cni cmd
+func RecoveryCNICmd(metadata *component.ExtraMetadata) (cmdList map[string]string, err error) {
+	c, err := Load(metadata.CNI)
+	if err != nil {
+		return
+	}
+	if metadata.CNINamespace == "" {
+		err = errors.New("the namespace of cni is empty")
+		return
+	}
+
+	c.Create().CmdList(metadata.CNINamespace)
+
+	return
 }
