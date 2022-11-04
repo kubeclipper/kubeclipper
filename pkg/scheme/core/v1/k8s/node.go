@@ -191,23 +191,11 @@ func (stepper *GenNode) MakeUninstallSteps(metadata *component.ExtraMetadata, pa
 		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 
 		// clean CNI config
-		if metadata.Offline {
-			cf, err := cni.Load(stepper.Cluster.CNI.Type)
-			if err != nil {
-				return err
-			}
-			cniStepper := cf.Create().InitStep(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking)
-			steps, err = cniStepper.UninstallSteps(patchNodes)
-			if err != nil {
-				return err
-			}
-			stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
-		}
-
-		steps, err = CleanCNI(&stepper.Cluster.CNI, patchNodes)
+		steps, err = CleanCNI(metadata, &stepper.Cluster.CNI, &stepper.Cluster.Networking, patchNodes)
 		if err != nil {
 			return err
 		}
+
 		stepper.uninstallSteps = append(stepper.uninstallSteps, steps...)
 		// clean Kubernetes config
 		stepper.uninstallSteps = append(stepper.uninstallSteps,

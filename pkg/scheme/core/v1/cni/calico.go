@@ -7,11 +7,27 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// CalicoNetworkIPIPAll IPIP-All mode
+	CalicoNetworkIPIPAll = "Overlay-IPIP-All"
+	// CalicoNetworkIPIPSubnet IPIP-Cross-Subnet mode
+	CalicoNetworkIPIPSubnet = "Overlay-IPIP-Cross-Subnet"
+	// CalicoNetworkVXLANAll Vxlan-All mode
+	CalicoNetworkVXLANAll = "Overlay-Vxlan-All"
+	// CalicoNetworkVXLANSubnet Vxlan-Cross-Subnet mode
+	CalicoNetworkVXLANSubnet = "Overlay-Vxlan-Cross-Subnet"
+	// CalicoNetworkBGP BGP mode
+	CalicoNetworkBGP = "BGP"
 )
 
 func init() {
@@ -94,10 +110,68 @@ func (runnable *CalicoRunnable) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, 
 	if err != nil {
 		return nil, err
 	}
+	var steps []v1.Step
 	if runnable.Offline && runnable.LocalRegistry == "" {
-		return []v1.Step{RemoveImage("calico", bytes, nodes)}, nil
+		steps = append(steps, RemoveImage("calico", bytes, nodes))
 	}
-	return nil, nil
+
+	if runnable.Calico != nil {
+		steps = append(steps, runnable.clear(runnable.Calico, nodes)...)
+	}
+
+	return steps, nil
+}
+
+func (runnable *CalicoRunnable) clear(calico *v1.Calico, nodes []v1.StepNode) []v1.Step {
+	if calico == nil {
+		return nil
+	}
+	var steps []v1.Step
+
+	switch calico.Mode {
+	case CalicoNetworkIPIPAll, CalicoNetworkIPIPSubnet:
+		steps = append(steps, v1.Step{
+			ID:         strutil.GetUUID(),
+			Name:       "removeTunl",
+			Timeout:    metav1.Duration{Duration: 5 * time.Second},
+			ErrIgnore:  true,
+			Nodes:      nodes,
+			Action:     v1.ActionUninstall,
+			RetryTimes: 1,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"modprobe", "-r", "ipip"},
+				},
+			},
+		})
+	case CalicoNetworkVXLANAll, CalicoNetworkVXLANSubnet:
+		steps = append(steps, v1.Step{
+			ID:         strutil.GetUUID(),
+			Name:       "removeVtep",
+			Timeout:    metav1.Duration{Duration: 5 * time.Second},
+			ErrIgnore:  true,
+			Nodes:      nodes,
+			Action:     v1.ActionUninstall,
+			RetryTimes: 1,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"ip", "link", "delete", "vxlan.calico"},
+				},
+			},
+		})
+	}
+
+	return steps
+}
+
+// CmdList cni kubectl cmd list
+func (runnable *CalicoRunnable) CmdList(namespace string) map[string]string {
+	cmdList := make(map[string]string)
+	cmdList["get"] = fmt.Sprintf("kubectl get po -n %s | grep calico", runnable.Namespace)
+	cmdList["restart"] = fmt.Sprintf("kubectl rollout restart ds calico-node -n %s", runnable.Namespace)
+	return cmdList
 }
 
 func (runnable *CalicoRunnable) Render(ctx context.Context, opts component.Options) error {

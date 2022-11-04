@@ -10,16 +10,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-	v13 "k8s.io/api/core/v1"
-	v14 "k8s.io/api/rbac/v1"
-	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/selection"
-
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	agentconfig "github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
@@ -30,6 +20,16 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
+	v13 "k8s.io/api/core/v1"
+	v14 "k8s.io/api/rbac/v1"
+	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/kubernetes"
 )
 
 func init() {
@@ -39,26 +39,29 @@ func init() {
 const ProviderKubeadm = "kubeadm"
 
 type Kubeadm struct {
-	Operator clustermanage.Operator
-	Provider v1.CloudProvider
-	Config   Config
+	Operator  clustermanage.Operator
+	Provider  v1.CloudProvider
+	Config    Config
+	Clientset kubernetes.Clientset
 }
 
-func (r Kubeadm) ClusterType() string {
+// ClusterType get cluster type
+func (r *Kubeadm) ClusterType() string {
 	return ProviderKubeadm
 }
 
-func (r Kubeadm) InitCloudProvider(operator clustermanage.Operator, provider v1.CloudProvider) (clustermanage.CloudProvider, error) {
+// InitCloudProvider init cloud provider
+func (r *Kubeadm) InitCloudProvider(operator clustermanage.Operator, provider v1.CloudProvider) (clustermanage.CloudProvider, error) {
 	return NewKubeadm(operator, provider)
 }
 
-func (r Kubeadm) GetKubeConfig(ctx context.Context, clusterName string) (string, error) {
-	// get it by kc's own kubeadm method, without any processing here
+// GetKubeConfig get it by kc's own kubeadm method, without any processing here
+func (r *Kubeadm) GetKubeConfig(ctx context.Context, clusterName string) (string, error) {
 	return "", nil
 }
 
-func (r Kubeadm) GetCertification(ctx context.Context, clusterName string) ([]v1.Certification, error) {
-	// get it by kc's own kubeadm method, without any processing here
+// GetCertification get it by kc's own kubeadm method, without any processing here
+func (r *Kubeadm) GetCertification(ctx context.Context, clusterName string) ([]v1.Certification, error) {
 	return nil, nil
 }
 
@@ -82,7 +85,8 @@ func NewKubeadm(operator clustermanage.Operator, provider v1.CloudProvider) (clu
 	return &r, nil
 }
 
-func (r Kubeadm) ToWrapper() (Wrapper, error) {
+// ToWrapper init wrapper param
+func (r *Kubeadm) ToWrapper() (Wrapper, error) {
 	var err error
 	w := Wrapper{}
 	w.KubeCli, err = NewKubeClient(r.Provider.Config)
@@ -95,6 +99,8 @@ func (r Kubeadm) ToWrapper() (Wrapper, error) {
 	w.Region = r.Provider.Region
 	w.ClusterName = r.Config.ClusterName
 
+	r.Clientset = *w.KubeCli
+
 	return w, nil
 }
 
@@ -104,7 +110,7 @@ func (r Kubeadm) ToWrapper() (Wrapper, error) {
 2. get cluster info
 3. create or update kc cluster
 */
-func (r Kubeadm) Sync(ctx context.Context) error {
+func (r *Kubeadm) Sync(ctx context.Context) error {
 	log := logger.FromContext(ctx)
 	log.Debugf("beginning sync provider %s", r.Provider.Name)
 
@@ -117,7 +123,6 @@ func (r Kubeadm) Sync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	err = r.patch(clu)
 	if err != nil {
 		return err
@@ -144,7 +149,7 @@ func (r Kubeadm) Sync(ctx context.Context) error {
 2.drain cluster's node
 3.delete cluster
 */
-func (r Kubeadm) Cleanup(ctx context.Context) error {
+func (r *Kubeadm) Cleanup(ctx context.Context) error {
 	log := logger.FromContext(ctx)
 	log.Debugf("beginning cleanup provider %s", r.Provider.Name)
 
@@ -209,7 +214,7 @@ func rawToConfig(config runtime.RawExtension) (Config, error) {
 	return conf, nil
 }
 
-func (r Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error {
+func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error {
 	log := logger.FromContext(ctx)
 	log.Debugf("beginning import provider %s's cluster [%s] to kc", r.Provider.Name, clu.Name)
 
@@ -234,6 +239,7 @@ func (r Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error {
 		// get resourceVersion for update
 		clu.ObjectMeta.ResourceVersion = oldClu.ObjectMeta.ResourceVersion
 		clu.Annotations[common.AnnotationDescription] = oldClu.Annotations[common.AnnotationDescription]
+		clu.Labels[common.LabelBackupPoint] = oldClu.Labels[common.LabelBackupPoint]
 		_, err = r.Operator.ClusterWriter.UpdateCluster(context.TODO(), clu)
 		if err != nil {
 			return errors.WithMessagef(err, "update cluster %s", clu.Name)
@@ -244,7 +250,7 @@ func (r Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error {
 	return nil
 }
 
-func (r Kubeadm) ssh() *sshutils.SSH {
+func (r *Kubeadm) ssh() *sshutils.SSH {
 	ssh := &sshutils.SSH{
 		User:              r.Provider.SSH.User,
 		Port:              r.Provider.SSH.Port,
@@ -268,7 +274,7 @@ func (r Kubeadm) ssh() *sshutils.SSH {
 	return ssh
 }
 
-func (r Kubeadm) listKCNode(clusterName string) ([]*v1.Node, error) {
+func (r *Kubeadm) listKCNode(clusterName string) ([]*v1.Node, error) {
 	requirement, err := labels.NewRequirement(common.LabelClusterName, selection.Equals, []string{clusterName})
 	if err != nil {
 		return nil, err
@@ -286,7 +292,7 @@ func (r Kubeadm) listKCNode(clusterName string) ([]*v1.Node, error) {
 	not origin node,drain it
 	origin node,just clean label&annotations to mark node free
 */
-func (r Kubeadm) syncNode(ctx context.Context, clu *v1.Cluster) error {
+func (r *Kubeadm) syncNode(ctx context.Context, clu *v1.Cluster) error {
 	// first import
 	addNodes, delNodes, err := r.NodeDiff(clu)
 	if err != nil {
@@ -326,7 +332,7 @@ func (r Kubeadm) syncNode(ctx context.Context, clu *v1.Cluster) error {
 	return nil
 }
 
-func (r Kubeadm) markToFree(ctx context.Context, node *v1.Node) error {
+func (r *Kubeadm) markToFree(ctx context.Context, node *v1.Node) error {
 	delete(node.Labels, common.LabelNodeRole)
 	delete(node.Labels, common.LabelClusterName)
 	delete(node.Annotations, common.AnnotationProviderNodeID)
@@ -336,7 +342,7 @@ func (r Kubeadm) markToFree(ctx context.Context, node *v1.Node) error {
 }
 
 // This function will replace the IP of the node with the ID
-func (r Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region string) error {
+func (r *Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region string) error {
 	ip := node.ID
 	// This function will replace the IP of the node with the ID
 	node.ID = uuid.New().String()
@@ -372,11 +378,13 @@ func (r Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region 
 		return nil
 	}
 	// download http://192.168.10.123:8081/kc/kubeclipper-agent
-	url := fmt.Sprintf("http://%s:%v/kc/kubeclipper-agent", deployConfig.ServerIPs[0], deployConfig.StaticServerPort)
+	url := fmt.Sprintf("http://%s:%v/kc", deployConfig.ServerIPs[0], deployConfig.StaticServerPort)
 	cmdList := []string{
 		"systemctl stop kc-agent || true",
-		fmt.Sprintf("curl %s -o /usr/local/bin/kubeclipper-agent", url),
+		fmt.Sprintf("curl %s/kubeclipper-agent -o /usr/local/bin/kubeclipper-agent", url),
 		"chmod +x /usr/local/bin/kubeclipper-agent",
+		fmt.Sprintf("if [[ $(which etcdctl) != which* ]]; then curl %s/etcdctl -o /usr/local/bin/etcdctl; fi", url),
+		"chmod +x /usr/local/bin/etcdctl",
 	}
 
 	for _, cmd := range cmdList {
@@ -440,7 +448,7 @@ func (r Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region 
 }
 
 // drainAgent remote kc-agent for node,and delete node from kc-server
-func (r Kubeadm) drainAgent(nodeIP, agentID string, ssh *sshutils.SSH) error {
+func (r *Kubeadm) drainAgent(nodeIP, agentID string, ssh *sshutils.SSH) error {
 	// 1. remove agent
 	cmdList := []string{
 		"systemctl disable kc-agent --now || true", // 	// disable agent service
@@ -480,7 +488,7 @@ func (r Kubeadm) drainAgent(nodeIP, agentID string, ssh *sshutils.SSH) error {
 	return nil
 }
 
-func (r Kubeadm) gerCerts() (ca, natsCliCert, natsCliKey []byte, err error) {
+func (r *Kubeadm) gerCerts() (ca, natsCliCert, natsCliKey []byte, err error) {
 	kcca, err := r.Operator.ConfigmapLister.Get("kc-ca")
 	if err != nil {
 		return nil, nil, nil, err
@@ -506,7 +514,7 @@ func (r Kubeadm) gerCerts() (ca, natsCliCert, natsCliKey []byte, err error) {
 	return ca, natsCliCert, natsCliKey, nil
 }
 
-func (r Kubeadm) getDeployConfig() (*options.DeployConfig, error) {
+func (r *Kubeadm) getDeployConfig() (*options.DeployConfig, error) {
 	configMap, err := r.Operator.ConfigmapLister.Get("deploy-config")
 	if err != nil {
 		return nil, err
@@ -520,7 +528,8 @@ func (r Kubeadm) getDeployConfig() (*options.DeployConfig, error) {
 	return &c, nil
 }
 
-func (r Kubeadm) PreCheck(ctx context.Context) (bool, error) {
+// PreCheck precheck import-cluster
+func (r *Kubeadm) PreCheck(ctx context.Context) (bool, error) {
 	clu, err := r.Operator.ClusterReader.GetCluster(ctx, r.Config.ClusterName)
 	if err != nil && !apimachineryErrors.IsNotFound(err) {
 		return false, err
@@ -556,7 +565,8 @@ func (r Kubeadm) PreCheck(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (r Kubeadm) NodeDiff(clu *v1.Cluster) (addNodes []*v1.WorkerNode, delNodes []*v1.Node, err error) {
+// NodeDiff Comparison of prior and subsequent cluster nodes
+func (r *Kubeadm) NodeDiff(clu *v1.Cluster) (addNodes []*v1.WorkerNode, delNodes []*v1.Node, err error) {
 	oldNodes, err := r.listKCNode(clu.Name)
 	if err != nil {
 		return nil, nil, errors.WithMessagef(err, "list cluster %s's node in kc", clu.Name)
@@ -596,7 +606,7 @@ func (r Kubeadm) NodeDiff(clu *v1.Cluster) (addNodes []*v1.WorkerNode, delNodes 
 	return
 }
 
-func (r Kubeadm) agentStatus(ip string) (id, region string, active bool) {
+func (r *Kubeadm) agentStatus(ip string) (id, region string, active bool) {
 	// check if kc-agent is running
 	ret, err := sshutils.SSHCmdWithSudo(r.ssh(), ip,
 		"systemctl --all --type service | grep kc-agent | grep running | wc -l")
@@ -626,7 +636,7 @@ func (r Kubeadm) agentStatus(ip string) (id, region string, active bool) {
 	return agentConf.AgentID, agentConf.Metadata.Region, true
 }
 
-func (r Kubeadm) updateDeployConfigAgents(ip string, meta *options.Metadata, action string) error {
+func (r *Kubeadm) updateDeployConfigAgents(ip string, meta *options.Metadata, action string) error {
 	deploy, err := r.Operator.ConfigmapLister.Get(constatns.DeployConfigConfigMapName)
 	if err != nil {
 		return fmt.Errorf("get deploy config failed: %v", err)
@@ -654,7 +664,7 @@ func (r Kubeadm) updateDeployConfigAgents(ip string, meta *options.Metadata, act
 	return err
 }
 
-func (r Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
+func (r *Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
 	address := net.ParseIP(no.ID)
 	if address != nil {
 		remoteID, _, _ := r.agentStatus(no.ID)
@@ -664,7 +674,7 @@ func (r Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
 	}
 }
 
-func (r Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction) error {
+func (r *Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction) error {
 	w, err := r.ToWrapper()
 	if err != nil {
 		return err
@@ -680,22 +690,22 @@ func (r Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction
 
 	switch action {
 	case v1.ActionInstall:
-		_, err = w.KubeCli.CoreV1().ServiceAccounts("kube-system").Create(ctx, sa, v12.CreateOptions{})
+		_, err = w.KubeCli.CoreV1().ServiceAccounts("kube-system").Create(ctx, sa, metav1.CreateOptions{})
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
 			return err
 		}
 
-		_, err = w.KubeCli.RbacV1().ClusterRoleBindings().Create(ctx, crb, v12.CreateOptions{})
+		_, err = w.KubeCli.RbacV1().ClusterRoleBindings().Create(ctx, crb, metav1.CreateOptions{})
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
 			return err
 		}
 	case v1.ActionUninstall:
-		err = w.KubeCli.CoreV1().ServiceAccounts("kube-system").Delete(ctx, sa.Name, v12.DeleteOptions{})
+		err = w.KubeCli.CoreV1().ServiceAccounts("kube-system").Delete(ctx, sa.Name, metav1.DeleteOptions{})
 		if err != nil && !strings.Contains(err.Error(), "not found") {
 			return err
 		}
 
-		err = w.KubeCli.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, v12.DeleteOptions{})
+		err = w.KubeCli.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{})
 		if err != nil && !strings.Contains(err.Error(), "not found") {
 			return err
 		}
@@ -704,22 +714,32 @@ func (r Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction
 	return nil
 }
 
-func (r Kubeadm) patch(clu *v1.Cluster) error {
+const (
+	unknownValue = "unknown"
+)
+
+func (r *Kubeadm) patch(clu *v1.Cluster) error {
 	err := r.patchCRI(clu)
 	if err != nil {
+		logger.Warnf("patch kubelet failed: %v", err)
 		return err
 	}
-
 	err = r.patchKubelet(clu)
 	if err != nil {
 		logger.Warnf("patch kubelet failed: %v", err)
-		clu.Kubelet.RootDir = "unknown"
+		clu.Kubelet.RootDir = unknownValue
+	}
+	err = r.patchCNI(clu)
+	if err != nil {
+		logger.Warnf("patch cni failed: %v", err)
+		clu.CNI.Type = unknownValue
+		clu.CNI.Namespace = unknownValue
 	}
 
 	return nil
 }
 
-func (r Kubeadm) patchCRI(clu *v1.Cluster) error {
+func (r *Kubeadm) patchCRI(clu *v1.Cluster) error {
 	switch clu.ContainerRuntime.Type {
 	// There is a known issue with k8s, where the node cri version information is incorrect when the cri type is docker
 	case v1.CRIDocker:
@@ -736,7 +756,7 @@ func (r Kubeadm) patchCRI(clu *v1.Cluster) error {
 	return nil
 }
 
-func (r Kubeadm) patchKubelet(clu *v1.Cluster) error {
+func (r *Kubeadm) patchKubelet(clu *v1.Cluster) error {
 	rootDirPrx := "--root-dir="
 	res, err := sshutils.SSHCmdWithSudo(r.ssh(), clu.Masters[0].ID, fmt.Sprintf(`cat /var/lib/kubelet/kubeadm-flags.env | grep -e %s`, rootDirPrx))
 	if err != nil {
@@ -759,5 +779,43 @@ func (r Kubeadm) patchKubelet(clu *v1.Cluster) error {
 			break
 		}
 	}
+	return nil
+}
+
+// cluster multi cni is not supported at this time
+func (r *Kubeadm) patchCNI(clu *v1.Cluster) error {
+	// The file naming of cni usually starts with ".conflist".
+	// The following is an example of a calico file "/etc/cni/net.d/10-calico.conflist"
+	filePrx := ".conflist"
+	cmd := fmt.Sprintf(`ls /etc/cni/net.d | grep %s`, filePrx)
+	res, err := sshutils.SSHCmdWithSudo(r.ssh(), clu.Masters[0].ID, cmd)
+	if err != nil {
+		return err
+	}
+	if err = res.Error(); err != nil && res.Stderr != "" {
+		return err
+	}
+
+	if res.StdoutToString("") == "" {
+		return nil
+	}
+	// 10-calico.conflist
+	out := res.Stdout
+	out = strings.Split(out, "\n")[0]
+	out = strings.Split(out, filePrx)[0]
+	out = strings.Split(out, "-")[1]
+	clu.CNI.Type = out
+
+	pods, err := r.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, po := range pods.Items {
+		if strings.Contains(po.Name, clu.CNI.Type) {
+			clu.CNI.Namespace = po.Namespace
+			break
+		}
+	}
+
 	return nil
 }

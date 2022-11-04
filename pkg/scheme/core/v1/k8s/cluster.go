@@ -34,6 +34,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
@@ -133,9 +134,9 @@ type Recovery struct {
 type AfterRecovery struct{}
 
 func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, c *v1.Cluster) {
-	apiServerDomain := APIServerDomainPrefix +
-		strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
+	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 	cpEndpoint := fmt.Sprintf("%s:6443", apiServerDomain)
+
 	stepper.Kubeadm = &KubeadmConfig{
 		ClusterConfigAPIVersion: "",
 		ContainerRuntime:        c.ContainerRuntime.Type,
@@ -759,9 +760,8 @@ func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *compone
 		},
 	}
 
-	unSupport, cmdList := stepper.RecoveryCNICmd(metadata)
-
-	if !unSupport {
+	cmdList, err := cni.RecoveryCNICmd(metadata)
+	if err == nil {
 		restart.Commands = append(restart.Commands, v1.Command{
 			Type:         v1.CommandShell,
 			ShellCommand: []string{"/bin/bash", "-c", cmdList["restart"]},
@@ -773,7 +773,7 @@ func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *compone
 		ShellCommand: []string{"/bin/bash", "-c", "kubectl rollout restart ds kube-proxy -n kube-system"},
 	})
 
-	if !unSupport {
+	if err == nil {
 		restart.Commands = append(restart.Commands, v1.Command{
 			Type: v1.CommandShell,
 			// since the daemon-set controller restarts the pods asynchronously, we try to get the pod status running 3 times in a row and the restart is considered complete
@@ -788,39 +788,17 @@ func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *compone
 		ShellCommand: []string{"/bin/bash", "-c", "for((i=1;i<=3;i++));do sleep 5;while true; do if [ 0 == $(kubectl get po -n kube-system | grep kube-proxy | grep -v Running | wc -l) ]; then break; else sleep 5 && kubectl get po -n kube-system | grep kube-proxy | grep -v Running ; fi ; done;done;"},
 	})
 
+	if err != nil {
+		note := fmt.Sprintf("===== WARNING: The daemon-set of this cni-%s cannot be restarted, please use kubectl to restart the daemon-set service of this cni-%s- =====", metadata.CNI, metadata.CNI)
+		restart.Commands = append(restart.Commands, v1.Command{
+			Type: v1.CommandShell,
+			// Since the daemon-set controller restarts the pods asynchronously, we try to get the pod status running 3 times in a row and the restart is considered complete
+			ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("echo %s", note)},
+		})
+	}
+
 	stepper.installSteps = append(stepper.installSteps, restart)
-
-	if unSupport {
-		if ok := stepper.appendFile(ctx, metadata.CNI, restart.Name); ok == nil {
-			return nil
-		}
-	}
-
 	return nil
-}
-
-func (stepper *Recovery) RecoveryCNICmd(metadata *component.ExtraMetadata) (unSupport bool, cmdList map[string]string) {
-	cmdList = make(map[string]string)
-	switch metadata.CNI {
-	case CniCalico:
-		cmdList["get"] = fmt.Sprintf("kubectl get po -n %s | grep calico", metadata.CNINamespace)
-		cmdList["restart"] = fmt.Sprintf("kubectl rollout restart ds calico-node -n %s", metadata.CNINamespace)
-	default:
-		unSupport = true
-	}
-
-	return
-}
-
-func (stepper *Recovery) appendFile(ctx context.Context, cni string, stepName string) error {
-	stepKey := fmt.Sprintf("%s-%s", component.GetStepID(ctx), stepName)
-	operationID := component.GetOperationID(ctx)
-	opLog := component.GetOplog(ctx)
-
-	note := fmt.Sprintf("\n ===== The daemon-set of this cni(%s) cannot be restarted, please use kubectl to restart the daemon-set service of this cni(%s) ===== \n\n", cni, cni)
-	err := opLog.CreateStepLogFileAndAppend(operationID, stepKey, []byte(note))
-	logger.Debugf("Ccreate step log file error: %v", err)
-	return err
 }
 
 func (stepper *Recovery) Install(ctx context.Context, opts component.Options) ([]byte, error) {

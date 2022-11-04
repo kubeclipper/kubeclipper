@@ -39,11 +39,3 @@ const (
 	KubeBinaryDir            = "/usr/bin"
 	KubeManifestsDir         = "/etc/kubernetes/manifests"
 )
-
-const (
-	CalicoNetworkIPIPAll     = "Overlay-IPIP-All"
-	CalicoNetworkIPIPSubnet  = "Overlay-IPIP-Cross-Subnet"
-	CalicoNetworkVXLANAll    = "Overlay-Vxlan-All"
-	CalicoNetworkVXLANSubnet = "Overlay-Vxlan-Cross-Subnet"
-	CalicoNetworkBGP         = "BGP"
-)

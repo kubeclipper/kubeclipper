@@ -651,8 +651,7 @@ func (d *DeployOptions) deployKcServer() {
 		sshutils.WrapEcho(config.KcServerService, "/usr/lib/systemd/system/kc-server.service"),
 		fmt.Sprintf("mkdir -pv %s/kc", d.deployConfig.StaticServerPath),
 		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/resource/* %s/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
-		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/kubeclipper-server %s/kc/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
-		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/kubeclipper-agent %s/kc/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
+		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/* %s/kc/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
 	}
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(d.deployConfig.SSHConfig, d.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
