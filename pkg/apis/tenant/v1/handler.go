@@ -29,10 +29,8 @@ import (
 	"go.uber.org/zap"
 	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 
-	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -96,7 +94,7 @@ func (h *handler) CreateProject(request *restful.Request, response *restful.Resp
 }
 
 func (h *handler) projectCheck(ctx context.Context, p *tenantv1.Project) error {
-	if err := h.nodeCheck(ctx, p.Spec.Nodes, p.Name); err != nil {
+	if err := NodeCheck(ctx, h.clusterOperator, p.Spec.Nodes, p.Name); err != nil {
 		return err
 	}
 	_, err := h.iamOperator.GetUser(ctx, p.Spec.Manager)
@@ -110,9 +108,10 @@ func (h *handler) projectCheck(ctx context.Context, p *tenantv1.Project) error {
 	return nil
 }
 
-func (h *handler) nodeCheck(ctx context.Context, nodes []string, projectName string) error {
+// NodeCheck check is all node belong to specify project
+func NodeCheck(ctx context.Context, clusterOperator cluster.Operator, nodes []string, projectName string) error {
 	for _, nodeID := range nodes {
-		node, err := h.clusterOperator.GetNode(ctx, nodeID)
+		node, err := clusterOperator.GetNode(ctx, nodeID)
 		if err != nil {
 			return err
 		}
@@ -313,68 +312,4 @@ func (h *handler) watchProjects(req *restful.Request, resp *restful.Response, q 
 		return
 	}
 	restplus.ServeWatch(watcher, tenantv1.SchemeGroupVersion.WithKind("Project"), req, resp, timeout)
-}
-
-type PatchNodes struct {
-	Nodes   []string `json:"nodes"`
-	Project string   `json:"project"`
-	OP      string   `json:"op"`
-}
-
-func (h *handler) AddOrRemoveNode(request *restful.Request, response *restful.Response) {
-	pn := &PatchNodes{}
-	if err := request.ReadEntity(pn); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-
-	projectName := request.PathParameter("name")
-	if pn.Project != projectName {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("the name of the object (%s) does not match the name on the URL (%s)", pn.Project, projectName))
-		return
-	}
-
-	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
-	ctx := request.Request.Context()
-	project, err := h.tenantOperator.GetProjectEx(ctx, projectName, "0")
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	if err = h.nodeCheck(ctx, pn.Nodes, pn.Project); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-
-	if !dryRun {
-		if project, err = mergeNodes(project, pn); err != nil {
-			return
-		}
-		_, err = h.tenantOperator.UpdateProject(request.Request.Context(), project)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-	}
-	response.WriteHeader(http.StatusOK)
-}
-
-func mergeNodes(p *tenantv1.Project, pn *PatchNodes) (*tenantv1.Project, error) {
-	set := sets.NewString(p.Spec.Nodes...)
-
-	switch pn.OP {
-	case corev1.NodesOperationAdd:
-		set.Insert(pn.Nodes...)
-	case corev1.NodesOperationRemove:
-		set.Delete(pn.Nodes...)
-	default:
-		return nil, fmt.Errorf("invalid operation %s", pn.OP)
-	}
-	p.Spec.Nodes = set.List()
-	return p, nil
 }

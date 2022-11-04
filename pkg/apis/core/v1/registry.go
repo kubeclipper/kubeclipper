@@ -172,11 +172,11 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run update clusters").
 			Required(false).DataType("boolean")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
-	webservice.Route(webservice.PUT("/projects/{project}/clusters/{cluster}/join").
-		To(h.JoinProject).
+	webservice.Route(webservice.PUT("/clusters/{cluster}/join").
+		To(h.ClusterJoinProject).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Join cluster to project.").
-		Reads(corev1.Cluster{}).
+		Reads(clusterJoinProject{}).
 		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter("cluster", "cluster name")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
@@ -570,6 +570,17 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter(query.ParameterName, "node name").
 			Required(true).
 			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
+		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
+	webservice.Route(webservice.PUT("/nodes/{node}/join").
+		To(h.NodeJoinProject).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("Join nodes to project.").
+		Param(webservice.PathParameter("node", "node name").
+			Required(true).
+			DataType("string")).
+		Reads(nodeJoinProject{}).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 

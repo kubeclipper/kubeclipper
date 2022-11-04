@@ -43,6 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/remotecommand"
 
+	tenantapiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 	reqpkg "github.com/kubeclipper/kubeclipper/pkg/server/request"
 
@@ -615,9 +618,22 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 	response.WriteHeader(http.StatusOK)
 }
 
-func (h *handler) JoinProject(request *restful.Request, response *restful.Response) {
+type clusterJoinProject struct {
+	Cluster string `json:"cluster"`
+	Project string `json:"project"`
+}
+
+func (h *handler) ClusterJoinProject(request *restful.Request, response *restful.Response) {
 	clusterName := request.PathParameter("cluster")
-	projectName := request.PathParameter("project")
+	c := clusterJoinProject{}
+	if err := request.ReadEntity(&c); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if c.Cluster != clusterName {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster in URL(%s) not match cluster in body(%s)", clusterName, c.Cluster))
+		return
+	}
 	ctx := request.Request.Context()
 	clu, err := h.clusterOperator.GetCluster(ctx, clusterName)
 	if err != nil {
@@ -628,11 +644,11 @@ func (h *handler) JoinProject(request *restful.Request, response *restful.Respon
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	if oldProject, ok := clu.Labels[common.LabelProject]; !ok {
+	if oldProject, ok := clu.Labels[common.LabelProject]; ok {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s already belong to project %s,can't edit", clusterName, oldProject))
 		return
 	}
-	project, err := h.tenantOperator.GetProject(ctx, projectName)
+	project, err := h.tenantOperator.GetProject(ctx, c.Project)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleNotFound(response, request, err)
@@ -641,7 +657,7 @@ func (h *handler) JoinProject(request *restful.Request, response *restful.Respon
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-
+	// join node to project
 	set := sets.NewString(project.Spec.Nodes...)
 	set.Insert(clu.GetAllNodes().List()...)
 	project.Spec.Nodes = set.List()
@@ -649,11 +665,11 @@ func (h *handler) JoinProject(request *restful.Request, response *restful.Respon
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-
+	// join cluster to project
 	if clu.Labels == nil {
 		clu.Labels = make(map[string]string)
 	}
-	clu.Labels[common.LabelProject] = projectName
+	clu.Labels[common.LabelProject] = c.Project
 	if _, err = h.clusterOperator.UpdateCluster(ctx, clu); err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -914,6 +930,70 @@ func (h *handler) syncNodeDisable(node *v1.Node, reqDisable bool) error {
 	}
 
 	return nil
+}
+
+type nodeJoinProject struct {
+	Node    string `json:"node"`
+	Project string `json:"project"`
+	OP      string `json:"op"`
+}
+
+func (h *handler) NodeJoinProject(request *restful.Request, response *restful.Response) {
+	data := &nodeJoinProject{}
+	if err := request.ReadEntity(data); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	node := request.PathParameter("node")
+	if data.Node != node {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the name of the object (%s) does not match the name on the URL (%s)", data.Node, node))
+		return
+	}
+
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	ctx := request.Request.Context()
+	project, err := h.tenantOperator.GetProjectEx(ctx, data.Project, "0")
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if err = tenantapiv1.NodeCheck(ctx, h.clusterOperator, []string{data.Node}, data.Project); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+
+	if !dryRun {
+		if project, err = mergeNodes(project, data); err != nil {
+			return
+		}
+		_, err = h.tenantOperator.UpdateProject(request.Request.Context(), project)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+	}
+	response.WriteHeader(http.StatusOK)
+}
+
+func mergeNodes(p *tenantv1.Project, pn *nodeJoinProject) (*tenantv1.Project, error) {
+	set := sets.NewString(p.Spec.Nodes...)
+
+	switch pn.OP {
+	case NodesOperationAdd:
+		set.Insert(pn.Node)
+	case NodesOperationRemove:
+		set.Delete(pn.Node)
+	default:
+		return nil, fmt.Errorf("invalid operation %s", pn.OP)
+	}
+	p.Spec.Nodes = set.List()
+	return p, nil
 }
 
 // DeleteNode delete node record from etcd,only called by kcctl now.

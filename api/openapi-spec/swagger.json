@@ -1107,6 +1107,47 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/clusters/{cluster}/join": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Join cluster to project.",
+        "operationId": "ClusterJoinProject",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.ClusterJoinProject"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "cluster",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/clusters/{cluster}/plugins": {
       "patch": {
         "produces": [
@@ -2983,6 +3024,38 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/nodes/{node}/join": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Join nodes to project.",
+        "operationId": "NodeJoinProject",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "node name",
+            "name": "node",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/operations": {
       "get": {
         "produces": [
@@ -3319,47 +3392,6 @@
           },
           "404": {
             "description": "Not Found"
-          }
-        }
-      }
-    },
-    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{cluster}/join": {
-      "put": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Cluster"
-        ],
-        "summary": "Join cluster to project.",
-        "operationId": "JoinProject",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1.Cluster"
-            }
-          },
-          {
-            "type": "string",
-            "description": "project name",
-            "name": "project",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "description": "cluster name",
-            "name": "cluster",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -6477,43 +6509,6 @@
         }
       }
     },
-    "/api/tenant.kubeclipper.io/v1/projects/{name}/nodes": {
-      "put": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Tenant"
-        ],
-        "summary": "Add or remove node to project.",
-        "operationId": "AddOrRemoveNode",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1.PatchNodes"
-            }
-          },
-          {
-            "type": "string",
-            "description": "project name",
-            "name": "name",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      }
-    },
     "/oauth/cb/{callback}": {
       "get": {
         "consumes": [
@@ -7790,6 +7785,20 @@
         }
       }
     },
+    "v1.ClusterJoinProject": {
+      "required": [
+        "cluster",
+        "project"
+      ],
+      "properties": {
+        "cluster": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        }
+      }
+    },
     "v1.ClusterStatus": {
       "required": [
         "Registries"
@@ -8750,21 +8759,21 @@
     },
     "v1.PatchNodes": {
       "required": [
+        "operation",
         "nodes",
-        "project",
-        "op"
+        "role"
       ],
       "properties": {
         "nodes": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/v1.WorkerNode"
           }
         },
-        "op": {
+        "operation": {
           "type": "string"
         },
-        "project": {
+        "role": {
           "type": "string"
         }
       }

@@ -488,12 +488,12 @@ var Roles = []iamv1.GlobalRole{
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "clusters/status", "regions", "nodes/disable", "nodes/enable"},
+				Resources: []string{"clusters", "clusters/status", "regions", "nodes/disable", "nodes/enable", "nodes/join"},
 				Verbs:     []string{"update", "patch"},
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters/plugins", "clusters/nodes", "clusters/backups", "clusters/cronbackups", "clusters/certification", "clusters/kubeconfig"},
+				Resources: []string{"clusters/plugins", "clusters/join", "clusters/nodes", "clusters/backups", "clusters/cronbackups", "clusters/certification", "clusters/kubeconfig"},
 				Verbs:     []string{"*"},
 			},
 			{

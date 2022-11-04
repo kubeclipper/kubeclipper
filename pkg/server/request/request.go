@@ -62,6 +62,7 @@ type Info struct {
 	ResourceScope string
 }
 
+// IsProjectScope check request is project scope
 func (info Info) IsProjectScope() bool {
 	return info.ResourceScope == ProjectScope
 }
