@@ -356,6 +356,13 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 		},
 	}...)
 
+	c := new(common.CSIHealthCheck)
+	checkCSIHealthStep, err := c.GetCheckCSIHealthStep(stepMaster0, n.StorageClassName)
+	if err != nil {
+		return err
+	}
+	n.installSteps = append(n.installSteps, checkCSIHealthStep...)
+
 	if metadata.OperationType != v1.OperationDeleteCluster {
 		n.uninstallSteps = append(n.uninstallSteps, []v1.Step{
 			rs,
