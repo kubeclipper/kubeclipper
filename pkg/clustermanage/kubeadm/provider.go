@@ -251,7 +251,9 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 	// get resourceVersion for update
 	clu.ObjectMeta.ResourceVersion = oldClu.ObjectMeta.ResourceVersion
 	clu.Annotations[common.AnnotationDescription] = oldClu.Annotations[common.AnnotationDescription]
-	clu.Labels[common.LabelBackupPoint] = oldClu.Labels[common.LabelBackupPoint]
+	if bp := oldClu.Labels[common.LabelBackupPoint]; bp != "" {
+		clu.Labels[common.LabelBackupPoint] = bp
+	}
 	_, err = r.Operator.ClusterWriter.UpdateCluster(context.TODO(), clu)
 	if err != nil {
 		return errors.WithMessagef(err, "update cluster %s", clu.Name)
