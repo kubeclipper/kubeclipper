@@ -162,7 +162,8 @@ spec:
 status: {}
 `
 
-const kubectlPodTemplate = `
+// KubectlPodTemplate kubectl terminal service yaml template
+const KubectlPodTemplate = `
 apiVersion: apps/v1
 kind: Deployment
 metadata:
