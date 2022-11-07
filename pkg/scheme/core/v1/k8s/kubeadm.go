@@ -850,7 +850,7 @@ func (stepper *KubectlTerminal) NewInstance() component.ObjectMeta {
 
 func (stepper *KubectlTerminal) renderTo(w io.Writer) error {
 	at := tmplutil.New()
-	_, err := at.RenderTo(w, kubectlPodTemplate, stepper)
+	_, err := at.RenderTo(w, KubectlPodTemplate, stepper)
 	return err
 }
 

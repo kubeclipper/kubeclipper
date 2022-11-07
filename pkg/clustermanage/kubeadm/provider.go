@@ -19,7 +19,9 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
+	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	v13 "k8s.io/api/core/v1"
@@ -133,11 +135,6 @@ func (r *Kubeadm) Sync(ctx context.Context) error {
 		return err
 	}
 
-	err = r.clusterServiceAccount(ctx, v1.ActionInstall)
-	if err != nil {
-		return err
-	}
-
 	log.Debugf("sync provider %s successfully", r.Provider.Name)
 
 	return nil
@@ -185,15 +182,15 @@ func (r *Kubeadm) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	if err = r.clusterServiceAccount(ctx, v1.ActionUninstall); err != nil {
-		// the failure to delete the service account due to an exception is tolerated, so ignore this error
-		log.Errorf("deleting the cluster %s's service accounts failed: %v", clu.Name, err)
+	for _, no := range nodes {
+		if no.Labels[common.LabelNodeRole] == k8s.NodeRoleMaster {
+			err = r.clusterAddon(ctx, no.Status.Ipv4DefaultIP, v1.ActionUninstall)
+			if err != nil {
+				logger.Warnf("cluster addons %s failed: %v", v1.ActionInstall, err)
+			}
+		}
 	}
 
-	// 3. delete cluster
-	// NOTE: must delete cluster after drain node
-	// because cluster controller will remove node's label,if delete cluster first
-	// then,the note will lost connection about this rancher cluster,case we can't drain it.
 	if err = r.Operator.ClusterWriter.DeleteCluster(ctx, clu.Name); err != nil {
 		return errors.WithMessagef(err, "delete cluster  %s", clu.Name)
 	}
@@ -219,6 +216,11 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 	log.Debugf("beginning import provider %s's cluster [%s] to kc", r.Provider.Name, clu.Name)
 
 	// sync cluster's node first
+	var masterIPs []string
+	for _, master := range clu.Masters {
+		masterIPs = append(masterIPs, master.ID)
+	}
+	// when the node synchronization is complete, the nodeID will be replaced with the nodeIP
 	err := r.syncNode(ctx, clu)
 	if err != nil {
 		return errors.WithMessagef(err, "sync cluster %s's node", clu.Name)
@@ -231,22 +233,31 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 			if _, err = r.Operator.ClusterWriter.CreateCluster(context.TODO(), clu); err != nil {
 				return errors.WithMessagef(err, "create cluster %s", clu.Name)
 			}
-		} else {
-			return errors.WithMessagef(err, "check cluster %s exits", clu.Name)
+			for _, masterIP := range masterIPs {
+				err = r.clusterAddon(ctx, masterIP, v1.ActionInstall)
+				if err == nil {
+					break
+				}
+				logger.Debugf("cluster addon service create failed: %v", err)
+			}
+			log.Debugf("create import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
+			return nil
 		}
-	} else {
-		// update,if exists
-		// get resourceVersion for update
-		clu.ObjectMeta.ResourceVersion = oldClu.ObjectMeta.ResourceVersion
-		clu.Annotations[common.AnnotationDescription] = oldClu.Annotations[common.AnnotationDescription]
-		clu.Labels[common.LabelBackupPoint] = oldClu.Labels[common.LabelBackupPoint]
-		_, err = r.Operator.ClusterWriter.UpdateCluster(context.TODO(), clu)
-		if err != nil {
-			return errors.WithMessagef(err, "update cluster %s", clu.Name)
-		}
+
+		return errors.WithMessagef(err, "check cluster %s exits", clu.Name)
 	}
 
-	log.Debugf("import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
+	// update,if exists
+	// get resourceVersion for update
+	clu.ObjectMeta.ResourceVersion = oldClu.ObjectMeta.ResourceVersion
+	clu.Annotations[common.AnnotationDescription] = oldClu.Annotations[common.AnnotationDescription]
+	clu.Labels[common.LabelBackupPoint] = oldClu.Labels[common.LabelBackupPoint]
+	_, err = r.Operator.ClusterWriter.UpdateCluster(context.TODO(), clu)
+	if err != nil {
+		return errors.WithMessagef(err, "update cluster %s", clu.Name)
+	}
+
+	log.Debugf("update import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
 	return nil
 }
 
@@ -674,6 +685,23 @@ func (r *Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
 	}
 }
 
+func (r *Kubeadm) clusterAddon(ctx context.Context, ip string, action v1.StepAction) error {
+	err := r.clusterServiceAccount(ctx, action)
+	if err != nil {
+		// the failure to delete the service account due to an exception is tolerated, so ignore this error
+		logger.Debugf("%s the cluster %s's service accounts failed: %v", action, r.Provider.ClusterName, err)
+		return nil
+	}
+
+	err = r.kubectlTerminal(ip, action)
+	if err != nil {
+		// the failure to delete the service account due to an exception is tolerated, so ignore this error
+		logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, r.Provider.ClusterName, err)
+	}
+
+	return nil
+}
+
 func (r *Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepAction) error {
 	w, err := r.ToWrapper()
 	if err != nil {
@@ -708,6 +736,49 @@ func (r *Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepActio
 		err = w.KubeCli.RbacV1().ClusterRoleBindings().Delete(ctx, crb.Name, metav1.DeleteOptions{})
 		if err != nil && !strings.Contains(err.Error(), "not found") {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Kubeadm) kubectlTerminal(nodeIP string, action v1.StepAction) error {
+	var cmdList []string
+	switch action {
+	case v1.ActionInstall:
+		// TODO: For some historical reasons,
+		// the kubectl terminal service image and the k8s image are bound together,
+		// and this issue will be improved after disassembling the image package
+		// instance, err := downloader.NewInstance(ctx, k8s.K8s, "v1.23.6", runtime2.GOARCH, true, false)
+		// if err != nil {
+		//	return nil, err
+		// }
+
+		terminalData, err := tmplutil.New().Render(k8s.KubectlPodTemplate, k8s.KubectlTerminal{})
+		if err != nil {
+			return err
+		}
+		yamlFile := filepath.Join(k8s.ManifestDir, "kc-kubectl.yaml")
+		cmdList = []string{
+			fmt.Sprintf("mkdir -p %s", k8s.ManifestDir),
+			sshutils.WrapEcho(terminalData, yamlFile),
+			fmt.Sprintf("kubectl apply -f %s", yamlFile),
+		}
+	case v1.ActionUninstall:
+		cmdList = []string{
+			"kubectl delete deploy kc-kubectl -n kube-system",
+			"kubectl delete sa kc-kubectl -n kube-system",
+			"kubectl delete ClusterRoleBinding kc-kubectl-rolebind -n kube-system",
+		}
+	}
+
+	for _, cmd := range cmdList {
+		ret, err := sshutils.SSHCmdWithSudo(r.ssh(), nodeIP, cmd)
+		if err != nil {
+			return errors.WithMessagef(err, "run cmd [%s] on node [%s]", cmd, nodeIP)
+		}
+		if err = ret.Error(); err != nil {
+			return errors.WithMessage(err, ret.String())
 		}
 	}
 
