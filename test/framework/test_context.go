@@ -66,4 +66,6 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 		"cri image registry addr, default 127.0.0.1:5000")
 	flag.StringVar(&TestContext.WorkerNodeVip, "vip", defaultWorkerNodeVip,
 		"cluster worker node loadblance vip, default 169.254.169.100")
+	flag.DurationVar(&clusterInstallShort, "cluster-install-short-timeout", clusterInstallShort,
+		"cluster install short timeout interval")
 }

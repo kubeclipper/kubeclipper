@@ -2,7 +2,7 @@ package framework
 
 import "time"
 
-const (
+var (
 	// Default timeouts to be used in TimeoutContext
 	clusterInstall      = 15 * time.Minute
 	clusterInstallShort = 5 * time.Minute
