@@ -91,7 +91,7 @@ func initHACluster(clusterName string, nodeList corev1.WorkerNodeList) *corev1.C
 			},
 		},
 		Masters:           nodeList,
-		Workers:           nil,
+		Workers:           corev1.WorkerNodeList{},
 		KubernetesVersion: "v1.23.6",
 		CertSANs:          nil,
 		LocalRegistry:     "",
@@ -113,7 +113,7 @@ func initHACluster(clusterName string, nodeList corev1.WorkerNodeList) *corev1.C
 		CNI: corev1.CNI{
 			LocalRegistry: "",
 			Type:          "calico",
-			Version:       "v3.21.2",
+			Version:       "v3.22.4",
 			Calico: &corev1.Calico{
 				IPv4AutoDetection: "first-found",
 				IPv6AutoDetection: "first-found",

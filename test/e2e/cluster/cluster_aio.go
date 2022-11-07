@@ -102,7 +102,7 @@ func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 				ID: nodeID[0],
 			},
 		},
-		Workers:           nil,
+		Workers:           corev1.WorkerNodeList{},
 		KubernetesVersion: "v1.23.6",
 		CertSANs:          nil,
 		LocalRegistry:     "",
@@ -124,7 +124,7 @@ func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 		CNI: corev1.CNI{
 			LocalRegistry: "",
 			Type:          "calico",
-			Version:       "v3.21.2",
+			Version:       "v3.22.4",
 			Calico: &corev1.Calico{
 				IPv4AutoDetection: "first-found",
 				IPv6AutoDetection: "first-found",
