@@ -45,9 +45,9 @@ type ExtraMetadata struct {
 	OperationType      string
 	KubeletDataDir     string
 	ControlPlaneStatus []v1.ControlPlaneHealth
-
-	CNI          string
-	CNINamespace string
+	Addons             []v1.Addon
+	CNI                string
+	CNINamespace       string
 }
 
 type Node struct {
