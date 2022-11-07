@@ -169,8 +169,9 @@ func (runnable *CalicoRunnable) clear(calico *v1.Calico, nodes []v1.StepNode) []
 // CmdList cni kubectl cmd list
 func (runnable *CalicoRunnable) CmdList(namespace string) map[string]string {
 	cmdList := make(map[string]string)
-	cmdList["get"] = fmt.Sprintf("kubectl get po -n %s | grep calico", runnable.Namespace)
-	cmdList["restart"] = fmt.Sprintf("kubectl rollout restart ds calico-node -n %s", runnable.Namespace)
+	cmdList["get"] = fmt.Sprintf("kubectl get po -n %s | grep calico", namespace)
+	cmdList["restart"] = fmt.Sprintf("kubectl rollout restart ds calico-node -n %s", namespace)
+
 	return cmdList
 }
 

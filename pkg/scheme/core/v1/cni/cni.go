@@ -95,7 +95,5 @@ func RecoveryCNICmd(metadata *component.ExtraMetadata) (cmdList map[string]strin
 		return
 	}
 
-	c.Create().CmdList(metadata.CNINamespace)
-
-	return
+	return c.Create().CmdList(metadata.CNINamespace), nil
 }
