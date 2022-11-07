@@ -883,6 +883,9 @@ func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*compo
 		CNI:                c.CNI.Type,
 		CNINamespace:       c.CNI.Namespace,
 	}
+
+	meta.Addons = append(meta.Addons, c.Addons...)
+
 	masters, err := h.getNodeInfo(ctx, c.Masters)
 	if err != nil {
 		return nil, err

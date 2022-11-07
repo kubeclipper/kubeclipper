@@ -23,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-
 	"github.com/kubeclipper/kubeclipper/pkg/component"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
