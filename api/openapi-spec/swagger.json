@@ -1107,6 +1107,47 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/clusters/{cluster}/join": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Join cluster to project.",
+        "operationId": "ClusterJoinProject",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.clusterJoinProject"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "cluster",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/clusters/{cluster}/plugins": {
       "patch": {
         "produces": [
@@ -2990,6 +3031,46 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/nodes/{node}/join": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Join nodes to project.",
+        "operationId": "NodeJoinProject",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "node name",
+            "name": "node",
+            "in": "path",
+            "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.nodeJoinProject"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/operations": {
       "get": {
         "produces": [
@@ -3102,6 +3183,1275 @@
         "summary": "clusters retry operation.",
         "operationId": "RetryCluster",
         "parameters": [
+          {
+            "type": "boolean",
+            "description": "dry run clusters retry operation.",
+            "name": "dryRun",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "operation name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "List clusters in project.",
+        "operationId": "ListClusters",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "watch request",
+            "name": "watch",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 60,
+            "description": "watch timeout seconds",
+            "name": "timeoutSeconds",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create clusters.",
+        "operationId": "CreateClusters",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{cluster}/backups/{backup}": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Update backups.",
+        "operationId": "UpdateBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "cluster",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "backup name",
+            "name": "backup",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Backup"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Delete backups.",
+        "operationId": "DeleteBackup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "cluster",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "backup name",
+            "name": "backup",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{cluster}/plugins": {
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Install or uninstall plugins",
+        "operationId": "InstallOrUninstallPlugins",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.PatchComponents"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "cluster",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{cluster}/recovery": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "create recovery.",
+        "operationId": "CreateRecovery",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Recovery"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "cluster",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Recovery"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Describe cluster.",
+        "operationId": "DescribeCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Update clusters.",
+        "operationId": "UpdateClusters",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run update clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Delete clusters.",
+        "operationId": "DeleteCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run delete clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/backups": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "List backups.",
+        "operationId": "ListBackupsWithCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create backups.",
+        "operationId": "CreateBackup",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Backup"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run create clusters",
+            "name": "dryRun",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Backup"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/certification": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Update certification of cluster.",
+        "operationId": "UpdateClusterCertification",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/kubeconfig": {
+      "get": {
+        "produces": [
+          "text/plain",
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Get kubeconfig file",
+        "operationId": "GetKubeConfig",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.Config"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/nodes": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Add or remove cluster node.",
+        "operationId": "AddOrRemoveNodes",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.PatchNodes"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Cluster"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/status": {
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "reset cluster status.",
+        "operationId": "ResetClusterStatus",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run upgrade cluster.",
+            "name": "dryRun",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/terminal": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "kubectl web terminal",
+        "operationId": "SSHToPod",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "auth token",
+            "name": "token",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/clusters/{name}/upgrade": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "upgrade cluster.",
+        "operationId": "UpgradeCluster",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.ClusterUpgrade"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run upgrade cluster.",
+            "name": "dryRun",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/logs": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Get operation log on node.",
+        "operationId": "GetOperationLog",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "node=%s",
+            "description": "node name",
+            "name": "node",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "operation=%s",
+            "description": "operation id",
+            "name": "operation",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "step=%s",
+            "description": "step id",
+            "name": "step",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "offset=%s",
+            "description": "offset",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.StepLog"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/nodes": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "List nodes.",
+        "operationId": "ListNodes",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "watch request",
+            "name": "watch",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 60,
+            "description": "watch timeout seconds",
+            "name": "timeoutSeconds",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/nodes/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Describe nodes.",
+        "operationId": "DescribeNode",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "node name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/nodes/{name}/disable": {
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Disable nodes.",
+        "operationId": "DisableNode",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "node name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/nodes/{name}/enable": {
+      "patch": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Enable nodes.",
+        "operationId": "EnableNode",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "node name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/nodes/{name}/terminal": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Region"
+        ],
+        "summary": "connector node with ssh protocol",
+        "operationId": "SSHToNode",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "node name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "auth token",
+            "name": "token",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "user name, password, port",
+            "name": "msg",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "default": 150,
+            "description": "terminal cols",
+            "name": "cols",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": 35,
+            "description": "terminal rows",
+            "name": "rows",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          },
+          "417": {
+            "description": "Expectation Failed",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/operations": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "List operations.",
+        "operationId": "ListOperations",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "watch request",
+            "name": "watch",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 60,
+            "description": "watch timeout seconds",
+            "name": "timeoutSeconds",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.OperationList"
+            }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/operations/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Describe operations.",
+        "operationId": "DescribeOperation",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "operation name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "resource version to query",
+            "name": "resourceVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Operation"
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/operations/{name}/retry": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "clusters retry operation.",
+        "operationId": "RetryCluster",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
           {
             "type": "boolean",
             "description": "dry run clusters retry operation.",
@@ -3880,6 +5230,52 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectmembers/{member}/roles": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "List member's role under specified project",
+        "operationId": "RetrieveProjectRoleTemplates",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/*v1.User"
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -5170,43 +6566,6 @@
             "schema": {
               "$ref": "#/definitions/errors.HTTPError"
             }
-          }
-        }
-      }
-    },
-    "/api/tenant.kubeclipper.io/v1/projects/{name}/nodes": {
-      "put": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Tenant"
-        ],
-        "summary": "Add or remove node to project.",
-        "operationId": "AddOrRemoveNode",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1.PatchNodes"
-            }
-          },
-          {
-            "type": "string",
-            "description": "project name",
-            "name": "name",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
           }
         }
       }
@@ -7473,21 +8832,21 @@
     },
     "v1.PatchNodes": {
       "required": [
+        "operation",
         "nodes",
-        "project",
-        "op"
+        "role"
       ],
       "properties": {
         "nodes": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/v1.WorkerNode"
           }
         },
-        "op": {
+        "operation": {
           "type": "string"
         },
-        "project": {
+        "role": {
           "type": "string"
         }
       }
@@ -8179,6 +9538,38 @@
           "items": {
             "$ref": "#/definitions/v1.Taint"
           }
+        }
+      }
+    },
+    "v1.clusterJoinProject": {
+      "required": [
+        "cluster",
+        "project"
+      ],
+      "properties": {
+        "cluster": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.nodeJoinProject": {
+      "required": [
+        "node",
+        "project",
+        "op"
+      ],
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
         }
       }
     }
