@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
@@ -635,7 +637,7 @@ func (h *handler) RetrieveProjectRoleTemplates(request *restful.Request, respons
 		return
 	}
 
-	roles, err := h.fetchAggregationProjectRoles(request.Request.Context(), projectRole)
+	roles, err := h.fetchAggregationProjectRoles(request.Request.Context(), projectRole, project, member)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -1332,10 +1334,36 @@ func (h *handler) fetchAggregationRoles(ctx context.Context, role *iamv1.GlobalR
 	return roles, nil
 }
 
-func (h *handler) fetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole) ([]*iamv1.ProjectRole, error) {
+func (h *handler) fetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole, projectName, member string) ([]*iamv1.ProjectRole, error) {
+	if projectRole != nil {
+		return h.doFetchAggregationProjectRoles(ctx, projectRole, nil)
+	}
+	// if user's projectRole not exist,maybe it's a platform user
+	// so we try to query admin role,and fetch aggregation rule
+	adminProjectRole, err := h.iamOperator.GetProjectRole(ctx, fmt.Sprintf("%s-%s", projectName, member))
+	if err != nil {
+		return nil, err
+	}
+	role, err := h.iamOperator.GetRoleOfUser(ctx, member)
+	if err != nil {
+		return nil, err
+	}
+	switch role.Name {
+	case "platform-view":
+		return h.doFetchAggregationProjectRoles(ctx, adminProjectRole, func(rules []rbacv1.PolicyRule) bool {
+			return isViewer(rules)
+		})
+	case "platform-admin":
+		return h.doFetchAggregationProjectRoles(ctx, adminProjectRole, nil)
+	default:
+		return nil, nil
+	}
+}
+
+func (h *handler) doFetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole, filter func(rules []rbacv1.PolicyRule) bool) ([]*iamv1.ProjectRole, error) {
 	roles := make([]*iamv1.ProjectRole, 0)
 	if projectRole == nil || projectRole.Annotations == nil {
-		return roles, nil
+		return nil, nil
 	}
 	if v := projectRole.Annotations[common.AnnotationAggregationRoles]; v != "" {
 		var roleNames []string
@@ -1350,11 +1378,24 @@ func (h *handler) fetchAggregationProjectRoles(ctx context.Context, projectRole 
 					}
 					return nil, err
 				}
+				if filter != nil && !filter(r.Rules) {
+					continue
+				}
 				roles = append(roles, r)
 			}
 		}
 	}
 	return roles, nil
+}
+
+func isViewer(rules []rbacv1.PolicyRule) bool {
+	viewer := sets.NewString("get", "list", "watch")
+	for _, rule := range rules {
+		if len(rule.Verbs) > 3 || !viewer.HasAll(rule.Verbs...) {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *handler) verifyUserPassword(ctx context.Context, username, password string) (bool, error) {

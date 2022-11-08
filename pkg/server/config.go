@@ -1911,4 +1911,108 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 			},
 		},
 	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-templates\"]",
+				"kubeclipper.io/module":              "Template",
+				"kubeclipper.io/role-template-rules": "{\"templates\": \"view\"}",
+				"kubeclipper.io/alias-name":          "Templates View",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-view-templates",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"templates"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-templates\"]",
+				"kubeclipper.io/module":              "Template",
+				"kubeclipper.io/role-template-rules": "{\"templates\": \"create\"}",
+				"kubeclipper.io/alias-name":          "Templates Create",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-create-templates",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"templates"},
+				Verbs:     []string{"create"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-templates\"]",
+				"kubeclipper.io/module":              "Template",
+				"kubeclipper.io/role-template-rules": "{\"templates\": \"edit\"}",
+				"kubeclipper.io/alias-name":          "Templates Edit",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-edit-templates",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"templates"},
+				Verbs:     []string{"update", "patch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-templates\"]",
+				"kubeclipper.io/module":              "Template",
+				"kubeclipper.io/role-template-rules": "{\"templates\": \"delete\"}",
+				"kubeclipper.io/alias-name":          "Templates Delete",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-delete-templates",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"templates"},
+				Verbs:     []string{"delete"},
+			},
+		},
+	},
 }

@@ -131,6 +131,36 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
+	webservice.Route(webservice.GET("/projects/{project}/users").
+		To(h.ListUsers).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Doc("List users api for project.").
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Param(webservice.QueryParameter(query.ParamRole, "resource filter by user role").
+			Required(false).
+			DataFormat("role=%s")).
+		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
+			Required(false).
+			DataFormat("labelSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
+			Required(false).
+			DataFormat("fieldSelector=%s=%s")).
+		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
+			DataType("integer").
+			DefaultValue("60").
+			Required(false)).
+		Param(webservice.QueryParameter(query.ParameterFuzzySearch, "fuzzy search conditions").
+			DataFormat("foo~bar,bar~baz").
+			Required(false)).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
 	webservice.Route(webservice.HEAD("/users").
 		To(h.CheckUserExist).
