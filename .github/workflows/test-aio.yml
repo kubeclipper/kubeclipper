@@ -1,0 +1,58 @@
+name: e2e-aio-test
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+      - 'release*'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        go-version: [ '1.19' ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Get branch name
+        id: extract_branch
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_HEAD_REF})"
+      - name: Build
+        if: github.event_name == 'pull_request'
+        run:
+          KUBE_BUILD_PLATFORMS="linux/amd64" make build
+      - name: deploy
+        run: | 
+          declare -A branch_map
+          branch_map["master"]="master"
+          branch_map["release-1.2"]="v1.2.1"
+          echo current version is ${branch_map["${{ steps.extract_branch.outputs.branch }}"]}
+          current_branch=${branch_map["${{ steps.extract_branch.outputs.branch }}"]}
+          curl -sfL https://oss.kubeclipper.io/kcctl.sh | sudo KC_VERSION=${current_branch} KC_REGION=cn bash -
+          sudo kcctl deploy --pkg https://oss.kubeclipper.io/release/${current_branch}/kc-amd64.tar.gz
+      - name: update kc assembly
+        run: |
+          sudo cp ./dist/kcctl /usr/local/bin/
+          sudo systemctl stop kc-agent
+          sudo systemctl stop kc-server
+          sudo cp ./dist/kubeclipper-agent /usr/local/bin/
+          sudo cp ./dist/kubeclipper-server /usr/local/bin/
+          sudo systemctl start kc-server
+          sudo systemctl start kc-agent
+      - name: login and build-e2e
+        run: |
+          make build-e2e
+          kcctl login -H http://localhost:80  -u admin -p Thinkbig1
+          ./dist/e2e.test -cluster-install-short-timeout=10m -ginkgo.focus="AIO"
+          
