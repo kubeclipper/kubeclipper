@@ -1123,7 +1123,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1.ClusterJoinProject"
+              "$ref": "#/definitions/v1.clusterJoinProject"
             }
           },
           {
@@ -3041,6 +3041,14 @@
             "name": "node",
             "in": "path",
             "required": true
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.nodeJoinProject"
+            }
           }
         ],
         "responses": {
@@ -5215,6 +5223,52 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectmembers/{member}/roles": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "List member's role under specified project",
+        "operationId": "RetrieveProjectRoleTemplates",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/*v1.User"
+              }
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -7785,20 +7839,6 @@
         }
       }
     },
-    "v1.ClusterJoinProject": {
-      "required": [
-        "cluster",
-        "project"
-      ],
-      "properties": {
-        "cluster": {
-          "type": "string"
-        },
-        "project": {
-          "type": "string"
-        }
-      }
-    },
     "v1.ClusterStatus": {
       "required": [
         "Registries"
@@ -9465,6 +9505,38 @@
           "items": {
             "$ref": "#/definitions/v1.Taint"
           }
+        }
+      }
+    },
+    "v1.clusterJoinProject": {
+      "required": [
+        "cluster",
+        "project"
+      ],
+      "properties": {
+        "cluster": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        }
+      }
+    },
+    "v1.nodeJoinProject": {
+      "required": [
+        "node",
+        "project",
+        "op"
+      ],
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
         }
       }
     }

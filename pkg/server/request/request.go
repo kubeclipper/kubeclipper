@@ -140,8 +140,6 @@ func (i *InfoFactory) NewRequestInfo(req *http.Request) (*Info, error) {
 		}
 	}
 
-	requestInfo.ResourceScope = i.resolveResourceScope(requestInfo)
-
 	// parts look like: resource/resourceName/subresource/other/stuff/we/don't/interpret
 	switch {
 	case len(currentParts) >= 3:
@@ -153,6 +151,8 @@ func (i *InfoFactory) NewRequestInfo(req *http.Request) (*Info, error) {
 	case len(currentParts) >= 1:
 		requestInfo.Resource = currentParts[0]
 	}
+
+	requestInfo.ResourceScope = i.resolveResourceScope(requestInfo)
 
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {

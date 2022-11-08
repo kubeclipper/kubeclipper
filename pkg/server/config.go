@@ -798,7 +798,68 @@ var Roles = []iamv1.GlobalRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/rego-override": "package authz\ndefault allow = false\nallow = true {\n  allowedResources := [\"users\"]\n  allowedResources[_] == input.Resource\n  input.User.Name == input.Name\n}",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-dns\",\"role-template-view-backuppoints\",\"role-template-view-registries\"]",
+				"kubeclipper.io/internal":          "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/hidden": "true",
+			},
+			Name: "platform-global-view", // for project member to view some global resources
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"domains", "domains/records"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"backuppoints"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"registries"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"templates"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindGlobalRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-users\"]",
+				"kubeclipper.io/internal":          "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/hidden": "true",
+			},
+			Name: "platform-user-view", // for project admin to view platform user
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"iam.kubeclipper.io"},
+				Resources: []string{"users"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindGlobalRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/rego-override": "package authz\ndefault allow = false\nallow = true {\n  allowedResources := [\"users\"]\n  allowedResources[_] == input.Resource\n  input.User.Name == input.Name\n}\nallow = true {\nallowedResources := [\"projects\"]\nallowedResources[_] == input.Resource\ninput.Verb=\"list\"\n}",
 				"kubeclipper.io/internal":      "true",
 			},
 			Labels: map[string]string{
@@ -1743,6 +1804,110 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"domains", "domains/records"},
 				Verbs:     []string{"update", "patch"},
+			},
+		},
+	},
+
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/module":              "Node",
+				"kubeclipper.io/role-template-rules": "{\"nodes\": \"view\"}",
+				"kubeclipper.io/alias-name":          "Nodes View",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-view-nodes",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"nodes", "nodes/terminal"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-nodes\"]",
+				"kubeclipper.io/module":              "Node",
+				"kubeclipper.io/role-template-rules": "{\"nodes\": \"create\"}",
+				"kubeclipper.io/alias-name":          "Nodes Create",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-create-nodes",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"create"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-nodes\"]",
+				"kubeclipper.io/module":              "Node",
+				"kubeclipper.io/role-template-rules": "{\"nodes\": \"edit\"}",
+				"kubeclipper.io/alias-name":          "Nodes Edit",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-edit-nodes",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"nodes", "nodes/disable", "nodes/enable"},
+				Verbs:     []string{"update", "patch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/dependencies":        "[\"role-template-view-nodes\"]",
+				"kubeclipper.io/module":              "Node",
+				"kubeclipper.io/role-template-rules": "{\"nodes\": \"delete\"}",
+				"kubeclipper.io/alias-name":          "Nodes Delete",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+			},
+			Name: "role-template-delete-nodes",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"delete"},
 			},
 		},
 	},

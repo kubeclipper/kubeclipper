@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/user"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
+
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -230,9 +232,18 @@ func (h *handler) ListProjects(req *restful.Request, resp *restful.Response) {
 	_ = resp.WriteHeaderAndEntity(http.StatusOK, projects)
 }
 
-func (h *handler) listProjects(ctx context.Context, user user.Info, q *query.Query, isInformer bool) (any, error) {
+func (h *handler) listProjects(ctx context.Context, reqUser user.Info, q *query.Query, isInformer bool) (any, error) {
+	// check internal user system:kc-server
+	if reqUser.GetName() != "system:kc-server" {
+		userInfo := reqUser.(*user.DefaultInfo)
+		userInfo.Groups = sliceutil.RemoveString(userInfo.Groups, func(item string) bool {
+			return item == user.AllAuthenticated
+		})
+		reqUser = user.Info(userInfo)
+	}
+
 	listWS := &authorizer.AttributesRecord{
-		User:            user,
+		User:            reqUser,
 		Verb:            "list",
 		APIGroup:        "*",
 		Resource:        "projects",
@@ -254,7 +265,7 @@ func (h *handler) listProjects(ctx context.Context, user user.Info, q *query.Que
 	}
 
 	// retrieving associated resources through role binding
-	workspaceRoleBindings, err := h.listProjectRoleBinding(ctx, user)
+	workspaceRoleBindings, err := h.listProjectRoleBinding(ctx, reqUser)
 	if err != nil {
 		logger.Error("list project role binding", zap.Error(err))
 		return nil, err

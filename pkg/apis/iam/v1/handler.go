@@ -620,6 +620,29 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 	_ = response.WriteEntity(defaultList)
 }
 
+func (h *handler) RetrieveProjectRoleTemplates(request *restful.Request, response *restful.Response) {
+	member := request.PathParameter("member")
+	project := request.PathParameter("project")
+	q := query.ParseQueryParameter(request)
+	q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	projectRole, err := h.iamOperator.GetProjectRoleOfMember(request.Request.Context(), q, member)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	roles, err := h.fetchAggregationProjectRoles(request.Request.Context(), projectRole)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteHeaderAndEntity(http.StatusOK, roles)
+}
+
 func (h *handler) CreateProjectMember(request *restful.Request, response *restful.Response) {
 	projectName := request.PathParameter("project")
 	var members []iamv1.Member
@@ -630,7 +653,7 @@ func (h *handler) CreateProjectMember(request *restful.Request, response *restfu
 
 	var roleBindings []*iamv1.ProjectRoleBinding
 	for _, member := range members {
-		newRoleBinding, err := h.createProjectMember(projectName, member)
+		newRoleBinding, err := h.createProjectMember(request.Request.Context(), projectName, member)
 		if err != nil {
 			if apimachineryErrors.IsNotFound(err) {
 				restplus.HandleNotFound(response, request, err)
@@ -699,25 +722,29 @@ func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv
 	return user, nil
 }
 
-func (h *handler) createProjectMember(projectName string, member iamv1.Member) (*iamv1.ProjectRoleBinding, error) {
-	if _, err := h.iamOperator.GetUserEx(context.TODO(), member.Username, "0", true, false); err != nil {
+func (h *handler) createProjectMember(ctx context.Context, projectName string, member iamv1.Member) (*iamv1.ProjectRoleBinding, error) {
+	if _, err := h.iamOperator.GetUserEx(ctx, member.Username, "0", true, false); err != nil {
 		return nil, err
 	}
-	if _, err := h.iamOperator.GetProjectRoleEx(context.TODO(), member.Role, "0"); err != nil {
+	projectRole, err := h.iamOperator.GetProjectRoleEx(ctx, member.Role, "0")
+	if err != nil {
 		return nil, err
 	}
-	if _, err := h.tenantOperator.GetProjectEx(context.TODO(), projectName, "0"); err != nil {
+	if projectRole.Labels[common.LabelProject] != projectName {
+		return nil, fmt.Errorf("project role %s not belong to project %s", projectRole.Name, projectName)
+	}
+	if _, err = h.tenantOperator.GetProjectEx(ctx, projectName, "0"); err != nil {
 		return nil, err
 	}
 
-	roleBinding, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", projectName, member.Username), "0")
+	roleBinding, err := h.iamOperator.GetProjectRoleBindingEx(ctx, fmt.Sprintf("%s-%s", projectName, member.Username), "0")
 	if err == nil {
 		// already exist with same role, return directly
 		if roleBinding.RoleRef.Name == member.Role {
 			return roleBinding, nil
 		}
 		// user already exist with other role, delete
-		if err = h.iamOperator.DeleteProjectRoleBinding(context.TODO(), fmt.Sprintf("%s-%s", projectName, member.Username)); err != nil {
+		if err = h.iamOperator.DeleteProjectRoleBinding(ctx, fmt.Sprintf("%s-%s", projectName, member.Username)); err != nil {
 			return nil, err
 		}
 	} else if !apimachineryErrors.IsNotFound(err) {
@@ -725,9 +752,21 @@ func (h *handler) createProjectMember(projectName string, member iamv1.Member) (
 		return nil, err
 	}
 	// create new rolebinding
+	result, err := h.createRoleBinding(ctx, projectName, member)
+	if err != nil {
+		return nil, err
+	}
+	// need create a globalRoleBinding,authorize global scope resource view permission to member.
+	if err = h.createViewer(ctx, projectName, member); err != nil {
+		return nil, err
+	}
+	return result, err
+}
+
+func (h *handler) createRoleBinding(ctx context.Context, projectName string, member iamv1.Member) (*iamv1.ProjectRoleBinding, error) {
 	newRoleBinding := &iamv1.ProjectRoleBinding{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ProjectRoleBinding",
+			Kind:       iamv1.KindProjectRoleBinding,
 			APIVersion: iamv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -748,12 +787,51 @@ func (h *handler) createProjectMember(projectName string, member iamv1.Member) (
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: iamv1.SchemeGroupVersion.Group,
-			Kind:     "ProjectRole",
+			Kind:     iamv1.KindProjectRole,
 			Name:     member.Role,
 		},
 	}
-	result, err := h.iamOperator.CreateProjectRoleBinding(context.TODO(), newRoleBinding)
-	return result, err
+	return h.iamOperator.CreateProjectRoleBinding(ctx, newRoleBinding)
+}
+
+func (h *handler) createViewer(ctx context.Context, project string, member iamv1.Member) error {
+	name := fmt.Sprintf("%s-%s", project, member.Username)
+	roleBinding := &iamv1.GlobalRoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindGlobalRoleBinding,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				common.AnnotationDescription: "create rolebinding to authorize project member view global scope resource",
+				common.AnnotationHidden:      "true",
+			},
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				APIGroup: rbacv1.SchemeGroupVersion.String(),
+				Kind:     rbacv1.UserKind,
+				Name:     member.Username,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: iamv1.SchemeGroupVersion.Group,
+			Kind:     iamv1.KindGlobalRole,
+			Name:     "platform-global-view",
+		},
+	}
+	_, err := h.iamOperator.GetRoleBinding(ctx, name)
+	if err == nil {
+		return nil
+	}
+	if !apimachineryErrors.IsNotFound(err) {
+		return err
+	}
+	if _, err = h.iamOperator.CreateRoleBinding(ctx, roleBinding); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (h *handler) UpdateProjectMember(request *restful.Request, response *restful.Response) {
@@ -794,7 +872,8 @@ func (h *handler) UpdateProjectMember(request *restful.Request, response *restfu
 func (h *handler) DeleteProjectMember(request *restful.Request, response *restful.Response) {
 	project := request.PathParameter("project")
 	member := request.PathParameter("member")
-	if _, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", project, member), "0"); err != nil {
+	ctx := request.Request.Context()
+	if _, err := h.iamOperator.GetProjectRoleBindingEx(ctx, fmt.Sprintf("%s-%s", project, member), "0"); err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleNotFound(response, request, err)
 			return
@@ -802,7 +881,14 @@ func (h *handler) DeleteProjectMember(request *restful.Request, response *restfu
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	err := h.iamOperator.DeleteProjectRoleBinding(context.TODO(), fmt.Sprintf("%s-%s", project, member))
+
+	// delete global view roleBinding
+	if err := h.iamOperator.DeleteRoleBinding(ctx, fmt.Sprintf("%s-%s", project, member)); err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	err := h.iamOperator.DeleteProjectRoleBinding(ctx, fmt.Sprintf("%s-%s", project, member))
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -1235,6 +1321,31 @@ func (h *handler) fetchAggregationRoles(ctx context.Context, role *iamv1.GlobalR
 					if apimachineryErrors.IsNotFound(err) {
 						logger.Warn("aggregation role invalid", zap.String("role", role.Name),
 							zap.String("aggregation_role", roleName))
+						continue
+					}
+					return nil, err
+				}
+				roles = append(roles, r)
+			}
+		}
+	}
+	return roles, nil
+}
+
+func (h *handler) fetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole) ([]*iamv1.ProjectRole, error) {
+	roles := make([]*iamv1.ProjectRole, 0)
+	if projectRole == nil || projectRole.Annotations == nil {
+		return roles, nil
+	}
+	if v := projectRole.Annotations[common.AnnotationAggregationRoles]; v != "" {
+		var roleNames []string
+		if err := json.Unmarshal([]byte(v), &roleNames); err == nil {
+			for _, roleName := range roleNames {
+				r, err := h.iamOperator.GetProjectRoleEx(ctx, roleName, "0")
+				if err != nil {
+					if apimachineryErrors.IsNotFound(err) {
+						logger.Warn("aggregation project role invalid", zap.String("project role", projectRole.Name),
+							zap.String("aggregation_project_role", roleName))
 						continue
 					}
 					return nil, err
