@@ -60,6 +60,7 @@ const (
 	RegoOverrideAnnotation     = "kubeclipper.io/rego-override"
 	RoleAnnotation             = "iam.kubeclipper.io/role"
 	AnnotationInternal         = "kubeclipper.io/internal"
+	AnnotationHidden           = "kubeclipper.io/hidden"
 
 	AnnotationMetadataFloatIP        = "metadata.kubeclipper.io/floatIP"
 	AnnotationMetadataProxyServer    = "metadata.kubeclipper.io/proxyServer"

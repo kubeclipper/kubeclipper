@@ -229,8 +229,9 @@ func (r *ProjectReconciler) initManagerRoleBinding(ctx context.Context, p *tenan
 			},
 		},
 	}
+
 	q := query.New()
-	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProjectRoleBindingManager, "true")
+	q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, p.Name), fmt.Sprintf("%s=%s", common.LabelProjectRoleBindingManager, "true")})
 	roleBinding, err := r.IAMOperator.ListProjectRoleBinding(ctx, q)
 	if err != nil {
 		return err
@@ -243,10 +244,16 @@ func (r *ProjectReconciler) initManagerRoleBinding(ctx context.Context, p *tenan
 		return nil
 	}
 	// if exist,check subject name is ok
-	// in normal,there just one robeBingind with label common.LabelProjectRoleBindingManager
+	// in normal,there just one robeBinding with label common.LabelProjectRoleBindingManager
 	for _, item := range roleBinding.Items {
 		if len(item.Subjects) == 0 || item.Subjects[0].Name != p.Spec.Manager {
-			if err = r.IAMOperator.DeleteProjectRoleBinding(ctx, item.Name); err != nil {
+			name := fmt.Sprintf("%s-%s", p.Name, item.Subjects[0].Name)
+			// delete old manager's projectRoleBinding
+			if err = r.IAMOperator.DeleteProjectRoleBinding(ctx, item.Name); err != nil && !errors.IsNotFound(err) {
+				return err
+			}
+			// delete old manager's global view roleBinding
+			if err = r.IAMOperator.DeleteRoleBinding(ctx, name); err != nil && !errors.IsNotFound(err) {
 				return err
 			}
 			if _, err = r.IAMOperator.CreateProjectRoleBinding(ctx, target); err != nil {
@@ -270,7 +277,7 @@ func (r *ProjectReconciler) deleteRoleAndRoleBinding(ctx context.Context, p *ten
 		return err
 	}
 	for _, role := range roles.Items {
-		if err = r.IAMOperator.DeleteRole(ctx, role.Name); err != nil {
+		if err = r.IAMOperator.DeleteProjectRole(ctx, role.Name); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -280,11 +287,15 @@ func (r *ProjectReconciler) deleteRoleAndRoleBinding(ctx context.Context, p *ten
 		return err
 	}
 	for _, roleBinding := range roleBindings.Items {
-		if err = r.IAMOperator.DeleteRoleBinding(ctx, roleBinding.Name); err != nil {
+		if err = r.IAMOperator.DeleteProjectRoleBinding(ctx, roleBinding.Name); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
 
+	name := fmt.Sprintf("%s-%s", p.Name, p.Spec.Manager)
+	if err = r.IAMOperator.DeleteRoleBinding(ctx, name); err != nil && !errors.IsNotFound(err) {
+		return err
+	}
 	return nil
 }
 
@@ -357,7 +368,7 @@ var ProjectRoles = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-access-clusters\",\"role-template-view-backuppoints\",\"role-template-edit-backuppoints\",\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-create-roles\",\"role-template-edit-roles\",\"role-template-delete-roles\",\"role-template-create-users\",\"role-template-edit-users\",\"role-template-delete-users\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-edit-platform\",\"role-template-view-audit\",\"role-template-create-dns\",\"role-template-edit-dns\",\"role-template-delete-dns\",\"role-template-view-dns\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-projectroles\",\"role-template-create-projectroles\",\"role-template-edit-projectroles\",\"role-template-delete-projectroles\",\"role-template-view-projectmembers\",\"role-template-create-projectmembers\",\"role-template-edit-projectmembers\",\"role-template-delete-projectmembers\",\"role-template-view-clusters\",\"role-template-access-clusters\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-nodes\",\"role-template-create-nodes\",\"role-template-edit-nodes\",\"role-template-delete-nodes\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "admin", // real name will generate when creating,format is {project}-admin
@@ -381,7 +392,7 @@ var ProjectRoles = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-access-clusters\",\"role-template-view-backuppoints\",\"role-template-edit-backuppoints\",\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-clusters\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-clusters\",\"role-template-access-clusters\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-nodes\",\"role-template-create-nodes\",\"role-template-edit-nodes\",\"role-template-delete-nodes\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "user",
@@ -406,7 +417,7 @@ var ProjectRoles = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-cloudproviders\",\"role-template-view-backuppoints\",\"role-template-view-registries\",\"role-template-view-clusters\",\"role-template-view-roles\",\"role-template-view-users\",\"role-template-view-platform\",\"role-template-view-audit\",\"role-template-view-dns\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-projectroles\",\"role-template-view-projectmembers\",\"role-template-view-clusters\",\"role-template-view-nodes\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "view",

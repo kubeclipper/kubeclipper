@@ -157,6 +157,7 @@ type ProjectRoleReader interface {
 type ProjectRoleReaderEx interface {
 	ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
 	GetProjectRoleEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRole, error)
+	GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*iamv1.ProjectRole, error)
 }
 
 type ProjectRoleWriter interface {

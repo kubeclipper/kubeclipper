@@ -359,6 +359,21 @@ func (mr *MockOperatorMockRecorder) GetProjectRoleEx(ctx, name, resourceVersion 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleEx", reflect.TypeOf((*MockOperator)(nil).GetProjectRoleEx), ctx, name, resourceVersion)
 }
 
+// GetProjectRoleOfMember mocks base method.
+func (m *MockOperator) GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleOfMember", ctx, query, member)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleOfMember indicates an expected call of GetProjectRoleOfMember.
+func (mr *MockOperatorMockRecorder) GetProjectRoleOfMember(ctx, query, member interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleOfMember", reflect.TypeOf((*MockOperator)(nil).GetProjectRoleOfMember), ctx, query, member)
+}
+
 // GetRole mocks base method.
 func (m *MockOperator) GetRole(ctx context.Context, name string) (*v1.GlobalRole, error) {
 	m.ctrl.T.Helper()
@@ -2130,6 +2145,21 @@ func (mr *MockProjectRoleReaderMockRecorder) GetProjectRoleEx(ctx, name, resourc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleEx", reflect.TypeOf((*MockProjectRoleReader)(nil).GetProjectRoleEx), ctx, name, resourceVersion)
 }
 
+// GetProjectRoleOfMember mocks base method.
+func (m *MockProjectRoleReader) GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleOfMember", ctx, query, member)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleOfMember indicates an expected call of GetProjectRoleOfMember.
+func (mr *MockProjectRoleReaderMockRecorder) GetProjectRoleOfMember(ctx, query, member interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleOfMember", reflect.TypeOf((*MockProjectRoleReader)(nil).GetProjectRoleOfMember), ctx, query, member)
+}
+
 // ListProjectRoleEx mocks base method.
 func (m *MockProjectRoleReader) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
 	m.ctrl.T.Helper()
@@ -2211,6 +2241,21 @@ func (m *MockProjectRoleReaderEx) GetProjectRoleEx(ctx context.Context, name, re
 func (mr *MockProjectRoleReaderExMockRecorder) GetProjectRoleEx(ctx, name, resourceVersion interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleEx", reflect.TypeOf((*MockProjectRoleReaderEx)(nil).GetProjectRoleEx), ctx, name, resourceVersion)
+}
+
+// GetProjectRoleOfMember mocks base method.
+func (m *MockProjectRoleReaderEx) GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*v1.ProjectRole, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectRoleOfMember", ctx, query, member)
+	ret0, _ := ret[0].(*v1.ProjectRole)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectRoleOfMember indicates an expected call of GetProjectRoleOfMember.
+func (mr *MockProjectRoleReaderExMockRecorder) GetProjectRoleOfMember(ctx, query, member interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectRoleOfMember", reflect.TypeOf((*MockProjectRoleReaderEx)(nil).GetProjectRoleOfMember), ctx, query, member)
 }
 
 // ListProjectRoleEx mocks base method.

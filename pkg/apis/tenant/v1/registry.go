@@ -116,17 +116,6 @@ func AddToContainer(c *restful.Container, tenantOperator tenant.Operator, cluste
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.PUT("/projects/{name}/nodes").
-		To(h.AddOrRemoveNode).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreTenantTag}).
-		Doc("Add or remove node to project.").
-		Reads(PatchNodes{}).
-		Param(webservice.PathParameter(query.ParameterName, "project name").
-			Required(true).
-			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
-		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
-
 	c.Add(webservice)
 	return nil
 }

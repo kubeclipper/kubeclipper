@@ -364,6 +364,18 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), []*iamv1.User{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
+	webservice.Route(webservice.GET("/projects/{project}/projectmembers/{member}/roles").
+		To(h.RetrieveProjectRoleTemplates).
+		Doc("List member's role under specified project").
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
+			Required(false).
+			DataFormat("limit=%d,page=%d").
+			DefaultValue("limit=10,page=1")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), []*iamv1.User{}).
+		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
+
 	webservice.Route(webservice.POST("/projects/{project}/projectmembers").
 		To(h.CreateProjectMember).
 		Doc("Add user to project").

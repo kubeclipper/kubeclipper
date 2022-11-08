@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/pkg/errors"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -169,18 +171,23 @@ func (i *iamOperator) GetRoleOfUser(ctx context.Context, username string) (*iamv
 	})
 	// TODO: make error standard
 	if err != nil {
-		return nil, fmt.Errorf("failed list rolebindings")
+		return nil, errors.WithMessage(err, "list roleBinding")
 	}
 	rolebindings, _ := list.(*iamv1.GlobalRoleBindingList)
 	result := make([]iamv1.GlobalRoleBinding, 0)
-	for i, item := range rolebindings.Items {
+	for idx, item := range rolebindings.Items {
 		if contains(item.Subjects, username, nil) {
-			result = append(result, rolebindings.Items[i])
+			result = append(result, rolebindings.Items[idx])
 		}
 	}
 	// Usually, only one globalRoleBinding will be found which is created by front-end
-	if len(result) > 0 {
-		return i.GetRoleEx(ctx, result[0].RoleRef.Name, "0")
+	// in v4.3.2 we add tenant,and will add a internal role to user for view some global resource
+	// so,we need exclude internal role
+	for _, v := range result {
+		if v.Annotations != nil && v.Annotations[common.AnnotationHidden] == "true" {
+			continue
+		}
+		return i.GetRoleEx(ctx, v.RoleRef.Name, "0")
 	}
 	return nil, nil
 }
@@ -543,6 +550,26 @@ func (i *iamOperator) ListProjectRoles(ctx context.Context, query *query.Query) 
 
 func (i *iamOperator) GetProjectRole(ctx context.Context, name string) (*iamv1.ProjectRole, error) {
 	return i.GetProjectRoleEx(ctx, name, "0")
+}
+
+func (i *iamOperator) GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*iamv1.ProjectRole, error) {
+	list, err := models.List(ctx, i.projectRoleBindingStorage, query)
+	if err != nil {
+		return nil, errors.WithMessage(err, "list projectRoleBinding")
+	}
+	rolebindings, _ := list.(*iamv1.ProjectRoleBindingList)
+	result := make([]iamv1.ProjectRoleBinding, 0)
+	for idx, item := range rolebindings.Items {
+		fmt.Printf("rb name:%s ref:%s", item.Name, item.RoleRef.Name)
+		if contains(item.Subjects, member, nil) {
+			result = append(result, rolebindings.Items[idx])
+		}
+	}
+	// Usually, only one globalRoleBinding will be found which is created by front-end
+	if len(result) > 0 {
+		return i.GetProjectRoleEx(ctx, result[0].RoleRef.Name, "0")
+	}
+	return nil, nil
 }
 
 func (i *iamOperator) WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error) {

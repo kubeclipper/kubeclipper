@@ -52,8 +52,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
 
-	schemecorev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	schemetenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
 
@@ -196,7 +196,7 @@ func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 	infoFactory := &request.InfoFactory{
 		APIPrefixes: sets.NewString("api"),
 		GlobalResources: []schema.GroupResource{
-			schemecorev1.Resource("projects"),
+			schemetenantv1.Resource("projects"),
 		},
 	}
 	s.container.Filter(filters.WithRequestInfo(infoFactory))
@@ -313,7 +313,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
-	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, coreOperator, deliverySvc); err != nil {
+	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, coreOperator, deliverySvc, tenantOperator); err != nil {
 		return err
 	}
 	staticResourceSvc, err := staticresource.NewService(s.Config.StaticServerOptions)
@@ -353,6 +353,7 @@ func (s *APIServer) migrateRole(operator iam.Operator) error {
 	}
 
 	for index := range ProjectRolesTemplate {
+		fmt.Println("ProjectRolesTemplate :", ProjectRolesTemplate[index].Name)
 		if _, err = operator.CreateProjectRole(context.TODO(), &ProjectRolesTemplate[index]); err != nil {
 			return err
 		}

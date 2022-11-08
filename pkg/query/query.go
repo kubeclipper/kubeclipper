@@ -151,13 +151,11 @@ func (q *Query) GetFieldSelector() fields.Selector {
 }
 
 func (q *Query) AddLabelSelector(selector []string) {
-	for _, v := range selector {
-		if q.LabelSelector == "" {
-			q.LabelSelector = v
-		} else {
-			q.LabelSelector = fmt.Sprintf("%s,%s", q.LabelSelector, v)
-		}
+	if q.LabelSelector == "" {
+		q.LabelSelector = strings.Join(selector, ",")
+		return
 	}
+	q.LabelSelector = fmt.Sprintf("%s,%s", q.LabelSelector, strings.Join(selector, ","))
 }
 
 func New() *Query {
