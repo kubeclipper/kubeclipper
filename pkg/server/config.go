@@ -859,7 +859,7 @@ var Roles = []iamv1.GlobalRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/rego-override": "package authz\ndefault allow = false\nallow = true {\n  allowedResources := [\"users\"]\n  allowedResources[_] == input.Resource\n  input.User.Name == input.Name\n}\nallow = true {\nallowedResources := [\"projects\"]\nallowedResources[_] == input.Resource\ninput.Verb=\"list\"\n}",
+				"kubeclipper.io/rego-override": "package authz\ndefault allow = false\nallow = true {\n  allowedResources := [\"users\",\"projectmembers\"]\n  allowedResources[_] == input.Resource\n  input.User.Name == input.Name\n}\nallow = true {\nallowedResources := [\"projects\"]\nallowedResources[_] == input.Resource\ninput.Verb=\"list\"\n}",
 				"kubeclipper.io/internal":      "true",
 			},
 			Labels: map[string]string{
