@@ -27,7 +27,7 @@ jobs:
       - name: Get branch name
         id: extract_branch
         shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_HEAD_REF})"
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_BASE_REF})"
       - name: Build
         if: github.event_name == 'pull_request'
         run:
