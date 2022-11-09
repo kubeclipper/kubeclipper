@@ -302,7 +302,7 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 			Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 			ErrIgnore:  false,
 			RetryTimes: 1,
-			Nodes:      utils.UnwrapNodeList(metadata.Masters),
+			Nodes:      utils.UnwrapNodeList(metadata.GetAllNodes()),
 			Action:     v1.ActionInstall,
 			Commands: []v1.Command{
 				{
