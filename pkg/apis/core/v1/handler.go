@@ -790,7 +790,7 @@ func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string, kc
 	// FIXME: KC support secure port deploy
 	var serverCA []byte
 	// TODO: get CA from kc server config
-	serverUrl := fmt.Sprintf("https://%s/cluster/%s", kcHost, clusterName)
+	serverURL := fmt.Sprintf("https://%s/cluster/%s", kcHost, clusterName)
 	user, ok := apirequest.UserFrom(ctx)
 	if !ok {
 		return nil, fmt.Errorf("not get user info")
@@ -801,7 +801,7 @@ func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string, kc
 		return nil, fmt.Errorf("issue token:%w", err)
 	}
 
-	kubecfg := CreateWithToken(serverUrl, clusterName, user.GetName(), serverCA, token.AccessToken)
+	kubecfg := CreateWithToken(serverURL, clusterName, user.GetName(), serverCA, token.AccessToken)
 	// skip all tls verify
 	for _, c := range kubecfg.Clusters {
 		if strings.HasPrefix(strings.ToLower(c.Server), "https") {

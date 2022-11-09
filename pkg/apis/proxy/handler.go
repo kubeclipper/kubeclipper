@@ -19,7 +19,6 @@
 package proxy
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful"
 	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -49,7 +47,7 @@ type handler struct {
 func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	clusterName, k8sResource := parseClusterFromPath(request.URL.Path)
 	if clusterName == "" {
-		http.Error(writer, fmt.Sprintf("cluster name cannot be empty"), http.StatusBadRequest)
+		http.Error(writer, "cluster name cannot be empty", http.StatusBadRequest)
 		return
 	}
 
@@ -89,42 +87,26 @@ func newHandler(clusterReader cluster.ClusterReader) *handler {
 	}
 }
 
-func (h *handler) getClusterConfig(ctx context.Context, clusterName string) (*rest.Config, error) {
-	clu, err := h.clusterReader.GetCluster(ctx, clusterName)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			return nil, restful.NewError(http.StatusNotFound, fmt.Sprintf("cluster %s not exists", clusterName))
-		}
-		return nil, err
-	}
-	if clu.KubeConfig == nil {
-		return nil, restful.NewError(http.StatusNotFound, fmt.Sprintf("cluster %s clientset not init", clusterName))
-	}
-
-	restCfg, err := clientcmd.RESTConfigFromKubeConfig(clu.KubeConfig)
-	if err != nil {
-		return nil, err
-	}
-	return restCfg, nil
-}
-
 func newClusterProxyHandler(restConfig *rest.Config, requestURL *url.URL) (http.Handler, error) {
-	clusterUrl, err := toClusterUrl(restConfig.Host, requestURL)
+	clusterURL, err := toClusterURL(restConfig.Host, requestURL)
 	if err != nil {
 		return nil, err
 	}
 	restTransport, err := rest.TransportFor(restConfig)
+	if err != nil {
+		return nil, err
+	}
 	upgrade, err := makeUpgradeTransport(restConfig, 0)
 	if err != nil {
 		return nil, err
 	}
-	h := proxy.NewUpgradeAwareHandler(clusterUrl, restTransport, true, false, nil)
+	h := proxy.NewUpgradeAwareHandler(clusterURL, restTransport, true, false, nil)
 	h.UpgradeTransport = upgrade
 	return h, nil
 }
 
-func toClusterUrl(restHost string, requestUrl *url.URL) (*url.URL, error) {
-	if requestUrl == nil {
+func toClusterURL(restHost string, requestURL *url.URL) (*url.URL, error) {
+	if requestURL == nil {
 		return nil, fmt.Errorf("request url is nil")
 	}
 	if !strings.HasPrefix(strings.ToLower(restHost), "http") {
@@ -134,17 +116,17 @@ func toClusterUrl(restHost string, requestUrl *url.URL) (*url.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse restHost:%w", err)
 	}
-	if requestUrl != nil {
+	if requestURL != nil {
 		// without host and scheme
-		u.Opaque = requestUrl.Opaque
-		u.User = requestUrl.User
-		u.Path = requestUrl.Path
-		u.RawPath = requestUrl.RawPath
-		u.OmitHost = requestUrl.OmitHost
-		u.ForceQuery = requestUrl.ForceQuery
-		u.RawQuery = requestUrl.RawQuery
-		u.Fragment = requestUrl.Fragment
-		u.RawFragment = requestUrl.RawFragment
+		u.Opaque = requestURL.Opaque
+		u.User = requestURL.User
+		u.Path = requestURL.Path
+		u.RawPath = requestURL.RawPath
+		u.OmitHost = requestURL.OmitHost
+		u.ForceQuery = requestURL.ForceQuery
+		u.RawQuery = requestURL.RawQuery
+		u.Fragment = requestURL.Fragment
+		u.RawFragment = requestURL.RawFragment
 	}
 	return u, nil
 }
