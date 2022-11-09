@@ -241,6 +241,11 @@ var Roles = []iamv1.GlobalRole{
 				Resources: []string{"clusters/terminal"},
 				Verbs:     []string{"get"},
 			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"clusters/proxy"},
+				Verbs:     []string{"*"},
+			},
 		},
 	},
 	{
@@ -499,6 +504,11 @@ var Roles = []iamv1.GlobalRole{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"templates"},
+				Verbs:     []string{"*"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"clusters/proxy"},
 				Verbs:     []string{"*"},
 			},
 		},
@@ -1411,6 +1421,11 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 				Resources: []string{"clusters/terminal"},
 				Verbs:     []string{"get"},
 			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"clusters/proxy"},
+				Verbs:     []string{"*"},
+			},
 		},
 	},
 	{
@@ -1516,6 +1531,11 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"templates"},
+				Verbs:     []string{"*"},
+			},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"clusters/proxy"},
 				Verbs:     []string{"*"},
 			},
 		},

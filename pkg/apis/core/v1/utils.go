@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
@@ -399,4 +400,38 @@ func MarkToOriginNode(ctx context.Context, operator cluster.Operator, kcNodeID s
 	}
 	node.Annotations[common.AnnotationOriginNode] = "true"
 	return operator.UpdateNode(ctx, node)
+}
+
+// CreateWithToken creates a KubeConfig object with access to the API server with a token
+// Copy from  k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig/kubeconfig.go
+func CreateWithToken(serverURL, clusterName, userName string, caCert []byte, token string) *clientcmdapi.Config {
+	config := CreateBasic(serverURL, clusterName, userName, caCert)
+	config.AuthInfos[userName] = &clientcmdapi.AuthInfo{
+		Token: token,
+	}
+	return config
+}
+
+// CreateBasic creates a basic, general KubeConfig object that then can be extended
+// Copy from  k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig/kubeconfig.go
+func CreateBasic(serverURL, clusterName, userName string, caCert []byte) *clientcmdapi.Config {
+	// Use the cluster and the username as the context name
+	contextName := fmt.Sprintf("%s@%s", userName, clusterName)
+
+	return &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			clusterName: {
+				Server:                   serverURL,
+				CertificateAuthorityData: caCert,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			contextName: {
+				Cluster:  clusterName,
+				AuthInfo: userName,
+			},
+		},
+		AuthInfos:      map[string]*clientcmdapi.AuthInfo{},
+		CurrentContext: contextName,
+	}
 }

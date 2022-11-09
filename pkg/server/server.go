@@ -25,67 +25,57 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/projectcontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/models/core"
-	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
-
-	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/tokencontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
-
+	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller/regioncontroller"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/backupcontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/dnscontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
-
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-	schemetenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
-
-	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
-
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/component-base/version"
 
-	"github.com/emicklei/go-restful"
-	"go.uber.org/zap"
-
 	auditingv1 "github.com/kubeclipper/kubeclipper/pkg/apis/auditing/v1"
 	configv1 "github.com/kubeclipper/kubeclipper/pkg/apis/config/v1"
+	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/apis/iam/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/apis/oauth"
+	"github.com/kubeclipper/kubeclipper/pkg/apis/proxy"
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/auditing"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/anonymous"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/bearertoken"
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/internaltoken"
 	authnpath "github.com/kubeclipper/kubeclipper/pkg/authentication/request/path"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/wstoken"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/rbac"
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
+	"github.com/kubeclipper/kubeclipper/pkg/controller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/backupcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/dnscontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/projectcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/regioncontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/tokencontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/healthz"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
+	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	schemetenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/server/config"
 	"github.com/kubeclipper/kubeclipper/pkg/server/filters"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry"
@@ -93,6 +83,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 	"github.com/kubeclipper/kubeclipper/pkg/service/delivery"
 	"github.com/kubeclipper/kubeclipper/pkg/service/staticresource"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/hashutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/metrics"
 )
@@ -194,7 +185,7 @@ func (s *APIServer) Run(stopCh <-chan struct{}) (err error) {
 
 func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 	infoFactory := &request.InfoFactory{
-		APIPrefixes: sets.NewString("api"),
+		APIPrefixes: sets.NewString("api", "cluster"),
 		GlobalResources: []schema.GroupResource{
 			schemetenantv1.Resource("projects"),
 		},
@@ -267,7 +258,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	opOperator := operation.NewOperationOperator(s.storageFactory.Operations())
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
 		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
-	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator)
+	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator, clusterOperator)
 
 	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator)
 	s.Services = append(s.Services, deliverySvc)
@@ -313,7 +304,11 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
-	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, coreOperator, deliverySvc, tenantOperator); err != nil {
+
+	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, coreOperator, deliverySvc, tokenOperator, tenantOperator); err != nil {
+		return err
+	}
+	if err = proxy.AddToContainer(s.container, clusterOperator); err != nil {
 		return err
 	}
 	staticResourceSvc, err := staticresource.NewService(s.Config.StaticServerOptions)
@@ -321,7 +316,6 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, staticResourceSvc)
-
 	return nil
 }
 

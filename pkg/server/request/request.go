@@ -81,6 +81,10 @@ eg: /api/core.kubeclipper.io/v1/nodes/node1
 /api/{api-group}/{version}/projects/{project}/{resource}/{resourceName}
 eg: /api/core.kubeclipper.io/v1/projects/demo1/nodes/node1
 
+Kubernetes proxy paths
+/cluster/{cluster-name}/{k8s-resource}
+eg: /cluster/test-cluster/api/v1/namespaces
+
 NonResource paths
 /healthz
 /metrics
@@ -106,13 +110,6 @@ func (i *InfoFactory) NewRequestInfo(req *http.Request) (*Info, error) {
 		return &requestInfo, nil
 	}
 
-	requestInfo.APIPrefix = currentParts[0]
-	requestInfo.APIGroup = currentParts[1]
-	requestInfo.APIVersion = currentParts[2]
-	requestInfo.IsResourceRequest = true
-
-	currentParts = currentParts[3:]
-
 	switch req.Method {
 	case "POST":
 		requestInfo.Verb = "create"
@@ -128,6 +125,22 @@ func (i *InfoFactory) NewRequestInfo(req *http.Request) (*Info, error) {
 		requestInfo.Verb = ""
 	}
 
+	requestInfo.APIPrefix = currentParts[0]
+	switch requestInfo.APIPrefix {
+	case "api":
+		requestInfo.APIGroup = currentParts[1]
+		requestInfo.APIVersion = currentParts[2]
+		requestInfo.IsResourceRequest = true
+		currentParts = currentParts[3:]
+	case "cluster":
+		requestInfo.Name = currentParts[1]
+		requestInfo.APIGroup = "core.kubeclipper.io"
+		requestInfo.IsResourceRequest = true
+		requestInfo.Resource = "clusters"
+		requestInfo.Subresource = "proxy"
+		requestInfo.ResourceScope = ProjectScope
+		return &requestInfo, nil
+	}
 	// parsing successful, so we now know the proper value for .Parts
 	// requestInfo.Parts = currentParts
 	// URL forms: /projects/{project}/*
