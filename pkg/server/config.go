@@ -1187,7 +1187,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectmembers\": \"view\"}",
 				"kubeclipper.io/alias-name":          "ProjectMember View",
 				"kubeclipper.io/internal":            "true",
@@ -1213,7 +1213,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-projectmembers\",\"role-template-view-projectroles\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectmembers\": \"create\"}",
 				"kubeclipper.io/alias-name":          "ProjectMember Create",
 				"kubeclipper.io/internal":            "true",
@@ -1239,7 +1239,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-projectmembers\",\"role-template-view-projectroles\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectmembers\": \"edit\"}",
 				"kubeclipper.io/alias-name":          "ProjectMember Edit",
 				"kubeclipper.io/internal":            "true",
@@ -1265,7 +1265,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-projectmembers\",\"role-template-view-projectroles\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectmembers\": \"delete\"}",
 				"kubeclipper.io/alias-name":          "ProjectMember Delete",
 				"kubeclipper.io/internal":            "true",
@@ -1291,7 +1291,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-members\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectroles\": \"view\"}",
 				"kubeclipper.io/alias-name":          "ProjectRole View",
 				"kubeclipper.io/internal":            "true",
@@ -1317,7 +1317,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-projectroles\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectroles\": \"create\"}",
 				"kubeclipper.io/alias-name":          "ProjectRole Create",
 				"kubeclipper.io/internal":            "true",
@@ -1343,7 +1343,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-projectroles\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectroles\": \"edit\"}",
 				"kubeclipper.io/alias-name":          "ProjectRole Edit",
 				"kubeclipper.io/internal":            "true",
@@ -1369,7 +1369,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				"kubeclipper.io/dependencies":        "[\"role-template-view-projectroles\"]",
-				"kubeclipper.io/module":              "Access Control",
+				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectroles\": \"delete\"}",
 				"kubeclipper.io/alias-name":          "ProjectRole Delete",
 				"kubeclipper.io/internal":            "true",

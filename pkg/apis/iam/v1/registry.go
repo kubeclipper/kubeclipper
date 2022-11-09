@@ -364,9 +364,9 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), iamv1.ProjectRole{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.PUT("/projects/{project}/projectroles").
+	webservice.Route(webservice.PUT("/projects/{project}/projectroles/{projectrole}").
 		To(h.UpdateProjectRole).
-		Doc("Update role info").
+		Doc("Update projectrole info").
 		Reads(iamv1.ProjectRole{}).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreIAMTag}).
 		Param(webservice.PathParameter("project", "project name")).
@@ -424,7 +424,7 @@ func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperat
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), &iamv1.User{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 
-	webservice.Route(webservice.PUT("/projects/{project}/projectmembers").
+	webservice.Route(webservice.PUT("/projects/{project}/projectmembers/{projectmember}").
 		To(h.UpdateProjectMember).
 		Doc("Update member info in specified project").
 		Reads(iamv1.Member{}).

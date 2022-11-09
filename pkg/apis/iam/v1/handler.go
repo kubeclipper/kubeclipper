@@ -500,9 +500,14 @@ func (h *handler) DescribeProjectRole(request *restful.Request, response *restfu
 
 func (h *handler) UpdateProjectRole(request *restful.Request, response *restful.Response) {
 	project := request.PathParameter("project")
+	projectRole := request.PathParameter("projectrole")
 	newRole := &iamv1.ProjectRole{}
 	if err := request.ReadEntity(newRole); err != nil {
 		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if newRole.Name != projectRole {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the name in URL(%s) and body(%s) dose not match", newRole.Name, projectRole))
 		return
 	}
 
@@ -538,6 +543,7 @@ func (h *handler) UpdateProjectRole(request *restful.Request, response *restful.
 		}
 	}
 	oldRole.Rules = rules
+	oldRole.Annotations[common.AnnotationAggregationRoles] = newRole.Annotations[common.AnnotationAggregationRoles]
 
 	result, err := h.iamOperator.UpdateProjectRole(context.TODO(), oldRole)
 	if err != nil {
@@ -838,9 +844,14 @@ func (h *handler) createViewer(ctx context.Context, project string, member iamv1
 
 func (h *handler) UpdateProjectMember(request *restful.Request, response *restful.Response) {
 	project := request.PathParameter("project")
+	projectMember := request.PathParameter("projectmember")
 	member := &iamv1.Member{}
 	if err := request.ReadEntity(member); err != nil {
 		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if member.Username != projectMember {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the name in URL(%s) and body(%s) dose not match", member.Username, projectMember))
 		return
 	}
 	oldRoleBinding, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", project, member.Username), "0")
@@ -1316,19 +1327,21 @@ func (h *handler) fetchAggregationRoles(ctx context.Context, role *iamv1.GlobalR
 
 	if v := role.Annotations[common.AnnotationAggregationRoles]; v != "" {
 		var roleNames []string
-		if err := json.Unmarshal([]byte(v), &roleNames); err == nil {
-			for _, roleName := range roleNames {
-				r, err := h.iamOperator.GetRoleEx(ctx, roleName, "0")
-				if err != nil {
-					if apimachineryErrors.IsNotFound(err) {
-						logger.Warn("aggregation role invalid", zap.String("role", role.Name),
-							zap.String("aggregation_role", roleName))
-						continue
-					}
-					return nil, err
+		if err := json.Unmarshal([]byte(v), &roleNames); err != nil {
+			return nil, err
+		}
+
+		for _, roleName := range roleNames {
+			r, err := h.iamOperator.GetRoleEx(ctx, roleName, "0")
+			if err != nil {
+				if apimachineryErrors.IsNotFound(err) {
+					logger.Warn("aggregation role invalid", zap.String("role", role.Name),
+						zap.String("aggregation_role", roleName))
+					continue
 				}
-				roles = append(roles, r)
+				return nil, err
 			}
+			roles = append(roles, r)
 		}
 	}
 	return roles, nil
@@ -1367,22 +1380,23 @@ func (h *handler) doFetchAggregationProjectRoles(ctx context.Context, projectRol
 	}
 	if v := projectRole.Annotations[common.AnnotationAggregationRoles]; v != "" {
 		var roleNames []string
-		if err := json.Unmarshal([]byte(v), &roleNames); err == nil {
-			for _, roleName := range roleNames {
-				r, err := h.iamOperator.GetProjectRoleEx(ctx, roleName, "0")
-				if err != nil {
-					if apimachineryErrors.IsNotFound(err) {
-						logger.Warn("aggregation project role invalid", zap.String("project role", projectRole.Name),
-							zap.String("aggregation_project_role", roleName))
-						continue
-					}
-					return nil, err
-				}
-				if filter != nil && !filter(r.Rules) {
+		if err := json.Unmarshal([]byte(v), &roleNames); err != nil {
+			return nil, err
+		}
+		for _, roleName := range roleNames {
+			r, err := h.iamOperator.GetProjectRoleEx(ctx, roleName, "0")
+			if err != nil {
+				if apimachineryErrors.IsNotFound(err) {
+					logger.Warn("aggregation project role invalid", zap.String("project role", projectRole.Name),
+						zap.String("aggregation_project_role", roleName))
 					continue
 				}
-				roles = append(roles, r)
+				return nil, err
 			}
+			if filter != nil && !filter(r.Rules) {
+				continue
+			}
+			roles = append(roles, r)
 		}
 	}
 	return roles, nil
