@@ -2352,6 +2352,22 @@ func (h *handler) DescribeLease(request *restful.Request, response *restful.Resp
 
 func (h *handler) ListDomains(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
+	ctx := request.Request.Context()
+
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() && !q.HasLabelSelector(fmt.Sprintf("!%s", common.LabelProject)) {
+		project := request.PathParameter("project")
+		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	}
+
 	if q.Watch {
 		h.watchDomain(request, response, q)
 		return
@@ -2981,6 +2997,21 @@ func decodeMsgToSSH(msg string) (*SSHCredential, error) {
 
 func (h *handler) ListTemplates(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
+	ctx := request.Request.Context()
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() && !q.HasLabelSelector(fmt.Sprintf("!%s", common.LabelProject)) {
+		project := request.PathParameter("project")
+		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	}
+
 	templates, err := h.clusterOperator.ListTemplatesEx(request.Request.Context(), q)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
@@ -3100,19 +3131,35 @@ func (h *handler) DescribeBackupPoint(request *restful.Request, response *restfu
 
 func (h *handler) ListBackupPoints(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
+	ctx := request.Request.Context()
+
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() && !q.HasLabelSelector(fmt.Sprintf("!%s", common.LabelProject)) {
+		project := request.PathParameter("project")
+		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(response, request, err)
+				return
+			}
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	}
+
 	if q.Watch {
 		h.watchBackupPoints(request, response, q)
 		return
 	}
 	if clientrest.IsInformerRawQuery(request.Request) {
-		result, err := h.clusterOperator.ListBackupPoints(request.Request.Context(), q)
+		result, err := h.clusterOperator.ListBackupPoints(ctx, q)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 	} else {
-		result, err := h.clusterOperator.ListBackupPointEx(request.Request.Context(), q)
+		result, err := h.clusterOperator.ListBackupPointEx(ctx, q)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -3902,19 +3949,35 @@ func (h *handler) DescribeRegistry(req *restful.Request, resp *restful.Response)
 
 func (h *handler) ListRegistry(req *restful.Request, resp *restful.Response) {
 	q := query.ParseQueryParameter(req)
+	ctx := req.Request.Context()
+
+	info, _ := reqpkg.InfoFrom(ctx)
+	if info.IsProjectScope() && !q.HasLabelSelector(fmt.Sprintf("!%s", common.LabelProject)) {
+		project := req.PathParameter("project")
+		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
+			if apimachineryErrors.IsNotFound(err) {
+				restplus.HandleNotFound(resp, req, err)
+				return
+			}
+			restplus.HandleInternalError(resp, req, err)
+			return
+		}
+		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
+	}
+
 	if q.Watch {
 		h.watchRegistries(req, resp, q)
 		return
 	}
 	if clientrest.IsInformerRawQuery(req.Request) {
-		result, err := h.clusterOperator.ListRegistries(req.Request.Context(), q)
+		result, err := h.clusterOperator.ListRegistries(ctx, q)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)
 			return
 		}
 		_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
 	} else {
-		result, err := h.clusterOperator.ListRegistriesEx(req.Request.Context(), q)
+		result, err := h.clusterOperator.ListRegistriesEx(ctx, q)
 		if err != nil {
 			restplus.HandleInternalError(resp, req, err)
 			return

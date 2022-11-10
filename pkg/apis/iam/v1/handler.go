@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
@@ -498,9 +500,14 @@ func (h *handler) DescribeProjectRole(request *restful.Request, response *restfu
 
 func (h *handler) UpdateProjectRole(request *restful.Request, response *restful.Response) {
 	project := request.PathParameter("project")
+	projectRole := request.PathParameter("projectrole")
 	newRole := &iamv1.ProjectRole{}
 	if err := request.ReadEntity(newRole); err != nil {
 		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if newRole.Name != projectRole {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the name in URL(%s) and body(%s) dose not match", newRole.Name, projectRole))
 		return
 	}
 
@@ -536,6 +543,7 @@ func (h *handler) UpdateProjectRole(request *restful.Request, response *restful.
 		}
 	}
 	oldRole.Rules = rules
+	oldRole.Annotations[common.AnnotationAggregationRoles] = newRole.Annotations[common.AnnotationAggregationRoles]
 
 	result, err := h.iamOperator.UpdateProjectRole(context.TODO(), oldRole)
 	if err != nil {
@@ -592,15 +600,9 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 	}
 
 	users := make([]iamv1.User, 0)
-	// TODO: add user selector filter
-	// q := query.ParseQueryParameter(request)
 	for _, roleBinding := range roleBindings.Items {
 		user, err := h.getProjectMember(&roleBinding)
 		if err != nil {
-			if apimachineryErrors.IsNotFound(err) {
-				restplus.HandleNotFound(response, request, err)
-				return
-			}
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -635,7 +637,7 @@ func (h *handler) RetrieveProjectRoleTemplates(request *restful.Request, respons
 		return
 	}
 
-	roles, err := h.fetchAggregationProjectRoles(request.Request.Context(), projectRole)
+	roles, err := h.fetchAggregationProjectRoles(request.Request.Context(), projectRole, project, member)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -712,6 +714,10 @@ func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv
 	}
 	user, err := h.iamOperator.GetUser(context.TODO(), roleBinding.Subjects[0].Name)
 	if err != nil {
+		// if user not found,ignore this roleBinding
+		if apimachineryErrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if user.Annotations == nil {
@@ -836,9 +842,14 @@ func (h *handler) createViewer(ctx context.Context, project string, member iamv1
 
 func (h *handler) UpdateProjectMember(request *restful.Request, response *restful.Response) {
 	project := request.PathParameter("project")
+	projectMember := request.PathParameter("projectmember")
 	member := &iamv1.Member{}
 	if err := request.ReadEntity(member); err != nil {
 		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if member.Username != projectMember {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the name in URL(%s) and body(%s) dose not match", member.Username, projectMember))
 		return
 	}
 	oldRoleBinding, err := h.iamOperator.GetProjectRoleBindingEx(context.TODO(), fmt.Sprintf("%s-%s", project, member.Username), "0")
@@ -1314,47 +1325,89 @@ func (h *handler) fetchAggregationRoles(ctx context.Context, role *iamv1.GlobalR
 
 	if v := role.Annotations[common.AnnotationAggregationRoles]; v != "" {
 		var roleNames []string
-		if err := json.Unmarshal([]byte(v), &roleNames); err == nil {
-			for _, roleName := range roleNames {
-				r, err := h.iamOperator.GetRoleEx(ctx, roleName, "0")
-				if err != nil {
-					if apimachineryErrors.IsNotFound(err) {
-						logger.Warn("aggregation role invalid", zap.String("role", role.Name),
-							zap.String("aggregation_role", roleName))
-						continue
-					}
-					return nil, err
+		if err := json.Unmarshal([]byte(v), &roleNames); err != nil {
+			return nil, err
+		}
+
+		for _, roleName := range roleNames {
+			r, err := h.iamOperator.GetRoleEx(ctx, roleName, "0")
+			if err != nil {
+				if apimachineryErrors.IsNotFound(err) {
+					logger.Warn("aggregation role invalid", zap.String("role", role.Name),
+						zap.String("aggregation_role", roleName))
+					continue
 				}
-				roles = append(roles, r)
+				return nil, err
 			}
+			roles = append(roles, r)
 		}
 	}
 	return roles, nil
 }
 
-func (h *handler) fetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole) ([]*iamv1.ProjectRole, error) {
+func (h *handler) fetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole, projectName, member string) ([]*iamv1.ProjectRole, error) {
+	if projectRole != nil {
+		return h.doFetchAggregationProjectRoles(ctx, projectRole, nil)
+	}
+	// if user's projectRole not exist,maybe it's a platform user
+	// so we try to query admin role,and fetch aggregation rule
+	adminProjectRole, err := h.iamOperator.GetProjectRole(ctx, fmt.Sprintf("%s-%s", projectName, member))
+	if err != nil {
+		return nil, err
+	}
+	role, err := h.iamOperator.GetRoleOfUser(ctx, member)
+	if err != nil {
+		return nil, err
+	}
+	switch role.Name {
+	case "platform-view":
+		return h.doFetchAggregationProjectRoles(ctx, adminProjectRole, func(rules []rbacv1.PolicyRule) bool {
+			return isViewer(rules)
+		})
+	case "platform-admin":
+		return h.doFetchAggregationProjectRoles(ctx, adminProjectRole, nil)
+	default:
+		return nil, nil
+	}
+}
+
+func (h *handler) doFetchAggregationProjectRoles(ctx context.Context, projectRole *iamv1.ProjectRole, filter func(rules []rbacv1.PolicyRule) bool) ([]*iamv1.ProjectRole, error) {
 	roles := make([]*iamv1.ProjectRole, 0)
 	if projectRole == nil || projectRole.Annotations == nil {
-		return roles, nil
+		return nil, nil
 	}
 	if v := projectRole.Annotations[common.AnnotationAggregationRoles]; v != "" {
 		var roleNames []string
-		if err := json.Unmarshal([]byte(v), &roleNames); err == nil {
-			for _, roleName := range roleNames {
-				r, err := h.iamOperator.GetProjectRoleEx(ctx, roleName, "0")
-				if err != nil {
-					if apimachineryErrors.IsNotFound(err) {
-						logger.Warn("aggregation project role invalid", zap.String("project role", projectRole.Name),
-							zap.String("aggregation_project_role", roleName))
-						continue
-					}
-					return nil, err
+		if err := json.Unmarshal([]byte(v), &roleNames); err != nil {
+			return nil, err
+		}
+		for _, roleName := range roleNames {
+			r, err := h.iamOperator.GetProjectRoleEx(ctx, roleName, "0")
+			if err != nil {
+				if apimachineryErrors.IsNotFound(err) {
+					logger.Warn("aggregation project role invalid", zap.String("project role", projectRole.Name),
+						zap.String("aggregation_project_role", roleName))
+					continue
 				}
-				roles = append(roles, r)
+				return nil, err
 			}
+			if filter != nil && !filter(r.Rules) {
+				continue
+			}
+			roles = append(roles, r)
 		}
 	}
 	return roles, nil
+}
+
+func isViewer(rules []rbacv1.PolicyRule) bool {
+	viewer := sets.NewString("get", "list", "watch")
+	for _, rule := range rules {
+		if len(rule.Verbs) > 3 || !viewer.HasAll(rule.Verbs...) {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *handler) verifyUserPassword(ctx context.Context, username, password string) (bool, error) {

@@ -159,6 +159,17 @@ func (q *Query) AddLabelSelector(selector []string) {
 	q.LabelSelector = fmt.Sprintf("%s,%s", q.LabelSelector, strings.Join(selector, ","))
 }
 
+// HasLabelSelector check label is exist
+func (q *Query) HasLabelSelector(selector string) bool {
+	split := strings.Split(q.LabelSelector, ",")
+	for _, v := range split {
+		if v == selector {
+			return true
+		}
+	}
+	return false
+}
+
 func New() *Query {
 	return &Query{
 		Pagination: NoPagination(),

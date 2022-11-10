@@ -368,7 +368,7 @@ var ProjectRoles = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-projectroles\",\"role-template-create-projectroles\",\"role-template-edit-projectroles\",\"role-template-delete-projectroles\",\"role-template-view-projectmembers\",\"role-template-create-projectmembers\",\"role-template-edit-projectmembers\",\"role-template-delete-projectmembers\",\"role-template-view-clusters\",\"role-template-access-clusters\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-nodes\",\"role-template-create-nodes\",\"role-template-edit-nodes\",\"role-template-delete-nodes\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-users\",\"role-template-view-dns\",\"role-template-view-backuppoints\",\"role-template-view-templates\",\"role-template-view-registries\",\"role-template-view-projectroles\",\"role-template-create-projectroles\",\"role-template-edit-projectroles\",\"role-template-delete-projectroles\",\"role-template-view-projectmembers\",\"role-template-create-projectmembers\",\"role-template-edit-projectmembers\",\"role-template-delete-projectmembers\",\"role-template-view-clusters\",\"role-template-access-clusters\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-nodes\",\"role-template-create-nodes\",\"role-template-edit-nodes\",\"role-template-delete-nodes\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "admin", // real name will generate when creating,format is {project}-admin
@@ -392,7 +392,7 @@ var ProjectRoles = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-clusters\",\"role-template-access-clusters\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-nodes\",\"role-template-create-nodes\",\"role-template-edit-nodes\",\"role-template-delete-nodes\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-dns\",\"role-template-view-backuppoints\",\"role-template-view-templates\",\"role-template-view-registries\",\"role-template-view-clusters\",\"role-template-access-clusters\",\"role-template-create-clusters\",\"role-template-edit-clusters\",\"role-template-delete-clusters\",\"role-template-view-nodes\",\"role-template-create-nodes\",\"role-template-edit-nodes\",\"role-template-delete-nodes\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "user",
@@ -400,12 +400,12 @@ var ProjectRoles = []iamv1.ProjectRole{
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "nodes", "regions", "operations"},
+				Resources: []string{"domains", "domains/records", "backuppoints", "templates", "templates"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions", "operations"},
+				Resources: []string{"clusters", "clusters/plugins", "clusters/join", "clusters/nodes", "clusters/backups", "clusters/cronbackups", "clusters/certification", "clusters/kubeconfig", "nodes", "operations"},
 				Verbs:     []string{"*"},
 			},
 		},
@@ -417,7 +417,7 @@ var ProjectRoles = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/aggregation-roles": "[\"role-template-view-projectroles\",\"role-template-view-projectmembers\",\"role-template-view-clusters\",\"role-template-view-nodes\"]",
+				"kubeclipper.io/aggregation-roles": "[\"role-template-view-dns\",\"role-template-view-backuppoints\",\"role-template-view-templates\",\"role-template-view-registries\",\"role-template-view-projectroles\",\"role-template-view-projectmembers\",\"role-template-view-clusters\",\"role-template-view-nodes\"]",
 				"kubeclipper.io/internal":          "true",
 			},
 			Name: "view",
