@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
@@ -248,8 +249,20 @@ func (cli *Client) DeleteRole(ctx context.Context, name string) error {
 	return nil
 }
 
+// DeleteCluster Delete Cluster with name
+// Deprecated. Use DeleteClusterWithQuery instead
 func (cli *Client) DeleteCluster(ctx context.Context, name string) error {
 	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", clustersPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteClusterWithQuery Delete Cluster with name and custom query parameter
+func (cli *Client) DeleteClusterWithQuery(ctx context.Context, name string, queryString url.Values) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", clustersPath, name), queryString, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return err

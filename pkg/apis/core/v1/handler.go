@@ -71,6 +71,11 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 )
 
+var (
+	allowedDeleteStatus = sets.NewString(string(v1.ClusterInstallFailed), string(v1.ClusterRunning), string(v1.ClusterUpgradeFailed),
+		string(v1.ClusterBackupError), string(v1.ClusterRestoreFailed), string(v1.ClusterTerminateFailed))
+)
+
 type handler struct {
 	clusterOperator  cluster.Operator
 	leaseOperator    lease.Operator
@@ -320,14 +325,8 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		restplus.HandleBadRequest(response, request, errors.New("can't delete cluster which belongs to provider"))
 		return
 	}
-
-	extraMeta, err := h.getClusterMetadata(request.Request.Context(), c)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
-			restplus.HandleBadRequest(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
+	if !allowedDeleteStatus.Has(string(c.Status.Phase)) {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("can't delete cluster when cluster is %s", c.Status.Phase))
 		return
 	}
 
@@ -339,9 +338,20 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		return
 	}
 	if backups.TotalCount > 0 {
-		restplus.HandleInternalError(response, request, fmt.Errorf("before deleting the cluster, please delete the cluster backup file first"))
+		restplus.HandleBadRequest(response, request, fmt.Errorf("before deleting the cluster, please delete the cluster backup file first"))
 		return
 	}
+
+	extraMeta, err := h.getClusterMetadata(request.Request.Context(), c)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
 	extraMeta.OperationType = v1.OperationDeleteCluster
 	op, err := h.parseOperationFromCluster(extraMeta, c, v1.ActionUninstall)
 	if err != nil {
