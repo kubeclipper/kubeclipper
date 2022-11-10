@@ -600,15 +600,9 @@ func (h *handler) ListProjectMember(request *restful.Request, response *restful.
 	}
 
 	users := make([]iamv1.User, 0)
-	// TODO: add user selector filter
-	// q := query.ParseQueryParameter(request)
 	for _, roleBinding := range roleBindings.Items {
 		user, err := h.getProjectMember(&roleBinding)
 		if err != nil {
-			if apimachineryErrors.IsNotFound(err) {
-				restplus.HandleNotFound(response, request, err)
-				return
-			}
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -720,6 +714,10 @@ func (h *handler) getProjectMember(roleBinding *iamv1.ProjectRoleBinding) (*iamv
 	}
 	user, err := h.iamOperator.GetUser(context.TODO(), roleBinding.Subjects[0].Name)
 	if err != nil {
+		// if user not found,ignore this roleBinding
+		if apimachineryErrors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	if user.Annotations == nil {

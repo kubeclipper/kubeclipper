@@ -1290,7 +1290,7 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				"kubeclipper.io/dependencies":        "[\"role-template-view-members\"]",
+				"kubeclipper.io/dependencies":        "[\"role-template-view-projectmembers\"]",
 				"kubeclipper.io/module":              "Project Setting",
 				"kubeclipper.io/role-template-rules": "{\"projectroles\": \"view\"}",
 				"kubeclipper.io/alias-name":          "ProjectRole View",
