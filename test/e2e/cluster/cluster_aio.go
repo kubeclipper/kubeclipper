@@ -21,9 +21,12 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kubeclipper/kubeclipper/test/e2e/project"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -47,6 +50,10 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 		ginkgo.By("waiting for cluster to be deleted")
 		err = cluster.WaitForClusterNotFound(f.Client, clusterName, f.Timeouts.ClusterDelete)
 		framework.ExpectNoError(err)
+
+		ginkgo.By("delete e2e project")
+		err = project.DeleteProject(f)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.BeforeEach(func() {
@@ -62,6 +69,15 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 		for _, node := range nodes.Items {
 			nodeID = append(nodeID, node.Name)
 		}
+		ginkgo.By("create e2e project")
+		err = project.CreateProject(f, nodeID)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("wait node join e2e project")
+		for _, v := range nodeID {
+			err := cluster.WaitForNodeJoinProject(f.Client, v, time.Second*10)
+			framework.ExpectNoError(err)
+		}
 	})
 
 	ginkgo.It("should create a AIO minimal kubernetes cluster and ensure cluster is running.", func() {
@@ -75,6 +91,7 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 		}
 
 		ginkgo.By("check cluster status is running")
+		clusterName = fmt.Sprintf("%s-%s", project.DefaultE2EProject, clusterName)
 		err = cluster.WaitForClusterRunning(f.Client, clusterName, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
 
@@ -93,6 +110,9 @@ func initAIOCluster(clusterName string, nodeID []string) *corev1.Cluster {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
+			Labels: map[string]string{
+				common.LabelProject: project.DefaultE2EProject,
+			},
 			Annotations: map[string]string{
 				common.AnnotationOffline: "true",
 			},

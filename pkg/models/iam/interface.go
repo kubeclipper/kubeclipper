@@ -147,6 +147,7 @@ type LoginRecordWriter interface {
 	DeleteLoginRecordCollection(ctx context.Context, query *query.Query) error
 }
 
+// ProjectRoleReader include method set of read projectRole.
 type ProjectRoleReader interface {
 	ListProjectRoles(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleList, error)
 	GetProjectRole(ctx context.Context, name string) (*iamv1.ProjectRole, error)
@@ -154,18 +155,21 @@ type ProjectRoleReader interface {
 	ProjectRoleReaderEx
 }
 
+// ProjectRoleReaderEx include method set of ex read projectRole.
 type ProjectRoleReaderEx interface {
 	ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
 	GetProjectRoleEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRole, error)
 	GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*iamv1.ProjectRole, error)
 }
 
+// ProjectRoleWriter include method set of write projectRole.
 type ProjectRoleWriter interface {
 	CreateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error)
 	DeleteProjectRole(ctx context.Context, name string) error
 	UpdateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error)
 }
 
+// ProjectRoleBindingReader include method set of read projectRoleBinding.
 type ProjectRoleBindingReader interface {
 	ListProjectRoleBinding(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleBindingList, error)
 	GetProjectRoleBinding(ctx context.Context, name string) (*iamv1.ProjectRoleBinding, error)
@@ -173,11 +177,13 @@ type ProjectRoleBindingReader interface {
 	ProjectRoleBindingReaderEx
 }
 
+// ProjectRoleBindingReaderEx include method set of ex read projectRoleBinding.
 type ProjectRoleBindingReaderEx interface {
 	ListProjectRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
 	GetProjectRoleBindingEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRoleBinding, error)
 }
 
+// ProjectRoleBindingWriter include method set of write projectRoleBinding.
 type ProjectRoleBindingWriter interface {
 	CreateProjectRoleBinding(ctx context.Context, user *iamv1.ProjectRoleBinding) (*iamv1.ProjectRoleBinding, error)
 	DeleteProjectRoleBinding(ctx context.Context, name string) error

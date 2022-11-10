@@ -26,6 +26,8 @@ import (
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
+
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -44,6 +46,7 @@ const (
 	versionPath       = "/version"
 	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
 	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
+	projectPath       = "/api/tenant.kubeclipper.io/v1/projects"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -460,4 +463,66 @@ func (cli *Client) UpdateConfigMap(ctx context.Context, cm *v1.ConfigMap) (*Conf
 		Items: []v1.ConfigMap{v},
 	}
 	return &cms, err
+}
+
+func (cli *Client) CreateProject(ctx context.Context, project *tenantv1.Project) (*tenantv1.ProjectList, error) {
+	serverResp, err := cli.post(ctx, projectPath, nil, project, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := tenantv1.Project{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	projects := tenantv1.ProjectList{
+		Items: []tenantv1.Project{v},
+	}
+	return &projects, err
+}
+
+func (cli *Client) UpdateProject(ctx context.Context, cm *tenantv1.Project) (*tenantv1.ProjectList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", projectPath, cm.Name), nil, cm, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := tenantv1.Project{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	projects := &tenantv1.ProjectList{
+		Items: []tenantv1.Project{v},
+	}
+	return projects, err
+}
+
+func (cli *Client) DeleteProject(ctx context.Context, name string) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", projectPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cli *Client) ListProjects(ctx context.Context, query Queries) (*tenantv1.ProjectList, error) {
+	serverResp, err := cli.get(ctx, projectPath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	projects := tenantv1.ProjectList{}
+	err = json.NewDecoder(serverResp.body).Decode(&projects)
+	return &projects, err
+}
+
+func (cli *Client) DescribeProjects(ctx context.Context, name string) (*tenantv1.ProjectList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", projectPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	project := tenantv1.Project{}
+	err = json.NewDecoder(serverResp.body).Decode(&project)
+	projects := &tenantv1.ProjectList{
+		Items: []tenantv1.Project{project},
+	}
+	return projects, err
 }

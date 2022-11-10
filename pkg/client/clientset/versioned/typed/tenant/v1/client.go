@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 implements tenant/v1 client.
 package v1
 
 import (
@@ -30,19 +31,23 @@ import (
 
 var _ TenantV1Interface = (*TenantV1Client)(nil)
 
+// TenantV1Interface include the clientset about tenant resource
 type TenantV1Interface interface {
 	RESTClient() rest.Interface
 	ProjectsGetter
 }
 
+// TenantV1Client implement TenantV1Interface
 type TenantV1Client struct {
 	restClient rest.Interface
 }
 
+// New return a TenantV1Interface
 func New(c rest.Interface) TenantV1Interface {
 	return &TenantV1Client{restClient: c}
 }
 
+// RESTClient return a RESTClient
 func (c *TenantV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
@@ -50,10 +55,12 @@ func (c *TenantV1Client) RESTClient() rest.Interface {
 	return c.restClient
 }
 
+// Projects return an obj which implement ProjectInterface
 func (c *TenantV1Client) Projects() ProjectInterface {
 	return newProjects(c)
 }
 
+// NewForConfig return a TenantV1Client from config.
 func NewForConfig(c *rest.Config) (*TenantV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {

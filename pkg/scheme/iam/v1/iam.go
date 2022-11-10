@@ -278,6 +278,7 @@ type TokenList struct {
 	Items           []Token `json:"items"`
 }
 
+// Member request of create、update project member
 type Member struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
@@ -287,6 +288,7 @@ type Member struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ProjectRole define of projectRole.
 type ProjectRole struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -310,6 +312,7 @@ type ProjectRoleList struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ProjectRoleBinding define of projectRoleBinding.
 type ProjectRoleBinding struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

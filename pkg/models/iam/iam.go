@@ -673,6 +673,7 @@ func (i *iamOperator) UpdateProjectRoleBinding(ctx context.Context, roleBinding 
 	return obj.(*iamv1.ProjectRoleBinding), nil
 }
 
+// UserFuzzyFilter func for filter user.
 func UserFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	users, ok := obj.(*iamv1.UserList)
 	if !ok {

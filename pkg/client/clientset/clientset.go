@@ -49,6 +49,7 @@ func (c *Clientset) IamV1() iamv1.IamV1Interface {
 	return c.iamv1
 }
 
+// TenantV1 return tenant v1 client
 func (c *Clientset) TenantV1() tenantv1.TenantV1Interface {
 	return c.tenantv1
 }

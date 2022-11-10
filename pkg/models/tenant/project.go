@@ -16,6 +16,7 @@
  *
  */
 
+// Package tenant implements tenant v1 resource's crud.
 package tenant
 
 import (
@@ -43,6 +44,7 @@ type projectOperator struct {
 	storage rest.StandardStorage
 }
 
+// NewProjectOperator return a ProjectOperator
 func NewProjectOperator(ss rest.StandardStorage) Operator {
 	return &projectOperator{
 		storage: ss,
@@ -104,6 +106,7 @@ func (p *projectOperator) DeleteProject(ctx context.Context, name string) error 
 	return err
 }
 
+// ProjectFilter filter project by query.
 func ProjectFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	projects, ok := obj.(*v1.ProjectList)
 	if !ok {

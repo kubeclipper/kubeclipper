@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 implements clientset for tenant resource.
 package v1
 
 import (
@@ -33,10 +34,12 @@ import (
 
 var _ ProjectInterface = (*projects)(nil)
 
+// ProjectsGetter get ProjectInterface
 type ProjectsGetter interface {
 	Projects() ProjectInterface
 }
 
+// ProjectInterface method set of project lister.
 type ProjectInterface interface {
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*tenantv1.Project, error)
 	List(ctx context.Context, opts v1.ListOptions) (*tenantv1.ProjectList, error)

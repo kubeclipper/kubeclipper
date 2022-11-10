@@ -16,6 +16,7 @@
  *
  */
 
+// Package projectrole implement ProjectRole's StandardStorage
 package projectrole
 
 import (
@@ -40,23 +41,18 @@ var (
 	_ rest.RESTDeleteStrategy = ProjectRoleStrategy{}
 )
 
+// ProjectRoleStrategy implement ProjectRoleStrategy.
 type ProjectRoleStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
-func (s ProjectRoleStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
-}
-
-func (s ProjectRoleStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
-}
-
+// NewStrategy return a ProjectRoleStrategy
 func NewStrategy(typer runtime.ObjectTyper) ProjectRoleStrategy {
 	return ProjectRoleStrategy{typer, names.SimpleNameGenerator}
 }
 
+// GetAttrs return a ProjectRoleS's label and selectable fields.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	c, ok := obj.(*v1.ProjectRole)
 	if !ok {
@@ -65,10 +61,12 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return c.ObjectMeta.Labels, SelectableFields(c), nil
 }
 
+// SelectableFields return obj's fields.Set.
 func SelectableFields(obj *v1.ProjectRole) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
 }
 
+// MatchProjectRole return a  SelectionPredicate.
 func MatchProjectRole(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
@@ -77,31 +75,49 @@ func MatchProjectRole(label labels.Selector, field fields.Selector) storage.Sele
 	}
 }
 
+// NamespaceScoped return is ProjectRole namespaced.
 func (ProjectRoleStrategy) NamespaceScoped() bool {
 	return false
 }
 
+// PrepareForCreate hook trigger before create
 func (ProjectRoleStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
+// PrepareForUpdate hook trigger before update
 func (ProjectRoleStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
+// Validate check obj is valid.
 func (ProjectRoleStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 
+// AllowCreateOnUpdate return is ProjectRole allow create on update
 func (ProjectRoleStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// AllowUnconditionalUpdate return is ProjectRole allow unconditiona on update
 func (ProjectRoleStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
+// Canonicalize make obj canonicalize
 func (ProjectRoleStrategy) Canonicalize(obj runtime.Object) {
 }
 
+// ValidateUpdate validate before update
 func (ProjectRoleStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnCreate returns warnings for the given create.
+func (ProjectRoleStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ProjectRoleStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

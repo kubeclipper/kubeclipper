@@ -182,6 +182,7 @@ func splitPath(path string) []string {
 	return strings.Split(path, "/")
 }
 
+// request scope enum
 const (
 	GlobalScope  = "Global"
 	ProjectScope = "Project"

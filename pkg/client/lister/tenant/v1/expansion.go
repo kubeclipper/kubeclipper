@@ -16,7 +16,9 @@
  *
  */
 
+// Package v1 implements tenant v1 resource's informer.
 package v1
 
+// ProjectListerExpansion .
 type ProjectListerExpansion interface {
 }

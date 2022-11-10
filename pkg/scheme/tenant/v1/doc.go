@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 include all tenant v1 resource scheme.
 package v1
 
 // +k8s:deepcopy-gen=package

@@ -16,6 +16,7 @@
  *
  */
 
+// Package project implement Project's StandardStorage
 package project
 
 import (
@@ -40,15 +41,18 @@ var (
 	_ rest.RESTDeleteStrategy = ProjectStrategy{}
 )
 
+// ProjectStrategy implement projectStrategy.
 type ProjectStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
+// NewStrategy return a ProjectStrategy
 func NewStrategy(typer runtime.ObjectTyper) ProjectStrategy {
 	return ProjectStrategy{typer, names.SimpleNameGenerator}
 }
 
+// GetAttrs return a ProjectS's label and selectable fields.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	c, ok := obj.(*v1.Project)
 	if !ok {
@@ -57,12 +61,12 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return c.ObjectMeta.Labels, SelectableFields(c), nil
 }
 
+// SelectableFields return obj's fields.Set.
 func SelectableFields(obj *v1.Project) fields.Set {
-	return generic.AddObjectMetaFieldsSet(fields.Set{
-		"name": obj.Name,
-	}, &obj.ObjectMeta, false)
+	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
 }
 
+// MatchProject return a  SelectionPredicate.
 func MatchProject(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
@@ -71,39 +75,49 @@ func MatchProject(label labels.Selector, field fields.Selector) storage.Selectio
 	}
 }
 
+// NamespaceScoped return is Project namespaced.
 func (ProjectStrategy) NamespaceScoped() bool {
 	return false
 }
 
+// PrepareForCreate hook trigger before create
 func (ProjectStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
+// PrepareForUpdate hook trigger before update
 func (ProjectStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
+// Validate check obj is valid.
 func (ProjectStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 
+// AllowCreateOnUpdate return is Project allow create on update
 func (ProjectStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// AllowUnconditionalUpdate return is Project allow unconditiona on update
 func (ProjectStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
+// Canonicalize make obj canonicalize
 func (ProjectStrategy) Canonicalize(obj runtime.Object) {
 }
 
+// ValidateUpdate validate before update
 func (ProjectStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 
+// WarningsOnCreate returns warnings for the given create.
 func (ProjectStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
 
+// WarningsOnUpdate returns warnings for the given update.
 func (ProjectStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }

@@ -136,6 +136,7 @@ func ListExV2(ctx context.Context, s rest.StandardStorage, q *query.Query, litTo
 	}, nil
 }
 
+// DefaultList a func to build a PageableResponse
 func DefaultList(object runtime.Object, q *query.Query, litToSliceFunc ListToObjectSliceFunction, compareFunc CompareFunc, mutatingFunc MutatingFunc) (*PageableResponse, error) {
 	if mutatingFunc == nil {
 		mutatingFunc = DefaultMutatingFunc

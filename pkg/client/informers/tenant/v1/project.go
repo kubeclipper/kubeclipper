@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 implements tenant v1 resource's informer.
 package v1
 
 import (
@@ -34,6 +35,7 @@ import (
 	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 )
 
+// ProjectInformer include method set of get tenant v1 resource's informer and lister.
 type ProjectInformer interface {
 	Informer() cache.SharedIndexInformer
 	Lister() tenantv1Lister.ProjectLister
@@ -44,11 +46,13 @@ type projectInformer struct {
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
+// NewProjectInformer return a project informer.
 func NewProjectInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredRegionInformer(client, resyncPeriod, indexers, nil)
+	return NewFilteredProjectInformer(client, resyncPeriod, indexers, nil)
 }
 
-func NewFilteredRegionInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+// NewFilteredProjectInformer return a project informer.
+func NewFilteredProjectInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -71,7 +75,7 @@ func NewFilteredRegionInformer(client clientset.Interface, resyncPeriod time.Dur
 }
 
 func (f *projectInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredRegionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredProjectInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *projectInformer) Informer() cache.SharedIndexInformer {

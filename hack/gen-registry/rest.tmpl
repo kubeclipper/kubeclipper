@@ -16,6 +16,7 @@
  *
  */
 
+// Package GENERIC_PACKAGE_NAME implement GENERIC_KIND's StandardStorage
 package GENERIC_PACKAGE_NAME
 
 import (
@@ -27,6 +28,7 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
+// NewStorage return a StandardStorage
 func NewStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (rest.StandardStorage, error) {
 	strategy := NewStrategy(scheme)
 

@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 implements tenant v1 resource's informer.
 package v1
 
 import (
@@ -24,6 +25,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/client/internal"
 )
 
+// Interface include method set of get tenant resource's informers.
 type Interface interface {
 	Projects() ProjectInformer
 }

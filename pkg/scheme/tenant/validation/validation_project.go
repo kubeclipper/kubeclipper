@@ -16,6 +16,7 @@
  *
  */
 
+// Package validation include all tenant resource validation func.
 package validation
 
 import (
@@ -23,10 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// ValidateUserCreate validate project when create.
 func ValidateUserCreate(p *tenantv1.Project) field.ErrorList {
 	return validateProjectSpecSpec(&p.Spec, field.NewPath("spec"))
 }
 
+// ValidateProjectUpdate validate project when update.
 func ValidateProjectUpdate(p *tenantv1.Project) field.ErrorList {
 	return validateProjectSpecSpec(&p.Spec, field.NewPath("spec"))
 }

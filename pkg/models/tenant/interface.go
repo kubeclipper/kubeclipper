@@ -18,6 +18,7 @@
 
 //go:generate mockgen -destination mock/mock_project.go -source interface.go Operator
 
+// Package tenant implements tenant v1 resource's crud.
 package tenant
 
 import (
@@ -30,11 +31,13 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 )
 
+// Operator include all method for tenant resource's crud.
 type Operator interface {
 	ProjectReader
 	ProjectWriter
 }
 
+// ProjectReader include all method for tenant resource's view.
 type ProjectReader interface {
 	GetProject(ctx context.Context, name string) (*v1.Project, error)
 	ListProjects(ctx context.Context, query *query.Query) (*v1.ProjectList, error)
@@ -42,11 +45,13 @@ type ProjectReader interface {
 	ProjectReaderEx
 }
 
+// ProjectReaderEx include all method for tenant resource's ex view.
 type ProjectReaderEx interface {
 	GetProjectEx(ctx context.Context, name string, resourceVersion string) (*v1.Project, error)
 	ListProjectsEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error)
 }
 
+// ProjectWriter include all method for tenant resource's write.
 type ProjectWriter interface {
 	CreateProject(ctx context.Context, r *v1.Project) (*v1.Project, error)
 	UpdateProject(ctx context.Context, r *v1.Project) (*v1.Project, error)

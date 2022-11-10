@@ -151,6 +151,7 @@ func (q *Query) GetFieldSelector() fields.Selector {
 	return selector
 }
 
+// AddLabelSelector add labelSelector to query.
 func (q *Query) AddLabelSelector(selector []string) {
 	if q.LabelSelector == "" {
 		q.LabelSelector = strings.Join(selector, ",")

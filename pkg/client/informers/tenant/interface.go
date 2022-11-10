@@ -16,6 +16,7 @@
  *
  */
 
+// Package tenant implements tenant resource's informer .
 package tenant
 
 import (
@@ -25,6 +26,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/client/internal"
 )
 
+// Interface include method set of get tenant resource's informers.
 type Interface interface {
 	V1() v1.Interface
 }
@@ -35,6 +37,7 @@ type group struct {
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
+// New return an obj which implement Interface
 func New(f internal.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &group{factor: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }

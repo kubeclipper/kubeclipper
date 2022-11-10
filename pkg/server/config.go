@@ -1179,6 +1179,7 @@ var Users = []iamv1.User{
 	},
 }
 
+// ProjectRolesTemplate project-role-template
 var ProjectRolesTemplate = []iamv1.ProjectRole{
 	{
 		TypeMeta: metav1.TypeMeta{

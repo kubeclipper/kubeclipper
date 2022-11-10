@@ -75,10 +75,12 @@ func (a *AttributesRecord) GetUser() user.Info {
 	return a.User
 }
 
+// GetProject return project in AttributesRecord.
 func (a *AttributesRecord) GetProject() string {
 	return a.Project
 }
 
+// GetResourceScope return resourceScope in AttributesRecord.
 func (a AttributesRecord) GetResourceScope() string {
 	return a.ResourceScope
 }

@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 implements all tenant/v1 api.
 package v1
 
 import (

@@ -2,8 +2,10 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/test/e2e/project"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -31,6 +33,9 @@ var _ = SIGDescribe("[Slow] [Serial] HA", func() {
 		ginkgo.By("waiting for cluster to be deleted")
 		err = cluster.WaitForClusterNotFound(f.Client, clusterName, f.Timeouts.ClusterDelete)
 		framework.ExpectNoError(err)
+		ginkgo.By("delete e2e project")
+		err = project.DeleteProject(f)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.BeforeEach(func() {
@@ -54,6 +59,16 @@ var _ = SIGDescribe("[Slow] [Serial] HA", func() {
 				ID: nodes.Items[2].Name,
 			},
 		}
+		ginkgo.By("create e2e project")
+		nodeID := nodeList.GetNodeIDs()
+		err = project.CreateProject(f, nodeID)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("wait node join e2e project")
+		for _, v := range nodeID {
+			err := cluster.WaitForNodeJoinProject(f.Client, v, time.Second*10)
+			framework.ExpectNoError(err)
+		}
 	})
 
 	ginkgo.It("should create a HA minimal kubernetes cluster and ensure cluster is running.", func() {
@@ -64,6 +79,8 @@ var _ = SIGDescribe("[Slow] [Serial] HA", func() {
 		if len(clus.Items) == 0 {
 			framework.Failf("unexpected problem, cluster not be nil at this time")
 		}
+
+		clusterName = fmt.Sprintf("%s-%s", project.DefaultE2EProject, clusterName)
 
 		ginkgo.By("check cluster status is running")
 		err = cluster.WaitForClusterRunning(f.Client, clusterName, f.Timeouts.ClusterInstall)
@@ -86,6 +103,9 @@ func initHACluster(clusterName string, nodeList corev1.WorkerNodeList) *corev1.C
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterName,
+			Labels: map[string]string{
+				common.LabelProject: project.DefaultE2EProject,
+			},
 			Annotations: map[string]string{
 				common.AnnotationOffline: "true",
 			},

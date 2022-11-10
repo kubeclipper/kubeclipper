@@ -36,6 +36,7 @@ func (l userList) Less(i, j int) bool {
 	}
 }
 
+// DesensitizationUserPassword mark user's passwd empty.
 func DesensitizationUserPassword(user *iamv1.User) {
 	user.Spec.EncryptedPassword = ""
 }

@@ -49,6 +49,7 @@ type PasswordReset struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+// AddToContainer add webservice to container.
 func AddToContainer(c *restful.Container, iamOperator iam.Operator, tenantOperator tenant.Operator, authz authorizer.Authorizer, tokenOperator auth.TokenManagementInterface) error {
 
 	webservice := runtime.NewWebService(schema.GroupVersion{Group: "iam.kubeclipper.io", Version: "v1"})

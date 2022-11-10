@@ -16,6 +16,7 @@
  *
  */
 
+// Package projectrolebinding implement ProjectRoleBinding's StandardStorage
 package projectrolebinding
 
 import (
@@ -27,6 +28,7 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
 
+// NewStorage return a StandardStorage
 func NewStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (rest.StandardStorage, error) {
 	strategy := NewStrategy(scheme)
 

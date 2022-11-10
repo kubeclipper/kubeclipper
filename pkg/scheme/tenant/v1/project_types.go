@@ -1,3 +1,4 @@
+// Package v1 implements tenant v1 resource's informer.
 package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -7,6 +8,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
 
+// Project define
 type Project struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -20,10 +22,12 @@ type ProjectSpec struct {
 	Nodes   []string `json:"nodes,omitempty"`
 }
 
+// ProjectStatus defines the status of Project
 type ProjectStatus struct {
 	Count ProjectCount `json:"count"`
 }
 
+// ProjectCount defines the count of ProjectStatus
 type ProjectCount struct {
 	Cluster int64 `json:"cluster"`
 	Node    int64 `json:"node"`

@@ -7,6 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+
 	apierror "github.com/kubeclipper/kubeclipper/pkg/errors"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
@@ -136,6 +138,31 @@ func WaitForClusterHealthy(c *kc.Client, clusterName string, timeout time.Durati
 		}
 		return false, nil
 	})
+}
+
+func WaitForNodeJoinProject(c *kc.Client, nodeID string, timeout time.Duration) error {
+	bp := &corev1.Backup{}
+	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+		nodeList, waitErr := c.DescribeNode(context.TODO(), nodeID)
+		if waitErr != nil {
+			return handleWaitingAPIError(waitErr, true, "getting node %s", nodeID)
+		}
+
+		if len(nodeList.Items) == 0 {
+			return false, nil
+		}
+		if nodeList.Items[0].Labels != nil && nodeList.Items[0].Labels[common.LabelProject] != "" {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err == nil {
+		return nil
+	}
+	if IsTimeout(err) && bp != nil {
+		return TimeoutError(fmt.Sprintf("timeout while waiting for node %s to join project", nodeID))
+	}
+	return maybeTimeoutError(err, "waiting for node %s not found", nodeID)
 }
 
 // WaitForClusterNotFound returns an error if it takes too long for the pod to fully terminate.

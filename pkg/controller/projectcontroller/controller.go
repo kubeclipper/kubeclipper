@@ -1,5 +1,3 @@
-package projectcontroller
-
 /*
  *
  *  * Copyright 2021 KubeClipper Authors.
@@ -17,6 +15,9 @@ package projectcontroller
  *  * limitations under the License.
  *
  */
+
+// Package projectcontroller implements controller of project.
+package projectcontroller
 
 import (
 	"context"
@@ -55,6 +56,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 )
 
+// ProjectReconciler .
 type ProjectReconciler struct {
 	ProjectLister tenantv1Lister.ProjectLister
 	ProjectWriter tenant.ProjectWriter
@@ -71,6 +73,7 @@ type ProjectReconciler struct {
 	// ProjectRoleBindingWrite  iam.ProjectRoleBindingWriter
 }
 
+// SetupWithManager add controller to mgr.
 func (r *ProjectReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
 	c, err := controller.NewUnmanaged("project", controller.Options{
 		MaxConcurrentReconciles: 1, // must run serialize
@@ -90,6 +93,7 @@ func (r *ProjectReconciler) SetupWithManager(mgr manager.Manager, cache informer
 	return nil
 }
 
+// Reconcile core login of controller.
 func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.FromContext(ctx)
 
@@ -360,6 +364,7 @@ func (r *ProjectReconciler) count(ctx context.Context, p *tenantv1.Project) erro
 	return nil
 }
 
+// ProjectRoles project role template
 var ProjectRoles = []iamv1.ProjectRole{
 	{
 		TypeMeta: metav1.TypeMeta{

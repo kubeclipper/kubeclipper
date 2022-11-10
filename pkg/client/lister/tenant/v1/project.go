@@ -16,6 +16,7 @@
  *
  */
 
+// Package v1 implements tenant v1 resource's informer.
 package v1
 
 import (
@@ -26,6 +27,7 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 )
 
+// ProjectLister include method set of project lister.
 type ProjectLister interface {
 	// List lists all Regions in the indexer.
 	List(selector labels.Selector) (ret []*v1.Project, err error)
@@ -38,6 +40,7 @@ type projectLister struct {
 	indexer cache.Indexer
 }
 
+// NewProjectLister return a project lister.
 func NewProjectLister(indexer cache.Indexer) ProjectLister {
 	return &projectLister{indexer: indexer}
 }
