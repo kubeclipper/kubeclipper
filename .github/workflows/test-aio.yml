@@ -27,18 +27,21 @@ jobs:
       - name: Get branch name
         id: extract_branch
         shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_HEAD_REF})"
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_BASE_REF})"
       - name: Build
         if: github.event_name == 'pull_request'
         run:
           KUBE_BUILD_PLATFORMS="linux/amd64" make build
       - name: deploy
-        run: | 
-          declare -A branch_map
-          branch_map["master"]="master"
-          branch_map["release-1.2"]="v1.2.1"
-          echo current version is ${branch_map["${{ steps.extract_branch.outputs.branch }}"]}
-          current_branch=${branch_map["${{ steps.extract_branch.outputs.branch }}"]}
+        run: |
+          current_branch=master
+          if [[ "${{ steps.extract_branch.outputs.branch }}" =~ ^release-.* ]]; then
+            IFS="-" read -ra items <<< "$(git describe)"
+            if [[ ! ${#items[@]} -eq 0 ]]; then
+              current_branch=${items[0]}
+            fi
+          fi
+          echo current version is ${current_branch}
           curl -sfL https://oss.kubeclipper.io/kcctl.sh | sudo KC_VERSION=${current_branch} KC_REGION=cn bash -
           sudo kcctl deploy --pkg https://oss.kubeclipper.io/release/${current_branch}/kc-amd64.tar.gz
       - name: update kc assembly
