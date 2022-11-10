@@ -400,6 +400,7 @@ func (n *NFS) UnInstall(ctx context.Context) error {
 	return nil
 }
 
+// GetImageRepoMirror return ImageRepoMirror
 func (n *NFS) GetImageRepoMirror() string {
 	return n.ImageRepoMirror
 }

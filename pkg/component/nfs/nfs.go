@@ -475,6 +475,7 @@ func (n *NFSProvisioner) Render(ctx context.Context, opts component.Options) err
 		n.renderTo, opts.DryRun)
 }
 
+// GetImageRepoMirror return ImageRepoMirror
 func (n *NFSProvisioner) GetImageRepoMirror() string {
 	return n.ImageRepoMirror
 }
