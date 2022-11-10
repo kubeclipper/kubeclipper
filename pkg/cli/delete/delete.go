@@ -21,6 +21,7 @@ package delete
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -63,6 +64,7 @@ type DeleteOptions struct {
 	BaseOptions
 	resource string
 	name     string
+	force    bool
 }
 
 var (
@@ -80,11 +82,15 @@ func NewCmdDelete(streams options.IOStreams) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete(o.CliOpts))
 			utils.CheckErr(o.ValidateArgs(cmd, args))
+			if !o.precheck() {
+				return
+			}
 			utils.CheckErr(o.RunDelete())
 		},
 		ValidArgsFunction: ValidArgsFunction(o),
 	}
-
+	o.CliOpts.AddFlags(cmd.Flags())
+	cmd.Flags().BoolVarP(&o.force, "force", "F", o.force, "Force delete resource. Now is only support cluster.")
 	return cmd
 }
 
@@ -142,7 +148,11 @@ func (l *DeleteOptions) RunDelete() error {
 			return err
 		}
 	case options.ResourceCluster:
-		err = l.Client.DeleteCluster(context.TODO(), l.name)
+		queryString := url.Values{}
+		if l.force {
+			queryString.Set(query.ParameterForce, "true")
+		}
+		err = l.Client.DeleteClusterWithQuery(context.TODO(), l.name, queryString)
 		if err != nil {
 			return err
 		}
@@ -150,6 +160,15 @@ func (l *DeleteOptions) RunDelete() error {
 		return fmt.Errorf("unsupported resource")
 	}
 	return nil
+}
+
+func (l *DeleteOptions) precheck() bool {
+	if l.force {
+		_, _ = l.IOStreams.Out.Write([]byte("Force delete cluster which is in used maybe cause data inconsistency." +
+			" Are you sure this cluster are not in used or your really want to force delete?  Please input (yes/no)"))
+		return utils.AskForConfirmation()
+	}
+	return true
 }
 
 func ValidArgsFunction(o *DeleteOptions) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
