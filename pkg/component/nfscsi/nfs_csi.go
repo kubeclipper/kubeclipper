@@ -277,13 +277,6 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 	// when the component does not specify an ImageRepoMirror, the cluster LocalRegistry is inherited
 	if n.ImageRepoMirror == "" {
 		n.ImageRepoMirror = metadata.LocalRegistry
-	} else {
-		// set the component image repository to CRI insecure registry to avoid image pull failure
-		insecureRegistryStep, err := common.GetAddInsecureRegistry(metadata.Masters, metadata.CRI, n.ImageRepoMirror)
-		if err != nil {
-			return err
-		}
-		n.installSteps = append(n.installSteps, insecureRegistryStep)
 	}
 	if metadata.Offline && n.ImageRepoMirror == "" {
 		// TODO: arch is unnecessary, version can be configured
@@ -405,6 +398,10 @@ func (n *NFS) Install(ctx context.Context) error {
 
 func (n *NFS) UnInstall(ctx context.Context) error {
 	return nil
+}
+
+func (n *NFS) GetImageRepoMirror() string {
+	return n.ImageRepoMirror
 }
 
 type ImageLoader struct {

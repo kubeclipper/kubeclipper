@@ -39,6 +39,7 @@ var (
 )
 
 const (
+	version                = "v1"
 	CsiHealthCheck         = "csi-healthcheck"
 	ManifestsDir           = "/tmp/.csi-healthcheck"
 	checkCSIHealthFile     = "csi-test.yaml"

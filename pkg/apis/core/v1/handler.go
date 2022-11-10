@@ -1791,6 +1791,11 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 				logger.Error("add or remove component from cluster", zap.Error(err))
 				return
 			}
+			newCluster.Status.Registries, err = h.getClusterCRIRegistries(request.Request.Context(), newCluster)
+			if err != nil {
+				logger.Error("update cri registry failed", zap.Error(err))
+				return
+			}
 			_, err = h.clusterOperator.UpdateCluster(context.TODO(), newCluster)
 			if err != nil {
 				logger.Error("update cluster metadata error", zap.Error(err))
