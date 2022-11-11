@@ -130,7 +130,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if cronBackup.Spec.Schedule != "" {
 		// first created cron backup, update next schedule time
 		if cronBackup.Status.NextScheduleTime == nil {
-			schedule := r.parseSchedule(cronBackup.Spec.Schedule)
+			schedule := r.ParseSchedule(cronBackup.Spec.Schedule)
 			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
 			// update the next schedule time
 			nextRunAt := metav1.NewTime(s.Next(time.Now()))
@@ -158,7 +158,7 @@ func (r *CronBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			cronBackup.Status.LastScheduleTime = &now
 			cronBackup.Status.LastSuccessfulTime = cronBackup.Status.LastScheduleTime
 
-			schedule := r.parseSchedule(cronBackup.Spec.Schedule)
+			schedule := r.ParseSchedule(cronBackup.Spec.Schedule)
 			s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(schedule)
 			// update the next schedule time
 			nextRunAt := metav1.NewTime(s.Next(now.Time))
@@ -540,7 +540,7 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	return nil
 }
 
-func (r *CronBackupReconciler) parseSchedule(schedule string) string {
+func (r *CronBackupReconciler) ParseSchedule(schedule string) string {
 	currentTime := r.Now()
 	arr := strings.Split(schedule, " ")
 	if arr[2] == "L" {
