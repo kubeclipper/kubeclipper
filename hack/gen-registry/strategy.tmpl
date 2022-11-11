@@ -1,3 +1,22 @@
+/*
+ *
+ *  * Copyright 2021 KubeClipper Authors.
+ *  *
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  *     http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
+ *
+ */
+
+// Package GENERIC_PACKAGE_NAME implement GENERIC_KIND's StandardStorage
 package GENERIC_PACKAGE_NAME
 
 import (
@@ -22,15 +41,18 @@ var (
 	_ rest.RESTDeleteStrategy = GENERIC_KINDStrategy{}
 )
 
+// GENERIC_KINDStrategy implement Strategy.
 type GENERIC_KINDStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
+// NewStrategy return a GENERIC_KINDStrategy
 func NewStrategy(typer runtime.ObjectTyper) GENERIC_KINDStrategy {
 	return GENERIC_KINDStrategy{typer, names.SimpleNameGenerator}
 }
 
+// GetAttrs return a GENERIC_KINDS's label and selectable fields.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	c, ok := obj.(*v1.GENERIC_KIND)
 	if !ok {
@@ -39,10 +61,12 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return c.ObjectMeta.Labels, SelectableFields(c), nil
 }
 
+// SelectableFields return obj's fields.Set.
 func SelectableFields(obj *v1.GENERIC_KIND) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
 }
 
+// MatchGENERIC_KIND return a  SelectionPredicate.
 func MatchGENERIC_KIND(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
@@ -51,39 +75,49 @@ func MatchGENERIC_KIND(label labels.Selector, field fields.Selector) storage.Sel
 	}
 }
 
+// NamespaceScoped return is GENERIC_KIND namespaced.
 func (GENERIC_KINDStrategy) NamespaceScoped() bool {
 	return false
 }
 
+// PrepareForCreate hook trigger before create
 func (GENERIC_KINDStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
+// PrepareForUpdate hook trigger before update
 func (GENERIC_KINDStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
+// Validate check obj is valid.
 func (GENERIC_KINDStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 
+// AllowCreateOnUpdate return is GENERIC_KIND allow create on update
 func (GENERIC_KINDStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// AllowUnconditionalUpdate return is GENERIC_KIND allow unconditiona on update
 func (GENERIC_KINDStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
+// Canonicalize make obj canonicalize
 func (GENERIC_KINDStrategy) Canonicalize(obj runtime.Object) {
 }
 
+// ValidateUpdate validate before update
 func (GENERIC_KINDStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
 }
 
+// WarningsOnCreate returns warnings for the given create.
 func (GENERIC_KINDStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
 
+// WarningsOnUpdate returns warnings for the given update.
 func (GENERIC_KINDStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }

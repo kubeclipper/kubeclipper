@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/pkg/errors"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -55,21 +57,26 @@ import (
 var _ Operator = (*iamOperator)(nil)
 
 type iamOperator struct {
-	userStorage        rest.StandardStorage
-	roleStorage        rest.StandardStorage
-	roleBindingStorage rest.StandardStorage
-	tokenStorage       rest.StandardStorage
-	loginRecordStorage rest.StandardStorage
+	userStorage               rest.StandardStorage
+	roleStorage               rest.StandardStorage
+	roleBindingStorage        rest.StandardStorage
+	tokenStorage              rest.StandardStorage
+	loginRecordStorage        rest.StandardStorage
+	projectRoleStorage        rest.StandardStorage
+	projectRoleBindingStorage rest.StandardStorage
 }
 
 func NewOperator(userStorage rest.StandardStorage, roleStorage rest.StandardStorage,
-	roleBindingStorage rest.StandardStorage, tokenStorage rest.StandardStorage, loginRecordStorage rest.StandardStorage) Operator {
+	roleBindingStorage rest.StandardStorage, tokenStorage rest.StandardStorage, loginRecordStorage rest.StandardStorage,
+	projectRoleStorage rest.StandardStorage, projectRoleBindingStorage rest.StandardStorage) Operator {
 	return &iamOperator{
-		userStorage:        userStorage,
-		roleStorage:        roleStorage,
-		roleBindingStorage: roleBindingStorage,
-		tokenStorage:       tokenStorage,
-		loginRecordStorage: loginRecordStorage,
+		userStorage:               userStorage,
+		roleStorage:               roleStorage,
+		roleBindingStorage:        roleBindingStorage,
+		tokenStorage:              tokenStorage,
+		loginRecordStorage:        loginRecordStorage,
+		projectRoleStorage:        projectRoleStorage,
+		projectRoleBindingStorage: projectRoleBindingStorage,
 	}
 }
 
@@ -128,7 +135,7 @@ func (i *iamOperator) GetUserEx(ctx context.Context, name string, resourceVersio
 			}
 
 			if desensitization {
-				desensitizationUserPassword(user)
+				DesensitizationUserPassword(user)
 			}
 			if includeRole {
 				role, err := i.GetRoleOfUser(ctx, user.Name)
@@ -164,18 +171,23 @@ func (i *iamOperator) GetRoleOfUser(ctx context.Context, username string) (*iamv
 	})
 	// TODO: make error standard
 	if err != nil {
-		return nil, fmt.Errorf("failed list rolebindings")
+		return nil, errors.WithMessage(err, "list roleBinding")
 	}
 	rolebindings, _ := list.(*iamv1.GlobalRoleBindingList)
 	result := make([]iamv1.GlobalRoleBinding, 0)
-	for i, item := range rolebindings.Items {
+	for idx, item := range rolebindings.Items {
 		if contains(item.Subjects, username, nil) {
-			result = append(result, rolebindings.Items[i])
+			result = append(result, rolebindings.Items[idx])
 		}
 	}
 	// Usually, only one globalRoleBinding will be found which is created by front-end
-	if len(result) > 0 {
-		return i.GetRoleEx(ctx, result[0].RoleRef.Name, "0")
+	// in v4.3.2 we add tenant,and will add a internal role to user for view some global resource
+	// so,we need exclude internal role
+	for _, v := range result {
+		if v.Annotations != nil && v.Annotations[common.AnnotationHidden] == "true" {
+			continue
+		}
+		return i.GetRoleEx(ctx, v.RoleRef.Name, "0")
 	}
 	return nil, nil
 }
@@ -204,7 +216,7 @@ func (i *iamOperator) ListUserEx(ctx context.Context, query *query.Query, desens
 		}
 
 		if desensitization {
-			desensitizationUserPassword(user)
+			DesensitizationUserPassword(user)
 		}
 		if includeRole {
 			role, err := i.GetRoleOfUser(ctx, user.Name)
@@ -217,7 +229,7 @@ func (i *iamOperator) ListUserEx(ctx context.Context, query *query.Query, desens
 		return user
 	}
 
-	return models.ListExV2(ctx, i.userStorage, query, i.userFuzzyFilter, nil, mutatingFunc)
+	return models.ListExV2(ctx, i.userStorage, query, UserFuzzyFilter, nil, mutatingFunc)
 }
 
 // ListUsersByRole
@@ -528,7 +540,141 @@ func (i *iamOperator) GetLoginRecordEx(ctx context.Context, name string, resourc
 	return token.(*iamv1.LoginRecord), nil
 }
 
-func (i *iamOperator) userFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func (i *iamOperator) ListProjectRoles(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleList, error) {
+	list, err := models.List(ctx, i.projectRoleStorage, query)
+	if err != nil {
+		return nil, err
+	}
+	return list.(*iamv1.ProjectRoleList), nil
+}
+
+func (i *iamOperator) GetProjectRole(ctx context.Context, name string) (*iamv1.ProjectRole, error) {
+	return i.GetProjectRoleEx(ctx, name, "0")
+}
+
+func (i *iamOperator) GetProjectRoleOfMember(ctx context.Context, query *query.Query, member string) (*iamv1.ProjectRole, error) {
+	list, err := models.List(ctx, i.projectRoleBindingStorage, query)
+	if err != nil {
+		return nil, errors.WithMessage(err, "list projectRoleBinding")
+	}
+	rolebindings, _ := list.(*iamv1.ProjectRoleBindingList)
+	result := make([]iamv1.ProjectRoleBinding, 0)
+	for idx, item := range rolebindings.Items {
+		fmt.Printf("rb name:%s ref:%s", item.Name, item.RoleRef.Name)
+		if contains(item.Subjects, member, nil) {
+			result = append(result, rolebindings.Items[idx])
+		}
+	}
+	// Usually, only one globalRoleBinding will be found which is created by front-end
+	if len(result) > 0 {
+		return i.GetProjectRoleEx(ctx, result[0].RoleRef.Name, "0")
+	}
+	return nil, nil
+}
+
+func (i *iamOperator) WatchProjectRole(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, i.projectRoleStorage, query)
+}
+
+func (i *iamOperator) ListProjectRoleEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	return models.ListExV2(ctx, i.projectRoleStorage, query, i.projectRoleFuzzyFilter, nil, nil)
+}
+
+func (i *iamOperator) GetProjectRoleEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRole, error) {
+	role, err := models.GetV2(ctx, i.projectRoleStorage, name, resourceVersion, nil)
+	if err != nil {
+		return nil, err
+	}
+	return role.(*iamv1.ProjectRole), nil
+}
+
+func (i *iamOperator) CreateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error) {
+	obj, err := i.projectRoleStorage.Create(ctx, role, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*iamv1.ProjectRole), nil
+}
+
+func (i *iamOperator) DeleteProjectRole(ctx context.Context, name string) error {
+	var err error
+	_, _, err = i.projectRoleStorage.Delete(ctx, name, func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}, &metav1.DeleteOptions{})
+	return err
+}
+
+func (i *iamOperator) UpdateProjectRole(ctx context.Context, role *iamv1.ProjectRole) (*iamv1.ProjectRole, error) {
+	obj, wasCreated, err := i.projectRoleStorage.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role),
+		nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if wasCreated {
+		logger.Debug("project role not exist, use create instead of update", zap.String("role", role.Name))
+	}
+	return obj.(*iamv1.ProjectRole), nil
+}
+
+func (i *iamOperator) ListProjectRoleBinding(ctx context.Context, query *query.Query) (*iamv1.ProjectRoleBindingList, error) {
+	list, err := models.List(ctx, i.projectRoleBindingStorage, query)
+	if err != nil {
+		return nil, err
+	}
+	result, _ := list.(*iamv1.ProjectRoleBindingList)
+	return result, nil
+}
+
+func (i *iamOperator) GetProjectRoleBinding(ctx context.Context, name string) (*iamv1.ProjectRoleBinding, error) {
+	return i.GetProjectRoleBindingEx(ctx, name, "0")
+}
+
+func (i *iamOperator) WatchProjectRoleBinding(ctx context.Context, query *query.Query) (watch.Interface, error) {
+	return models.Watch(ctx, i.projectRoleBindingStorage, query)
+}
+
+func (i *iamOperator) ListProjectRoleBindingEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
+	return models.ListExV2(ctx, i.projectRoleBindingStorage, query, i.projectRoleBindingFuzzyFilter, nil, nil)
+}
+
+func (i *iamOperator) GetProjectRoleBindingEx(ctx context.Context, name string, resourceVersion string) (*iamv1.ProjectRoleBinding, error) {
+	obj, err := models.GetV2(ctx, i.projectRoleBindingStorage, name, resourceVersion, nil)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*iamv1.ProjectRoleBinding), nil
+}
+
+func (i *iamOperator) CreateProjectRoleBinding(ctx context.Context, user *iamv1.ProjectRoleBinding) (*iamv1.ProjectRoleBinding, error) {
+	obj, err := i.projectRoleBindingStorage.Create(ctx, user, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*iamv1.ProjectRoleBinding), nil
+}
+
+func (i *iamOperator) DeleteProjectRoleBinding(ctx context.Context, name string) error {
+	var err error
+	_, _, err = i.projectRoleBindingStorage.Delete(ctx, name, func(ctx context.Context, obj runtime.Object) error {
+		return nil
+	}, &metav1.DeleteOptions{})
+	return err
+}
+
+func (i *iamOperator) UpdateProjectRoleBinding(ctx context.Context, roleBinding *iamv1.ProjectRoleBinding) (*iamv1.ProjectRoleBinding, error) {
+	obj, wasCreated, err := i.projectRoleBindingStorage.Update(ctx, roleBinding.Name, rest.DefaultUpdatedObjectInfo(roleBinding),
+		nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	if wasCreated {
+		logger.Debug("project role binding not exist, use create instead of update", zap.String("role", roleBinding.Name))
+	}
+	return obj.(*iamv1.ProjectRoleBinding), nil
+}
+
+// UserFuzzyFilter func for filter user.
+func UserFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	users, ok := obj.(*iamv1.UserList)
 	if !ok {
 		return nil
@@ -600,6 +746,30 @@ func (i *iamOperator) tokenFuzzyFilter(obj runtime.Object, _ *query.Query) []run
 	objs := make([]runtime.Object, 0, len(tokens.Items))
 	for index := range tokens.Items {
 		objs = append(objs, &tokens.Items[index])
+	}
+	return objs
+}
+
+func (i *iamOperator) projectRoleFuzzyFilter(obj runtime.Object, _ *query.Query) []runtime.Object {
+	rbs, ok := obj.(*iamv1.ProjectRoleList)
+	if !ok {
+		return nil
+	}
+	objs := make([]runtime.Object, 0, len(rbs.Items))
+	for index := range rbs.Items {
+		objs = append(objs, &rbs.Items[index])
+	}
+	return objs
+}
+
+func (i *iamOperator) projectRoleBindingFuzzyFilter(obj runtime.Object, _ *query.Query) []runtime.Object {
+	rbs, ok := obj.(*iamv1.ProjectRoleBindingList)
+	if !ok {
+		return nil
+	}
+	objs := make([]runtime.Object, 0, len(rbs.Items))
+	for index := range rbs.Items {
+		objs = append(objs, &rbs.Items[index])
 	}
 	return objs
 }

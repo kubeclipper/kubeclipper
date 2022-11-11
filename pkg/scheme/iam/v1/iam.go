@@ -24,11 +24,13 @@ import (
 )
 
 const (
-	KindUser              = "User"
-	KindToken             = "Token"
-	KindLoginRecord       = "LoginRecord"
-	KindGlobalRole        = "GlobalRole"
-	KindGlobalRoleBinding = "GlobalRoleBinding"
+	KindUser               = "User"
+	KindToken              = "Token"
+	KindLoginRecord        = "LoginRecord"
+	KindGlobalRole         = "GlobalRole"
+	KindGlobalRoleBinding  = "GlobalRoleBinding"
+	KindProjectRole        = "ProjectRole"
+	KindProjectRoleBinding = "ProjectRoleBinding"
 )
 
 // +genclient
@@ -274,4 +276,64 @@ type TokenList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Token `json:"items"`
+}
+
+// Member request of create、update project member
+type Member struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ProjectRole define of projectRole.
+type ProjectRole struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Rules holds all the PolicyRules for this GlobalRole
+	// +optional
+	Rules []rbacv1.PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ProjectRoleList GlobalRoleList contains a list of GlobalRole
+type ProjectRoleList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ProjectRole `json:"items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ProjectRoleBinding define of projectRoleBinding.
+type ProjectRoleBinding struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Subjects holds references to the objects the role applies to.
+	// +optional
+	Subjects []rbacv1.Subject `json:"subjects,omitempty" protobuf:"bytes,2,rep,name=subjects"`
+
+	// RoleRef can only reference a GlobalRole.
+	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	RoleRef rbacv1.RoleRef `json:"roleRef" protobuf:"bytes,3,opt,name=roleRef"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ProjectRoleBindingList GlobalRoleList contains a list of GlobalRole
+type ProjectRoleBindingList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ProjectRoleBinding `json:"items"`
 }

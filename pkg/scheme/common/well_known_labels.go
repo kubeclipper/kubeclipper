@@ -45,10 +45,14 @@ const (
 
 	LabelClusterProviderType = "kubeclipper.io/clusterProviderType"
 	LabelClusterProviderName = "kubeclipper.io/clusterProviderName"
+
+	LabelProject                   = "kubeclipper.io/project"
+	LabelProjectRoleBindingManager = "kubeclipper.io/project-role-binding-manager"
 )
 
 const (
-	ResourceKindGlobalRole = "GlobalRole"
+	ResourceKindGlobalRole        = "GlobalRole"
+	ResourceKindProjectGlobalRole = "ProjectRole"
 )
 
 const (
@@ -56,6 +60,7 @@ const (
 	RegoOverrideAnnotation     = "kubeclipper.io/rego-override"
 	RoleAnnotation             = "iam.kubeclipper.io/role"
 	AnnotationInternal         = "kubeclipper.io/internal"
+	AnnotationHidden           = "kubeclipper.io/hidden"
 
 	AnnotationMetadataFloatIP        = "metadata.kubeclipper.io/floatIP"
 	AnnotationMetadataProxyServer    = "metadata.kubeclipper.io/proxyServer"

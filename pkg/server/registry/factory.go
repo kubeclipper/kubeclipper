@@ -22,8 +22,10 @@ import (
 	"reflect"
 	"sync"
 
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/cloudprovider"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/configmap"
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/project"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/registry"
 
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/cronbackup"
@@ -51,6 +53,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/node"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/platformsetting"
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/projectrole"
+	"github.com/kubeclipper/kubeclipper/pkg/server/registry/projectrolebinding"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/recovery"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/region"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/token"
@@ -70,6 +74,8 @@ type SharedStorageFactory interface {
 	Tokens() rest.StandardStorage
 	Users() rest.StandardStorage
 	LoginRecords() rest.StandardStorage
+	ProjectRole() rest.StandardStorage
+	ProjectRoleBinding() rest.StandardStorage
 	PlatformSettings() rest.StandardStorage
 	Events() rest.StandardStorage
 	Backups() rest.StandardStorage
@@ -81,6 +87,7 @@ type SharedStorageFactory interface {
 	ConfigMaps() rest.StandardStorage
 	CloudProvider() rest.StandardStorage
 	Registry() rest.StandardStorage
+	Project() rest.StandardStorage
 }
 
 var _ SharedStorageFactory = (*sharedStorageFactory)(nil)
@@ -157,6 +164,14 @@ func (s *sharedStorageFactory) LoginRecords() rest.StandardStorage {
 	return s.StorageFor(&iamv1.LoginRecord{}, loginrecord.NewStorage)
 }
 
+func (s *sharedStorageFactory) ProjectRole() rest.StandardStorage {
+	return s.StorageFor(&iamv1.ProjectRole{}, projectrole.NewStorage)
+}
+
+func (s *sharedStorageFactory) ProjectRoleBinding() rest.StandardStorage {
+	return s.StorageFor(&iamv1.ProjectRoleBinding{}, projectrolebinding.NewStorage)
+}
+
 func (s *sharedStorageFactory) PlatformSettings() rest.StandardStorage {
 	return s.StorageFor(&corev1.PlatformSetting{}, platformsetting.NewStorage)
 }
@@ -198,4 +213,8 @@ func (s *sharedStorageFactory) CloudProvider() rest.StandardStorage {
 
 func (s *sharedStorageFactory) Registry() rest.StandardStorage {
 	return s.StorageFor(&corev1.Registry{}, registry.NewStorage)
+}
+
+func (s *sharedStorageFactory) Project() rest.StandardStorage {
+	return s.StorageFor(&tenantv1.Project{}, project.NewStorage)
 }

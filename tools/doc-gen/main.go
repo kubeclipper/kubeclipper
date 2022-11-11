@@ -31,6 +31,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/apis/oauth"
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/apis/iam/v1"
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 
@@ -98,8 +99,9 @@ func validateSpec(apiSpec []byte) error {
 func generateSwaggerJSON() []byte {
 
 	container := restful.NewContainer()
-	urlruntime.Must(corev1.AddToContainer(container, nil, nil, nil, nil, nil, nil))
-	urlruntime.Must(iamv1.AddToContainer(container, nil, nil, nil))
+	urlruntime.Must(corev1.AddToContainer(container, nil, nil, nil, nil, nil, nil, nil))
+	urlruntime.Must(iamv1.AddToContainer(container, nil, nil, nil, nil))
+	urlruntime.Must(tenantv1.AddToContainer(container, nil, nil, nil, nil))
 	urlruntime.Must(configv1.AddToContainer(container, nil, nil))
 	urlruntime.Must(oauth.AddToContainer(container, nil, nil, nil, nil, nil, nil, nil))
 	urlruntime.Must(auditingv1.AddToContainer(container, nil))

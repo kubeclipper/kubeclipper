@@ -53,7 +53,7 @@ type Attributes interface {
 	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
 	GetVerb() string
 
-	// The kind of object, if a request is for a REST object.
+	// GetResource The kind of object, if a request is for a REST object.
 	GetResource() string
 
 	// GetSubresource returns the subresource being requested, if present
@@ -63,7 +63,7 @@ type Attributes interface {
 	// will be present for: get, update, delete
 	GetName() string
 
-	// The group of the resource, if a request is for a REST object.
+	// GetAPIGroup The group of the resource, if a request is for a REST object.
 	GetAPIGroup() string
 
 	// GetAPIVersion returns the version of the group requested, if a request is for a REST object.
@@ -75,6 +75,12 @@ type Attributes interface {
 
 	// GetPath returns the path of the request
 	GetPath() string
+
+	// GetProject returns the project of the request
+	GetProject() string
+
+	// GetResourceScope returns the scope of the resource requested, if a request is for a REST object.
+	GetResourceScope() string
 }
 
 type Authorizer interface {

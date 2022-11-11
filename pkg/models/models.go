@@ -23,9 +23,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-
 	"k8s.io/apimachinery/pkg/api/meta"
+
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -114,6 +114,39 @@ func ListExV2(ctx context.Context, s rest.StandardStorage, q *query.Query, litTo
 	}
 	list = list.DeepCopyObject()
 	objs := litToSliceFunc(list, q)
+	totalCount := len(objs)
+	// sort
+	sort.Slice(objs, func(i, j int) bool {
+		if q.Reverse {
+			return !compareFunc(objs[i], objs[j], q.OrderBy)
+		}
+		return compareFunc(objs[i], objs[j], q.OrderBy)
+	})
+	// limit offset
+	start, end := q.Pagination.GetValidPagination(totalCount)
+
+	objs = objs[start:end]
+	items := make([]interface{}, 0, len(objs))
+	for i := range objs {
+		items = append(items, mutatingFunc(objs[i]))
+	}
+	return &PageableResponse{
+		Items:      items,
+		TotalCount: totalCount,
+	}, nil
+}
+
+// DefaultList a func to build a PageableResponse
+func DefaultList(object runtime.Object, q *query.Query, litToSliceFunc ListToObjectSliceFunction, compareFunc CompareFunc, mutatingFunc MutatingFunc) (*PageableResponse, error) {
+	if mutatingFunc == nil {
+		mutatingFunc = DefaultMutatingFunc
+	}
+	if compareFunc == nil {
+		compareFunc = DefaultCompareFunc
+	}
+
+	object = object.DeepCopyObject()
+	objs := litToSliceFunc(object, q)
 	totalCount := len(objs)
 	// sort
 	sort.Slice(objs, func(i, j int) bool {

@@ -19,6 +19,7 @@
 package query
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -148,6 +149,26 @@ func (q *Query) GetFieldSelector() fields.Selector {
 		return fields.Everything()
 	}
 	return selector
+}
+
+// AddLabelSelector add labelSelector to query.
+func (q *Query) AddLabelSelector(selector []string) {
+	if q.LabelSelector == "" {
+		q.LabelSelector = strings.Join(selector, ",")
+		return
+	}
+	q.LabelSelector = fmt.Sprintf("%s,%s", q.LabelSelector, strings.Join(selector, ","))
+}
+
+// HasLabelSelector check label is exist
+func (q *Query) HasLabelSelector(selector string) bool {
+	split := strings.Split(q.LabelSelector, ",")
+	for _, v := range split {
+		if v == selector {
+			return true
+		}
+	}
+	return false
 }
 
 func New() *Query {
