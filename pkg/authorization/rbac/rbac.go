@@ -81,10 +81,10 @@ type Authorizer struct {
 	cm cluster.Operator
 }
 
-func (a *Authorizer) Authorize(attributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (a *Authorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: attributes}
 
-	a.visitRulesFor(attributes, ruleCheckingVisitor.visit)
+	a.visitRulesFor(ctx, attributes, ruleCheckingVisitor.visit)
 
 	if ruleCheckingVisitor.allowed {
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
@@ -97,8 +97,8 @@ func (a *Authorizer) Authorize(attributes authorizer.Attributes) (authorizer.Dec
 	return authorizer.DecisionNoOpinion, reason, nil
 }
 
-func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visitor func(source fmt.Stringer, regoPolicy string, rule *rbacv1.PolicyRule, err error) bool) {
-	if globalRoleBindings, err := a.am.ListRoleBindings(context.TODO(), &query.Query{
+func (a *Authorizer) visitRulesFor(ctx context.Context, requestAttributes authorizer.Attributes, visitor func(source fmt.Stringer, regoPolicy string, rule *rbacv1.PolicyRule, err error) bool) {
+	if globalRoleBindings, err := a.am.ListRoleBindings(ctx, &query.Query{
 		Pagination:      query.NoPagination(),
 		ResourceVersion: "0",
 		LabelSelector:   "",
@@ -114,7 +114,7 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 			if !applies {
 				continue
 			}
-			regoPolicy, rules, err := a.getRoleReferenceRules(globalRoleBinding.RoleRef)
+			regoPolicy, rules, err := a.getRoleReferenceRules(ctx, globalRoleBinding.RoleRef)
 			if err != nil {
 				visitor(nil, "", nil, err)
 				continue
@@ -136,7 +136,7 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 	if project == "" &&
 		requestAttributes.GetResource() == "cluster" &&
 		requestAttributes.GetSubresource() == "proxy" {
-		c, err := a.cm.GetClusterEx(context.TODO(), requestAttributes.GetName(), "")
+		c, err := a.cm.GetClusterEx(ctx, requestAttributes.GetName(), "")
 		if err != nil && !visitor(nil, "", nil, err) {
 			return
 		}
@@ -146,7 +146,7 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 	}
 
 	if requestAttributes.GetResourceScope() == request.ProjectScope {
-		if projectRoleBindings, err := a.am.ListProjectRoleBinding(context.TODO(), &query.Query{
+		if projectRoleBindings, err := a.am.ListProjectRoleBinding(ctx, &query.Query{
 			Pagination:      query.NoPagination(),
 			ResourceVersion: "0",
 			LabelSelector:   fmt.Sprintf("%s=%s", common.LabelProject, project),
@@ -162,7 +162,7 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 				if !applies {
 					continue
 				}
-				regoPolicy, rules, err := a.getRoleReferenceRules(projectRoleBinding.RoleRef)
+				regoPolicy, rules, err := a.getRoleReferenceRules(ctx, projectRoleBinding.RoleRef)
 				if err != nil {
 					visitor(nil, "", nil, err)
 					continue
@@ -183,11 +183,11 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 }
 
 // TODO: add am interface rather than iam.Operator
-func (a *Authorizer) getRoleReferenceRules(roleRef rbacv1.RoleRef) (regoPolicy string, rules []rbacv1.PolicyRule, err error) {
+func (a *Authorizer) getRoleReferenceRules(ctx context.Context, roleRef rbacv1.RoleRef) (regoPolicy string, rules []rbacv1.PolicyRule, err error) {
 	empty := make([]rbacv1.PolicyRule, 0)
 	switch roleRef.Kind {
 	case common.ResourceKindGlobalRole:
-		globalRole, err := a.am.GetRoleEx(context.TODO(), roleRef.Name, "0")
+		globalRole, err := a.am.GetRoleEx(ctx, roleRef.Name, "0")
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return "", empty, nil
@@ -196,7 +196,7 @@ func (a *Authorizer) getRoleReferenceRules(roleRef rbacv1.RoleRef) (regoPolicy s
 		}
 		return globalRole.Annotations[common.RegoOverrideAnnotation], globalRole.Rules, nil
 	case common.ResourceKindProjectGlobalRole:
-		projectRole, err := a.am.GetProjectRoleEx(context.TODO(), roleRef.Name, "0")
+		projectRole, err := a.am.GetProjectRoleEx(ctx, roleRef.Name, "0")
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return "", empty, nil

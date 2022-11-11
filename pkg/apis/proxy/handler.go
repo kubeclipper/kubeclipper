@@ -51,7 +51,7 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	c, err := h.clusterReader.GetClusterEx(request.Context(), clusterName, "")
+	c, err := h.clusterReader.GetClusterEx(request.Context(), clusterName, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			http.Error(writer, fmt.Sprintf("cluster %s not exists", clusterName), http.StatusNotFound)

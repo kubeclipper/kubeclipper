@@ -1112,7 +1112,7 @@ func (h *handler) updateRoleBinding(ctx context.Context, operator authuser.Info,
 		ResourceRequest: true,
 		Path:            "",
 	}
-	decision, _, err := h.authz.Authorize(authRecord)
+	decision, _, err := h.authz.Authorize(ctx, authRecord)
 	if err != nil {
 		return err
 	}
@@ -1211,7 +1211,7 @@ func (h *handler) UpdateUserPassword(request *restful.Request, response *restful
 		Path:            "",
 	}
 
-	decision, _, err := h.authz.Authorize(authRecord)
+	decision, _, err := h.authz.Authorize(request.Request.Context(), authRecord)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
