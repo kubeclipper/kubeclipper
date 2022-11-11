@@ -32,6 +32,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
+
 	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -3422,13 +3424,17 @@ func (h *handler) UpdateCronBackup(req *restful.Request, resp *restful.Response)
 	}
 
 	if cb.Spec.Schedule != "" {
-		ocb.Spec.Schedule = cb.Spec.Schedule
+		r := cronbackupcontroller.CronBackupReconciler{}
+		r.Now = func() time.Time {
+			return time.Now()
+		}
+		ocb.Spec.Schedule = r.ParseSchedule(cb.Spec.Schedule)
 		// update the next schedule time
-		s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(cb.Spec.Schedule)
+		s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(ocb.Spec.Schedule)
 		nextRunAt := metav1.NewTime(s.Next(time.Now()))
 		ocb.Status.NextScheduleTime = &nextRunAt
 	}
-
+	ocb.Spec.MaxBackupNum = cb.Spec.MaxBackupNum
 	_, err = h.clusterOperator.UpdateCronBackup(req.Request.Context(), ocb)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
