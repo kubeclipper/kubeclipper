@@ -134,6 +134,26 @@ func (dl *Downloader) RemoveImages() error {
 	return os.RemoveAll(filepath.Join(dl.dstDir, ImageFilename))
 }
 
+// DownloadCustomImages download custom image file
+func (dl *Downloader) DownloadCustomImages(imageList ...string) (files []string, err error) {
+	for _, image := range imageList {
+		if err = dl.Download(image); err != nil {
+			return
+		}
+		files = append(files, filepath.Join(dl.dstDir, image))
+	}
+	return
+}
+
+// RemoveCustomImages remove custom image file
+func (dl *Downloader) RemoveCustomImages(imageList ...string) (err error) {
+	for _, v := range imageList {
+		// only the last error is recorded, can ignore it
+		err = os.RemoveAll(v)
+	}
+	return
+}
+
 // DownloadAll download config and image file
 func (dl *Downloader) DownloadAll() (cPath, iPath string, err error) {
 	cPath, err = dl.DownloadAndUnpackConfigs()

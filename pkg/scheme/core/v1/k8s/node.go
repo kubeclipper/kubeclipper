@@ -167,7 +167,7 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 			stepList := newComp.GetInstallSteps()
 			for _, st := range stepList {
 				// TODO: Temporarily use hardcode to adjust, and subsequently optimize the step code for image download and load
-				if st.Name == "imageLoader" {
+				if strings.Contains(st.Name, "imageLoad") {
 					st.Nodes = patchNodes
 					stepper.installSteps = append(stepper.installSteps, st)
 					break
