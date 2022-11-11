@@ -252,7 +252,7 @@ func (h *handler) listProjects(ctx context.Context, reqUser user.Info, q *query.
 		ResourceScope:   request.GlobalScope,
 	}
 
-	decision, _, err := h.authorizer.Authorize(listWS)
+	decision, _, err := h.authorizer.Authorize(ctx, listWS)
 	if err != nil {
 		return nil, err
 	}

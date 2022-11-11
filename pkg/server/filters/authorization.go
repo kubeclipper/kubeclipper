@@ -44,7 +44,7 @@ func WithAuthorization(authorizers authorizer.Authorizer) restful.FilterFunction
 			restplus.HandleInternalError(response, req, err)
 			return
 		}
-		authorized, reason, err := authorizers.Authorize(attributes)
+		authorized, reason, err := authorizers.Authorize(ctx, attributes)
 		if authorized == authorizer.DecisionAllow {
 			chain.ProcessFilter(req, response)
 			return

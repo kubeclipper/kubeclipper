@@ -19,6 +19,7 @@
 package rbac
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -1515,7 +1516,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 				return
 			}
 
-			got, got1, err := authz.Authorize(getAuthorizerAttributes(tt.args.user, info))
+			got, got1, err := authz.Authorize(context.TODO(), getAuthorizerAttributes(tt.args.user, info))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return

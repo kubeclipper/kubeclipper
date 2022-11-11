@@ -21,6 +21,7 @@ package v1
 import (
 	"net/http"
 
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 
@@ -258,6 +259,8 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
+		Param(webservice.QueryParameter("proxy", "use kubeClipper proxy").
+			Required(false).DataType("boolean").DefaultValue("false")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), clientcmdapi.Config{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 	webservice.Route(webservice.GET("/projects/{project}/clusters/{name}/kubeconfig").
@@ -1590,9 +1593,10 @@ func SetupWebService(h *handler) *restful.WebService {
 	return webservice
 }
 
-func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator,
-	leaseOperator lease.Operator, coreOperator core.Operator, delivery service.IDelivery, tenantOperator tenant.Operator) error {
-	h := newHandler(clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tenantOperator)
+func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator, leaseOperator lease.Operator, coreOperator core.Operator,
+	delivery service.IDelivery, tokenOperator auth.TokenManagementInterface,
+	tenantOperator tenant.Operator) error {
+	h := newHandler(clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tokenOperator, tenantOperator)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil
