@@ -26,9 +26,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component/common"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
