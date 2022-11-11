@@ -19,6 +19,7 @@
 package authorizer
 
 import (
+	"context"
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -84,7 +85,7 @@ type Attributes interface {
 }
 
 type Authorizer interface {
-	Authorize(a Attributes) (authorized Decision, reason string, err error)
+	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
 }
 
 type AuthorizerFunc func(a Attributes) (Decision, string, error)

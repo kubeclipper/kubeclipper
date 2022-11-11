@@ -20,30 +20,22 @@ import (
 	"context"
 	"fmt"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	"github.com/kubeclipper/kubeclipper/pkg/server/request"
-
-	v12 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-
 	"github.com/open-policy-agent/opa/rego"
 	"go.uber.org/zap"
-
-	"github.com/kubeclipper/kubeclipper/pkg/logger"
-
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 
-	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
-
-	"github.com/kubeclipper/kubeclipper/pkg/query"
-
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-
-	rbacv1 "k8s.io/api/rbac/v1"
-
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/server/request"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 )
 
 const (
@@ -55,8 +47,8 @@ var (
 	_ authorizer.Authorizer = (*Authorizer)(nil)
 )
 
-func NewAuthorizer(am iam.Operator) authorizer.Authorizer {
-	return &Authorizer{am: am}
+func NewAuthorizer(am iam.Operator, cm cluster.Operator) authorizer.Authorizer {
+	return &Authorizer{am: am, cm: cm}
 }
 
 type authorizingVisitor struct {
@@ -86,12 +78,13 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, regoPolicy string, rule 
 
 type Authorizer struct {
 	am iam.Operator
+	cm cluster.Operator
 }
 
-func (a *Authorizer) Authorize(attributes authorizer.Attributes) (authorizer.Decision, string, error) {
+func (a *Authorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: attributes}
 
-	a.visitRulesFor(attributes, ruleCheckingVisitor.visit)
+	a.visitRulesFor(ctx, attributes, ruleCheckingVisitor.visit)
 
 	if ruleCheckingVisitor.allowed {
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil
@@ -104,8 +97,8 @@ func (a *Authorizer) Authorize(attributes authorizer.Attributes) (authorizer.Dec
 	return authorizer.DecisionNoOpinion, reason, nil
 }
 
-func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visitor func(source fmt.Stringer, regoPolicy string, rule *rbacv1.PolicyRule, err error) bool) {
-	if globalRoleBindings, err := a.am.ListRoleBindings(context.TODO(), &query.Query{
+func (a *Authorizer) visitRulesFor(ctx context.Context, requestAttributes authorizer.Attributes, visitor func(source fmt.Stringer, regoPolicy string, rule *rbacv1.PolicyRule, err error) bool) {
+	if globalRoleBindings, err := a.am.ListRoleBindings(ctx, &query.Query{
 		Pagination:      query.NoPagination(),
 		ResourceVersion: "0",
 		LabelSelector:   "",
@@ -121,7 +114,7 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 			if !applies {
 				continue
 			}
-			regoPolicy, rules, err := a.getRoleReferenceRules(globalRoleBinding.RoleRef)
+			regoPolicy, rules, err := a.getRoleReferenceRules(ctx, globalRoleBinding.RoleRef)
 			if err != nil {
 				visitor(nil, "", nil, err)
 				continue
@@ -140,11 +133,23 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 	}
 
 	project := requestAttributes.GetProject()
+	if project == "" &&
+		requestAttributes.GetResource() == "cluster" &&
+		requestAttributes.GetSubresource() == "proxy" {
+		c, err := a.cm.GetClusterEx(ctx, requestAttributes.GetName(), "")
+		if err != nil && !visitor(nil, "", nil, err) {
+			return
+		}
+		if c != nil {
+			project = c.Labels[common.LabelProject]
+		}
+	}
+
 	if requestAttributes.GetResourceScope() == request.ProjectScope {
-		if projectRoleBindings, err := a.am.ListProjectRoleBinding(context.TODO(), &query.Query{
+		if projectRoleBindings, err := a.am.ListProjectRoleBinding(ctx, &query.Query{
 			Pagination:      query.NoPagination(),
 			ResourceVersion: "0",
-			LabelSelector:   fmt.Sprintf("%s=%s", v1.LabelProject, project),
+			LabelSelector:   fmt.Sprintf("%s=%s", common.LabelProject, project),
 			FieldSelector:   "",
 		}); err != nil {
 			if !visitor(nil, "", nil, err) {
@@ -157,7 +162,7 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 				if !applies {
 					continue
 				}
-				regoPolicy, rules, err := a.getRoleReferenceRules(projectRoleBinding.RoleRef)
+				regoPolicy, rules, err := a.getRoleReferenceRules(ctx, projectRoleBinding.RoleRef)
 				if err != nil {
 					visitor(nil, "", nil, err)
 					continue
@@ -178,27 +183,27 @@ func (a *Authorizer) visitRulesFor(requestAttributes authorizer.Attributes, visi
 }
 
 // TODO: add am interface rather than iam.Operator
-func (a *Authorizer) getRoleReferenceRules(roleRef rbacv1.RoleRef) (regoPolicy string, rules []rbacv1.PolicyRule, err error) {
+func (a *Authorizer) getRoleReferenceRules(ctx context.Context, roleRef rbacv1.RoleRef) (regoPolicy string, rules []rbacv1.PolicyRule, err error) {
 	empty := make([]rbacv1.PolicyRule, 0)
 	switch roleRef.Kind {
-	case v1.ResourceKindGlobalRole:
-		globalRole, err := a.am.GetRoleEx(context.TODO(), roleRef.Name, "0")
+	case common.ResourceKindGlobalRole:
+		globalRole, err := a.am.GetRoleEx(ctx, roleRef.Name, "0")
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return "", empty, nil
 			}
 			return "", nil, err
 		}
-		return globalRole.Annotations[v1.RegoOverrideAnnotation], globalRole.Rules, nil
-	case v1.ResourceKindProjectGlobalRole:
-		projectRole, err := a.am.GetProjectRoleEx(context.TODO(), roleRef.Name, "0")
+		return globalRole.Annotations[common.RegoOverrideAnnotation], globalRole.Rules, nil
+	case common.ResourceKindProjectGlobalRole:
+		projectRole, err := a.am.GetProjectRoleEx(ctx, roleRef.Name, "0")
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return "", empty, nil
 			}
 			return "", nil, err
 		}
-		return projectRole.Annotations[v1.RegoOverrideAnnotation], projectRole.Rules, nil
+		return projectRole.Annotations[common.RegoOverrideAnnotation], projectRole.Rules, nil
 
 	default:
 		return "", nil, fmt.Errorf("unsupported role reference kind: %q", roleRef.Kind)
@@ -206,7 +211,7 @@ func (a *Authorizer) getRoleReferenceRules(roleRef rbacv1.RoleRef) (regoPolicy s
 }
 
 type globalRoleBindingDescriber struct {
-	binding *v12.GlobalRoleBinding
+	binding *iamv1.GlobalRoleBinding
 	subject *rbacv1.Subject
 }
 
@@ -220,7 +225,7 @@ func (d *globalRoleBindingDescriber) String() string {
 }
 
 type projectRoleBindingDescriber struct {
-	binding *v12.ProjectRoleBinding
+	binding *iamv1.ProjectRoleBinding
 	subject *rbacv1.Subject
 }
 

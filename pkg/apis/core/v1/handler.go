@@ -42,14 +42,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	r "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
 	tenantapiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
-
-	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
-	reqpkg "github.com/kubeclipper/kubeclipper/pkg/server/request"
-
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -62,12 +59,16 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
+	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
+	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
+	apirequest "github.com/kubeclipper/kubeclipper/pkg/server/request"
+	reqpkg "github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
@@ -90,6 +91,7 @@ type handler struct {
 	coreOperator     core.Operator
 	delivery         service.IDelivery
 	tenantOperator   tenant.Operator
+	tokenOperator    auth.TokenManagementInterface
 }
 
 const (
@@ -105,7 +107,8 @@ var (
 )
 
 func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery, tenantOperator tenant.Operator) *handler {
+	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery,
+	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator) *handler {
 	return &handler{
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
@@ -114,6 +117,7 @@ func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOp
 		leaseOperator:    leaseOperator,
 		coreOperator:     coreOperator,
 		tenantOperator:   tenantOperator,
+		tokenOperator:    tokenOperator,
 	}
 }
 
@@ -832,6 +836,8 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 
 func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Response) {
 	name := request.PathParameter(query.ParameterName)
+	proxyMode := strings.ToLower(request.QueryParameter("proxy")) == "true"
+
 	ctx := request.Request.Context()
 	clu, err := h.clusterOperator.GetCluster(ctx, name)
 	if err != nil {
@@ -848,23 +854,65 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		}
 	}
 
-	extraMeta, err := h.getClusterMetadata(ctx, clu)
+	var (
+		kubeConfigData []byte
+	)
+	if proxyMode {
+		kubeConfigData, err = h.getProxyKubeConfig(ctx, name, request.Request.Host)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+	} else {
+		extraMeta, err := h.getClusterMetadata(ctx, clu)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
+		if clu.Annotations != nil && clu.Annotations[common.AnnotationActualName] != "" {
+			extraMeta.ClusterName = clu.Annotations[common.AnnotationActualName]
+		}
+
+		kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		kubeConfigData = []byte(kubeConfig)
+	}
+
+	_, _ = response.Write(kubeConfigData)
+}
+
+func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string, kcHost string) ([]byte, error) {
+	// FIXME: KC support secure port deploy
+	var serverCA []byte
+	// TODO: get CA from kc server config
+	serverURL := fmt.Sprintf("https://%s/cluster/%s", kcHost, clusterName)
+	user, ok := apirequest.UserFrom(ctx)
+	if !ok {
+		return nil, fmt.Errorf("not get user info")
+	}
+
+	token, err := h.tokenOperator.IssueTo(user)
 	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
+		return nil, fmt.Errorf("issue token:%w", err)
 	}
 
-	if clu.Annotations != nil && clu.Annotations[common.AnnotationActualName] != "" {
-		extraMeta.ClusterName = clu.Annotations[common.AnnotationActualName]
+	kubecfg := CreateWithToken(serverURL, clusterName, user.GetName(), serverCA, token.AccessToken)
+	// skip all tls verify
+	for _, c := range kubecfg.Clusters {
+		if strings.HasPrefix(strings.ToLower(c.Server), "https") {
+			c.InsecureSkipTLSVerify = true
+		}
 	}
 
-	kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
+	buf, err := clientcmd.Write(*kubecfg)
 	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
+		return nil, err
 	}
-
-	_, _ = response.Write([]byte(kubeConfig))
+	return buf, nil
 }
 
 func (h *handler) ListNodes(request *restful.Request, response *restful.Response) {
