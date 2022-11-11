@@ -26,9 +26,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component/common"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
@@ -455,4 +460,42 @@ func (n *NFSProvisioner) Render(ctx context.Context, opts component.Options) err
 // GetImageRepoMirror return ImageRepoMirror
 func (n *NFSProvisioner) GetImageRepoMirror() string {
 	return n.ImageRepoMirror
+}
+
+type ImageLoader struct {
+	Version string
+	CriType string
+	Offline bool
+}
+
+func (n *ImageLoader) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	instance, err := downloader.NewInstance(ctx, nfs, n.Version, runtime.GOARCH, !n.Offline, opts.DryRun)
+	if err != nil {
+		return nil, err
+	}
+	dstFile, err := instance.DownloadImages()
+	if err != nil {
+		return nil, err
+	}
+	// load image package
+	if err = utils.LoadImage(ctx, opts.DryRun, dstFile, n.CriType); err == nil {
+		logger.Info("nfs packages offline install successfully")
+	}
+
+	return nil, err
+}
+
+func (n *ImageLoader) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+	instance, err := downloader.NewInstance(ctx, nfs, n.Version, runtime.GOARCH, !n.Offline, opts.DryRun)
+	if err != nil {
+		return nil, err
+	}
+	if err = instance.RemoveImages(); err != nil {
+		logger.Error("remove nfs images compressed file failed", zap.Error(err))
+	}
+	return nil, nil
+}
+
+func (n *ImageLoader) NewInstance() component.ObjectMeta {
+	return &ImageLoader{}
 }
