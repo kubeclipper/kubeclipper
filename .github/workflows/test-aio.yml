@@ -34,16 +34,18 @@ jobs:
           KUBE_BUILD_PLATFORMS="linux/amd64" make build
       - name: deploy
         run: |
-          current_branch=master
+          current_branch=${{ steps.extract_branch.outputs.branch }}
+          release_version=master
           if [[ "${{ steps.extract_branch.outputs.branch }}" =~ ^release-.* ]]; then
             IFS="-" read -ra items <<< "$(git describe)"
             if [[ ! ${#items[@]} -eq 0 ]]; then
-              current_branch=${items[0]}
+              release_version=${items[0]}
             fi
           fi
-          echo current version is ${current_branch}
+          echo current version is ${release_version}
+          echo current branch is ${current_branch}
           curl -sfL https://oss.kubeclipper.io/kcctl.sh | sudo KC_VERSION=${current_branch} KC_REGION=cn bash -
-          sudo kcctl deploy --pkg https://oss.kubeclipper.io/release/${current_branch}/kc-amd64.tar.gz
+          sudo kcctl deploy --pkg https://oss.kubeclipper.io/release/${release_version}/kc-amd64.tar.gz
       - name: update kc assembly
         run: |
           sudo cp ./dist/kcctl /usr/local/bin/
