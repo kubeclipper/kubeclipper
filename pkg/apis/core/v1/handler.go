@@ -44,6 +44,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/remotecommand"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models"
+
 	tenantapiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 
@@ -1357,6 +1359,44 @@ func (h *handler) ListRegions(request *restful.Request, response *restful.Respon
 		}
 		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 	}
+}
+
+func (h *handler) ListRegionsInProject(request *restful.Request, response *restful.Response) {
+	q := query.ParseQueryParameter(request)
+	project := request.PathParameter("project")
+	ctx := request.Request.Context()
+
+	// list node and extract region
+	nodeQ := query.New()
+	nodeQ.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProject, project)
+	nodes, err := h.clusterOperator.ListNodes(ctx, nodeQ)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	regions := sets.NewString()
+	for _, node := range nodes.Items {
+		regions.Insert(node.Labels[common.LabelTopologyRegion])
+	}
+
+	list := make([]v1.Region, 0, regions.Len())
+	for _, region := range regions.List() {
+		getRegion, err := h.clusterOperator.GetRegion(ctx, region)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		list = append(list, *getRegion)
+	}
+	// build a pageable response
+	regionList := &v1.RegionList{Items: list}
+	result, err := models.DefaultList(regionList.DeepCopyObject(), q, cluster.RegionFuzzyFilter, nil, nil)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	_ = response.WriteHeaderAndEntity(http.StatusOK, result)
 }
 
 func (h *handler) watchRegions(req *restful.Request, resp *restful.Response, q *query.Query) {
@@ -3725,12 +3765,12 @@ func (h *handler) PreCheckCloudProvider(req *restful.Request, resp *restful.Resp
 
 func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Response) {
 	cp := &v1.CloudProvider{}
-	err := req.ReadEntity(cp)
-	if err != nil {
+	ctx := req.Request.Context()
+	if err := req.ReadEntity(cp); err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	if err = h.providerValidate(req.Request.Context(), cp); err != nil {
+	if err := h.providerValidate(req.Request.Context(), cp); err != nil {
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
@@ -3740,7 +3780,20 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
-	check, err := provider.PreCheck(req.Request.Context())
+	projectName := cp.Labels[common.LabelProject]
+	if projectName == "" {
+		restplus.HandleBadRequest(resp, req, errors.New("cloudprovider must belong to a  project"))
+		return
+	}
+	if _, err = h.tenantOperator.GetProject(ctx, projectName); err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleBadRequest(resp, req, err)
+			return
+		}
+		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+	check, err := provider.PreCheck(ctx)
 	if err != nil {
 		restplus.HandleBadRequest(resp, req, fmt.Errorf("preCheck connect failed: %v", err))
 		return
@@ -3793,6 +3846,11 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 			return
 		}
 		restplus.HandleInternalError(resp, req, err)
+		return
+	}
+
+	if cp.Labels[common.LabelProject] != oldCP.Labels[common.LabelProject] {
+		restplus.HandleBadRequest(resp, req, fmt.Errorf("provider already belong to project %s", cp.Labels[common.LabelProject]))
 		return
 	}
 

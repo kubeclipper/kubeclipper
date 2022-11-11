@@ -202,7 +202,7 @@ func (c *clusterOperator) GetRegion(ctx context.Context, name string) (*v1.Regio
 }
 
 func (c *clusterOperator) ListRegionEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, c.regionStorage, query, c.regionFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, c.regionStorage, query, RegionFuzzyFilter, nil, nil)
 }
 
 func (c *clusterOperator) GetRegionEx(ctx context.Context, name string, resourceVersion string) (*v1.Region, error) {
@@ -571,7 +571,7 @@ func nodeCustomFilter(node *v1.Node, key, value string) bool {
 	return true
 }
 
-func (c *clusterOperator) regionFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func RegionFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	regions, ok := obj.(*v1.RegionList)
 	if !ok {
 		return nil

@@ -31,7 +31,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
+	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -88,12 +93,56 @@ func (r *ProjectReconciler) SetupWithManager(mgr manager.Manager, cache informer
 	if err = c.Watch(source.NewKindWithCache(&tenantv1.Project{}, cache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
+	if err = c.Watch(source.NewKindWithCache(&v1.Cluster{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsFromCluster)); err != nil {
+		return err
+	}
+	if err = c.Watch(source.NewKindWithCache(&v1.Node{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsFromNode)); err != nil {
+		return err
+	}
 
 	mgr.AddRunnable(c)
 	return nil
 }
 
 // Reconcile core login of controller.
+func (r *ProjectReconciler) findObjectsFromCluster(clu client.Object) []reconcile.Request {
+	// just watch cluster from kubeadm provider
+	if clu.GetLabels()[common.LabelClusterProviderType] != kubeadm.ProviderKubeadm {
+		return []reconcile.Request{}
+	}
+	// if cluster deleted,ignore
+	if !clu.GetDeletionTimestamp().IsZero() {
+		return []reconcile.Request{}
+	}
+	projectName := clu.GetLabels()[common.LabelProject]
+	project, err := r.ProjectLister.Get(projectName)
+	if err != nil {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{NamespacedName: types.NamespacedName{
+			Name: project.Name,
+		}},
+	}
+}
+
+func (r *ProjectReconciler) findObjectsFromNode(clu client.Object) []reconcile.Request {
+	// just watch delete event
+	if clu.GetDeletionTimestamp().IsZero() {
+		return []reconcile.Request{}
+	}
+	project := clu.GetLabels()[common.LabelProject]
+	// just watch node which joined project
+	if project == "" {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{NamespacedName: types.NamespacedName{
+			Name: project,
+		}},
+	}
+}
+
 func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.FromContext(ctx)
 
@@ -149,6 +198,16 @@ func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	if err = r.addClusterNode(ctx, project); err != nil {
+		log.Error("failed to sync cluster node", zap.Error(err))
+		return ctrl.Result{}, err
+	}
+
+	if err = r.syncSpecNode(ctx, project); err != nil {
+		log.Error("failed to sync spec node", zap.Error(err))
+		return ctrl.Result{}, err
+	}
+
 	if err = r.syncNodeLabel(ctx, project); err != nil {
 		log.Error("failed to sync node label", zap.Error(err))
 		return ctrl.Result{}, err
@@ -160,6 +219,66 @@ func (r *ProjectReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// addClusterNode add kubeadm provider cluster's node to project.
+func (r *ProjectReconciler) addClusterNode(ctx context.Context, p *tenantv1.Project) error {
+	log := logger.FromContext(ctx)
+	log.Info("addClusterNode")
+
+	selector := labels.NewSelector()
+	requirement, err := labels.NewRequirement(common.LabelProject, selection.Equals, []string{p.Name})
+	if err != nil {
+		return err
+	}
+	selector.Add(*requirement)
+	requirement2, err := labels.NewRequirement(common.LabelClusterProviderType, selection.Equals, []string{kubeadm.ProviderKubeadm})
+	if err != nil {
+		return err
+	}
+	selector.Add(*requirement2)
+	clusters, err := r.ClusterLister.List(selector)
+	if err != nil {
+		return err
+	}
+	set := sets.NewString(p.Spec.Nodes...)
+	for _, clu := range clusters {
+		nodes := clu.GetAllNodes()
+		set.Insert(nodes.List()...)
+	}
+
+	if !set.Equal(sets.NewString(p.Spec.Nodes...)) {
+		p.Spec.Nodes = set.List()
+		if _, err = r.ProjectWriter.UpdateProject(ctx, p); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// syncSpecNode update spec.Nodes if node deleted
+func (r *ProjectReconciler) syncSpecNode(ctx context.Context, p *tenantv1.Project) error {
+	del := sets.NewString()
+	for _, node := range p.Spec.Nodes {
+		if _, err := r.NodeLister.Get(node); err != nil {
+			if errors.IsNotFound(err) {
+				del.Insert(node)
+			} else {
+				return err
+			}
+		}
+	}
+	if del.Len() == 0 {
+		return nil
+	}
+	set := sets.NewString(p.Spec.Nodes...).Delete(del.List()...)
+	p.Spec.Nodes = set.List()
+
+	if _, err := r.ProjectWriter.UpdateProject(ctx, p); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *ProjectReconciler) initProjectRole(ctx context.Context, p *tenantv1.Project) error {
