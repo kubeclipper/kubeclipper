@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
 
@@ -65,13 +67,18 @@ type CSIHealthCheck struct {
 
 func (c *CSIHealthCheck) Install(ctx context.Context, opts component.Options) ([]byte, error) {
 	filePath := filepath.Join(ManifestsDir, checkCSIHealthFile)
+	// delete the resource that will be created later
+	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "delete", "-f", filePath)
+	if err != nil && !apimachineryErrors.IsNotFound(err) {
+		logger.Warnf("kubectl delete %s failed: %s", filePath, err.Error())
+	}
 	// create pvc
-	_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "apply", "-f", filePath)
+	_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "apply", "-f", filePath)
 	if err != nil {
 		logger.Warnf("kubectl apply %s failed: %s", filePath, err.Error())
 	}
 	// check install csi success or not
-	if err := utils.RetryFunc(ctx, opts, 10*time.Second, "checkCSIInstall", c.checkCSIHealth); err != nil {
+	if err = utils.RetryFunc(ctx, opts, 10*time.Second, "checkCSIInstall", c.checkCSIHealth); err != nil {
 		return nil, err
 	}
 	// delete pod, pvc, pv
