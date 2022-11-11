@@ -112,6 +112,7 @@ type Interface interface {
 	GetInstallSteps() []v1.Step
 	GetUninstallSteps() []v1.Step
 	GetUpgradeSteps() []v1.Step
+	GetImageRepoMirror() string
 }
 
 // OfflinePackages key must format as version-osVendor-osArch

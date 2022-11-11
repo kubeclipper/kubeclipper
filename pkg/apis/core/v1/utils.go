@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/google/uuid"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
@@ -124,31 +126,11 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 		steps = append(steps, k8sSteps...)
 	}
 
-	for _, com := range carr {
-		comp, ok := component.Load(fmt.Sprintf(component.RegisterFormat, com.Name, com.Version))
-		if !ok {
-			continue
-		}
-		compMeta := comp.NewInstance()
-		if err := json.Unmarshal(com.Config.Raw, compMeta); err != nil {
-			return nil, err
-		}
-		newComp, _ := compMeta.(component.Interface)
-		if err := h.initComponentExtraCluster(ctx, newComp); err != nil {
-			return nil, err
-		}
-		if err := newComp.Validate(); err != nil {
-			return nil, err
-		}
-		if err := newComp.InitSteps(ctx); err != nil {
-			return nil, err
-		}
-		s, err := getSteps(newComp, action)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, s...)
+	addonSteps, err := h.parseAddonStep(ctx, c, carr, action)
+	if err != nil {
+		return nil, err
 	}
+	steps = append(steps, addonSteps...)
 
 	if action == v1.ActionUninstall {
 		steps = append(steps, k8sSteps...)
@@ -275,7 +257,7 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 
 // parseOperationFromComponent parse operation instance from component
 func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMetadata, addons []v1.Addon, c *v1.Cluster, action v1.StepAction) (*v1.Operation, error) {
-	var steps []v1.Step
+	var err error
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
 	op.Labels = map[string]string{
@@ -284,33 +266,10 @@ func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMeta
 	}
 	// with extra meta data
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
-	for _, comp := range addons {
-		cInterface, ok := component.Load(fmt.Sprintf(component.RegisterFormat, comp.Name, comp.Version))
-		if !ok {
-			continue
-		}
-		instance := cInterface.NewInstance()
-		if err := json.Unmarshal(comp.Config.Raw, instance); err != nil {
-			return nil, err
-		}
-		newComp, ok := instance.(component.Interface)
-		if !ok {
-			continue
-		}
-		if err := newComp.Validate(); err != nil {
-			return nil, err
-		}
-		if err := newComp.InitSteps(ctx); err != nil {
-			return nil, err
-		}
-		s, err := getSteps(newComp, action)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, s...)
+	op.Steps, err = h.parseAddonStep(ctx, c, addons, action)
+	if err != nil {
+		return nil, err
 	}
-
-	op.Steps = steps
 	return op, nil
 }
 
@@ -402,4 +361,44 @@ func MarkToOriginNode(ctx context.Context, operator cluster.Operator, kcNodeID s
 	}
 	node.Annotations[common.AnnotationOriginNode] = "true"
 	return operator.UpdateNode(ctx, node)
+}
+
+func (h *handler) parseAddonStep(ctx context.Context, clu *v1.Cluster, addons []v1.Addon, action v1.StepAction) ([]v1.Step, error) {
+	var steps []v1.Step
+	registry := sets.NewString(clu.ContainerRuntime.InsecureRegistry...)
+	for _, comp := range addons {
+		cInterface, ok := component.Load(fmt.Sprintf(component.RegisterFormat, comp.Name, comp.Version))
+		if !ok {
+			continue
+		}
+		instance := cInterface.NewInstance()
+		if err := json.Unmarshal(comp.Config.Raw, instance); err != nil {
+			return []v1.Step{}, err
+		}
+		newComp, ok := instance.(component.Interface)
+		if !ok {
+			continue
+		}
+		if m := newComp.GetImageRepoMirror(); m != "" {
+			if !registry.Has(m) {
+				registry.Insert(m)
+			}
+		}
+		if err := h.initComponentExtraCluster(ctx, newComp); err != nil {
+			return []v1.Step{}, err
+		}
+		if err := newComp.Validate(); err != nil {
+			return []v1.Step{}, err
+		}
+		if err := newComp.InitSteps(ctx); err != nil {
+			return []v1.Step{}, err
+		}
+		s, err := getSteps(newComp, action)
+		if err != nil {
+			return []v1.Step{}, err
+		}
+		steps = append(steps, s...)
+	}
+	clu.ContainerRuntime.InsecureRegistry = registry.List()
+	return steps, nil
 }
