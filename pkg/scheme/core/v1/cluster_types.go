@@ -43,6 +43,8 @@ type Cluster struct {
 	Workers           WorkerNodeList   `json:"workers" optional:"true"`
 	KubernetesVersion string           `json:"kubernetesVersion" enum:"v1.20.13"`
 	CertSANs          []string         `json:"certSANs,omitempty" optional:"true"`
+	ExternalCaCert    string           `json:"externalCaCert,omitempty" optional:"true"`
+	ExternalCaKey     string           `json:"externalCaKey,omitempty" optional:"true"`
 	KubeProxy         KubeProxy        `json:"kubeProxy,omitempty" optional:"true"`
 	Etcd              Etcd             `json:"etcd,omitempty" optional:"true"`
 	Kubelet           Kubelet          `json:"kubelet,omitempty" optional:"true"`

@@ -20,9 +20,11 @@ package create
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -79,6 +81,8 @@ type CreateClusterOptions struct {
 	CNIVersion    string
 	Name          string
 	createdByIP   bool
+	CaCertFile    string
+	CaKeyFile     string
 }
 
 var (
@@ -128,6 +132,9 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.K8sVersion, "k8s-version", o.K8sVersion, "k8s version")
 	cmd.Flags().StringVar(&o.CNI, "cni", o.CNI, "k8s cni type, calico or others")
 	cmd.Flags().StringVar(&o.CNIVersion, "cni-version", o.CNIVersion, "k8s cni version")
+	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
+	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
+
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -241,6 +248,20 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	if pre != nil {
 		l.createdByIP = true
 	}
+
+	if l.CaCertFile != "" || l.CaKeyFile != "" {
+		caCert, err := os.ReadFile(l.CaCertFile)
+		if err != nil {
+			return err
+		}
+		caKey, err := os.ReadFile(l.CaKeyFile)
+		if err != nil {
+			return err
+		}
+
+		l.CaCertFile = base64.StdEncoding.EncodeToString(caCert)
+		l.CaKeyFile = base64.StdEncoding.EncodeToString(caKey)
+	}
 	return nil
 }
 
@@ -307,13 +328,15 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Name:        l.Name,
 			Annotations: annotations,
 		},
-
+		ExternalCaCert:    l.CaCertFile,
+		ExternalCaKey:     l.CaKeyFile,
 		Masters:           nil,
 		Workers:           nil,
 		KubernetesVersion: l.K8sVersion,
 		CertSANs:          nil,
-		LocalRegistry:     l.LocalRegistry,
-		ContainerRuntime:  v1.ContainerRuntime{},
+
+		LocalRegistry:    l.LocalRegistry,
+		ContainerRuntime: v1.ContainerRuntime{},
 		Networking: v1.Networking{
 			IPFamily:      v1.IPFamilyIPv4,
 			Services:      v1.NetworkRanges{CIDRBlocks: []string{"10.96.0.0/16"}},
