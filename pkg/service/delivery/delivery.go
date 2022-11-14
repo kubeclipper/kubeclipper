@@ -434,11 +434,16 @@ func (s *Service) DeliverTaskOperation(ctx context.Context, operation *v1.Operat
 			// so there is no running status.
 			// May be out of list range here.
 			if len(operation.Status.Conditions[i-1].Status) < 1 {
-				return errors.New("unexpected error, steps node field must be valid")
+				if !opts.ForceSkipError {
+					return errors.New("unexpected error, steps node field must be valid")
+				}
+				err = s.deliveryTaskStep(stepCtx, operation.Name, &operation.Steps[i],
+					nil, &operation.Status.Conditions[i], opts.DryRun)
+			} else {
+				logger.Info("last response", zap.ByteString("response", operation.Status.Conditions[i-1].Status[0].Response))
+				err = s.deliveryTaskStep(stepCtx, operation.Name, &operation.Steps[i],
+					operation.Status.Conditions[i-1].Status[0].Response, &operation.Status.Conditions[i], opts.DryRun)
 			}
-			logger.Info("last response", zap.ByteString("response", operation.Status.Conditions[i-1].Status[0].Response))
-			err = s.deliveryTaskStep(stepCtx, operation.Name, &operation.Steps[i],
-				operation.Status.Conditions[i-1].Status[0].Response, &operation.Status.Conditions[i], opts.DryRun)
 		} else {
 			err = s.deliveryTaskStep(stepCtx, operation.Name, &operation.Steps[i],
 				component.GetExtraData(ctx), &operation.Status.Conditions[i], opts.DryRun)
