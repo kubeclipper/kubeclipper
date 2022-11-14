@@ -78,7 +78,7 @@ func TestCronBackupReconciler_parseSchedule(t *testing.T) {
 			s := &CronBackupReconciler{
 				Now: tt.fields.Now,
 			}
-			if got := s.ParseSchedule(tt.args.schedule); got != tt.want {
+			if got := ParseSchedule(tt.args.schedule, s.Now()); got != tt.want {
 				t.Errorf("CronBackupReconciler.parseSchedule() = %v, want %v, %v", got, tt.want, tt.fields.Now().String())
 			}
 		})
