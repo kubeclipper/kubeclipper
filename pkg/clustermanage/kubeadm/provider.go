@@ -126,6 +126,11 @@ func (r *Kubeadm) Sync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	if r.Provider.Labels[common.LabelProject] != "" {
+		clu.Labels[common.LabelProject] = r.Provider.Labels[common.LabelProject]
+	}
+
 	err = r.patch(clu)
 	if err != nil {
 		return err

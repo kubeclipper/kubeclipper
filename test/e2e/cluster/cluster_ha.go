@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/test/e2e/project"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kubeclipper/kubeclipper/test/e2e/project"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
