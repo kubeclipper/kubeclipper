@@ -20,6 +20,7 @@ package k8s
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -123,6 +124,8 @@ type ControlPlane struct {
 	APIServerDomainName string
 	EtcdDataPath        string
 	ContainerRuntime    string
+	ExternalCaCert      string
+	ExternalCaKey       string
 }
 
 type ClusterNode struct {
@@ -380,6 +383,11 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		logger.Warnf("clean init node env error: %s", err.Error())
 	}
 
+	err = stepper.externalCa(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	hosts, err := txeh.NewHostsDefault()
 	if err != nil {
 		return nil, err
@@ -429,6 +437,34 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 		}
 	}
 	return []byte(fmt.Sprintf("%s,%s", joinControlPlaneCMD, joinWorkerCMD)), nil
+}
+
+func (stepper *ControlPlane) externalCa(ctx context.Context, opts component.Options) error {
+	if stepper.ExternalCaCert != "" && stepper.ExternalCaKey != "" {
+		certBytes, err := base64.StdEncoding.DecodeString(stepper.ExternalCaCert)
+		if err != nil {
+			return fmt.Errorf("external ca-cert file decode failed: %v", err)
+		}
+		keyBytes, err := base64.StdEncoding.DecodeString(stepper.ExternalCaKey)
+		if err != nil {
+			return fmt.Errorf("external ca-key file decode failed: %v", err)
+		}
+
+		caDir := fmt.Sprintf("%s/pki", K8SDefaultConfigDir)
+		cmdList := []string{
+			fmt.Sprintf("mkdir -p %s", caDir),
+			fmt.Sprintf(`echo "%s" > %s/ca.crt`, string(certBytes), caDir),
+			fmt.Sprintf(`echo "%s" > %s/ca.key`, string(keyBytes), caDir),
+		}
+		for _, cmd := range cmdList {
+			_, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", cmd)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
