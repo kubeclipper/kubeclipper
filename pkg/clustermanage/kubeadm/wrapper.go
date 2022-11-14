@@ -142,7 +142,6 @@ func (w *Wrapper) completeKubeadm(kubeadmConf *corev1.ConfigMap, c *v1.Cluster) 
 	c.Annotations[common.AnnotationActualName] = clusterConf.ClusterName
 	c.KubernetesVersion = clusterConf.KubernetesVersion
 	c.CertSANs = clusterConf.APIServer.CertSANs
-	c.LocalRegistry = clusterConf.ImageRepository
 	c.KubeProxy = v1.KubeProxy{}
 	c.Etcd.DataDir = clusterConf.Etcd.Local.DataDir
 	c.Kubelet.RootDir = ""
