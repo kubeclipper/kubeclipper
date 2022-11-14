@@ -147,7 +147,7 @@ func (h *handler) initComponentExtraCluster(ctx context.Context, p component.Int
 	extraClulsterMeta := make(map[string]component.ExtraMetadata, len(cluNames))
 	for _, cluName := range cluNames {
 		if clu, err := h.clusterOperator.GetClusterEx(ctx, cluName, "0"); err == nil {
-			extra, err := h.getClusterMetadata(ctx, clu)
+			extra, err := h.getClusterMetadata(ctx, clu, false)
 			if err != nil {
 				return err
 			}
