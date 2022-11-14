@@ -217,7 +217,7 @@ func (c *DrainOptions) runDrainAgentNode() error {
 		if err != nil {
 			return err
 		}
-		if err = c.agentFilesAndData(nodeInfo); err != nil {
+		if err = c.removeAgentData(nodeInfo); err != nil {
 			return err
 		}
 	}
@@ -245,7 +245,7 @@ func (c *DrainOptions) checkAgentNode(id string) (*v1.Node, error) {
 	return nil, fmt.Errorf("the node could not be draind. reason: %s is used by the cluster %s", id, clusterName)
 }
 
-func (c *DrainOptions) agentFilesAndData(node *v1.Node) error {
+func (c *DrainOptions) removeAgentData(node *v1.Node) error {
 	// 1. remove agent
 	cmdList := []string{
 		"systemctl disable kc-agent --now", // 	// disable agent service
@@ -255,7 +255,10 @@ func (c *DrainOptions) agentFilesAndData(node *v1.Node) error {
 	for _, v := range cmdList {
 		_, err := sshutils.SSHCmd(c.deployConfig.SSHConfig, node.Status.Ipv4DefaultIP, v)
 		if err != nil {
-			return errors.WithMessagef(err, "run cmd %s on %s failed", v, node.Status.Ipv4DefaultIP)
+			if !c.force {
+				return errors.WithMessagef(err, "run cmd %s on %s failed", v, node.Status.Ipv4DefaultIP)
+			}
+			logger.Warnf("force delete node will ignore err: %s", err.Error())
 		}
 	}
 
