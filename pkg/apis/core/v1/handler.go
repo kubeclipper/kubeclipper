@@ -75,7 +75,7 @@ import (
 
 var (
 	allowedDeleteStatus = sets.NewString(string(v1.ClusterInstallFailed), string(v1.ClusterRunning), string(v1.ClusterUpgradeFailed),
-		string(v1.ClusterBackupError), string(v1.ClusterRestoreFailed), string(v1.ClusterTerminateFailed))
+		string(v1.ClusterRestoreFailed), string(v1.ClusterTerminateFailed), string(v1.ClusterUpdateFailed))
 )
 
 type handler struct {
@@ -178,7 +178,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 	nodeSet := c.GetAllNodes()
 
 	// We need IP addresses of all master nodes later.
-	extraMeta, err := h.getClusterMetadata(ctx, c)
+	extraMeta, err := h.getClusterMetadata(ctx, c, false)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
 			restplus.HandleBadRequest(response, request, err)
@@ -199,7 +199,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 
 	// Get workers node information must be called before pn.MakeCompare, in order to ensure pn.Nodes = extraMeta.Workers.
 	// Replace cluster worker nodes with nodes to be operated.
-	nodes, err := h.getNodeInfo(ctx, pn.Nodes)
+	nodes, err := h.getNodeInfo(ctx, pn.Nodes, false)
 	if err != nil {
 		if err == ErrNodesRegionDifferent {
 			restplus.HandleBadRequest(response, request, err)
@@ -344,13 +344,26 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	extraMeta, err := h.getClusterMetadata(request.Request.Context(), c)
+	extraMeta, err := h.getClusterMetadata(request.Request.Context(), c, force)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
 			restplus.HandleBadRequest(response, request, err)
 			return
 		}
 		restplus.HandleInternalError(response, request, err)
+		return
+	}
+
+	if force && len(extraMeta.Masters) == 0 {
+		logger.Warn("force delete cluster when master node not found, delete cluster directly", zap.String("cluster", name))
+		if !dryRun {
+			err = h.clusterOperator.DeleteCluster(request.Request.Context(), name)
+			if err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+		}
+		response.WriteHeader(http.StatusOK)
 		return
 	}
 
@@ -410,7 +423,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	}
 	c.Complete()
 	// validate node exist
-	extraMeta, err := h.getClusterMetadata(request.Request.Context(), &c)
+	extraMeta, err := h.getClusterMetadata(request.Request.Context(), &c, false)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
 			restplus.HandleBadRequest(response, request, err)
@@ -595,7 +608,7 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 		return
 	}
 
-	extraMeta, err := h.getClusterMetadata(ctx, c)
+	extraMeta, err := h.getClusterMetadata(ctx, c, false)
 	if err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
@@ -639,7 +652,7 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	extraMeta, err := h.getClusterMetadata(ctx, clu)
+	extraMeta, err := h.getClusterMetadata(ctx, clu, false)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -883,7 +896,7 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Operation"), req, resp, timeout)
 }
 
-func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
+func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
 		ClusterName:        c.Name,
 		Offline:            c.Offline(),
@@ -898,12 +911,12 @@ func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster) (*compo
 
 	meta.Addons = append(meta.Addons, c.Addons...)
 
-	masters, err := h.getNodeInfo(ctx, c.Masters)
+	masters, err := h.getNodeInfo(ctx, c.Masters, skipNodeNotFound)
 	if err != nil {
 		return nil, err
 	}
 	meta.Masters = append(meta.Masters, masters...)
-	workers, err := h.getNodeInfo(ctx, c.Workers)
+	workers, err := h.getNodeInfo(ctx, c.Workers, skipNodeNotFound)
 	if err != nil {
 		return nil, err
 	}
@@ -929,11 +942,14 @@ func (h *handler) regionCheck(master, worker []component.Node) error {
 	return nil
 }
 
-func (h *handler) getNodeInfo(ctx context.Context, nodes v1.WorkerNodeList) ([]component.Node, error) {
+func (h *handler) getNodeInfo(ctx context.Context, nodes v1.WorkerNodeList, skipNodeNotFound bool) ([]component.Node, error) {
 	var meta []component.Node
 	for _, node := range nodes {
 		n, err := h.clusterOperator.GetNodeEx(ctx, node.ID, "0")
 		if err != nil {
+			if skipNodeNotFound && apimachineryErrors.IsNotFound(err) {
+				continue
+			}
 			return nil, err
 		}
 		item := component.Node{
@@ -1739,7 +1755,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		return
 	}
 	// We need IP addresses of all master nodes later.
-	extraMeta, err := h.getClusterMetadata(ctx, clu)
+	extraMeta, err := h.getClusterMetadata(ctx, clu, false)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
 			restplus.HandleBadRequest(response, request, err)
@@ -1840,7 +1856,7 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 	if v := request.QueryParameter("timeout"); v != "" {
 		timeoutSecs = v
 	}
-	extraMeta, err := h.getClusterMetadata(request.Request.Context(), clu)
+	extraMeta, err := h.getClusterMetadata(request.Request.Context(), clu, false)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
 			restplus.HandleBadRequest(response, request, err)
