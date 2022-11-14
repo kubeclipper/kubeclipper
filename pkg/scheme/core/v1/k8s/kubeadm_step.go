@@ -469,6 +469,8 @@ func (stepper *ControlPlane) InitStepper(c *v1.Cluster) *ControlPlane {
 	stepper.APIServerDomainName = apiServerDomain
 	stepper.EtcdDataPath = c.Etcd.DataDir
 	stepper.ContainerRuntime = c.ContainerRuntime.Type
+	stepper.ExternalCaCert = c.ExternalCaCert
+	stepper.ExternalCaKey = c.ExternalCaKey
 
 	return stepper
 }
