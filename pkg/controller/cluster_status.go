@@ -50,7 +50,9 @@ import (
 )
 
 const (
-	clusterStatusMonitorPeriod = 3 * time.Minute
+	clusterStatusMonitorPeriod            = 3 * time.Minute
+	updateClusterCertStatusRetryTimes     = 2
+	updateClusterCertStatusRetrySleepTime = 3 * time.Second
 )
 
 var (
@@ -94,7 +96,14 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
 			continue
 		}
-		err = s.updateClusterCertification(clu.Name)
+		// TODO: need refactor
+		// use backoff retry utils instead
+		for i := 0; i < updateClusterCertStatusRetryTimes; i++ {
+			if err = s.updateClusterCertification(clu.Name); err == nil {
+				break
+			}
+			time.Sleep(updateClusterCertStatusRetrySleepTime)
+		}
 		if err != nil {
 			s.log.Error("update cluster certification failed", zap.Error(err))
 		}
