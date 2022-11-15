@@ -53,16 +53,16 @@ const (
   Create cluster using command line`
 	createClusterExample = `
   # Create cluster offline. The default value of offline is true, so it can be omitted.
-  kcctl create cluster --name demo --master 192.168.10.123
+  kcctl create cluster --name demo --master 192.168.10.123 --project pro-demo
 
   # Create cluster online
-  kcctl create cluster --name demo --master 192.168.10.123 --offline false --local-registry 192.168.10.123:5000
+  kcctl create cluster --name demo --master 192.168.10.123 --offline false --local-registry 192.168.10.123:5000 --project pro-demo
 
   # Create cluster with taint manage
-  kcctl create cluster --name demo --master 192.168.10.123 --untaint-master
+  kcctl create cluster --name demo --master 192.168.10.123 --untaint-master --project pro-demo
 
   # Create cluster with worker.
-  kcctl create cluster --name demo --master 192.168.10.123 --worker 192.168.10.124
+  kcctl create cluster --name demo --master 192.168.10.123 --worker 192.168.10.124 --project pro-demo
 
   Please read 'kcctl create cluster -h' get more create cluster flags.`
 )
@@ -84,6 +84,7 @@ type CreateClusterOptions struct {
 	CertSans      []string
 	CaCertFile    string
 	CaKeyFile     string
+	Project       string
 }
 
 var (
@@ -136,6 +137,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
+	cmd.Flags().StringVar(&o.Project, "project", o.Project, "the project to which this k8s cluster belongs")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -364,6 +366,10 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		},
 
 		Status: v1.ClusterStatus{},
+	}
+
+	if l.Project != "" {
+		c.Labels = map[string]string{common.LabelProject: l.Project}
 	}
 
 	masters := make([]v1.WorkerNode, 0)
