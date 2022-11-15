@@ -81,6 +81,7 @@ type CreateClusterOptions struct {
 	CNIVersion    string
 	Name          string
 	createdByIP   bool
+	CertSans      []string
 	CaCertFile    string
 	CaKeyFile     string
 }
@@ -132,6 +133,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.K8sVersion, "k8s-version", o.K8sVersion, "k8s version")
 	cmd.Flags().StringVar(&o.CNI, "cni", o.CNI, "k8s cni type, calico or others")
 	cmd.Flags().StringVar(&o.CNIVersion, "cni-version", o.CNIVersion, "k8s cni version")
+	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
 	o.CliOpts.AddFlags(cmd.Flags())
@@ -247,6 +249,7 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	if pre != nil {
 		l.createdByIP = true
 	}
+
 	if l.CaCertFile != "" || l.CaKeyFile != "" {
 		caCert, err := os.ReadFile(l.CaCertFile)
 		if err != nil {
@@ -313,10 +316,11 @@ func (l *CreateClusterOptions) transformNodeIP() error {
 }
 
 func (l *CreateClusterOptions) newCluster() *v1.Cluster {
-	annotations := map[string]string{}
+	var annotations = map[string]string{}
 	if l.Offline {
 		annotations[common.AnnotationOffline] = ""
 	}
+
 	c := &v1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
@@ -330,7 +334,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		Masters:           nil,
 		Workers:           nil,
 		KubernetesVersion: l.K8sVersion,
-		CertSANs:          nil,
+		CertSANs:          l.CertSans,
 		ExternalCaCert:    l.CaCertFile,
 		ExternalCaKey:     l.CaKeyFile,
 		LocalRegistry:     l.LocalRegistry,
