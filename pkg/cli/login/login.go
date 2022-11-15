@@ -51,10 +51,10 @@ const (
   The command currently stores the results to the /root/.kc/config file by default.`
 	loginExample = `
   # Login to the kubeclipper server
-  kcctl login --host http://127.0.0.1 --username root
+  kcctl login --host http://127.0.0.1 --username admin
 
   # Login to the kubeclipper server via passwd by cli
-  kcctl login --host http://127.0.0.1 --username root --password xxx
+  kcctl login --host http://127.0.0.1 --username admin --password xxx
 
   Please read 'kcctl login -h' get more login flags.`
 )
