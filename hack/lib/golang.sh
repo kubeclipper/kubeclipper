@@ -268,7 +268,7 @@ kube::golang::outfile_for_binary() {
   local output_path="${KUBE_GOPATH}"
   local bin
   bin=$(basename "${binary}")
-  if [[ "${platform}" != "${host_platform}" ]]; then
+  if [[ "${platform}" != "${host_platform}" || ${KUBE_ALL_WITH_PREFIX:-"false"} == "true" ]]; then
     output_path="${output_path}/${platform//\//_}"
   fi
   if [[ ${GOOS} == "windows" ]]; then

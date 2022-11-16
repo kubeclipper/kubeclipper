@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kc-server
+  labels:
+    app: kc-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kc-server
+  template:
+    metadata:
+      labels:
+        app: kc-server
+    spec:
+      volumes:
+        - name: host-time
+          hostPath:
+            path: /etc/localtime
+            type: ''
+        - name: kc-server
+          configMap:
+            name: kc-server
+      containers:
+        - name: kc-server
+          image: caas4/kc-server:v0.0.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: host-time
+              readOnly: true
+              mountPath: /etc/localtime
+            - name: kc-server
+              mountPath: /etc/kubeclipper-server
+          resources:
+            requests:
+              memory: "100Mi"
+              cpu: "100m"
+            limits:
+              memory: "500Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kc-server
+spec:
+  selector:
+    app: kc-server
+  type: NodePort
+#  type: LoadBalancer
+  ports:
+    - name: web
+      protocol: TCP
+      port: 80
+      #targetPort: 80
+
+
