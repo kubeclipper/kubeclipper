@@ -87,7 +87,11 @@ func (w *Wrapper) ClusterInfo() (*v1.Cluster, error) {
 		Phase: v1.ClusterRunning,
 	}
 
-	c.KubeConfig = []byte(w.KubeConfig)
+	kubeconfig, err := base64.StdEncoding.DecodeString(w.KubeConfig)
+	if err != nil {
+		return nil, err
+	}
+	c.KubeConfig = kubeconfig
 
 	return c, w.completeClusterInfo(c)
 }
