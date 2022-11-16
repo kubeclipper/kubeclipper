@@ -10,17 +10,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-	v13 "k8s.io/api/core/v1"
-	v14 "k8s.io/api/rbac/v1"
-	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/client-go/kubernetes"
-
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	agentconfig "github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
@@ -33,6 +22,16 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	kuberuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/kubernetes"
 )
 
 func init() {
@@ -46,6 +45,12 @@ type Kubeadm struct {
 	Provider  v1.CloudProvider
 	Config    Config
 	Clientset kubernetes.Clientset
+}
+
+type KubeNode struct {
+	ip   string
+	cri  string
+	arch string
 }
 
 // ClusterType get cluster type
@@ -183,13 +188,9 @@ func (r *Kubeadm) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	for _, no := range nodes {
-		if no.Labels[common.LabelNodeRole] == k8s.NodeRoleMaster {
-			err = r.clusterAddon(ctx, no.Status.Ipv4DefaultIP, v1.ActionUninstall)
-			if err != nil {
-				logger.Warnf("cluster addons %s failed: %v", v1.ActionInstall, err)
-			}
-		}
+	err = r.clusterAddon(ctx, v1.ActionUninstall)
+	if err != nil {
+		logger.Warnf("cluster addons %s failed: %v", v1.ActionInstall, err)
 	}
 
 	if err = r.Operator.ClusterWriter.DeleteCluster(ctx, clu.Name); err != nil {
@@ -200,7 +201,7 @@ func (r *Kubeadm) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-func rawToConfig(config runtime.RawExtension) (Config, error) {
+func rawToConfig(config kuberuntime.RawExtension) (Config, error) {
 	var conf Config
 	data, err := config.MarshalJSON()
 	if err != nil {
@@ -216,11 +217,6 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 	log := logger.FromContext(ctx)
 	log.Debugf("beginning import provider %s's cluster [%s] to kc", r.Provider.Name, clu.Name)
 
-	// sync cluster's node first
-	var masterIPs []string
-	for _, master := range clu.Masters {
-		masterIPs = append(masterIPs, master.ID)
-	}
 	// when the node synchronization is complete, the nodeID will be replaced with the nodeIP
 	err := r.syncNode(ctx, clu)
 	if err != nil {
@@ -234,20 +230,18 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 			if _, err = r.Operator.ClusterWriter.CreateCluster(context.TODO(), clu); err != nil {
 				return errors.WithMessagef(err, "create cluster %s", clu.Name)
 			}
-			for _, masterIP := range masterIPs {
-				err = r.clusterAddon(ctx, masterIP, v1.ActionInstall)
-				if err == nil {
-					break
-				}
-				logger.Debugf("cluster addon service create failed: %v", err)
-			}
-			log.Debugf("create import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
 			return nil
 		}
 
 		return errors.WithMessagef(err, "check cluster %s exits", clu.Name)
 	}
 
+	log.Debugf("create import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
+
+	err = r.clusterAddon(ctx, v1.ActionInstall)
+	if err != nil {
+		logger.Debugf("cluster addon service create failed: %v", err)
+	}
 	// update,if exists
 	// get resourceVersion for update
 	clu.ObjectMeta.ResourceVersion = oldClu.ObjectMeta.ResourceVersion
@@ -688,7 +682,7 @@ func (r *Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
 	}
 }
 
-func (r *Kubeadm) clusterAddon(ctx context.Context, ip string, action v1.StepAction) error {
+func (r *Kubeadm) clusterAddon(ctx context.Context, action v1.StepAction) error {
 	err := r.clusterServiceAccount(ctx, action)
 	if err != nil {
 		// the failure to delete the service account due to an exception is tolerated, so ignore this error
@@ -696,10 +690,16 @@ func (r *Kubeadm) clusterAddon(ctx context.Context, ip string, action v1.StepAct
 		return nil
 	}
 
-	err = r.kubectlTerminal(ip, action)
+	masters, err := listMaster(ctx, &r.Clientset)
 	if err != nil {
-		// the failure to delete the service account due to an exception is tolerated, so ignore this error
-		logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, r.Provider.ClusterName, err)
+		return fmt.Errorf("list cluster(%s) master node failed: %v", r.Provider.ClusterName, err)
+	}
+	for _, master := range masters {
+		err = r.kubectlTerminal(ctx, master, action)
+		if err != nil {
+			// the failure to delete the service account due to an exception is tolerated, so ignore this error
+			logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, r.Provider.ClusterName, err)
+		}
 	}
 
 	return nil
@@ -710,14 +710,14 @@ func (r *Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepActio
 	if err != nil {
 		return err
 	}
-	sa := &v13.ServiceAccount{}
+	sa := &corev1.ServiceAccount{}
 	sa.Name = "kc-server"
 
-	crb := &v14.ClusterRoleBinding{}
+	crb := &rbacv1.ClusterRoleBinding{}
 	crb.Name = "kc-server"
 	crb.RoleRef.Kind = "ClusterRole"
 	crb.RoleRef.Name = "cluster-admin"
-	crb.Subjects = []v14.Subject{{Kind: "ServiceAccount", Name: "kc-server", Namespace: "kube-system"}}
+	crb.Subjects = []rbacv1.Subject{{Kind: "ServiceAccount", Name: "kc-server", Namespace: "kube-system"}}
 
 	switch action {
 	case v1.ActionInstall:
@@ -745,24 +745,53 @@ func (r *Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepActio
 	return nil
 }
 
-func (r *Kubeadm) kubectlTerminal(nodeIP string, action v1.StepAction) error {
+func (r *Kubeadm) kubectlTerminal(ctx context.Context, node KubeNode, action v1.StepAction) error {
 	var cmdList []string
 	switch action {
 	case v1.ActionInstall:
-		// TODO: For some historical reasons,
-		// the kubectl terminal service image and the k8s image are bound together,
-		// and this issue will be improved after disassembling the image package
-		// instance, err := downloader.NewInstance(ctx, k8s.K8s, "v1.23.6", runtime2.GOARCH, true, false)
-		// if err != nil {
-		//	return nil, err
-		// }
+		dep, err := r.Clientset.AppsV1().Deployments("kube-system").Get(ctx, "kc-kubectl", metav1.GetOptions{})
+		if err != nil && !apimachineryErrors.IsNotFound(err) {
+			return err
+		}
+		if dep.Status.AvailableReplicas >= 1 {
+			return nil
+		}
+
+		deployConfig, err := r.getDeployConfig()
+		if err != nil {
+			return err
+		}
+
+		exDir := "/tmp/.kc-extension"
+		exImage := fmt.Sprintf("%s/images.tar", exDir)
+
+		// TODO： since there is only one version of the kubectl terminal image at this stage,
+		// it is difficult to match multiple versions of the k8s cluster.
+		//for now, we are using kubectl v1.23.6 as the latest version
+		url := fmt.Sprintf("http://%s:%v/kc-extension/latest/%s", deployConfig.ServerIPs[0], deployConfig.StaticServerPort, node.arch)
+
+		loadImage := ""
+		switch node.cri {
+		case v1.CRIDocker:
+			// docker load -i xxx/images.tar
+			loadImage = fmt.Sprintf("docker load -i %s", exImage)
+		case v1.CRIContainerd:
+			loadImage = fmt.Sprintf("ctr --namespace k8s.io image import --all-platforms %s", exImage)
+		default:
+			logger.Warnf("unsupported cri types: ", node.cri)
+		}
 
 		terminalData, err := tmplutil.New().Render(k8s.KubectlPodTemplate, k8s.KubectlTerminal{})
 		if err != nil {
 			return err
 		}
 		yamlFile := filepath.Join(k8s.ManifestDir, "kc-kubectl.yaml")
+
 		cmdList = []string{
+			fmt.Sprintf("mkdir -p %s", exDir),
+			fmt.Sprintf("curl %s/images.tar.gz -o %s.gz", url, exImage),
+			fmt.Sprintf("gzip -df %s.gz", exImage),
+			loadImage,
 			fmt.Sprintf("mkdir -p %s", k8s.ManifestDir),
 			sshutils.WrapEcho(terminalData, yamlFile),
 			fmt.Sprintf("kubectl apply -f %s", yamlFile),
@@ -776,9 +805,9 @@ func (r *Kubeadm) kubectlTerminal(nodeIP string, action v1.StepAction) error {
 	}
 
 	for _, cmd := range cmdList {
-		ret, err := sshutils.SSHCmdWithSudo(r.ssh(), nodeIP, cmd)
+		ret, err := sshutils.SSHCmdWithSudo(r.ssh(), node.ip, cmd)
 		if err != nil {
-			return errors.WithMessagef(err, "run cmd [%s] on node [%s]", cmd, nodeIP)
+			return errors.WithMessagef(err, "run cmd [%s] on node [%s]", cmd, node.ip)
 		}
 		if err = ret.Error(); err != nil {
 			return errors.WithMessage(err, ret.String())
@@ -892,4 +921,37 @@ func (r *Kubeadm) patchCNI(clu *v1.Cluster) error {
 	}
 
 	return nil
+}
+
+func listMaster(ctx context.Context, cli *kubernetes.Clientset) ([]KubeNode, error) {
+	nodeList, err := cli.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	knodeList := make([]KubeNode, 0)
+	for _, node := range nodeList.Items {
+		if _, ok := node.Labels["node-role.kubernetes.io/worker"]; ok {
+			continue
+		}
+
+		ip := ""
+		for _, addr := range node.Status.Addresses {
+			if string(addr.Type) == "InternalIP" {
+				ip = addr.Address
+			}
+		}
+
+		// containerRuntimeVersion: docker://20.10.20
+		cri := strings.ReplaceAll(node.Status.NodeInfo.ContainerRuntimeVersion, " ", "")
+		cri = strings.Split(cri, ":")[0]
+		knode := KubeNode{
+			ip:   ip,
+			cri:  cri,
+			arch: node.Status.NodeInfo.Architecture,
+		}
+		knodeList = append(knodeList, knode)
+	}
+
+	return knodeList, nil
 }
