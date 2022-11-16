@@ -27,7 +27,6 @@ import (
 	"math/rand"
 	"net/http"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -474,87 +473,6 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 
 	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
-}
-
-// TODO: copy from ClusterController, Remove after refactoring
-func (h *handler) getClusterCRIRegistries(ctx context.Context, c *v1.Cluster) ([]v1.RegistrySpec, error) {
-	type mirror struct {
-		ImageRepoMirror string `json:"imageRepoMirror"`
-	}
-	insecureRegistry := append([]string{}, c.ContainerRuntime.InsecureRegistry...)
-	sort.Strings(insecureRegistry)
-	// add addons mirror registry
-	for _, a := range c.Addons {
-		var m mirror
-		err := json.Unmarshal(a.Config.Raw, &m)
-		if err != nil {
-			continue
-		}
-		if m.ImageRepoMirror != "" {
-			idx, ok := sort.Find(len(insecureRegistry), func(i int) int {
-				return strings.Compare(m.ImageRepoMirror, insecureRegistry[i])
-			})
-			if !ok {
-				if idx == len(insecureRegistry) {
-					insecureRegistry = append(insecureRegistry, m.ImageRepoMirror)
-				} else {
-					insecureRegistry = append(insecureRegistry[:idx+1], insecureRegistry[idx:]...)
-					insecureRegistry[idx] = m.ImageRepoMirror
-				}
-			}
-		}
-	}
-
-	registries := make([]v1.RegistrySpec, 0, len(insecureRegistry)*2+len(c.ContainerRuntime.Registries))
-	// insecure registry
-	for _, host := range insecureRegistry {
-		registries = appendUniqueRegistry(registries,
-			v1.RegistrySpec{Scheme: "http", Host: host},
-			v1.RegistrySpec{Scheme: "https", Host: host, SkipVerify: true})
-	}
-
-	validRegistries := c.ContainerRuntime.Registries[:0]
-	for _, reg := range c.ContainerRuntime.Registries {
-		if reg.RegistryRef == nil || *reg.RegistryRef == "" {
-			// fix reg.RegistryRef=""
-			reg.RegistryRef = nil
-			registries = appendUniqueRegistry(registries,
-				v1.RegistrySpec{Scheme: "http", Host: reg.InsecureRegistry},
-				v1.RegistrySpec{Scheme: "https", Host: reg.InsecureRegistry, SkipVerify: true})
-			validRegistries = append(validRegistries, reg)
-			continue
-		}
-		registry, err := h.clusterOperator.GetRegistry(ctx, *reg.RegistryRef)
-		if err != nil {
-			if apimachineryErrors.IsNotFound(err) {
-				continue
-			}
-			return nil, fmt.Errorf("get registry %s:%w", *reg.RegistryRef, err)
-		}
-		registries = appendUniqueRegistry(registries, registry.RegistrySpec)
-		validRegistries = append(validRegistries, reg)
-	}
-	c.ContainerRuntime.Registries = validRegistries
-	return registries, nil
-}
-
-// TODO: copy from ClusterController, Remove after refactoring
-func appendUniqueRegistry(s []v1.RegistrySpec, items ...v1.RegistrySpec) []v1.RegistrySpec {
-	for _, r := range items {
-		key := r.Scheme + r.Host
-		idx, ok := sort.Find(len(s), func(i int) int {
-			return strings.Compare(key, s[i].Scheme+s[i].Host)
-		})
-		if !ok {
-			if idx == len(s) {
-				s = append(s, r)
-			} else {
-				s = append(s[:idx+1], s[idx:]...)
-				s[idx] = r
-			}
-		}
-	}
-	return s
 }
 
 func (h *handler) UpdateClusters(request *restful.Request, response *restful.Response) {
@@ -1773,7 +1691,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		action = v1.ActionUninstall
 		operationAction = v1.OperationUninstallComponents
 	}
-	op, err := h.parseOperationFromComponent(extraMeta, pcs.Addons, clu, action)
+	op, err := h.parseOperationFromComponent(ctx, extraMeta, pcs.Addons, clu, action)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -1783,23 +1701,42 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		restplus.HandleBadRequest(response, request, errors.New("the current operation steps is empty and cannot be performed"))
 		return
 	}
+
+	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
+	op.Labels[common.LabelOperationAction] = operationAction
+	op.Status.Status = v1.OperationStatusRunning
+
 	if !dryRun {
+		// cluster.Status.Registries will be updated
+		var statusRegistry []v1.RegistrySpec
+		statusRegistry, err = h.getClusterCRIRegistries(ctx, clu)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		criStep, err := h.getCRIRegistriesStep(ctx, clu, statusRegistry)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		if criStep != nil {
+			op.Steps = append(op.Steps[:1], op.Steps...)
+			op.Steps[0] = *criStep
+			clu.Status.Registries = statusRegistry
+		}
 		clu.Status.Phase = v1.ClusterUpdating
 		_, err = h.clusterOperator.UpdateCluster(context.TODO(), clu)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-	}
-	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
-	op.Labels[common.LabelOperationAction] = operationAction
-	op.Status.Status = v1.OperationStatusRunning
-	if !dryRun {
+
 		op, err = h.opOperator.CreateOperation(context.TODO(), op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+
 	}
 	go func(o *v1.Operation, opts *service.Options, oPcs *PatchComponents) {
 		if err := h.delivery.DeliverTaskOperation(context.TODO(), o, opts); err != nil {
@@ -1817,11 +1754,6 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 			newCluster, err := oPcs.addOrRemoveComponentFromCluster(latestCluster)
 			if err != nil {
 				logger.Error("add or remove component from cluster", zap.Error(err))
-				return
-			}
-			newCluster.Status.Registries, err = h.getClusterCRIRegistries(request.Request.Context(), newCluster)
-			if err != nil {
-				logger.Error("update cri registry failed", zap.Error(err))
 				return
 			}
 			_, err = h.clusterOperator.UpdateCluster(context.TODO(), newCluster)

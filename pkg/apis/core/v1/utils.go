@@ -29,7 +29,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
-
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -256,7 +255,7 @@ func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir
 }
 
 // parseOperationFromComponent parse operation instance from component
-func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMetadata, addons []v1.Addon, c *v1.Cluster, action v1.StepAction) (*v1.Operation, error) {
+func (h *handler) parseOperationFromComponent(ctx context.Context, extraMetadata *component.ExtraMetadata, addons []v1.Addon, c *v1.Cluster, action v1.StepAction) (*v1.Operation, error) {
 	var err error
 	op := &v1.Operation{}
 	op.Name = uuid.New().String()
@@ -265,7 +264,7 @@ func (h *handler) parseOperationFromComponent(extraMetadata *component.ExtraMeta
 		common.LabelTopologyRegion: extraMetadata.Masters[0].Region,
 	}
 	// with extra meta data
-	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
+	ctx = component.WithExtraMetadata(ctx, *extraMetadata)
 	op.Steps, err = h.parseAddonStep(ctx, c, addons, action)
 	if err != nil {
 		return nil, err
