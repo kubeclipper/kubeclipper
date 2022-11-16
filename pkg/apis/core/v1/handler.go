@@ -2952,12 +2952,13 @@ func (h *handler) UpdateCronBackup(req *restful.Request, resp *restful.Response)
 		now := func() time.Time {
 			return time.Now()
 		}
-		ocb.Spec.Schedule = cronbackupcontroller.ParseSchedule(cb.Spec.Schedule, now())
+		Schedule := cronbackupcontroller.ParseSchedule(cb.Spec.Schedule, now())
 		// update the next schedule time
-		s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(ocb.Spec.Schedule)
+		s, _ := cron.NewParser(4 | 8 | 16 | 32 | 64).Parse(Schedule)
 		nextRunAt := metav1.NewTime(s.Next(time.Now()))
 		ocb.Status.NextScheduleTime = &nextRunAt
 	}
+	ocb.Spec.Schedule = cb.Spec.Schedule
 	ocb.Spec.MaxBackupNum = cb.Spec.MaxBackupNum
 	_, err = h.clusterOperator.UpdateCronBackup(req.Request.Context(), ocb)
 	if err != nil {
