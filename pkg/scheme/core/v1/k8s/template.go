@@ -186,6 +186,15 @@ spec:
           operator: Exists
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: In
+                values:
+                - ""
       serviceAccountName: kc-kubectl
       containers:
         - image: {{with .ImageRegistryAddr}}{{.}}/{{end}}kubeclipper/kubectl
