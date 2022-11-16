@@ -19,6 +19,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -241,7 +242,7 @@ func Test_parseOperationFromComponent(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := h.parseOperationFromComponent(test.arg.meta, test.arg.components, test.arg.cluster, test.arg.action)
+			_, err := h.parseOperationFromComponent(context.Background(), test.arg.meta, test.arg.components, test.arg.cluster, test.arg.action)
 			if err != nil {
 				t.Errorf("  parseOperationFromComponent() error: %v", err)
 			}
