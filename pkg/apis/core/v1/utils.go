@@ -22,6 +22,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"path/filepath"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -435,4 +437,25 @@ func CreateBasic(serverURL, clusterName, userName string, caCert []byte) *client
 		AuthInfos:      map[string]*clientcmdapi.AuthInfo{},
 		CurrentContext: contextName,
 	}
+}
+
+// BuildPendingOperation build PendingOperation struct
+// @param operationType Operation type
+// @param timeout The timeout time of the entire operation
+// @param clusterResourceVersion The resource version of the cluster at the time the request was submitted
+// @param extra Additional data necessary to create the operation
+func buildPendingOperation(operationType, timeout, clusterResourceVersion string, extra interface{}) (v1.PendingOperation, error) {
+	extraData, err := json.Marshal(extra)
+	if err != nil {
+		return v1.PendingOperation{}, nil
+	}
+	logger.Infof("pending operation is: %v", string(extraData))
+
+	return v1.PendingOperation{
+		OperationType:          operationType,
+		Timeout:                timeout,
+		ClusterResourceVersion: clusterResourceVersion,
+		OperationID:            strutil.GetUUID(),
+		ExtraData:              extraData,
+	}, nil
 }

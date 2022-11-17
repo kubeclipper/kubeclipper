@@ -21,6 +21,7 @@ package operationcontroller
 import (
 	"context"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +41,7 @@ import (
 )
 
 type OperationReconciler struct {
+	CmdDelivery     service.CmdDelivery
 	ClusterLister   listerv1.ClusterLister
 	OperationLister listerv1.OperationLister
 	OperationWriter operation.Writer
@@ -100,6 +102,23 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		log.Error("Failed to get cluster with name", zap.String("cluster", cluName), zap.Error(err))
 		return ctrl.Result{}, err
+	}
+	// 投递消息规则
+	if op.Status.Status == v1.OperationStatusPending {
+		op.Status.Status = v1.OperationStatusRunning
+		if _, err = r.OperationWriter.UpdateOperation(ctx, op); err != nil {
+			return ctrl.Result{}, err
+		}
+		log.Debug("distribute task")
+
+		go func() {
+			if err = r.CmdDelivery.DeliverTaskOperation(context.TODO(), op, nil); err != nil {
+				log.Error("distribute task error", zap.Error(err))
+			}
+		}()
+	}
+	if op.Status.Status == v1.OperationStatusFailed {
+
 	}
 	return ctrl.Result{}, nil
 }

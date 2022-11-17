@@ -22,13 +22,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 	"net/url"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
 	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 
-	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
@@ -206,7 +207,7 @@ func (cli *Client) CreateUser(ctx context.Context, user *iamv1.User) (*UsersList
 	return &users, err
 }
 
-func (cli *Client) AddOrRemoveNode(ctx context.Context, patchNode *corev1.PatchNodes, clusterName string) (*ClustersList, error) {
+func (cli *Client) AddOrRemoveNode(ctx context.Context, patchNode *clusteroperation.PatchNodes, clusterName string) (*ClustersList, error) {
 	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, clusterName, "nodes"), nil, patchNode, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
