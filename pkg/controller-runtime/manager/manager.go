@@ -23,10 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry"
 
-	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientset"
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 
@@ -48,8 +49,8 @@ var _ service.Interface = (*ControllerManager)(nil)
 var _ Manager = (*ControllerManager)(nil)
 
 type Manager interface {
-	//ClusterClientWriter() cluster.OperatorWriter
-	//OperationClient() operation.Writer
+	// ClusterClientWriter() cluster.OperatorWriter
+	// OperationClient() operation.Writer
 	AddRunnable(run Runnable)
 	AddWorkerLoop(fn LoopFunc, period time.Duration)
 	GetLogger() logger.Logging
@@ -92,10 +93,7 @@ type ControllerManager struct {
 	cmdDelivery    service.CmdDelivery
 	storageFactory registry.SharedStorageFactory
 
-	cs                      clientset.Interface
-	internalInformerAddress string
-	internalInformerUser    string
-	InternalInformerToken   string
+	cs clientset.Interface
 
 	setupFunc SetupFunc
 
@@ -155,7 +153,7 @@ func (s *ControllerManager) GetCmdDelivery() service.CmdDelivery {
 	return s.cmdDelivery
 }
 
-func NewControllerManager(addr, user, pass string, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, setupFunc SetupFunc) (*ControllerManager, error) {
+func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, setupFunc SetupFunc) (*ControllerManager, error) {
 	s := &ControllerManager{
 		leaderStopChan:          make(chan struct{}, 1),
 		defaultWorkerLoopPeriod: time.Second,
@@ -164,14 +162,11 @@ func NewControllerManager(addr, user, pass string, storageFactory registry.Share
 		storageFactory:          storageFactory,
 		setupFunc:               setupFunc,
 	}
-	s.internalInformerAddress = addr
-	s.internalInformerUser = user
-	s.InternalInformerToken = pass
 	s.lock = leaderelect.NewLock(resourceLockNS, resourceLockName, lease.NewLeaseOperator(storageFactory.Leases()), resourcelock.ResourceLockConfig{
 		Identity:      uuid.New().String(),
 		EventRecorder: nil,
 	})
-	cs, err := clientset.NewForConfig(clientrest.InternalRestConfig(s.internalInformerAddress, s.internalInformerUser, s.InternalInformerToken))
+	cs, err := clientset.NewForConfig(rc)
 	if err != nil {
 		return nil, err
 	}

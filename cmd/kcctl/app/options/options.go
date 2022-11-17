@@ -31,9 +31,8 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
-
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/util/homedir"
@@ -65,14 +64,16 @@ const (
 )
 
 const (
-	DefaultPath               = ".kc"
-	DefaultDeployConfig       = "deploy-config.yaml"
-	DefaultConfig             = "config"
-	DefaultCaPath             = "pki"
-	DefaultEtcdPKIPath        = "pki/etcd"
-	DefaultNatsPKIPath        = "pki/nats"
-	DefaultKcServerConfigPath = "/etc/kubeclipper-server"
-	DefaultKcAgentConfigPath  = "/etc/kubeclipper-agent"
+	DefaultPath                = ".kc"
+	DefaultDeployConfig        = "deploy-config.yaml"
+	DefaultConfig              = "config"
+	DefaultCaPath              = "pki"
+	DefaultEtcdPKIPath         = "pki/etcd"
+	DefaultNatsPKIPath         = "pki/nats"
+	DefaultKCPKIPath           = "pki/kc"
+	DefaultKcServerConfigPath  = "/etc/kubeclipper-server"
+	DefaultKcAgentConfigPath   = "/etc/kubeclipper-agent"
+	DefaultKcConsoleConfigPath = "/etc/kc-console"
 
 	DefaultRegion = "default"
 
@@ -84,8 +85,9 @@ const (
 	EtcdHealthCheck  = "kube-etcd-healthcheck-client" // healthcheck-client
 	NatsIOClient     = "kc-server-nats-client"
 	NatsIOServer     = "kc-server-nats-server"
+	KCServer         = "kc-server"
 	NatsAltNameProxy = "proxy.kubeclipper.io" // add nats server SAN for agent proxy
-
+	KCServerAltName  = "server.kubeclipper.io"
 )
 
 var AssumeYes bool
@@ -241,6 +243,7 @@ type DeployConfig struct {
 	Debug              bool                           `json:"debug" yaml:"debug,omitempty"`
 	DefaultRegion      string                         `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
 	ServerPort         int                            `json:"serverPort" yaml:"serverPort,omitempty"`
+	TLS                bool                           `json:"tls" yaml:"tls,omitempty"`
 	StaticServerPort   int                            `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
 	StaticServerPath   string                         `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
 	Pkg                string                         `json:"pkg" yaml:"pkg,omitempty"`
@@ -304,6 +307,7 @@ func NewDeployOptions() *DeployConfig {
 		Debug:            false,
 		DefaultRegion:    "default",
 		ServerPort:       8080,
+		TLS:              true,
 		StaticServerPort: 8081,
 		StaticServerPath: "/opt/kubeclipper-server/resource",
 		AuditOpts:        option.NewAuditOptions(),
@@ -419,6 +423,7 @@ func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.IPDetect, "ip-detect", c.IPDetect, "Kc ip detect method.")
 	flags.BoolVar(&c.Debug, "debug", c.Debug, "Deploy kc use debug mode")
 	flags.StringVarP(&c.DefaultRegion, "region", "r", c.DefaultRegion, "Kc agent default region")
+	flags.BoolVar(&c.TLS, "tls", c.TLS, "Kc api server  use tls mode")
 	flags.IntVar(&c.ServerPort, "server-port", c.ServerPort, "Kc server port")
 	flags.IntVar(&c.StaticServerPort, "static-server-port", c.StaticServerPort, "Kc static server port")
 	flags.StringVar(&c.StaticServerPath, "static-server-path", c.StaticServerPath, "Kc static server path(absolute path")
@@ -467,6 +472,12 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	var data = make(map[string]interface{})
 	data["ServerAddress"] = ip
 	data["ServerPort"] = c.ServerPort
+	if c.TLS {
+		data["TLS"] = true
+		data["TLSCertFile"] = filepath.Join(DefaultKcServerConfigPath, DefaultKCPKIPath, fmt.Sprintf("%s.crt", KCServer))
+		data["TLSPrivateKey"] = filepath.Join(DefaultKcServerConfigPath, DefaultKCPKIPath, fmt.Sprintf("%s.key", KCServer))
+		data["CACertFile"] = filepath.Join(DefaultKcServerConfigPath, DefaultCaPath, "ca.crt")
+	}
 	// TODO: make auto generate
 	data["JwtSecret"] = c.JWTSecret
 	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod

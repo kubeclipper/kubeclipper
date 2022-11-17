@@ -19,10 +19,9 @@
 package kc
 
 import (
-	"fmt"
+	"crypto/x509"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
 var (
@@ -33,36 +32,24 @@ var (
 
 type Opt func(*Client) error
 
-func WithHost(host string) Opt {
+func WithEndpoint(endpoint string) Opt {
 	return func(c *Client) error {
-		host = strings.TrimSuffix(host, "/")
-		//c.host = host
-
-		hostURL, err := ParseHostURL(host)
+		endpointURL, err := url.Parse(endpoint)
 		if err != nil {
 			return err
 		}
-		c.host = hostURL.Host
-		c.scheme = hostURL.Scheme
-
-		//c.basePath = host
+		c.host = endpointURL.Host
+		c.scheme = endpointURL.Scheme
+		// c.basePath = endpointURL.Path
 		return nil
 	}
 }
 
-// ParseHostURL parses a url string, validates the string is a host url, and
-// returns the parsed URL
-func ParseHostURL(host string) (*url.URL, error) {
-	protoAddrParts := strings.SplitN(host, "://", 2)
-	if len(protoAddrParts) == 1 {
-		return nil, fmt.Errorf("unable to parse host `%s`", host)
+func WithHost(h string) Opt {
+	return func(c *Client) error {
+		c.host = h
+		return nil
 	}
-
-	proto, addr := protoAddrParts[0], protoAddrParts[1]
-	return &url.URL{
-		Scheme: proto,
-		Host:   addr,
-	}, nil
 }
 
 // WithHTTPClient overrides the client http client with the specified one
@@ -86,6 +73,29 @@ func WithScheme(scheme string) Opt {
 func WithBearerAuth(token string) Opt {
 	return func(c *Client) error {
 		c.bearerToken = token
+		return nil
+	}
+}
+
+func WithCAData(ca []byte) Opt {
+	return func(client *Client) error {
+		caPool := x509.NewCertPool()
+		caPool.AppendCertsFromPEM(ca)
+		client.caPool = caPool
+		return nil
+	}
+}
+
+func WithInsecureSkipTLSVerify() Opt {
+	return func(client *Client) error {
+		client.insecureSkipTLSVerify = true
+		return nil
+	}
+}
+
+func WithServerName(name string) Opt {
+	return func(client *Client) error {
+		client.tlsServerName = name
 		return nil
 	}
 }

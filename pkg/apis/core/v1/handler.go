@@ -31,10 +31,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
-
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
-
 	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -48,17 +44,19 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/kubeclipper/kubeclipper/pkg/models"
-
+	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	tenantapiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/models"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
@@ -77,6 +75,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/generic"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
@@ -89,6 +88,7 @@ var (
 )
 
 type handler struct {
+	genericConfig    *generic.ServerRunOptions
 	clusterOperator  cluster.Operator
 	leaseOperator    lease.Operator
 	opOperator       operation.Operator
@@ -111,10 +111,11 @@ var (
 	ErrNodesRegionDifferent = errors.New("nodes belongs to different region")
 )
 
-func newHandler(clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
+func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
 	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery,
 	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator) *handler {
 	return &handler{
+		genericConfig:    conf,
 		clusterOperator:  clusterOperator,
 		delivery:         delivery,
 		opOperator:       op,
@@ -776,7 +777,7 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		kubeConfigData []byte
 	)
 	if proxyMode {
-		kubeConfigData, err = h.getProxyKubeConfig(ctx, name, request.Request.Host)
+		kubeConfigData, err = h.getProxyKubeConfig(ctx, name)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -803,11 +804,20 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 	_, _ = response.Write(kubeConfigData)
 }
 
-func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string, kcHost string) ([]byte, error) {
-	// FIXME: KC support secure port deploy
-	var serverCA []byte
+func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string) ([]byte, error) {
 	// TODO: get CA from kc server config
-	serverURL := fmt.Sprintf("https://%s/cluster/%s", kcHost, clusterName)
+	var serverCA []byte
+
+	scheme := "http"
+	port := h.genericConfig.InsecurePort
+	if h.genericConfig.SecurePort != 0 {
+		scheme = "https"
+		port = h.genericConfig.SecurePort
+	}
+	// FIXME floatIP or domain?
+	host := fmt.Sprintf("%s:%d", h.genericConfig.BindAddress, port)
+
+	serverURL := fmt.Sprintf("%s://%s/cluster/%s", scheme, host, clusterName)
 	user, ok := apirequest.UserFrom(ctx)
 	if !ok {
 		return nil, fmt.Errorf("not get user info")
@@ -823,6 +833,7 @@ func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string, kc
 	for _, c := range kubecfg.Clusters {
 		if strings.HasPrefix(strings.ToLower(c.Server), "https") {
 			c.InsecureSkipTLSVerify = true
+			c.TLSServerName = options.KCServerAltName
 		}
 	}
 

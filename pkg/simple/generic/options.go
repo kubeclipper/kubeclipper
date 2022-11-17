@@ -31,6 +31,7 @@ type ServerRunOptions struct {
 	BindAddress   string `json:"bindAddress" yaml:"bindAddress"`
 	InsecurePort  int    `json:"insecurePort" yaml:"insecurePort"`
 	SecurePort    int    `json:"securePort" yaml:"securePort"`
+	CACertFile    string `json:"caCertFile" yaml:"caCertFile"`
 	TLSCertFile   string `json:"tlsCertFile" yaml:"tlsCertFile"`
 	TLSPrivateKey string `json:"tlsPrivateKey" yaml:"tlsPrivateKey"`
 }

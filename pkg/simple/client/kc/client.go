@@ -20,10 +20,16 @@ package kc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -34,18 +40,41 @@ const (
 )
 
 type Client struct {
-	client      *http.Client
-	host        string
-	bearerToken string
-	scheme      string
+	client                *http.Client
+	host                  string
+	bearerToken           string
+	scheme                string
+	insecureSkipTLSVerify bool
+	tlsServerName         string
+	caPool                *x509.CertPool
 }
 
 func FromConfig(c config.Config) (*Client, error) {
 	ctx := c.Contexts[c.CurrentContext]
+	currentServer := c.Servers[ctx.Server]
 
-	cli, err := NewClientWithOpts(WithHost(c.Servers[ctx.Server].Server),
-		WithScheme("http"),
+	var opts []Opt
+	opts = append(opts,
+		WithEndpoint(c.Servers[ctx.Server].Server),
 		WithBearerAuth(c.AuthInfos[ctx.AuthInfo].Token))
+	if currentServer.TLSServerName != "" {
+		opts = append(opts, WithServerName(currentServer.TLSServerName))
+	}
+	if currentServer.InsecureSkipTLSVerify {
+		opts = append(opts, WithInsecureSkipTLSVerify())
+	}
+	switch {
+	case len(currentServer.CertificateAuthorityData) != 0:
+		opts = append(opts, WithCAData(currentServer.CertificateAuthorityData))
+	case currentServer.CertificateAuthority != "":
+		caData, err := os.ReadFile(currentServer.CertificateAuthority)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, WithCAData(caData))
+	}
+
+	cli, err := NewClientWithOpts(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +92,6 @@ func FromConfig(c config.Config) (*Client, error) {
 
 func NewClientWithOpts(opts ...Opt) (*Client, error) {
 	c := &Client{
-		client: http.DefaultClient,
 		scheme: defaultHTTPScheme,
 	}
 
@@ -72,7 +100,28 @@ func NewClientWithOpts(opts ...Opt) (*Client, error) {
 			return nil, err
 		}
 	}
-
+	// init tlsConfig
+	if c.insecureSkipTLSVerify || c.tlsServerName != "" || c.caPool != nil {
+		tr, err := c.httpTransport()
+		if err != nil {
+			return nil, err
+		}
+		if tr.TLSClientConfig == nil {
+			tr.TLSClientConfig = new(tls.Config)
+		}
+		if c.insecureSkipTLSVerify {
+			tr.TLSClientConfig.InsecureSkipVerify = true
+		}
+		if c.tlsServerName != "" {
+			tr.TLSClientConfig.ServerName = c.tlsServerName
+		}
+		if c.caPool != nil {
+			tr.TLSClientConfig.RootCAs = c.caPool
+		}
+	}
+	if c.client == nil {
+		c.client = http.DefaultClient
+	}
 	return c, nil
 }
 
@@ -102,4 +151,36 @@ func (cli *Client) getAPIPath(ctx context.Context, p string, query url.Values) s
 func (cli *Client) Validate() error {
 	// TODO
 	return nil
+}
+
+func (cli *Client) httpTransport() (*http.Transport, error) {
+	if cli.client == nil {
+		cli.client = &http.Client{Transport: defaultHTTPTransport()}
+	}
+	if cli.client.Transport == nil {
+		cli.client.Transport = defaultHTTPTransport()
+	}
+	tr, ok := cli.client.Transport.(*http.Transport)
+	if !ok {
+		return nil, fmt.Errorf("http client Transport not is http.Transport")
+	}
+	return tr, nil
+
+}
+
+func defaultHTTPTransport() *http.Transport {
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		TLSClientConfig:       new(tls.Config),
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 }

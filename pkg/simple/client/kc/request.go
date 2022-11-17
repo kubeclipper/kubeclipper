@@ -209,7 +209,7 @@ func (cli *Client) doRequest(ctx context.Context, req *http.Request) (serverResp
 	serverResp := serverResponse{statusCode: -1, reqURL: req.URL}
 
 	req = req.WithContext(ctx)
-	resp, err := cli.client.Do(req)
+	resp, err := cli.HTTPClient().Do(req)
 	if err != nil {
 		if resp != nil && resp.Body != nil {
 			defer resp.Body.Close()
