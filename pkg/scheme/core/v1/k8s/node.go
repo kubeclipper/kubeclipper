@@ -127,6 +127,30 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 				return err
 			}
 			stepper.installSteps = append(stepper.installSteps, steps...)
+
+			for _, addon := range metadata.Addons {
+				ad, ok := component.Load(fmt.Sprintf(component.RegisterFormat, addon.Name, addon.Version))
+				if !ok {
+					continue
+				}
+				compMeta := ad.NewInstance()
+				if err := json.Unmarshal(addon.Config.Raw, compMeta); err != nil {
+					return err
+				}
+				newComp, _ := compMeta.(component.Interface)
+				if err := newComp.InitSteps(component.WithExtraMetadata(context.TODO(), *metadata)); err != nil {
+					return err
+				}
+				stepList := newComp.GetInstallSteps()
+				for _, st := range stepList {
+					// TODO: Temporarily use hardcode to adjust, and subsequently optimize the step code for image download and load
+					if strings.Contains(st.Name, "imageLoad") {
+						st.Nodes = patchNodes
+						stepper.installSteps = append(stepper.installSteps, st)
+						break
+					}
+				}
+			}
 		}
 
 		joinCmd := JoinCmd{}
@@ -150,30 +174,6 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 			return err
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
-
-		for _, addon := range metadata.Addons {
-			ad, ok := component.Load(fmt.Sprintf(component.RegisterFormat, addon.Name, addon.Version))
-			if !ok {
-				continue
-			}
-			compMeta := ad.NewInstance()
-			if err := json.Unmarshal(addon.Config.Raw, compMeta); err != nil {
-				return err
-			}
-			newComp, _ := compMeta.(component.Interface)
-			if err := newComp.InitSteps(component.WithExtraMetadata(context.TODO(), *metadata)); err != nil {
-				return err
-			}
-			stepList := newComp.GetInstallSteps()
-			for _, st := range stepList {
-				// TODO: Temporarily use hardcode to adjust, and subsequently optimize the step code for image download and load
-				if strings.Contains(st.Name, "imageLoad") {
-					st.Nodes = patchNodes
-					stepper.installSteps = append(stepper.installSteps, st)
-					break
-				}
-			}
-		}
 	}
 
 	return nil
