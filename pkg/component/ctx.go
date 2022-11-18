@@ -42,6 +42,7 @@ type ExtraMetadata struct {
 	CRI                string
 	ClusterName        string
 	KubeVersion        string
+	OperationID        string
 	OperationType      string
 	KubeletDataDir     string
 	ControlPlaneStatus []v1.ControlPlaneHealth

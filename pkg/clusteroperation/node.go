@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -19,11 +18,9 @@ const (
 )
 
 var (
-	ErrInvalidNodesOperation      = errors.New("invalid nodes patch operation")
-	ErrInvalidNodesRole           = errors.New("invalid node role")
-	ErrZeroNode                   = errors.New("zero node")
-	ErrUninstallNotExistComponent = errors.New("the component is not installed in the current cluster")
-	ErrInstallExistingComponent   = errors.New("the component has been installed in the current cluster")
+	ErrInvalidNodesOperation = errors.New("invalid nodes patch operation")
+	ErrInvalidNodesRole      = errors.New("invalid node role")
+	ErrZeroNode              = errors.New("zero node")
 )
 
 type NodesPatchOperation string
@@ -37,24 +34,29 @@ type PatchNodes struct {
 
 var _ Interface = (*NodeOperation)(nil)
 
-type NodeOperation struct{}
+type NodeOperation struct {
+	Options
+}
 
-func (n *NodeOperation) Builder(options Options) (*corev1.Operation, error) {
+func NewNodeOperation(options Options) *NodeOperation {
+	return &NodeOperation{options}
+}
+
+func (n *NodeOperation) Builder() (*corev1.Operation, error) {
 	var pn PatchNodes
-	if err := json.Unmarshal(options.pendingOperation.ExtraData, &pn); err != nil {
+	if err := json.Unmarshal(n.pendingOperation.ExtraData, &pn); err != nil {
 		return nil, err
 	}
-	// Add the worker node to extra
+	// add the worker node to extra
 	if pn.Role == common.NodeRoleWorker {
-		options.extra.Workers = append(options.extra.Workers, pn.ConvertNodes...)
+		n.extra.Workers = append(n.extra.Workers, pn.ConvertNodes...)
 	}
-	op, err := pn.MakeOperation(*options.extra, options.cluster)
+	op, err := pn.MakeOperation(*n.extra, n.cluster)
 	if err != nil {
 		return nil, err
 	}
 
-	op.Labels[common.LabelTimeoutSeconds] = options.pendingOperation.Timeout
-	op.Labels[common.LabelOperationID] = options.pendingOperation.OperationID
+	op.Labels[common.LabelTimeoutSeconds] = n.pendingOperation.Timeout
 	op.Status.Status = corev1.OperationStatusPending
 
 	return op, nil
@@ -91,7 +93,6 @@ func (p *PatchNodes) makeWorkerCompare(cluster *corev1.Cluster) error {
 		// Remove nodes from cluster.
 		// Filter out nodes in cluster already.
 		// Filter out nodes to be removed.
-		// TODO: if len(p.nodes)==0, should return error
 		p.Nodes = cluster.Workers.Intersect(p.Nodes...)
 		cluster.Workers = cluster.Workers.Complement(p.Nodes...)
 	default:
@@ -133,14 +134,15 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 
 	// make operation for adding worker nodes to cluster
 	op := &corev1.Operation{}
-	op.Name = uuid.New().String()
+	// use pass-through operationID
+	op.Name = extra.OperationID
 	op.Labels = map[string]string{
 		common.LabelClusterName: cluster.Name,
-		// v1.LabelTopologyRegion ???
 	}
-	ctx := context.TODO()
-	ctx = component.WithExtraMetadata(ctx, extra)
-	stepNodes := []corev1.StepNode{}
+	// pass extra metadata in context
+	ctx := component.WithExtraMetadata(context.TODO(), extra)
+	// nodes to be added or removed
+	var stepNodes []corev1.StepNode
 	workerIPs := extra.GetWorkerNodeIP()
 	for _, nodeID := range p.Nodes.GetNodeIDs() {
 		stepNode := corev1.StepNode{
@@ -154,12 +156,6 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 	var action corev1.StepAction
 	switch p.Operation {
 	case NodesOperationAdd:
-		// add nodes to cluster
-		// check nodes in cluster
-		// nodes to be added
-
-		// p.Nodes = cluster.Workers.Complement(p.Nodes...)
-		// cluster.Workers = append(cluster.Workers, p.Nodes...)
 		action = corev1.ActionInstall
 		op.Labels[common.LabelOperationAction] = corev1.OperationAddNodes
 
@@ -177,7 +173,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		}
 		op.Steps = append(op.Steps, steps...)
 
-		// join component
+		// join node
 		gen := k8s.GenNode{}
 		err = gen.InitStepper(&extra, cluster, p.Role.String()).MakeInstallSteps(&extra, stepNodes, p.Role.String())
 		if err != nil {
@@ -185,14 +181,10 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		}
 		op.Steps = append(op.Steps, gen.GetSteps(action)...)
 	case NodesOperationRemove:
-		// remove nodes from cluster
-		// filter nodes in cluster
-		// nodes to be removed
-		// p.Nodes = cluster.Workers.Intersect(p.Nodes...)
-		// cluster.Workers = cluster.Workers.Complement(p.Nodes...)
 		action = corev1.ActionUninstall
 		op.Labels[common.LabelOperationAction] = corev1.OperationRemoveNodes
 
+		// drain node
 		gen := k8s.GenNode{}
 		err := gen.InitStepper(&extra, cluster, p.Role.String()).MakeUninstallSteps(&extra, stepNodes)
 		if err != nil {

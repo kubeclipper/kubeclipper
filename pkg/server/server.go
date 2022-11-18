@@ -445,7 +445,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		RegistryLister:      informerFactory.Core().V1().Registries().Lister(),
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:          clusterOperator,
-		OperationLister:     informerFactory.Core().V1().Operations().Lister(),
+		OperationOperator:   opOperator,
 		OperationWriter:     opOperator,
 		CronBackupWriter:    clusterOperator,
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),

@@ -69,7 +69,7 @@ type ClusterReconciler struct {
 	RegistryLister      listerv1.RegistryLister
 	NodeLister          listerv1.NodeLister
 	NodeWriter          cluster.NodeWriter
-	OperationLister     listerv1.OperationLister
+	OperationOperator   operation.Operator
 	OperationWriter     operation.Writer
 	CronBackupWriter    cluster.CronBackupWriter
 	CloudProviderLister listerv1.CloudProviderLister
@@ -608,15 +608,16 @@ func getKubeConfig(clusterName string, address string, user string, token string
 }
 
 func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log logger.Logging, c *v1.Cluster) error {
-	log.Debug("process pending operation")
+	log.Debug("process pending operations")
 
 	// all pending operations are processed
 	clean := true
 
 	for _, pendingOperation := range c.PendingOperations {
-		log.Infof("pending operation info is %+v, extraData is %+v", pendingOperation, string(pendingOperation.ExtraData))
+		log.Debugf("pending operation info is %+v, extraData is %+v", pendingOperation, string(pendingOperation.ExtraData))
 		// the operation has been processed ?
-		op, err := r.OperationLister.Get(pendingOperation.OperationID)
+		op, err := r.OperationOperator.GetOperationEx(ctx, pendingOperation.OperationID, "0")
+		// ignore IsNotFound error
 		if err != nil && !errors.IsNotFound(err) {
 			// if an error occurs, the deletion operation will not be performed
 			clean = false
@@ -625,29 +626,32 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 		// if no, the operation will be created
 		if op == nil {
 			clean = false
-			log.Infof("process pending operation, create %s %s operation", pendingOperation.OperationID, pendingOperation.OperationType)
-			// todo build operation
-			// 1. 获取 cluster 根据 resourceVersion
+
+			// get cluster information about the specified resource version when the operation is performed
 			clu, err := r.ClusterOperator.GetClusterEx(ctx, c.Name, pendingOperation.ClusterResourceVersion)
 			if err != nil {
 				log.Error(fmt.Sprintf("get resource-version-%s cluster info failed", pendingOperation.ClusterResourceVersion), zap.String("cluster", c.Name), zap.Error(err))
 				return err
 			}
-			log.Info(fmt.Sprintf("get resource-version-%s cluster info successful", pendingOperation.ClusterResourceVersion), zap.String("cluster", c.Name), zap.String("info", clu.Name))
-			// 2. 获取 clusterExtraMetadata
-			extraMeta, err := r.getClusterExtraMetadata(ctx, clu)
+
+			// restore and assemble the cluster metadata, passing it through
+			extraMeta, err := r.assembleClusterExtraMetadata(ctx, clu)
 			if err != nil {
 				log.Error("get cluster extra metadata failed", zap.String("cluster", c.Name), zap.Error(err))
 				return err
 			}
-			log.Info("get cluster extra metadata successful", zap.String("cluster", c.Name))
-			// 3. 调用 builder 处理
-			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta)
+
+			// pass-through operationID
+			extraMeta.OperationID = pendingOperation.OperationID
+
+			// build the operation structure based on the type of operation
+			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil)
 			if err != nil {
 				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.Error(err))
 				return err
 			}
-			log.Info("create operation struct successful", zap.String("cluster", c.Name))
+
+			log.Debugf("create operation struct successful", zap.String("cluster", c.Name))
 			_, err = r.OperationWriter.CreateOperation(ctx, newOperation)
 			if err != nil {
 				log.Error("create operation failed", zap.String("cluster", c.Name), zap.Error(err))
@@ -657,7 +661,7 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 	}
 
 	if clean && len(c.PendingOperations) > 0 {
-		log.Infof("clean pending operation in %s cluster", c.Name)
+		log.Debugf("clean pending operation in %s cluster", c.Name)
 		// clean pending operations
 		c.PendingOperations = nil
 		if _, err := r.ClusterWriter.UpdateCluster(ctx, c); err != nil {

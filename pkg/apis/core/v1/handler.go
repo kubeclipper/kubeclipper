@@ -216,6 +216,21 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
+
+	operationType := v1.OperationAddNodes
+	if pn.Operation == clusteroperation.NodesOperationRemove {
+		operationType = v1.OperationRemoveNodes
+	}
+	executable, err := clusteroperation.Executable(ctx, operationType, clu, h.opOperator)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if executable {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("%s does not support concurrent execution", operationType))
+		return
+	}
+
 	// backing up old masters and workers
 	nodeSet := c.GetAllNodes()
 
@@ -257,7 +272,6 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 				restplus.HandleBadRequest(response, request, fmt.Errorf("this node(%s) is already in use", n.IPv4))
 				return
 			}
-			// todo 替换为通过集群的 region label 判断集群下节点是否符合 region 要求
 			if n.Region != c.Labels[common.LabelTopologyRegion] {
 				restplus.HandleBadRequest(response, request, fmt.Errorf("the node(%s) belongs to different region", n.IPv4))
 				return
@@ -270,28 +284,6 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		}
 	}
 
-	// todo 整个创建 operation 的操作全部移动到 controller 层
-	//op, err := pn.MakeOperation(*extraMeta, c)
-	//if err != nil {
-	//	if errors.Is(err, clusteroperation.ErrZeroNode) {
-	//		// No node needs to be operated.
-	//		_ = response.WriteHeaderAndEntity(http.StatusOK, c)
-	//		return
-	//	} else if errors.Is(err, clusteroperation.ErrInvalidNodesOperation) || errors.Is(err, clusteroperation.ErrInvalidNodesRole) {
-	//		restplus.HandleBadRequest(response, request, err)
-	//		return
-	//	}
-	//	restplus.HandleInternalError(response, request, err)
-	//	return
-	//}
-	//
-	//op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
-	//op.Labels[common.LabelOperationID] = strutil.GetUUID()
-	//op.Status.Status = v1.OperationStatusPending
-	operationType := v1.OperationAddNodes
-	if pn.Operation == clusteroperation.NodesOperationRemove {
-		operationType = v1.OperationRemoveNodes
-	}
 	if !dryRun {
 		for _, node := range pn.Nodes {
 			_, err = MarkToOriginNode(ctx, h.clusterOperator, node.ID)
@@ -300,22 +292,19 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 				return
 			}
 		}
-		// TODO 我们需要一个通用的，能够生成 pending operation 的方法 buildPendingOperation
 		pendingOperation, err := buildPendingOperation(operationType, timeoutSecs, c.ResourceVersion, pn)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+
 		c.Status.Phase = v1.ClusterUpdating
-		logger.Infof("build pending operation is %+v", pendingOperation)
 		c.PendingOperations = append(c.PendingOperations, pendingOperation)
 		if c, err = h.clusterOperator.UpdateCluster(ctx, c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 	}
-	// distribute tasks
-	//go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }

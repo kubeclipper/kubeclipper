@@ -33,7 +33,7 @@ const (
 	LabelRecoveryName      = "kubeclipper.io/recovery"
 	LabelOperationAction   = "kubeclipper.io/operation"
 	LabelOperationName     = "kubeclipper.io/operation-name"
-	LabelOperationID       = "kubeclipper.io/operation-id"
+	LabelOperationRetry    = "kubeclipper.io/operation-retry-times"
 	LabelTimeoutSeconds    = "kubeclipper.io/timeout"
 	LabelRoleTemplate      = "kubeclipper.io/role-template"
 	LabelHidden            = "kubeclipper.io/hidden"

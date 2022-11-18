@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"path/filepath"
 
@@ -449,13 +448,12 @@ func buildPendingOperation(operationType, timeout, clusterResourceVersion string
 	if err != nil {
 		return v1.PendingOperation{}, nil
 	}
-	logger.Infof("pending operation is: %v", string(extraData))
 
 	return v1.PendingOperation{
+		OperationID:            strutil.GetUUID(),
 		OperationType:          operationType,
 		Timeout:                timeout,
 		ClusterResourceVersion: clusterResourceVersion,
-		OperationID:            strutil.GetUUID(),
 		ExtraData:              extraData,
 	}, nil
 }

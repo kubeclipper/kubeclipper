@@ -7,7 +7,8 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
-func (r *ClusterReconciler) getClusterExtraMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
+// assembleClusterExtraMetadata assemble cluster extra metadata, used to share data between the various steps
+func (r *ClusterReconciler) assembleClusterExtraMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
 		ClusterName:        c.Name,
 		Offline:            c.Offline(),
@@ -34,6 +35,7 @@ func (r *ClusterReconciler) getClusterExtraMetadata(ctx context.Context, c *v1.C
 	return meta, nil
 }
 
+// convertNodes convert nodes information, this is especially important for handling node information in subsequent operations
 func (r *ClusterReconciler) convertNodes(ctx context.Context, nodes v1.WorkerNodeList) ([]component.Node, error) {
 	var meta []component.Node
 	for _, node := range nodes {
