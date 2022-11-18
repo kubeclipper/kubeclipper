@@ -21,10 +21,13 @@ package operationcontroller
 import (
 	"context"
 	"fmt"
+	"strconv"
+
+	"k8s.io/client-go/util/retry"
+
 	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
-	"strconv"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +49,7 @@ import (
 type OperationReconciler struct {
 	CmdDelivery       service.CmdDelivery
 	ClusterLister     listerv1.ClusterLister
-	ClusterWriter     cluster.Operator
+	ClusterOperator   cluster.Operator
 	OperationLister   listerv1.OperationLister
 	OperationWriter   operation.Writer
 	OperationOperator operation.Operator
@@ -142,7 +145,6 @@ func (r *OperationReconciler) distributeOperation(ctx context.Context, log logge
 		if _, err := r.OperationWriter.UpdateOperation(ctx, op); err != nil {
 			return err
 		}
-		log.Debug("distribute task")
 
 		go func() {
 			if err := r.CmdDelivery.DeliverTaskOperation(context.TODO(), op, nil); err != nil {
@@ -153,43 +155,47 @@ func (r *OperationReconciler) distributeOperation(ctx context.Context, log logge
 	if op.Status.Status == v1.OperationStatusFailed {
 		times, _ := strconv.Atoi(op.Labels[common.LabelOperationRetry])
 		op.Labels[common.LabelOperationRetry] = strconv.Itoa(times + 1)
-		retry, err := clusteroperation.AutomaticRetry(ctx, op, r.OperationOperator)
+		automaticRetry, err := clusteroperation.AutomaticRetry(ctx, op, r.OperationOperator)
 		if err != nil {
 			log.Error("automatic retry failure", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
 			return err
 		}
+		log.Infof("automatic retry result: %v, current-times: %s", automaticRetry, strconv.Itoa(times+1))
 		// automatic retry
-		if retry {
+		if automaticRetry {
 			// get retry operation step
-			newOp, continueSteps, err := clusteroperation.Retry(op)
+			deliverCtx, newOp, continueSteps, err := clusteroperation.Retry(op)
 			if err != nil {
 				log.Error("automatic retry failure, processing retry step error", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
 				return err
 			}
 			// TODO: update operation and cluster is non-atomic
+			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				// get the latest cluster info
+				clu, err := r.ClusterOperator.GetClusterEx(ctx, cluName, "0")
+				if err != nil {
+					return err
+				}
+				// update cluster status
+				clu.Status.Phase = clusteroperation.GetClusterPhase(op.Labels[common.LabelOperationAction])
+				if _, err = r.ClusterOperator.UpdateCluster(ctx, clu.DeepCopy()); err != nil {
+					return err
+				}
+				return nil
+			}); err != nil {
+				log.Error("automatic retry, update cluster failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				return err
+			}
 			// update operation
 			newOp.Status.Status = v1.OperationStatusRunning
 			if _, err = r.OperationWriter.UpdateOperation(ctx, newOp); err != nil {
-				log.Error("automatic retry, update operation failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
-				return err
-			}
-			// get the latest cluster info
-			clu, err := r.ClusterWriter.GetClusterEx(ctx, cluName, "0")
-			if err != nil {
-				log.Error("automatic retry, get cluster failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
-				return err
-			}
-			// update cluster status
-			// TODO: get the cluster status based on the type of operation
-			clu.Status.Phase = v1.ClusterUpdating
-			if _, err = r.ClusterWriter.UpdateCluster(ctx, clu); err != nil {
-				log.Error("automatic retry, update cluster failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				log.Error("retry on conflict, update operation failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
 				return err
 			}
 			// process delivery steps
 			newOp.Steps = continueSteps
 			go func() {
-				if err = r.CmdDelivery.DeliverTaskOperation(context.TODO(), newOp, nil); err != nil {
+				if err = r.CmdDelivery.DeliverTaskOperation(deliverCtx, newOp, nil); err != nil {
 					log.Error("automatic retry, distribute task error", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
 				}
 			}()

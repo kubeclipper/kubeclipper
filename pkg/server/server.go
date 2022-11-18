@@ -475,10 +475,12 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		return err
 	}
 	if err = (&operationcontroller.OperationReconciler{
-		CmdDelivery:     mgr.GetCmdDelivery(),
-		ClusterLister:   informerFactory.Core().V1().Clusters().Lister(),
-		OperationLister: informerFactory.Core().V1().Operations().Lister(),
-		OperationWriter: opOperator,
+		CmdDelivery:       mgr.GetCmdDelivery(),
+		ClusterLister:     informerFactory.Core().V1().Clusters().Lister(),
+		ClusterOperator:   clusterOperator,
+		OperationLister:   informerFactory.Core().V1().Operations().Lister(),
+		OperationWriter:   opOperator,
+		OperationOperator: opOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}

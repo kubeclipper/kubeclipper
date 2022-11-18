@@ -111,6 +111,7 @@ type Step struct {
 	BeforeRunCommands []Command       `json:"beforeRunCommands,omitempty"`
 	AfterRunCommands  []Command       `json:"afterRunCommands,omitempty"`
 	RetryTimes        int32           `json:"retryTimes,omitempty"`
+	AutomaticRetry    bool            `json:"automaticRetry"`
 }
 
 type StepNode struct {

@@ -22,10 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -621,7 +622,7 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 		if err != nil && !errors.IsNotFound(err) {
 			// if an error occurs, the deletion operation will not be performed
 			clean = false
-			return err
+			continue
 		}
 		// if no, the operation will be created
 		if op == nil {
@@ -630,15 +631,16 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			// get cluster information about the specified resource version when the operation is performed
 			clu, err := r.ClusterOperator.GetClusterEx(ctx, c.Name, pendingOperation.ClusterResourceVersion)
 			if err != nil {
-				log.Error(fmt.Sprintf("get resource-version-%s cluster info failed", pendingOperation.ClusterResourceVersion), zap.String("cluster", c.Name), zap.Error(err))
-				return err
+				log.Error(fmt.Sprintf("get resource-version-%s cluster info failed", pendingOperation.ClusterResourceVersion),
+					zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
 			}
 
 			// restore and assemble the cluster metadata, passing it through
 			extraMeta, err := r.assembleClusterExtraMetadata(ctx, clu)
 			if err != nil {
-				log.Error("get cluster extra metadata failed", zap.String("cluster", c.Name), zap.Error(err))
-				return err
+				log.Error("get cluster extra metadata failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
 			}
 
 			// pass-through operationID
@@ -647,15 +649,15 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			// build the operation structure based on the type of operation
 			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil)
 			if err != nil {
-				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.Error(err))
-				return err
+				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
 			}
 
-			log.Debugf("create operation struct successful", zap.String("cluster", c.Name))
+			log.Debugf("create operation struct successful", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID))
 			_, err = r.OperationWriter.CreateOperation(ctx, newOperation)
 			if err != nil {
-				log.Error("create operation failed", zap.String("cluster", c.Name), zap.Error(err))
-				return err
+				log.Error("create operation failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
 			}
 		}
 	}

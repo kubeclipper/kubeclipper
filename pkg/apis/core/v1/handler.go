@@ -24,13 +24,14 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 	"math/rand"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 
@@ -226,7 +227,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-	if executable {
+	if !executable {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("%s does not support concurrent execution", operationType))
 		return
 	}

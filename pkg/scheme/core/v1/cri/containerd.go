@@ -137,7 +137,7 @@ func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.O
 	if err != nil {
 		return nil, err
 	}
-	if _, err = instance.DownloadAndUnpackConfigs(); err != nil {
+	if _, err = instance.DownloadAndUnpackConfigs(); err == nil {
 		return nil, err
 	}
 	// generate containerd daemon config file

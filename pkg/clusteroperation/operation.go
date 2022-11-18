@@ -3,12 +3,13 @@ package clusteroperation
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"strconv"
 )
 
 // RetryTimes max number of operation retry
@@ -86,7 +87,7 @@ func AutomaticRetry(ctx context.Context, op *v1.Operation, operator operation.Op
 	}
 	times, _ := strconv.Atoi(op.Labels[common.LabelOperationRetry])
 	// maximum number of retries exceeded
-	if times >= RetryTimes {
+	if times > RetryTimes {
 		return false, nil
 	}
 	q := query.New()
@@ -110,9 +111,9 @@ func AutomaticRetry(ctx context.Context, op *v1.Operation, operator operation.Op
 }
 
 // Retry operation retry
-func Retry(op *v1.Operation) (*v1.Operation, []v1.Step, error) {
+func Retry(op *v1.Operation) (context.Context, *v1.Operation, []v1.Step, error) {
 	if op.Status.Status == v1.OperationStatusSuccessful || op.Status.Status == v1.OperationStatusRunning {
-		return nil, nil, fmt.Errorf("only the latest faild operation can do a retry")
+		return nil, nil, nil, fmt.Errorf("only the latest faild operation can do a retry")
 	}
 
 	// error step index
@@ -147,6 +148,8 @@ func Retry(op *v1.Operation) (*v1.Operation, []v1.Step, error) {
 
 		// the node that failed to execute the task
 		continueSteps[0].Nodes = failedNodes
+		// set the current step to the auto retry flag so that the step log file can be cleared later
+		continueSteps[0].AutomaticRetry = true
 
 		if len(successStatus) != 0 {
 			// failed status
@@ -169,7 +172,7 @@ func Retry(op *v1.Operation) (*v1.Operation, []v1.Step, error) {
 		continueSteps = op.Steps
 		op.Status.Conditions = make([]v1.OperationCondition, 0)
 	}
-	return op, continueSteps, nil
+	return ctx, op, continueSteps, nil
 }
 
 // SupportConcurrent whether concurrency is supported
@@ -198,4 +201,25 @@ func Executable(ctx context.Context, opType, cluName string, operator operation.
 		return true, nil
 	}
 	return SupportConcurrent(opType), nil
+}
+
+// GetClusterPhase get the cluster phase based on the type of operation
+func GetClusterPhase(opType string) v1.ClusterPhase {
+	switch opType {
+	case v1.OperationCreateCluster:
+		return v1.ClusterInstalling
+	case v1.OperationDeleteCluster:
+		return v1.ClusterTerminating
+	case v1.OperationUpgradeCluster:
+		return v1.ClusterUpgrading
+	case v1.OperationBackupCluster, v1.OperationDeleteBackup:
+		return v1.ClusterBackingUp
+	case v1.OperationRecoverCluster:
+		return v1.ClusterRestoring
+	default:
+		// OperationAddNodes,OperationRemoveNodes
+		// OperationInstallComponents,OperationUninstallComponents
+		// OperationUpdateCertification
+		return v1.ClusterUpdating
+	}
 }
