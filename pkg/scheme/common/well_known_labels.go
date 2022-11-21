@@ -34,6 +34,7 @@ const (
 	LabelOperationAction   = "kubeclipper.io/operation"
 	LabelOperationName     = "kubeclipper.io/operation-name"
 	LabelOperationRetry    = "kubeclipper.io/operation-retry-times"
+	LabelOperationIntent   = "kubeclipper.io/operation-intent"
 	LabelTimeoutSeconds    = "kubeclipper.io/timeout"
 	LabelRoleTemplate      = "kubeclipper.io/role-template"
 	LabelHidden            = "kubeclipper.io/hidden"
@@ -102,3 +103,5 @@ const (
 	AnnotationOriginNode        = "kubeclipper.io/originNode"        // mark node is from kc or provider,add when join node to provider cluster
 	AnnotationProviderClusterID = "kubeclipper.io/providerClusterID" // match kc cluster to provider cluster
 )
+
+const OperationIntent = "termination"

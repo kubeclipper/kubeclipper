@@ -64,11 +64,12 @@ const DefaultOperationTimeoutSecs = "5400"
 type OperationStatusType string
 
 const (
-	OperationStatusPending    OperationStatusType = "pending"
-	OperationStatusRunning    OperationStatusType = "running"
-	OperationStatusFailed     OperationStatusType = "failed"
-	OperationStatusUnknown    OperationStatusType = "unknown"
-	OperationStatusSuccessful OperationStatusType = "successful"
+	OperationStatusPending     OperationStatusType = "pending"
+	OperationStatusRunning     OperationStatusType = "running"
+	OperationStatusFailed      OperationStatusType = "failed"
+	OperationStatusTermination OperationStatusType = "termination"
+	OperationStatusUnknown     OperationStatusType = "unknown"
+	OperationStatusSuccessful  OperationStatusType = "successful"
 )
 
 type OperationStatus struct {

@@ -31,6 +31,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
+	"k8s.io/client-go/util/retry"
+
 	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -57,7 +60,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
@@ -98,6 +100,7 @@ type handler struct {
 	delivery         service.IDelivery
 	tenantOperator   tenant.Operator
 	tokenOperator    auth.TokenManagementInterface
+	terminationChan  *chan struct{}
 }
 
 const (
@@ -114,7 +117,7 @@ var (
 
 func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
 	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery,
-	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator) *handler {
+	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator, terminationChan *chan struct{}) *handler {
 	return &handler{
 		genericConfig:    conf,
 		clusterOperator:  clusterOperator,
@@ -125,6 +128,7 @@ func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator
 		coreOperator:     coreOperator,
 		tenantOperator:   tenantOperator,
 		tokenOperator:    tokenOperator,
+		terminationChan:  terminationChan,
 	}
 }
 
@@ -1052,6 +1056,40 @@ func (h *handler) ListOperations(request *restful.Request, response *restful.Res
 	}
 }
 
+func (h *handler) TerminationOperation(request *restful.Request, response *restful.Response) {
+	ctx := request.Request.Context()
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
+	name := request.PathParameter(query.ParameterName)
+
+	op, err := h.opOperator.GetOperationEx(ctx, name, "0")
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if op.Status.Status != v1.OperationStatusRunning {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("the operation status does not support termination"))
+		return
+	}
+	if !dryRun {
+		// update the data before broadcasting the message
+		// write termination label
+		op.Labels[common.LabelOperationIntent] = common.OperationIntent
+
+		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			_, err = h.opOperator.UpdateOperation(ctx, op)
+			return err
+		}); err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		// close channel for broadcast termination message
+		close(*h.terminationChan)
+		// reset channel
+		*h.terminationChan = make(chan struct{})
+	}
+	_ = response.WriteHeaderAndEntity(http.StatusOK, nil)
+}
+
 func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, q *query.Query) {
 	timeout := query.MinTimeoutSeconds * time.Second
 	if q.TimeoutSeconds != nil {
@@ -1760,7 +1798,8 @@ func (h *handler) RetryCluster(request *restful.Request, response *restful.Respo
 	}
 
 	op = opList.Items[0].(*v1.Operation)
-	if op.Status.Status == v1.OperationStatusSuccessful || op.Status.Status == v1.OperationStatusRunning || op.Name != name {
+	if op.Status.Status == v1.OperationStatusSuccessful || op.Status.Status == v1.OperationStatusRunning ||
+		op.Status.Status == v1.OperationStatusTermination || op.Name != name {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("only the latest faild operation can do a retry"))
 		return
 	}
