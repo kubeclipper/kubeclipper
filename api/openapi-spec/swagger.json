@@ -1483,6 +1483,13 @@
             "name": "name",
             "in": "path",
             "required": true
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "use kubeClipper proxy",
+            "name": "proxy",
+            "in": "query"
           }
         ],
         "responses": {
@@ -4602,6 +4609,76 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/projects/{project}/regions": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Region"
+        ],
+        "summary": "List regions in project.",
+        "operationId": "ListRegionsInProject",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "format": "limit=%d,page=%d",
+            "default": "limit=10,page=1",
+            "description": "paging query, e.g. limit=100,page=1",
+            "name": "paging",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "labelSelector=%s=%s",
+            "description": "resource filter by metadata label",
+            "name": "labelSelector",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "format": "fieldSelector=%s=%s",
+            "description": "resource filter by field",
+            "name": "fieldSelector",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "resource sort reverse or not",
+            "name": "reverse",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "watch request",
+            "name": "watch",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 60,
+            "description": "watch timeout seconds",
+            "name": "timeoutSeconds",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/models.PageableResponse"
+            }
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/projects/{project}/registries": {
       "get": {
         "produces": [
@@ -5317,47 +5394,6 @@
           }
         }
       },
-      "put": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-IAM"
-        ],
-        "summary": "Update member info in specified project",
-        "operationId": "UpdateProjectMember",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1.Member"
-            }
-          },
-          {
-            "type": "string",
-            "description": "project name",
-            "name": "project",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.ProjectRoleBinding"
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "schema": {
-              "$ref": "#/definitions/errors.HTTPError"
-            }
-          }
-        }
-      },
       "post": {
         "produces": [
           "application/json"
@@ -5531,6 +5567,49 @@
         }
       }
     },
+    "/api/iam.kubeclipper.io/v1/projects/{project}/projectmembers/{projectmember}": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Update member info in specified project",
+        "operationId": "UpdateProjectMember",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Member"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRoleBinding"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      }
+    },
     "/api/iam.kubeclipper.io/v1/projects/{project}/projectroles": {
       "get": {
         "produces": [
@@ -5563,47 +5642,6 @@
             "description": "OK",
             "schema": {
               "$ref": "#/definitions/models.PageableResponse"
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "schema": {
-              "$ref": "#/definitions/errors.HTTPError"
-            }
-          }
-        }
-      },
-      "put": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-IAM"
-        ],
-        "summary": "Update role info",
-        "operationId": "UpdateProjectRole",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1.ProjectRole"
-            }
-          },
-          {
-            "type": "string",
-            "description": "project name",
-            "name": "project",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.ProjectRole"
             }
           },
           "500": {
@@ -5678,6 +5716,47 @@
             "type": "string",
             "description": "role name",
             "name": "projectrole",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-IAM"
+        ],
+        "summary": "Update projectrole info",
+        "operationId": "UpdateProjectRole",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.ProjectRole"
+            }
+          },
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
             "in": "path",
             "required": true
           }
@@ -7875,6 +7954,9 @@
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
           "type": "string"
         },
+        "description": {
+          "type": "string"
+        },
         "fsConfig": {
           "$ref": "#/definitions/v1.FsConfig"
         },
@@ -7923,23 +8005,17 @@
     "v1.CNI": {
       "required": [
         "type",
-        "Version",
-        "CriType",
-        "Offline",
+        "version",
+        "criType",
+        "offline",
         "namespace"
       ],
       "properties": {
-        "CriType": {
-          "type": "string"
-        },
-        "Offline": {
-          "type": "boolean"
-        },
-        "Version": {
-          "type": "string"
-        },
         "calico": {
           "$ref": "#/definitions/v1.Calico"
+        },
+        "criType": {
+          "type": "string"
         },
         "localRegistry": {
           "type": "string"
@@ -7947,11 +8023,17 @@
         "namespace": {
           "type": "string"
         },
+        "offline": {
+          "type": "boolean"
+        },
         "type": {
           "type": "string",
           "enum": [
             "calico"
           ]
+        },
+        "version": {
+          "type": "string"
         }
       }
     },
@@ -8133,6 +8215,12 @@
         "etcd": {
           "$ref": "#/definitions/v1.Etcd"
         },
+        "externalCaCert": {
+          "type": "string"
+        },
+        "externalCaKey": {
+          "type": "string"
+        },
         "kind": {
           "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
           "type": "string"
@@ -8179,16 +8267,7 @@
       }
     },
     "v1.ClusterStatus": {
-      "required": [
-        "Registries"
-      ],
       "properties": {
-        "Registries": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.RegistrySpec"
-          }
-        },
         "certifications": {
           "type": "array",
           "items": {
@@ -8209,6 +8288,12 @@
         },
         "phase": {
           "type": "string"
+        },
+        "registries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.RegistrySpec"
+          }
         },
         "versions": {
           "$ref": "#/definitions/v1.ClusterVersionsStatus"
@@ -8588,9 +8673,6 @@
     "v1.FsConfig": {
       "properties": {
         "backupRootDir": {
-          "type": "string"
-        },
-        "description": {
           "type": "string"
         }
       }
