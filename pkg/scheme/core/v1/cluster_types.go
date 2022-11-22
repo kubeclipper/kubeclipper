@@ -128,7 +128,7 @@ type ClusterStatus struct {
 
 	Certifications []Certification `json:"certifications,omitempty"`
 	// Registries all CRI registry
-	Registries []RegistrySpec
+	Registries []RegistrySpec `json:"registries,omitempty"`
 	// ControlPlane Health
 	ControlPlaneHealth []ControlPlaneHealth `json:"controlPlaneHealth,omitempty"`
 }
@@ -235,10 +235,10 @@ var (
 type CNI struct {
 	LocalRegistry string `json:"localRegistry" optional:"true"`
 	// TODO: Cluster multiple cni plugins are not supported at this time
-	Type      string `json:"type" enum:"calico"`
-	Version   string
-	CriType   string
-	Offline   bool
+	Type      string  `json:"type" enum:"calico"`
+	Version   string  `json:"version"`
+	CriType   string  `json:"criType"`
+	Offline   bool    `json:"offline"`
 	Namespace string  `json:"namespace"`
 	Calico    *Calico `json:"calico" optional:"true"`
 }
