@@ -69,7 +69,14 @@ const KcCaddyTmpl = `{
 			health_status 2xx
 			#health_body
 			#health_headers
+{{- if .TLS }}
+			transport http {
+				tls_trusted_ca_certs {{.CACert}}
+				tls_server_name {{.TLSServerName}}
+				#tls_insecure_skip_verify
+            }
 		}
+{{- end}}
 		try_files {path} {path}/ /index.html
 		file_server
 	}
@@ -167,10 +174,19 @@ WantedBy=multi-user.target`
 
 const KcServerConfigTmpl = `generic:
   bindAddress: {{.ServerAddress}}
+{{- if .TLS }}
+  insecurePort: 0
+  securePort: {{.ServerPort}}
+  tlsCertFile: "{{.TLSCertFile}}"
+  tlsPrivateKey: "{{.TLSPrivateKey}}"
+  caCertFile: "{{.CACertFile}}"
+{{- else }}
   insecurePort: {{.ServerPort}}
   securePort: 0
   tlsCertFile: ""
   tlsPrivateKey: ""
+  caCertFile: ""
+{{- end}}
 authentication:
   authenticateRateLimiterMaxTries: {{.AuthenticateRateLimiterMaxTries}}
   authenticateRateLimiterDuration: {{.AuthenticateRateLimiterDuration}}

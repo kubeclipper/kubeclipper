@@ -34,6 +34,7 @@ import (
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/component-base/version"
 
+	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	auditingv1 "github.com/kubeclipper/kubeclipper/pkg/apis/auditing/v1"
 	configv1 "github.com/kubeclipper/kubeclipper/pkg/apis/config/v1"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
@@ -51,6 +52,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/request/wstoken"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/authorizer"
 	"github.com/kubeclipper/kubeclipper/pkg/authorization/rbac"
+	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 	"github.com/kubeclipper/kubeclipper/pkg/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
@@ -293,19 +295,37 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		s.Config.AuthenticationOptions, s.cache); err != nil {
 		return err
 	}
-	addr := ""
-	if s.Config.GenericServerRunOptions.SecurePort != 0 {
-		addr = fmt.Sprintf("https://%s:%d", s.Config.GenericServerRunOptions.BindAddress, s.Config.GenericServerRunOptions.SecurePort)
-	} else {
-		addr = fmt.Sprintf("http://%s:%d", s.Config.GenericServerRunOptions.BindAddress, s.Config.GenericServerRunOptions.InsecurePort)
+	scheme := "http"
+	host := s.Config.GenericServerRunOptions.BindAddress
+	if host == "0.0.0.0" {
+		host = "127.0.0.1"
 	}
-	ctrl, err := manager.NewControllerManager(addr, s.internalInformerUser, s.InternalInformerToken, s.storageFactory, deliverySvc, s.SetupController)
+	port := s.Config.GenericServerRunOptions.InsecurePort
+	if s.Config.GenericServerRunOptions.SecurePort != 0 {
+		scheme = "https"
+		port = s.Config.GenericServerRunOptions.SecurePort
+	}
+	addr := fmt.Sprintf("%s://%s:%d", scheme, host, port)
+
+	rc := clientrest.InternalRestConfig(addr, s.internalInformerUser, s.InternalInformerToken)
+	if scheme == "https" {
+		rc.TLSClientConfig.ServerName = options.KCServerAltName
+		rc.TLSClientConfig.CAFile = s.Config.GenericServerRunOptions.CACertFile
+		if rc.TLSClientConfig.CAFile == "" {
+			// self-signed certificate
+			rc.TLSClientConfig.CAFile = s.Config.GenericServerRunOptions.TLSCertFile
+		}
+	}
+
+	ctrl, err := manager.NewControllerManager(rc, s.storageFactory, deliverySvc, s.SetupController)
 	if err != nil {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
 
-	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator, leaseOperator, coreOperator, deliverySvc, tokenOperator, tenantOperator); err != nil {
+	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator,
+		leaseOperator, coreOperator, deliverySvc, tokenOperator, tenantOperator,
+		s.Config.GenericServerRunOptions); err != nil {
 		return err
 	}
 	if err = proxy.AddToContainer(s.container, clusterOperator); err != nil {

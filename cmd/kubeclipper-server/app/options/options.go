@@ -84,6 +84,10 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 		if err != nil {
 			return nil, err
 		}
+
+		if httpSrv.TLSConfig == nil {
+			httpSrv.TLSConfig = new(tls.Config)
+		}
 		httpSrv.TLSConfig.Certificates = []tls.Certificate{certificate}
 		httpSrv.Addr = fmt.Sprintf("%s:%d", s.GenericServerRunOptions.BindAddress, s.GenericServerRunOptions.SecurePort)
 	}

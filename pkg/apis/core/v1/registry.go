@@ -26,6 +26,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/generic"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
@@ -1619,10 +1620,12 @@ func SetupWebService(h *handler) *restful.WebService {
 	return webservice
 }
 
-func AddToContainer(c *restful.Container, clusterOperator cluster.Operator, op operation.Operator, platform platform.Operator, leaseOperator lease.Operator, coreOperator core.Operator,
-	delivery service.IDelivery, tokenOperator auth.TokenManagementInterface,
-	tenantOperator tenant.Operator) error {
-	h := newHandler(clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tokenOperator, tenantOperator)
+func AddToContainer(c *restful.Container, clusterOperator cluster.Operator,
+	op operation.Operator, platform platform.Operator, leaseOperator lease.Operator,
+	coreOperator core.Operator, delivery service.IDelivery,
+	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator,
+	conf *generic.ServerRunOptions) error {
+	h := newHandler(conf, clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tokenOperator, tenantOperator)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

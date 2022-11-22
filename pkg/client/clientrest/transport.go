@@ -20,7 +20,9 @@ package clientrest
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -53,13 +55,52 @@ func NewTransport(config *transport.Config) (http.RoundTripper, error) {
 	}
 
 	var rt http.RoundTripper
-
+	var err error
 	if config.Transport != nil {
 		rt = config.Transport
 	} else {
-		rt = http.DefaultTransport
+		rt, err = initTransport(config)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return HTTPWrappersForConfig(config, rt)
+}
+
+func initTransport(config *transport.Config) (http.RoundTripper, error) {
+	// Get the TLS options for this client config
+	tlsConfig, err := transport.TLSConfigFor(config)
+	if err != nil {
+		return nil, err
+	}
+	// The options didn't require a custom TLS config
+	if tlsConfig == nil && config.Dial == nil && config.Proxy == nil {
+		return http.DefaultTransport, nil
+	}
+
+	dial := config.Dial
+	if dial == nil {
+		dial = (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext
+	}
+
+	proxy := http.ProxyFromEnvironment
+	if config.Proxy != nil {
+		proxy = config.Proxy
+	}
+
+	rt := utilnet.SetTransportDefaults(&http.Transport{
+		Proxy:               proxy,
+		TLSHandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:     tlsConfig,
+		MaxIdleConnsPerHost: 25,
+		DialContext:         dial,
+		DisableCompression:  config.DisableCompression,
+	})
+
+	return rt, nil
 }
 
 // HTTPWrappersForConfig wraps a round tripper with any relevant layered

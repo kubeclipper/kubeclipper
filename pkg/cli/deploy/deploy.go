@@ -458,7 +458,7 @@ func (d *DeployOptions) sendPackage() {
 	}
 }
 
-func (d DeployOptions) generateAndSendCerts() error {
+func (d *DeployOptions) generateAndSendCerts() error {
 	var altNames []string
 	for _, name := range d.servers {
 		altNames = append(altNames, name)
@@ -482,6 +482,16 @@ func (d DeployOptions) generateAndSendCerts() error {
 		natsCommonNameUsages[options.NatsIOServer] = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 		natsCert = certList(options.DefaultNatsPKIPath, options.Ca, append(append(altNames, d.deployConfig.ServerIPs...), options.NatsAltNameProxy), natsCommonNameUsages)
 		certs = append(certs, natsCert...)
+	}
+	var kcCerts []certutils.Config
+	if d.deployConfig.TLS {
+		nameUsages := map[string][]x509.ExtKeyUsage{
+			options.KCServer: {x509.ExtKeyUsageServerAuth},
+		}
+		names := append(altNames, d.deployConfig.ServerIPs...)
+		names = append(names, options.KCServerAltName)
+		kcCerts = certList(options.DefaultKCPKIPath, options.Ca, names, nameUsages)
+		certs = append(certs, kcCerts...)
 	}
 
 	CACerts := map[string]*x509.Certificate{}
@@ -569,7 +579,16 @@ func (d DeployOptions) generateAndSendCerts() error {
 			}
 		}
 	}
-
+	if d.deployConfig.TLS {
+		err := d.sendConsoleCert(cas, options.DefaultCaPath)
+		if err != nil {
+			return err
+		}
+		err = d.sendCertAndKey(kcCerts, options.DefaultKCPKIPath)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -632,10 +651,18 @@ func (d *DeployOptions) getKcConsoleTemplateContent() string {
 		logger.Fatalf("template parse failed: %s", err.Error())
 	}
 	var serverUpstream string
+	scheme := "http"
+	if d.deployConfig.TLS {
+		scheme = "https"
+	}
 	for k := range d.servers {
-		serverUpstream = serverUpstream + fmt.Sprintf(" http://%s:%d", k, d.deployConfig.ServerPort)
+		serverUpstream = serverUpstream + fmt.Sprintf(" %s://%s:%d",
+			scheme, k, d.deployConfig.ServerPort)
 	}
 	var data = make(map[string]interface{})
+	data["TLS"] = d.deployConfig.TLS
+	data["TLSServerName"] = options.KCServerAltName
+	data["CACert"] = filepath.Join(options.DefaultKcConsoleConfigPath, options.DefaultCaPath, "ca.crt")
 	data["ConsolePort"] = d.deployConfig.ConsolePort
 	data["ServerUpstream"] = serverUpstream
 	var buffer bytes.Buffer
@@ -781,11 +808,28 @@ func (d *DeployOptions) sendAgentCertAndKey(contents []certutils.Config, pki str
 	return nil
 }
 
+func (d *DeployOptions) sendConsoleCert(contents []certutils.Config, pki string) error {
+	for _, content := range contents {
+		err := utils.SendPackageV2(d.deployConfig.SSHConfig,
+			path.Join(content.Path, content.BaseName+".crt"),
+			d.deployConfig.Agents.ListIP(),
+			filepath.Join(options.DefaultKcConsoleConfigPath, pki), nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (d *DeployOptions) uploadConfig() {
-	host := fmt.Sprintf("http://%s:%d", d.deployConfig.ServerIPs[0], d.deployConfig.ServerPort)
-	c, err := kc.NewClientWithOpts(
-		kc.WithHost(host),
-	)
+	scheme := "http"
+	if d.deployConfig.TLS {
+		scheme = "https"
+	}
+	host := fmt.Sprintf("%s://%s:%d", scheme, d.deployConfig.ServerIPs[0],
+		d.deployConfig.ServerPort)
+	// TODO use WithCAData insteadof WithInsecureSkipTLSVerify
+	c, err := kc.NewClientWithOpts(kc.WithEndpoint(host), kc.WithInsecureSkipTLSVerify())
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -800,6 +844,8 @@ func (d *DeployOptions) uploadConfig() {
 		Servers: map[string]*config.Server{
 			"default": {
 				Server: host,
+				// TODO get ca insteadof InsecureSkipTLSVerify
+				InsecureSkipTLSVerify: true,
 			},
 		},
 		AuthInfos: map[string]*config.AuthInfo{
