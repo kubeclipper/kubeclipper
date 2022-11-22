@@ -21,6 +21,13 @@ package operationcontroller
 import (
 	"context"
 	"fmt"
+	"strconv"
+
+	"k8s.io/client-go/util/retry"
+
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	"github.com/kubeclipper/kubeclipper/pkg/service"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,9 +47,12 @@ import (
 )
 
 type OperationReconciler struct {
-	ClusterLister   listerv1.ClusterLister
-	OperationLister listerv1.OperationLister
-	OperationWriter operation.Writer
+	CmdDelivery       service.CmdDelivery
+	ClusterLister     listerv1.ClusterLister
+	ClusterOperator   cluster.Operator
+	OperationLister   listerv1.OperationLister
+	OperationWriter   operation.Writer
+	OperationOperator operation.Operator
 }
 
 func (r *OperationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -101,6 +111,12 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error("Failed to get cluster with name", zap.String("cluster", cluName), zap.Error(err))
 		return ctrl.Result{}, err
 	}
+
+	if err = r.distributeOperation(ctx, log, op); err != nil {
+		log.Error("Failed to distribute operation", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -119,5 +135,71 @@ func (r *OperationReconciler) SetupWithManager(mgr manager.Manager, cache inform
 	}
 
 	mgr.AddRunnable(c)
+	return nil
+}
+
+func (r *OperationReconciler) distributeOperation(ctx context.Context, log logger.Logging, op *v1.Operation) error {
+	cluName := op.Labels[common.LabelClusterName]
+	if op.Status.Status == v1.OperationStatusPending {
+		op.Status.Status = v1.OperationStatusRunning
+		if _, err := r.OperationWriter.UpdateOperation(ctx, op); err != nil {
+			return err
+		}
+
+		go func() {
+			if err := r.CmdDelivery.DeliverTaskOperation(context.TODO(), op, nil); err != nil {
+				log.Error("distribute task error", zap.Error(err))
+			}
+		}()
+	}
+	if op.Status.Status == v1.OperationStatusFailed {
+		times, _ := strconv.Atoi(op.Labels[common.LabelOperationRetry])
+		op.Labels[common.LabelOperationRetry] = strconv.Itoa(times + 1)
+		automaticRetry, err := clusteroperation.AutomaticRetry(ctx, op, r.OperationOperator)
+		if err != nil {
+			log.Error("automatic retry failure", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+			return err
+		}
+		log.Infof("automatic retry result: %v, current-times: %s", automaticRetry, strconv.Itoa(times+1))
+		// automatic retry
+		if automaticRetry {
+			// get retry operation step
+			deliverCtx, newOp, continueSteps, err := clusteroperation.Retry(op)
+			if err != nil {
+				log.Error("automatic retry failure, processing retry step error", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				return err
+			}
+			// TODO: update operation and cluster is non-atomic
+			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				// get the latest cluster info
+				clu, err := r.ClusterOperator.GetClusterEx(ctx, cluName, "0")
+				if err != nil {
+					return err
+				}
+				// update cluster status
+				clu.Status.Phase = clusteroperation.GetClusterPhase(op.Labels[common.LabelOperationAction])
+				if _, err = r.ClusterOperator.UpdateCluster(ctx, clu.DeepCopy()); err != nil {
+					return err
+				}
+				return nil
+			}); err != nil {
+				log.Error("automatic retry, update cluster failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				return err
+			}
+			// update operation
+			newOp.Status.Status = v1.OperationStatusRunning
+			if _, err = r.OperationWriter.UpdateOperation(ctx, newOp); err != nil {
+				log.Error("retry on conflict, update operation failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				return err
+			}
+			// process delivery steps
+			newOp.Steps = continueSteps
+			go func() {
+				if err = r.CmdDelivery.DeliverTaskOperation(deliverCtx, newOp, nil); err != nil {
+					log.Error("automatic retry, distribute task error", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				}
+			}()
+		}
+	}
 	return nil
 }

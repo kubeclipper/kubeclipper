@@ -21,6 +21,8 @@ package v1
 import (
 	"net/http"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
@@ -279,7 +281,7 @@ func SetupWebService(h *handler) *restful.WebService {
 		To(h.AddOrRemoveNodes).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Add or remove cluster node.").
-		Reads(PatchNodes{}).
+		Reads(clusteroperation.PatchNodes{}).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).
 			DataType("string")).
@@ -289,7 +291,7 @@ func SetupWebService(h *handler) *restful.WebService {
 		To(h.AddOrRemoveNodes).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
 		Doc("Add or remove cluster node.").
-		Reads(PatchNodes{}).
+		Reads(clusteroperation.PatchNodes{}).
 		Param(webservice.PathParameter("project", "project name")).
 		Param(webservice.PathParameter(query.ParameterName, "cluster name").
 			Required(true).

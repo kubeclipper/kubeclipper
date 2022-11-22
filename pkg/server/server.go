@@ -441,9 +441,11 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		CmdDelivery:         mgr.GetCmdDelivery(),
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
 		ClusterWriter:       clusterOperator,
+		ClusterOperator:     clusterOperator,
 		RegistryLister:      informerFactory.Core().V1().Registries().Lister(),
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:          clusterOperator,
+		OperationOperator:   opOperator,
 		OperationWriter:     opOperator,
 		CronBackupWriter:    clusterOperator,
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
@@ -473,9 +475,12 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		return err
 	}
 	if err = (&operationcontroller.OperationReconciler{
-		ClusterLister:   informerFactory.Core().V1().Clusters().Lister(),
-		OperationLister: informerFactory.Core().V1().Operations().Lister(),
-		OperationWriter: opOperator,
+		CmdDelivery:       mgr.GetCmdDelivery(),
+		ClusterLister:     informerFactory.Core().V1().Clusters().Lister(),
+		ClusterOperator:   clusterOperator,
+		OperationLister:   informerFactory.Core().V1().Operations().Lister(),
+		OperationWriter:   opOperator,
+		OperationOperator: opOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}

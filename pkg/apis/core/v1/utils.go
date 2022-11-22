@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/google/uuid"
@@ -435,4 +437,24 @@ func CreateBasic(serverURL, clusterName, userName string, caCert []byte) *client
 		AuthInfos:      map[string]*clientcmdapi.AuthInfo{},
 		CurrentContext: contextName,
 	}
+}
+
+// BuildPendingOperation build PendingOperation struct
+// @param operationType Operation type
+// @param timeout The timeout time of the entire operation
+// @param clusterResourceVersion The resource version of the cluster at the time the request was submitted
+// @param extra Additional data necessary to create the operation
+func buildPendingOperation(operationType, timeout, clusterResourceVersion string, extra interface{}) (v1.PendingOperation, error) {
+	extraData, err := json.Marshal(extra)
+	if err != nil {
+		return v1.PendingOperation{}, nil
+	}
+
+	return v1.PendingOperation{
+		OperationID:            strutil.GetUUID(),
+		OperationType:          operationType,
+		Timeout:                timeout,
+		ClusterResourceVersion: clusterResourceVersion,
+		ExtraData:              extraData,
+	}, nil
 }

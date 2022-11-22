@@ -31,6 +31,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 
 	"github.com/emicklei/go-restful"
@@ -179,7 +181,7 @@ func (h *handler) DescribeCluster(request *restful.Request, response *restful.Re
 }
 
 func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.Response) {
-	pn := &PatchNodes{}
+	pn := &clusteroperation.PatchNodes{}
 	if err := request.ReadEntity(pn); err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
@@ -215,22 +217,26 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-	// backing up old masters and workers
-	nodeSet := c.GetAllNodes()
 
-	// We need IP addresses of all master nodes later.
-	extraMeta, err := h.getClusterMetadata(ctx, c, false)
+	operationType := v1.OperationAddNodes
+	if pn.Operation == clusteroperation.NodesOperationRemove {
+		operationType = v1.OperationRemoveNodes
+	}
+	executable, err := clusteroperation.Executable(ctx, operationType, clu, h.opOperator)
 	if err != nil {
-		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {
-			restplus.HandleBadRequest(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if !executable {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("%s does not support concurrent execution", operationType))
 		return
 	}
 
+	// backing up old masters and workers
+	nodeSet := c.GetAllNodes()
+
 	if err = pn.MakeCompare(c); err != nil {
-		if errors.Is(err, ErrInvalidNodesOperation) || errors.Is(err, ErrInvalidNodesRole) {
+		if errors.Is(err, clusteroperation.ErrInvalidNodesOperation) || errors.Is(err, clusteroperation.ErrInvalidNodesRole) {
 			restplus.HandleBadRequest(response, request, err)
 			return
 		}
@@ -242,21 +248,14 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 	// Replace cluster worker nodes with nodes to be operated.
 	nodes, err := h.getNodeInfo(ctx, pn.Nodes, false)
 	if err != nil {
-		if err == ErrNodesRegionDifferent {
-			restplus.HandleBadRequest(response, request, err)
-			return
-		}
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-
-	if pn.Role == common.NodeRoleWorker {
-		extraMeta.Workers = append(extraMeta.Workers, nodes...)
-	}
+	pn.ConvertNodes = nodes
 
 	if len(nodes) == 0 {
 		err = fmt.Errorf("nodes is already in use")
-		if pn.Operation == NodesOperationRemove {
+		if pn.Operation == clusteroperation.NodesOperationRemove {
 			err = fmt.Errorf("nodes is already removed")
 		}
 		restplus.HandleBadRequest(response, request, err)
@@ -265,7 +264,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 
 	for _, n := range nodes {
 		switch pn.Operation {
-		case NodesOperationAdd:
+		case clusteroperation.NodesOperationAdd:
 			if n.Disable {
 				restplus.HandleBadRequest(response, request, fmt.Errorf("this node(%s) is disabled", n.IPv4))
 				return
@@ -274,11 +273,11 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 				restplus.HandleBadRequest(response, request, fmt.Errorf("this node(%s) is already in use", n.IPv4))
 				return
 			}
-			if n.Region != extraMeta.Masters[0].Region {
+			if n.Region != c.Labels[common.LabelTopologyRegion] {
 				restplus.HandleBadRequest(response, request, fmt.Errorf("the node(%s) belongs to different region", n.IPv4))
 				return
 			}
-		case NodesOperationRemove:
+		case clusteroperation.NodesOperationRemove:
 			if !nodeSet.Has(n.ID) {
 				restplus.HandleBadRequest(response, request, fmt.Errorf("the node(%s) is not part of this cluster and cannot be removed", n.IPv4))
 				return
@@ -286,22 +285,6 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		}
 	}
 
-	op, err := pn.MakeOperation(*extraMeta, c)
-	if err != nil {
-		if errors.Is(err, ErrZeroNode) {
-			// No node needs to be operated.
-			_ = response.WriteHeaderAndEntity(http.StatusOK, c)
-			return
-		} else if errors.Is(err, ErrInvalidNodesOperation) || errors.Is(err, ErrInvalidNodesRole) {
-			restplus.HandleBadRequest(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
-	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
 		for _, node := range pn.Nodes {
 			_, err = MarkToOriginNode(ctx, h.clusterOperator, node.ID)
@@ -310,19 +293,19 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 				return
 			}
 		}
+		pendingOperation, err := buildPendingOperation(operationType, timeoutSecs, c.ResourceVersion, pn)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
 		c.Status.Phase = v1.ClusterUpdating
+		c.PendingOperations = append(c.PendingOperations, pendingOperation)
 		if c, err = h.clusterOperator.UpdateCluster(ctx, c); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		if op, err = h.opOperator.CreateOperation(ctx, op); err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
 	}
-
-	// distribute tasks
-	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
@@ -1067,9 +1050,9 @@ func mergeNodes(p *tenantv1.Project, pn *nodeJoinProject) (*tenantv1.Project, er
 	set := sets.NewString(p.Spec.Nodes...)
 
 	switch pn.OP {
-	case NodesOperationAdd:
+	case clusteroperation.NodesOperationAdd:
 		set.Insert(pn.Node)
-	case NodesOperationRemove:
+	case clusteroperation.NodesOperationRemove:
 		set.Delete(pn.Node)
 	default:
 		return nil, fmt.Errorf("invalid operation %s", pn.OP)
@@ -1173,6 +1156,7 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Operation"), req, resp, timeout)
 }
 
+// TODO: it will be deprecated in the future
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
 		ClusterName:        c.Name,

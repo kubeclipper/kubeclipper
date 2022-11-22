@@ -64,6 +64,7 @@ const DefaultOperationTimeoutSecs = "5400"
 type OperationStatusType string
 
 const (
+	OperationStatusPending    OperationStatusType = "pending"
 	OperationStatusRunning    OperationStatusType = "running"
 	OperationStatusFailed     OperationStatusType = "failed"
 	OperationStatusUnknown    OperationStatusType = "unknown"
@@ -111,6 +112,7 @@ type Step struct {
 	BeforeRunCommands []Command       `json:"beforeRunCommands,omitempty"`
 	AfterRunCommands  []Command       `json:"afterRunCommands,omitempty"`
 	RetryTimes        int32           `json:"retryTimes,omitempty"`
+	AutomaticRetry    bool            `json:"automaticRetry"`
 }
 
 type StepNode struct {
@@ -165,4 +167,12 @@ type StepStatus struct {
 	// +optional
 	Message  string `json:"message,omitempty"`
 	Response []byte `json:"response,omitempty"`
+}
+
+type PendingOperation struct {
+	OperationID            string `json:"operationID"`
+	OperationType          string `json:"operationType"`
+	Timeout                string `json:"timeout"`
+	ClusterResourceVersion string `json:"clusterResourceVersion"`
+	ExtraData              []byte `json:"extraData,omitempty"`
 }

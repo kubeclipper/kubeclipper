@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -49,7 +50,7 @@ var _ = SIGDescribe("[Slow] [Serial] Add a node to the cluster", func() {
 
 	ginkgo.It("add a node to the cluster and ensure the node is added", func() {
 		ginkgo.By("add node")
-		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(v1.NodesOperationAdd, nodeID), clu.Name)
+		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(clusteroperation.NodesOperationAdd, nodeID), clu.Name)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check cluster status is running")
@@ -87,7 +88,7 @@ var _ = SIGDescribe("[Slow] [Serial] Remove a node from the cluster", func() {
 
 	ginkgo.It("remove a node from the cluster and ensure the node is removed", func() {
 		ginkgo.By("remove node")
-		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(v1.NodesOperationRemove, clu.Workers[0].ID), clu.Name)
+		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(clusteroperation.NodesOperationRemove, clu.Workers[0].ID), clu.Name)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check cluster status is running")
@@ -157,9 +158,9 @@ func initClusterWithWorkNode(clusterName string, nodeID []string) *corev1.Cluste
 	}
 }
 
-func initPatchNode(operation, node string) *v1.PatchNodes {
-	return &v1.PatchNodes{
-		Operation: v1.NodesPatchOperation(operation),
+func initPatchNode(operation, node string) *clusteroperation.PatchNodes {
+	return &clusteroperation.PatchNodes{
+		Operation: clusteroperation.NodesPatchOperation(operation),
 		Role:      "worker",
 		Nodes: corev1.WorkerNodeList{
 			{

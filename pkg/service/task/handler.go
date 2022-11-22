@@ -59,6 +59,17 @@ func (s *Service) runTaskStep(ctx context.Context, payload *service.MsgPayload, 
 			zap.Bool("retry", payload.Retry),
 		)
 	}
+	if payload.Step.AutomaticRetry {
+		// the automatic retry step clears the log file
+		if err := s.oplog.TruncateStepLogFile(payload.OperationIdentity, stepKey); err != nil {
+			logger.Error("truncate step log file failed: "+err.Error(),
+				zap.String("operation", payload.OperationIdentity),
+				zap.String("step", stepKey),
+				zap.String("cmd", "run task step"),
+				zap.Bool("retry", payload.Retry),
+			)
+		}
+	}
 
 	cmds := make([]v1.Command, len(payload.Step.BeforeRunCommands)+len(payload.Step.Commands)+len(payload.Step.AfterRunCommands))
 	cmds = append(cmds, payload.Step.BeforeRunCommands...)

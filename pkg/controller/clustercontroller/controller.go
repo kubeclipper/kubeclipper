@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,9 +66,11 @@ type ClusterReconciler struct {
 	mgr                 manager.Manager
 	ClusterLister       listerv1.ClusterLister
 	ClusterWriter       cluster.ClusterWriter
+	ClusterOperator     cluster.Operator
 	RegistryLister      listerv1.RegistryLister
 	NodeLister          listerv1.NodeLister
 	NodeWriter          cluster.NodeWriter
+	OperationOperator   operation.Operator
 	OperationWriter     operation.Writer
 	CronBackupWriter    cluster.CronBackupWriter
 	CloudProviderLister listerv1.CloudProviderLister
@@ -207,6 +211,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	if err = r.syncClusterClient(ctx, log, clu); err != nil {
+		return ctrl.Result{}, nil
+	}
+	if err = r.processPendingOperations(ctx, log, clu); err != nil {
+		log.Error("process pending operation error", zap.Error(err))
 		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, r.updateCRIRegistries(ctx, clu)
@@ -598,4 +606,69 @@ users:
 
 func getKubeConfig(clusterName string, address string, user string, token string) string {
 	return fmt.Sprintf(kubeconfigFormat, address, clusterName, clusterName, user, user, clusterName, user, clusterName, user, token)
+}
+
+func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log logger.Logging, c *v1.Cluster) error {
+	log.Debug("process pending operations")
+
+	// all pending operations are processed
+	clean := true
+
+	for _, pendingOperation := range c.PendingOperations {
+		log.Debugf("pending operation info is %+v, extraData is %+v", pendingOperation, string(pendingOperation.ExtraData))
+		// the operation has been processed ?
+		op, err := r.OperationOperator.GetOperationEx(ctx, pendingOperation.OperationID, "0")
+		// ignore IsNotFound error
+		if err != nil && !errors.IsNotFound(err) {
+			// if an error occurs, the deletion operation will not be performed
+			clean = false
+			continue
+		}
+		// if no, the operation will be created
+		if op == nil {
+			clean = false
+
+			// get cluster information about the specified resource version when the operation is performed
+			clu, err := r.ClusterOperator.GetClusterEx(ctx, c.Name, pendingOperation.ClusterResourceVersion)
+			if err != nil {
+				log.Error(fmt.Sprintf("get resource-version-%s cluster info failed", pendingOperation.ClusterResourceVersion),
+					zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
+			}
+
+			// restore and assemble the cluster metadata, passing it through
+			extraMeta, err := r.assembleClusterExtraMetadata(ctx, clu)
+			if err != nil {
+				log.Error("get cluster extra metadata failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
+			}
+
+			// pass-through operationID
+			extraMeta.OperationID = pendingOperation.OperationID
+
+			// build the operation structure based on the type of operation
+			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil)
+			if err != nil {
+				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
+			}
+
+			log.Debugf("create operation struct successful", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID))
+			_, err = r.OperationWriter.CreateOperation(ctx, newOperation)
+			if err != nil {
+				log.Error("create operation failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				continue
+			}
+		}
+	}
+
+	if clean && len(c.PendingOperations) > 0 {
+		log.Debugf("clean pending operation in %s cluster", c.Name)
+		// clean pending operations
+		c.PendingOperations = nil
+		if _, err := r.ClusterWriter.UpdateCluster(ctx, c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
