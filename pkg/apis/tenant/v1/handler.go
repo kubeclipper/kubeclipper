@@ -200,7 +200,17 @@ func (h *handler) DeleteProject(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	// todo check clusters and nodes in projects
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProject, name)
+	clusters, err := h.clusterOperator.ListClusters(ctx, q)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if len(clusters.Items) != 0 {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("there are %v cluster in this project,please delete first", len(clusters.Items)))
+		return
+	}
 
 	if !dryRun {
 		err = h.tenantOperator.DeleteProject(request.Request.Context(), name)

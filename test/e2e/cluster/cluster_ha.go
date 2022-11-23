@@ -61,15 +61,8 @@ var _ = SIGDescribe("[Slow] [Serial] HA", func() {
 			},
 		}
 		ginkgo.By("create e2e project")
-		nodeID := nodeList.GetNodeIDs()
-		err = project.CreateProject(f, nodeID)
+		err = project.CreateProject(f)
 		framework.ExpectNoError(err)
-
-		ginkgo.By("wait node join e2e project")
-		for _, v := range nodeID {
-			err := cluster.WaitForNodeJoinProject(f.Client, v, time.Second*10)
-			framework.ExpectNoError(err)
-		}
 	})
 
 	ginkgo.It("should create a HA minimal kubernetes cluster and ensure cluster is running.", func() {

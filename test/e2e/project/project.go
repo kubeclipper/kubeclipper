@@ -13,7 +13,7 @@ import (
 
 const DefaultE2EProject = "e2e"
 
-func CreateProject(f *framework.Framework, nodes []string) error {
+func CreateProject(f *framework.Framework) error {
 	project := &tenantv1.Project{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Project",
@@ -27,7 +27,7 @@ func CreateProject(f *framework.Framework, nodes []string) error {
 		},
 		Spec: tenantv1.ProjectSpec{
 			Manager: "admin",
-			Nodes:   nodes,
+			Nodes:   []string{},
 		},
 	}
 

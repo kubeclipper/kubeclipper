@@ -1521,7 +1521,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1.PatchNodes"
+              "$ref": "#/definitions/clusteroperation.PatchNodes"
             }
           },
           {
@@ -3038,46 +3038,6 @@
         }
       }
     },
-    "/api/core.kubeclipper.io/v1/nodes/{node}/join": {
-      "put": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Node"
-        ],
-        "summary": "Join nodes to project.",
-        "operationId": "NodeJoinProject",
-        "parameters": [
-          {
-            "type": "string",
-            "description": "node name",
-            "name": "node",
-            "in": "path",
-            "required": true
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/v1.nodeJoinProject"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.Node"
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      }
-    },
     "/api/core.kubeclipper.io/v1/operations": {
       "get": {
         "produces": [
@@ -3903,7 +3863,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1.PatchNodes"
+              "$ref": "#/definitions/clusteroperation.PatchNodes"
             }
           },
           {
@@ -7537,6 +7497,34 @@
         }
       }
     },
+    "clusteroperation.PatchNodes": {
+      "required": [
+        "operation",
+        "nodes",
+        "convertNodes",
+        "role"
+      ],
+      "properties": {
+        "convertNodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/component.Node"
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.WorkerNode"
+          }
+        },
+        "operation": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
     "component.JSON": {},
     "component.JSONSchemaProps": {
       "required": [
@@ -7658,6 +7646,36 @@
           "type": "boolean"
         },
         "version": {
+          "type": "string"
+        }
+      }
+    },
+    "component.Node": {
+      "required": [
+        "ID",
+        "IPv4",
+        "Region",
+        "Hostname",
+        "Role",
+        "Disable"
+      ],
+      "properties": {
+        "Disable": {
+          "type": "boolean"
+        },
+        "Hostname": {
+          "type": "string"
+        },
+        "ID": {
+          "type": "string"
+        },
+        "IPv4": {
+          "type": "string"
+        },
+        "Region": {
+          "type": "string"
+        },
+        "Role": {
           "type": "string"
         }
       }
@@ -8254,6 +8272,12 @@
         },
         "networking": {
           "$ref": "#/definitions/v1.Networking"
+        },
+        "pendingOperations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1.PendingOperation"
+          }
         },
         "status": {
           "$ref": "#/definitions/v1.ClusterStatus"
@@ -9240,23 +9264,27 @@
         }
       }
     },
-    "v1.PatchNodes": {
+    "v1.PendingOperation": {
       "required": [
-        "operation",
-        "nodes",
-        "role"
+        "operationID",
+        "operationType",
+        "timeout",
+        "clusterResourceVersion"
       ],
       "properties": {
-        "nodes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.WorkerNode"
-          }
-        },
-        "operation": {
+        "clusterResourceVersion": {
           "type": "string"
         },
-        "role": {
+        "extraData": {
+          "type": "string"
+        },
+        "operationID": {
+          "type": "string"
+        },
+        "operationType": {
+          "type": "string"
+        },
+        "timeout": {
           "type": "string"
         }
       }
@@ -9593,7 +9621,8 @@
     },
     "v1.Step": {
       "required": [
-        "errIgnore"
+        "errIgnore",
+        "automaticRetry"
       ],
       "properties": {
         "action": {
@@ -9604,6 +9633,9 @@
           "items": {
             "$ref": "#/definitions/v1.Command"
           }
+        },
+        "automaticRetry": {
+          "type": "boolean"
         },
         "beforeRunCommands": {
           "type": "array",
@@ -9958,24 +9990,6 @@
       ],
       "properties": {
         "cluster": {
-          "type": "string"
-        },
-        "project": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.nodeJoinProject": {
-      "required": [
-        "node",
-        "project",
-        "op"
-      ],
-      "properties": {
-        "node": {
-          "type": "string"
-        },
-        "op": {
           "type": "string"
         },
         "project": {

@@ -2036,4 +2036,31 @@ var ProjectRolesTemplate = []iamv1.ProjectRole{
 			},
 		},
 	},
+	// only for project manager to view users
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       iamv1.KindProjectRole,
+			APIVersion: iamv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"kubeclipper.io/module":              "Project Setting",
+				"kubeclipper.io/role-template-rules": "{\"users\": \"view\"}",
+				"kubeclipper.io/alias-name":          "Users View",
+				"kubeclipper.io/internal":            "true",
+			},
+			Labels: map[string]string{
+				"kubeclipper.io/role-template": "true",
+				"kubeclipper.io/hidden":        "true",
+			},
+			Name: "role-template-view-users",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"iam.kubeclipper.io"},
+				Resources: []string{"users", "users/loginrecords"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	},
 }
