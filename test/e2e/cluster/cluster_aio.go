@@ -21,7 +21,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,18 +65,14 @@ var _ = SIGDescribe("[Slow] [Serial] AIO", func() {
 		if len(nodes.Items) == 0 {
 			framework.Failf("Not enough nodes to test")
 		}
-		for _, node := range nodes.Items {
-			nodeID = append(nodeID, node.Name)
-		}
-		ginkgo.By("create e2e project")
-		err = project.CreateProject(f, nodeID)
-		framework.ExpectNoError(err)
 
-		ginkgo.By("wait node join e2e project")
-		for _, v := range nodeID {
-			err := cluster.WaitForNodeJoinProject(f.Client, v, time.Second*10)
-			framework.ExpectNoError(err)
+		for _, item := range nodes.Items {
+			nodeID = append(nodeID, item.Name)
 		}
+
+		ginkgo.By("create e2e project")
+		err = project.CreateProject(f)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should create a AIO minimal kubernetes cluster and ensure cluster is running.", func() {

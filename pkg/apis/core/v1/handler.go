@@ -45,7 +45,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
-	tenantapiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/models"
+
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
@@ -56,7 +57,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
-	"github.com/kubeclipper/kubeclipper/pkg/models"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
@@ -69,7 +69,6 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	apirequest "github.com/kubeclipper/kubeclipper/pkg/server/request"
 	reqpkg "github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
@@ -214,10 +213,8 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		}
 	}
 
-	if err = h.checkNode(ctx, c.Labels[common.LabelProject], pn.Nodes.GetNodeIDs()); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
+	// backing up old masters and workers
+	nodeSet := c.GetAllNodes()
 
 	operationType := v1.OperationAddNodes
 	if pn.Operation == clusteroperation.NodesOperationRemove {
@@ -232,9 +229,6 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		restplus.HandleBadRequest(response, request, fmt.Errorf("%s does not support concurrent execution", operationType))
 		return
 	}
-
-	// backing up old masters and workers
-	nodeSet := c.GetAllNodes()
 
 	if err = pn.MakeCompare(c); err != nil {
 		if errors.Is(err, clusteroperation.ErrInvalidNodesOperation) || errors.Is(err, clusteroperation.ErrInvalidNodesRole) {
@@ -456,10 +450,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 		c.Labels[common.LabelProject] = project
 	}
 	project := c.Labels[common.LabelProject]
-	if err := h.checkNode(ctx, project, c.GetAllNodes().List()); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
+
 	// mutate name and add display-name
 	actualName := fmt.Sprintf("%s-%s", project, c.Name)
 	if c.Annotations == nil {
@@ -547,31 +538,6 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 
 	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
-}
-
-// checkNode check is cluster's node all belong to same project
-func (h *handler) checkNode(ctx context.Context, project string, nodeIDs []string) error {
-	q := query.New()
-	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProject, project)
-	list, err := h.clusterOperator.ListNodes(ctx, q)
-	if err != nil {
-		return err
-	}
-	m := make(map[string]v1.Node)
-	for _, node := range list.Items {
-		m[node.Name] = node
-	}
-
-	for _, clusterNode := range nodeIDs {
-		node, ok := m[clusterNode]
-		if !ok {
-			return fmt.Errorf("node %s not belong to project %s", clusterNode, project)
-		}
-		if node.Labels == nil || node.Labels[common.LabelProject] != project {
-			return fmt.Errorf("node %s not belong to project %s", clusterNode, project)
-		}
-	}
-	return nil
 }
 
 func (h *handler) UpdateClusters(request *restful.Request, response *restful.Response) {
@@ -851,12 +817,6 @@ func (h *handler) ListNodes(request *restful.Request, response *restful.Response
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-	}
-
 	if clientrest.IsInformerRawQuery(request.Request) {
 		result, err := h.clusterOperator.ListNodes(request.Request.Context(), q)
 		if err != nil {
@@ -1006,70 +966,6 @@ func (h *handler) syncNodeDisable(node *v1.Node, reqDisable bool) error {
 	}
 
 	return nil
-}
-
-type nodeJoinProject struct {
-	Node    string `json:"node"`
-	Project string `json:"project"`
-	OP      string `json:"op"`
-}
-
-func (h *handler) NodeJoinProject(request *restful.Request, response *restful.Response) {
-	data := &nodeJoinProject{}
-	if err := request.ReadEntity(data); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-
-	node := request.PathParameter("node")
-	if data.Node != node {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("the name of the object (%s) does not match the name on the URL (%s)", data.Node, node))
-		return
-	}
-
-	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
-	ctx := request.Request.Context()
-	project, err := h.tenantOperator.GetProjectEx(ctx, data.Project, "0")
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	if err = tenantapiv1.NodeCheck(ctx, h.clusterOperator, []string{data.Node}, data.Project); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-
-	if !dryRun {
-		if project, err = mergeNodes(project, data); err != nil {
-			return
-		}
-		_, err = h.tenantOperator.UpdateProject(request.Request.Context(), project)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-	}
-	response.WriteHeader(http.StatusOK)
-}
-
-func mergeNodes(p *tenantv1.Project, pn *nodeJoinProject) (*tenantv1.Project, error) {
-	set := sets.NewString(p.Spec.Nodes...)
-
-	switch pn.OP {
-	case clusteroperation.NodesOperationAdd:
-		set.Insert(pn.Node)
-	case clusteroperation.NodesOperationRemove:
-		set.Delete(pn.Node)
-	default:
-		return nil, fmt.Errorf("invalid operation %s", pn.OP)
-	}
-	p.Spec.Nodes = set.List()
-	return p, nil
 }
 
 // DeleteNode delete node record from etcd,only called by kcctl now.

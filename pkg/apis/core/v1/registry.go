@@ -605,17 +605,6 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
-	webservice.Route(webservice.PUT("/nodes/{node}/join").
-		To(h.NodeJoinProject).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
-		Doc("Join nodes to project.").
-		Param(webservice.PathParameter("node", "node name").
-			Required(true).
-			DataType("string")).
-		Reads(nodeJoinProject{}).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
-		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
-
 	webservice.Route(webservice.DELETE("/nodes/{name}").
 		To(h.DeleteNode).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
