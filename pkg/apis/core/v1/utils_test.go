@@ -147,7 +147,7 @@ var (
 )
 
 func Test_parseOperationFromCluster(t *testing.T) {
-	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	type args struct {
 		c      *v1.Cluster
 		meta   *component.ExtraMetadata
@@ -195,7 +195,7 @@ func Test_parseOperationFromComponent(t *testing.T) {
 		cluster    *v1.Cluster
 		components []v1.Addon
 	}
-	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	nfs := nfsprovisioner.NFSProvisioner{
 		ManifestsDir:     "/tmp/.nfs",
 		Namespace:        "kube-system",
