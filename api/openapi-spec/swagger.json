@@ -4029,7 +4029,7 @@
           "Core-Cluster"
         ],
         "summary": "List domains api for project.",
-        "operationId": "ListDomains",
+        "operationId": "ListDomainsProject",
         "parameters": [
           {
             "type": "string",
@@ -4648,7 +4648,7 @@
           "Core-Cluster"
         ],
         "summary": "List Registries api for projects.",
-        "operationId": "ListRegistry",
+        "operationId": "ListRegistryProject",
         "parameters": [
           {
             "type": "string",
@@ -4711,7 +4711,7 @@
           "Core-Cluster"
         ],
         "summary": "List templates api for project.",
-        "operationId": "ListTemplates",
+        "operationId": "ListTemplatesProject",
         "parameters": [
           {
             "type": "string",
@@ -4747,6 +4747,46 @@
             "description": "OK",
             "schema": {
               "$ref": "#/definitions/models.PageableResponse"
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "Create template.",
+        "operationId": "CreateTemplate",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Template"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Template"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/errors.HTTPError"
             }
           },
           "500": {

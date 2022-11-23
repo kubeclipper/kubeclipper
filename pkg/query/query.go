@@ -152,12 +152,17 @@ func (q *Query) GetFieldSelector() fields.Selector {
 }
 
 // AddLabelSelector add labelSelector to query.
-func (q *Query) AddLabelSelector(selector []string) {
+func (q *Query) AddLabelSelector(selectors []string) {
 	if q.LabelSelector == "" {
-		q.LabelSelector = strings.Join(selector, ",")
+		q.LabelSelector = strings.Join(selectors, ",")
 		return
 	}
-	q.LabelSelector = fmt.Sprintf("%s,%s", q.LabelSelector, strings.Join(selector, ","))
+	for _, selector := range selectors {
+		if q.HasLabelSelector(selector) {
+			continue
+		}
+		q.LabelSelector = fmt.Sprintf("%s,%s", q.LabelSelector, selector)
+	}
 }
 
 // HasLabelSelector check label is exist
@@ -169,6 +174,26 @@ func (q *Query) HasLabelSelector(selector string) bool {
 		}
 	}
 	return false
+}
+
+// DeepCopy copy query.
+func (q *Query) DeepCopy() *Query {
+	out := *q
+	if q.Pagination != nil {
+		out.Pagination = newPagination(q.Pagination.Limit, q.Pagination.Offset)
+	}
+	if q.TimeoutSeconds != nil {
+		newTimeoutSeconds := *q.TimeoutSeconds
+		out.TimeoutSeconds = &newTimeoutSeconds
+	}
+	if q.FuzzySearch != nil {
+		newFuzzySearch := make(map[string]string)
+		for k, v := range q.FuzzySearch {
+			newFuzzySearch[k] = v
+		}
+		out.FuzzySearch = q.FuzzySearch
+	}
+	return &out
 }
 
 func New() *Query {

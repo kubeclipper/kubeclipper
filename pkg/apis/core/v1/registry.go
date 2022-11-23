@@ -941,8 +941,9 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
 	webservice.Route(webservice.GET("/projects/{project}/domains").
-		To(h.ListDomains).
+		To(h.ListDomainsProject).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Doc("List domains api for project.").
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
@@ -1104,8 +1105,9 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
 	webservice.Route(webservice.GET("/projects/{project}/templates").
-		To(h.ListTemplates).
+		To(h.ListTemplatesProject).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Doc("List templates api for project.").
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
@@ -1202,7 +1204,8 @@ func SetupWebService(h *handler) *restful.WebService {
 	webservice.Route(webservice.GET("/projects/{project}/backuppoints").
 		Doc("List of backup point api for project").
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
-		To(h.ListBackupPoints).
+		Param(webservice.PathParameter("project", "project name")).
+		To(h.ListBackupPointsProject).
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
 			DataFormat("limit=%d,page=%d").
@@ -1541,8 +1544,9 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
 	webservice.Route(webservice.GET("/projects/{project}/registries").
-		To(h.ListRegistry).
+		To(h.ListRegistryProject).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Param(webservice.PathParameter("project", "project name")).
 		Doc("List Registries api for projects.").
 		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
 			Required(false).
