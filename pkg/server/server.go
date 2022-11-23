@@ -401,6 +401,7 @@ func (s *APIServer) migrateUser(operator iam.Operator) error {
 		return nil
 	}
 
+	Users := GetInternalUser(s.Config.AuthenticationOptions.InternalUserPassword)
 	for index := range Users {
 		encPass, err := hashutil.EncryptPassword(Users[index].Spec.EncryptedPassword)
 		if err != nil {
