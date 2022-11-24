@@ -480,7 +480,7 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 	}
 	// TODO: make auto generate
 	data["JwtSecret"] = c.JWTSecret
-	data["InternalUserPassword"] = c.AuthenticationOpts.InternalUserPassword
+	data["InitialPassword"] = c.AuthenticationOpts.InitialPassword
 	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod
 	data["MaximumEntries"] = c.AuditOpts.MaximumEntries
 	data["AuditLevel"] = c.AuditOpts.AuditLevel

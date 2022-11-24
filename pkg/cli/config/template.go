@@ -195,7 +195,7 @@ authentication:
   maximumClockSkew: 10s
   multipleLogin: true
   jwtSecret: {{.JwtSecret}}
-  internalUserPassword: {{.InternalUserPassword}}
+  internalUserPassword: {{.InitialPassword}}
 audit:
   retentionPeriod: {{.RetentionPeriod}}
   maximumEntries: {{.MaximumEntries}}
