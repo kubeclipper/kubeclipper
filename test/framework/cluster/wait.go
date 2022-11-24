@@ -277,6 +277,29 @@ func WaitForCertUpdated(c *kc.Client, clusterName string, latestTime metav1.Time
 	})
 }
 
+func WaitForCriRegistry(c *kc.Client, clusterName string, timeout time.Duration, registries []string) error {
+	find := func(registries []corev1.RegistrySpec, target string) bool {
+		for _, spec := range registries {
+			if spec.Host == target {
+				return true
+			}
+		}
+		return false
+	}
+
+	return WaitForClusterCondition(c, clusterName, "cri registry successful", timeout, func(clu *corev1.Cluster) (bool, error) {
+		if len(registries) == 0 {
+			return false, nil
+		}
+		for _, reg := range registries {
+			if !find(clu.Status.Registries, reg) {
+				return false, fmt.Errorf("cri failed to add %s registry", reg)
+			}
+		}
+		return true, nil
+	})
+}
+
 // maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
 // taskFormat and taskArgs should be the task being performed when the error occurred,
 // e.g. "waiting for pod to be running".
