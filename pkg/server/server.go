@@ -401,16 +401,16 @@ func (s *APIServer) migrateUser(operator iam.Operator) error {
 		return nil
 	}
 
-	Users := GetInternalUser(s.Config.AuthenticationOptions.InitialPassword)
-	for index := range Users {
-		encPass, err := hashutil.EncryptPassword(Users[index].Spec.EncryptedPassword)
+	users := GetInternalUser(s.Config.AuthenticationOptions.InitialPassword)
+	for index := range users {
+		encPass, err := hashutil.EncryptPassword(users[index].Spec.EncryptedPassword)
 		if err != nil {
 			return err
 		}
-		Users[index].Spec.EncryptedPassword = encPass
+		users[index].Spec.EncryptedPassword = encPass
 		state := v1.UserActive
-		Users[index].Status.State = &state
-		if _, err := operator.CreateUser(context.TODO(), &Users[index]); err != nil {
+		users[index].Status.State = &state
+		if _, err := operator.CreateUser(context.TODO(), &users[index]); err != nil {
 			return err
 		}
 	}
