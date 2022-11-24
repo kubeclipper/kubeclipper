@@ -85,6 +85,7 @@ func NewCmdCreate(streams options.IOStreams) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateCluster(streams))
 	cmd.AddCommand(NewCmdCreateRole(streams))
 	cmd.AddCommand(NewCmdCreateUser(streams))
+	cmd.AddCommand(NewCmdCreateProject(streams))
 	return cmd
 }
 
