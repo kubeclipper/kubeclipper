@@ -47,7 +47,7 @@ type AuthenticationOptions struct {
 	MultipleLogin                   bool           `json:"multipleLogin" yaml:"multipleLogin"`
 	MFAOptions                      *mfa.Options   `json:"mfaOptions" yaml:"mfaOptions"`
 	JwtSecret                       string         `json:"-" yaml:"jwtSecret"`
-	InitialPassword                 string         `json:"internalUserPassword" yaml:"internalUserPassword"`
+	InitialPassword                 string         `json:"initialPassword" yaml:"initialPassword"`
 	OAuthOptions                    *oauth.Options `json:"oauthOptions" yaml:"oauthOptions"`
 }
 
