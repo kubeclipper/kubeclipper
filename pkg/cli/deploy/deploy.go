@@ -163,7 +163,7 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "specifies the lock duration of the user")
 	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period", o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")
 	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries", o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
-	cmd.Flags().StringVar(&o.deployConfig.AuthenticationOpts.InternalUserPassword, "user-password", o.deployConfig.AuthenticationOpts.InternalUserPassword, "internal user password")
+	cmd.Flags().StringVar(&o.deployConfig.AuthenticationOpts.InitialPassword, "user-password", o.deployConfig.AuthenticationOpts.InitialPassword, "internal user password")
 	o.deployConfig.AddFlags(cmd.Flags())
 	o.deployConfig.AuditOpts.AddFlags(cmd.Flags())
 
@@ -791,7 +791,7 @@ func (d *DeployOptions) uploadConfig() {
 	}
 	resp, err := c.Login(context.TODO(), kc.LoginRequest{
 		Username: constatns.DefaultAdminUser,
-		Password: d.deployConfig.AuthenticationOpts.InternalUserPassword,
+		Password: d.deployConfig.AuthenticationOpts.InitialPassword,
 	})
 	if err != nil {
 		logger.Fatal(err)

@@ -47,7 +47,7 @@ type AuthenticationOptions struct {
 	MultipleLogin                   bool           `json:"multipleLogin" yaml:"multipleLogin"`
 	MFAOptions                      *mfa.Options   `json:"mfaOptions" yaml:"mfaOptions"`
 	JwtSecret                       string         `json:"-" yaml:"jwtSecret"`
-	InternalUserPassword            string         `json:"internalUserPassword" yaml:"internalUserPassword"`
+	InitialPassword                 string         `json:"internalUserPassword" yaml:"internalUserPassword"`
 	OAuthOptions                    *oauth.Options `json:"oauthOptions" yaml:"oauthOptions"`
 }
 
@@ -62,7 +62,7 @@ func NewAuthenticateOptions() *AuthenticationOptions {
 		OAuthOptions:                    oauth.NewOauthOptions(),
 		MultipleLogin:                   false,
 		JwtSecret:                       "kubeclipper",
-		InternalUserPassword:            constatns.DefaultAdminUserPass,
+		InitialPassword:                 constatns.DefaultAdminUserPass,
 	}
 }
 
@@ -88,11 +88,11 @@ func (a *AuthenticationOptions) Validate() []error {
 	if err != nil {
 		errs = append(errs, err)
 	}
-	ok, err := reg.MatchString(a.InternalUserPassword)
+	ok, err := reg.MatchString(a.InitialPassword)
 	if err != nil {
 		errs = append(errs, err)
 	} else if !ok {
-		errs = append(errs, fmt.Errorf("password [%s] format error", a.InternalUserPassword))
+		errs = append(errs, fmt.Errorf("password [%s] format error", a.InitialPassword))
 	}
 
 	return errs
@@ -108,5 +108,5 @@ func (a *AuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&a.LoginHistoryMaximumEntries, "login-history-maximum-entries", a.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
 	fs.DurationVar(&a.OAuthOptions.AccessTokenMaxAge, "access-token-max-age", a.OAuthOptions.AccessTokenMaxAge, "access-token-max-age control the lifetime of access tokens, 0 means no expiration.")
 	fs.DurationVar(&a.MaximumClockSkew, "maximum-clock-skew", a.MaximumClockSkew, "The maximum time difference between the system clocks of the ks-apiserver that issued a JWT and the ks-apiserver that verified the JWT.")
-	fs.StringVar(&a.InternalUserPassword, "user-password", constatns.DefaultAdminUserPass, "internal user password")
+	fs.StringVar(&a.InitialPassword, "user-password", constatns.DefaultAdminUserPass, "internal user password")
 }
