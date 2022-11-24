@@ -49,3 +49,31 @@ func Test_parseFuzzy(t *testing.T) {
 		})
 	}
 }
+
+func TestQuery_AddLabelSelector(t *testing.T) {
+	type args struct {
+		selectors []string
+	}
+	tests := []struct {
+		name string
+		old  args
+		add  args
+		want string
+	}{
+		{name: "empty", old: args{selectors: []string{""}}, add: args{selectors: []string{""}}, want: ""},
+		{name: "normal", old: args{selectors: []string{""}}, add: args{selectors: []string{"a=b"}}, want: "a=b"},
+		{name: "normal2", old: args{selectors: []string{"a=b"}}, add: args{selectors: []string{"c=d"}}, want: "a=b,c=d"},
+		{name: "normal3", old: args{selectors: []string{"a=b", "c=d"}}, add: args{selectors: []string{"e=f"}}, want: "a=b,c=d,e=f"},
+		{name: "override", old: args{selectors: []string{"a=b", "c=d"}}, add: args{selectors: []string{"c=d"}}, want: "a=b,c=d"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := New()
+			q.AddLabelSelector(tt.old.selectors)
+			q.AddLabelSelector(tt.add.selectors)
+			if q.LabelSelector != tt.want {
+				t.Fatalf("want:%s got:%s", tt.want, q.LabelSelector)
+			}
+		})
+	}
+}

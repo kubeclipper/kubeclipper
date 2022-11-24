@@ -320,7 +320,7 @@ func (c *clusterOperator) ListBackupPoints(ctx context.Context, query *query.Que
 }
 
 func (c *clusterOperator) ListBackupPointEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, c.backupPointStorage, query, c.backupPointFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, c.backupPointStorage, query, BackupPointFuzzyFilter, nil, nil)
 }
 
 func (c *clusterOperator) CreateBackupPoint(ctx context.Context, backupPoint *v1.BackupPoint) (*v1.BackupPoint, error) {
@@ -438,7 +438,7 @@ func (c *clusterOperator) WatchDomain(ctx context.Context, query *query.Query) (
 }
 
 func (c *clusterOperator) ListDomainsEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, c.dnsStorage, query, c.dnsFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, c.dnsStorage, query, DNSFuzzyFilter, nil, nil)
 }
 
 func (c *clusterOperator) GetDomain(ctx context.Context, name string) (*v1.Domain, error) {
@@ -591,7 +591,7 @@ func RegionFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	return objs
 }
 
-func (c *clusterOperator) dnsFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func DNSFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	domains, ok := obj.(*v1.DomainList)
 	if !ok {
 		return nil
@@ -631,7 +631,7 @@ func (c *clusterOperator) backupFuzzyFilter(obj runtime.Object, q *query.Query) 
 	return objs
 }
 
-func (c *clusterOperator) backupPointFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func BackupPointFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	backupPoints, ok := obj.(*v1.BackupPointList)
 	if !ok {
 		return nil
@@ -702,7 +702,7 @@ func (c *clusterOperator) GetTemplate(ctx context.Context, name string) (*v1.Tem
 }
 
 func (c *clusterOperator) ListTemplatesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, c.templateStorage, query, c.templateFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, c.templateStorage, query, TemplateFuzzyFilter, nil, nil)
 }
 
 func (c *clusterOperator) GetTemplateEx(ctx context.Context, name string, resourceVersion string) (*v1.Template, error) {
@@ -752,7 +752,7 @@ func (c *clusterOperator) DeleteTemplateCollection(ctx context.Context, query *q
 	return nil
 }
 
-func (c *clusterOperator) templateFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func TemplateFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	templates, ok := obj.(*v1.TemplateList)
 	if !ok {
 		return nil
@@ -875,7 +875,7 @@ func (c *clusterOperator) GetRegistryEx(ctx context.Context, name string, resour
 }
 
 func (c *clusterOperator) ListRegistriesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	return models.ListExV2(ctx, c.registryStorage, query, c.registryFuzzyFilter, nil, nil)
+	return models.ListExV2(ctx, c.registryStorage, query, RegistryFuzzyFilter, nil, nil)
 }
 
 func (c *clusterOperator) CreateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
@@ -906,7 +906,7 @@ func (c *clusterOperator) DeleteRegistry(ctx context.Context, name string) error
 	return err
 }
 
-func (c *clusterOperator) registryFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
+func RegistryFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	registries, ok := obj.(*v1.RegistryList)
 	if !ok {
 		return nil

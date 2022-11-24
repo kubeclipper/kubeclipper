@@ -169,6 +169,42 @@ func DefaultList(object runtime.Object, q *query.Query, litToSliceFunc ListToObj
 	}, nil
 }
 
+// DefaultListMerge a func to build a PageableResponse from many obj
+func DefaultListMerge(objects []runtime.Object, litToSliceFunc ListToObjectSliceFunction, compareFunc CompareFunc, mutatingFunc MutatingFunc) (*PageableResponse, error) {
+	if mutatingFunc == nil {
+		mutatingFunc = DefaultMutatingFunc
+	}
+	if compareFunc == nil {
+		compareFunc = DefaultCompareFunc
+	}
+	objs := make([]runtime.Object, 0)
+	q := query.New()
+	for _, object := range objects {
+		obj := litToSliceFunc(object.DeepCopyObject(), q)
+		objs = append(objs, obj...)
+	}
+	totalCount := len(objs)
+	// sort
+	sort.Slice(objs, func(i, j int) bool {
+		if q.Reverse {
+			return !compareFunc(objs[i], objs[j], q.OrderBy)
+		}
+		return compareFunc(objs[i], objs[j], q.OrderBy)
+	})
+	// limit offset
+	start, end := q.Pagination.GetValidPagination(totalCount)
+
+	objs = objs[start:end]
+	items := make([]interface{}, 0, len(objs))
+	for i := range objs {
+		items = append(items, mutatingFunc(objs[i]))
+	}
+	return &PageableResponse{
+		Items:      items,
+		TotalCount: totalCount,
+	}, nil
+}
+
 type ListToObjectSliceFunction func(runtime.Object, *query.Query) []runtime.Object
 type CompareFunc func(left runtime.Object, right runtime.Object, orderBy string) bool
 type FilterFunc func(obj runtime.Object) bool
