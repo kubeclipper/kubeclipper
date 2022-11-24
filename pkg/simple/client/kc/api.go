@@ -34,6 +34,7 @@ import (
 const (
 	ListNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
 	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
+	clustersCertPath  = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
 	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
 	backupPath        = "/api/core.kubeclipper.io/v1/backups"
 	backupPonitPath   = "/api/core.kubeclipper.io/v1/backuppoints"
@@ -306,6 +307,21 @@ func (cli *Client) GetComponentMeta(ctx context.Context) (*ComponentMeta, error)
 func (cli *Client) InstallOrUninstallComponent(ctx context.Context, cluName string, component *corev1.PatchComponents) (*ClustersList, error) {
 	url := fmt.Sprintf(componentPath, cluName)
 	resp, err := cli.patch(ctx, url, nil, component, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	clu := v1.Cluster{}
+	err = json.NewDecoder(resp.body).Decode(&clu)
+	clusters := &ClustersList{
+		Items: []v1.Cluster{clu},
+	}
+	return clusters, err
+}
+
+func (cli *Client) UpdateCert(ctx context.Context, cluName string) (*ClustersList, error) {
+	u := fmt.Sprintf(clustersCertPath, cluName)
+	resp, err := cli.post(ctx, u, nil, nil, nil)
 	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err

@@ -3,8 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	apierror "github.com/kubeclipper/kubeclipper/pkg/errors"
@@ -246,6 +248,30 @@ func WaitForUpgrade(c *kc.Client, clusterName string, timeout time.Duration) err
 			return true, nil
 		} else if clu.Status.Phase == corev1.ClusterUpdateFailed {
 			return false, fmt.Errorf("upgrade cluster %s failed", clusterName)
+		}
+		return false, nil
+	})
+}
+
+func WaitForCertInit(c *kc.Client, clusterName string, timeout time.Duration) error {
+	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s cret init", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
+		for _, item := range clu.Status.Certifications {
+			if item.Name == "ca" {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+func WaitForCertUpdated(c *kc.Client, clusterName string, latestTime metav1.Time, timeout time.Duration) error {
+	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s cert updated", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
+		for _, item := range clu.Status.Certifications {
+			// update operation will just update non-ca cert,so we need check non-ca certification's expiration time
+			if !strings.Contains(item.Name, "ca") && item.ExpirationTime.After(latestTime.Time) {
+				framework.Logf("updated cert expiration time: %v", item.ExpirationTime.Format(time.RFC3339))
+				return true, nil
+			}
 		}
 		return false, nil
 	})
