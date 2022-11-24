@@ -2,15 +2,17 @@ package create
 
 import (
 	"context"
+
+	"github.com/spf13/cobra"
+	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
-	"github.com/spf13/cobra"
-	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -59,8 +61,8 @@ func NewCmdCreateProject(streams options.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.ProjectName, "project-name", "p", o.ProjectName, "project name")
-	cmd.Flags().StringVarP(&o.ProjectManager, "project-manager", "m", o.ProjectManager, "project manager")
+	cmd.Flags().StringVarP(&o.ProjectName, "name", "p", o.ProjectName, "project name")
+	cmd.Flags().StringVarP(&o.ProjectManager, "manager", "m", o.ProjectManager, "project manager")
 	cmd.Flags().StringVarP(&o.Description, "description", "d", o.Description, "project description")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
