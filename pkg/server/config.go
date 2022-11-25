@@ -977,26 +977,28 @@ var RoleBindings = []iamv1.GlobalRoleBinding{
 	},
 }
 
-var Users = []iamv1.User{
-	{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "User",
-			APIVersion: iamv1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: constatns.DefaultAdminUser,
-			Annotations: map[string]string{
-				"kubeclipper.io/internal": "true",
+func GetInternalUser(password string) []iamv1.User {
+	return []iamv1.User{
+		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "User",
+				APIVersion: iamv1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: constatns.DefaultAdminUser,
+				Annotations: map[string]string{
+					"kubeclipper.io/internal": "true",
+				},
+			},
+			Spec: iamv1.UserSpec{
+				Email:             "admin@kubeclipper.com",
+				Lang:              "",
+				Phone:             "",
+				Description:       "Platform Admin",
+				DisplayName:       constatns.DefaultAdminUser,
+				Groups:            nil,
+				EncryptedPassword: password,
 			},
 		},
-		Spec: iamv1.UserSpec{
-			Email:             "admin@kubeclipper.com",
-			Lang:              "",
-			Phone:             "",
-			Description:       "Platform Admin",
-			DisplayName:       constatns.DefaultAdminUser,
-			Groups:            nil,
-			EncryptedPassword: constatns.DefaultAdminUserPass,
-		},
-	},
+	}
 }
