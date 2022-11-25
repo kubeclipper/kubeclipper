@@ -277,6 +277,56 @@ func WaitForCertUpdated(c *kc.Client, clusterName string, latestTime metav1.Time
 	})
 }
 
+func WaitForNodeNotFound(c *kc.Client, nodeID string, timeout time.Duration) error {
+	node := &corev1.Node{}
+	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+		nodes, waitErr := c.DescribeNode(context.TODO(), nodeID)
+		if waitErr != nil {
+			if apierror.IsNotFound(waitErr) {
+				return true, nil
+			}
+			return handleWaitingAPIError(waitErr, false, "getting node %s", nodeID)
+		}
+		if len(nodes.Items) == 0 {
+			return true, nil
+		}
+		node = nodes.Items[0].DeepCopy()
+		return false, nil
+	})
+	if err == nil {
+		return nil
+	}
+	if IsTimeout(err) && node != nil {
+		return TimeoutError(fmt.Sprintf("timeout while waiting for node %s to be Not Found", nodeID), node)
+	}
+	return maybeTimeoutError(err, "waiting for node %s not found", nodeID)
+}
+
+func WaitForJoinNode(c *kc.Client, nodeIP string, timeout time.Duration) error {
+	node := &corev1.Node{}
+	query := kc.Queries{
+		FieldSelector: fmt.Sprintf("status.ipv4DefaultIP=%s", nodeIP),
+	}
+	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+		nodes, waitErr := c.ListNodes(context.TODO(), query)
+		if waitErr != nil {
+			return handleWaitingAPIError(waitErr, true, "getting node %s", nodeIP)
+		}
+		if len(nodes.Items) == 0 {
+			return true, nil
+		}
+		node = nodes.Items[0].DeepCopy()
+		return false, nil
+	})
+	if err == nil {
+		return nil
+	}
+	if IsTimeout(err) && node != nil {
+		return TimeoutError(fmt.Sprintf("timeout while waiting for node %s to be join", nodeIP), node)
+	}
+	return maybeTimeoutError(err, "waiting for node %s join", nodeIP)
+}
+
 // maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
 // taskFormat and taskArgs should be the task being performed when the error occurred,
 // e.g. "waiting for pod to be running".
