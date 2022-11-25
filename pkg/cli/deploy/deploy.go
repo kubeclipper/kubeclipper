@@ -812,7 +812,7 @@ func (d *DeployOptions) sendConsoleCert(contents []certutils.Config, pki string)
 	for _, content := range contents {
 		err := utils.SendPackageV2(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".crt"),
-			d.deployConfig.Agents.ListIP(),
+			d.deployConfig.ServerIPs,
 			filepath.Join(options.DefaultKcConsoleConfigPath, pki), nil, nil)
 		if err != nil {
 			return err
