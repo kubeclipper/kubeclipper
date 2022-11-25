@@ -44,6 +44,7 @@ const (
 	versionPath       = "/version"
 	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
 	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
+	templatePath      = "/api/core.kubeclipper.io/v1/templates"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -460,4 +461,63 @@ func (cli *Client) UpdateConfigMap(ctx context.Context, cm *v1.ConfigMap) (*Conf
 		Items: []v1.ConfigMap{v},
 	}
 	return &cms, err
+}
+
+func (cli *Client) CreateTemplate(ctx context.Context, template *v1.Template) (*TemplateList, error) {
+	serverResp, err := cli.post(ctx, templatePath, nil, template, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.Template{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	list := TemplateList{
+		Items: []v1.Template{v},
+	}
+	return &list, err
+}
+
+func (cli *Client) DeleteTemplate(ctx context.Context, name string) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", templatePath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
+}
+
+func (cli *Client) UpdateTemplate(ctx context.Context, template *v1.Template) (*TemplateList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", templatePath, template.Name), nil, template, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.Template{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	list := TemplateList{
+		Items: []v1.Template{v},
+	}
+	return &list, err
+}
+
+func (cli *Client) ListTemplate(ctx context.Context, query Queries) (*TemplateList, error) {
+	serverResp, err := cli.get(ctx, templatePath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	list := TemplateList{}
+	err = json.NewDecoder(serverResp.body).Decode(&list)
+	return &list, err
+}
+
+func (cli *Client) DescribeTemplate(ctx context.Context, name string) (*TemplateList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", templatePath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.Template{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	list := TemplateList{
+		Items: []v1.Template{v},
+	}
+	return &list, err
 }

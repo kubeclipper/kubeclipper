@@ -261,3 +261,31 @@ func (n *ConfigMapList) TablePrint() ([]string, [][]string) {
 	}
 	return headers, data
 }
+
+type TemplateList struct {
+	Items      []v1.Template `json:"items" description:"paging data"`
+	TotalCount int           `json:"totalCount,omitempty" description:"total count"`
+}
+
+func (n *TemplateList) JSONPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.JSONPrinter(n.Items[0])
+	}
+	return printer.JSONPrinter(n)
+}
+
+func (n *TemplateList) YAMLPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.YAMLPrinter(n.Items[0])
+	}
+	return printer.YAMLPrinter(n)
+}
+
+func (n *TemplateList) TablePrint() ([]string, [][]string) {
+	headers := []string{"name", "create_timestamp"}
+	var data [][]string
+	for _, cm := range n.Items {
+		data = append(data, []string{cm.Name, cm.CreationTimestamp.String()})
+	}
+	return headers, data
+}
