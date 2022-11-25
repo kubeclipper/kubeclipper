@@ -46,6 +46,7 @@ const (
 	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
 	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
 	templatePath      = "/api/core.kubeclipper.io/v1/templates"
+	registryPath      = "/api/core.kubeclipper.io/v1/registries"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -189,6 +190,15 @@ func (cli *Client) CreateCluster(ctx context.Context, cluster *v1.Cluster) (*Clu
 		Items: []v1.Cluster{v},
 	}
 	return &clusters, err
+}
+
+func (cli *Client) UpdateCluster(ctx context.Context, cluster *v1.Cluster) error {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", clustersPath, cluster.Name), nil, cluster, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (cli *Client) CreateUser(ctx context.Context, user *iamv1.User) (*UsersList, error) {
@@ -536,4 +546,38 @@ func (cli *Client) DescribeTemplate(ctx context.Context, name string) (*Template
 		Items: []v1.Template{v},
 	}
 	return &list, err
+}
+
+func (cli *Client) CreateRegistry(ctx context.Context, registry *v1.Registry) (*v1.RegistryList, error) {
+	serverResp, err := cli.post(ctx, registryPath, nil, registry, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.Registry{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	registries := v1.RegistryList{
+		Items: []v1.Registry{v},
+	}
+	return &registries, err
+}
+
+func (cli *Client) DeleteRegistry(ctx context.Context, name string) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", registryPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cli *Client) ListRegistries(ctx context.Context, query Queries) (*v1.RegistryList, error) {
+	serverResp, err := cli.get(ctx, registryPath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	registries := v1.RegistryList{}
+	err = json.NewDecoder(serverResp.body).Decode(&registries)
+	return &registries, err
 }
