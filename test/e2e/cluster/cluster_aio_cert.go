@@ -76,7 +76,7 @@ var _ = SIGDescribe("[Slow] [Serial] Update Cert", func() {
 
 	})
 
-	ginkgo.It("should create a AIO minimal kubernetes cluster and update cert when ensure cluster is running.", func() {
+	ginkgo.It("should create a aio minimal kubernetes cluster and update cert when ensure cluster is running.", func() {
 		ginkgo.By("create aio cluster")
 
 		clus, err := f.Client.CreateCluster(context.TODO(), initAIOCluster(clusterName, nodeID))
