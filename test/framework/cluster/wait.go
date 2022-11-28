@@ -300,31 +300,6 @@ func WaitForCriRegistry(c *kc.Client, clusterName string, timeout time.Duration,
 	})
 }
 
-func WaitForNodeNotFound(c *kc.Client, nodeID string, timeout time.Duration) error {
-	node := &corev1.Node{}
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
-		nodes, waitErr := c.DescribeNode(context.TODO(), nodeID)
-		if waitErr != nil {
-			if apierror.IsNotFound(waitErr) {
-				return true, nil
-			}
-			return handleWaitingAPIError(waitErr, false, "getting node %s", nodeID)
-		}
-		if len(nodes.Items) == 0 {
-			return true, nil
-		}
-		node = nodes.Items[0].DeepCopy()
-		return false, nil
-	})
-	if err == nil {
-		return nil
-	}
-	if IsTimeout(err) && node != nil {
-		return TimeoutError(fmt.Sprintf("timeout while waiting for node %s to be Not Found", nodeID), node)
-	}
-	return maybeTimeoutError(err, "waiting for node %s not found", nodeID)
-}
-
 func WaitForJoinNode(c *kc.Client, nodeIP string, timeout time.Duration) error {
 	node := &corev1.Node{}
 	query := kc.Queries{
