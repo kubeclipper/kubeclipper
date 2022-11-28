@@ -36,22 +36,23 @@ import (
 )
 
 const (
-	ListNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
-	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
-	clustersCertPath  = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
-	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
-	backupPath        = "/api/core.kubeclipper.io/v1/backups"
-	backupPonitPath   = "/api/core.kubeclipper.io/v1/backuppoints"
-	usersPath         = "/api/iam.kubeclipper.io/v1/users"
-	rolesPath         = "/api/iam.kubeclipper.io/v1/roles"
-	platformPath      = "/api/config.kubeclipper.io/v1/template"
-	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
-	versionPath       = "/version"
-	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
-	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
-	projectPath       = "/api/tenant.kubeclipper.io/v1/projects"
-	templatePath      = "/api/core.kubeclipper.io/v1/templates"
-	registryPath      = "/api/core.kubeclipper.io/v1/registries"
+	ListNodesPath        = "/api/core.kubeclipper.io/v1/nodes"
+	clustersPath         = "/api/core.kubeclipper.io/v1/clusters"
+	clusterInProjectPath = "/api/core.kubeclipper.io/v1/projects"
+	clustersCertPath     = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
+	componentPath        = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
+	backupPath           = "/api/core.kubeclipper.io/v1/backups"
+	backupPonitPath      = "/api/core.kubeclipper.io/v1/backuppoints"
+	usersPath            = "/api/iam.kubeclipper.io/v1/users"
+	rolesPath            = "/api/iam.kubeclipper.io/v1/roles"
+	platformPath         = "/api/config.kubeclipper.io/v1/template"
+	publicKeyPath        = "/api/config.kubeclipper.io/v1/terminal.key"
+	versionPath          = "/version"
+	componentMetaPath    = "/api/config.kubeclipper.io/v1/componentmeta"
+	configmapPath        = "/api/core.kubeclipper.io/v1/configmaps"
+	projectPath          = "/api/tenant.kubeclipper.io/v1/projects"
+	templatePath         = "/api/core.kubeclipper.io/v1/templates"
+	registryPath         = "/api/core.kubeclipper.io/v1/registries"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -135,6 +136,20 @@ func (cli *Client) ListClusters(ctx context.Context, query Queries) (*ClustersLi
 
 func (cli *Client) DescribeCluster(ctx context.Context, name string) (*ClustersList, error) {
 	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", clustersPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	cluster := v1.Cluster{}
+	err = json.NewDecoder(serverResp.body).Decode(&cluster)
+	clusters := ClustersList{
+		Items: []v1.Cluster{cluster},
+	}
+	return &clusters, err
+}
+
+func (cli *Client) DescribeClusterInProject(ctx context.Context, projectName, clusterName string) (*ClustersList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/cluster/%s", clusterInProjectPath, projectName, clusterName), nil, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -309,8 +324,8 @@ func (cli *Client) GetPublicKey(ctx context.Context) (*v1.WebTerminal, error) {
 	return &v, err
 }
 
-func (cli *Client) GetComponentMeta(ctx context.Context) (*ComponentMeta, error) {
-	serverResp, err := cli.get(ctx, componentMetaPath, nil, nil)
+func (cli *Client) GetComponentMeta(ctx context.Context, query url.Values) (*ComponentMeta, error) {
+	serverResp, err := cli.get(ctx, componentMetaPath, query, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -428,6 +443,12 @@ func (cli *Client) CreateRecovery(ctx context.Context, cluName string, recovery 
 
 func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCluster *corev1.ClusterUpgrade) error {
 	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, cluName, "upgrade"), nil, upgradeCluster, nil)
+	defer ensureReaderClosed(resp)
+	return err
+}
+
+func (cli *Client) UpgradeClusterInProject(ctx context.Context, proName, cluName string, upgradeCluster *corev1.ClusterUpgrade) error {
+	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/cluster/%s/upgrade", clusterInProjectPath, proName, cluName), nil, upgradeCluster, nil)
 	defer ensureReaderClosed(resp)
 	return err
 }

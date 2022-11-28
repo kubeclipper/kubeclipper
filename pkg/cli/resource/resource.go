@@ -51,7 +51,7 @@ import (
 
 const (
 	longDescription = `
-  Offline resource operation.
+  Online resource operation.
 
   Currently, You can push, delete, and list offline resource packs.`
 	resourceExample = `
@@ -146,7 +146,7 @@ func NewCmdResource(streams options.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "resource",
 		DisableFlagsInUseLine: true,
-		Short:                 "Offline resource operation",
+		Short:                 "Online resource operation",
 		Long:                  longDescription,
 		Example:               resourceExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -454,7 +454,7 @@ func (l *CreateClusterOptions) listK8s(toComplete string) []string {
 }
 
 func (l *CreateClusterOptions) componentVersions(component, toComplete string) []string {
-	metas, err := l.Client.GetComponentMeta(context.TODO())
+	metas, err := l.Client.GetComponentMeta(context.TODO(), nil)
 	if err != nil {
 		logger.Errorf("get component meta failed: %s. please check .kc/config", err)
 		return nil

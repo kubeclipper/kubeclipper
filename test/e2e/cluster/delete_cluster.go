@@ -3,11 +3,13 @@ package cluster
 import (
 	"context"
 	"fmt"
+
+	"github.com/onsi/ginkgo"
+
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
-	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("[Slow] [Serial] Force delete cluster", func() {

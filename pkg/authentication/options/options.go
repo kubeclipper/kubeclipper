@@ -108,5 +108,5 @@ func (a *AuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&a.LoginHistoryMaximumEntries, "login-history-maximum-entries", a.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
 	fs.DurationVar(&a.OAuthOptions.AccessTokenMaxAge, "access-token-max-age", a.OAuthOptions.AccessTokenMaxAge, "access-token-max-age control the lifetime of access tokens, 0 means no expiration.")
 	fs.DurationVar(&a.MaximumClockSkew, "maximum-clock-skew", a.MaximumClockSkew, "The maximum time difference between the system clocks of the ks-apiserver that issued a JWT and the ks-apiserver that verified the JWT.")
-	fs.StringVar(&a.InitialPassword, "user-password", a.InitialPassword, "admin user password")
+	fs.StringVar(&a.InitialPassword, "initial-password", a.InitialPassword, "admin user password")
 }

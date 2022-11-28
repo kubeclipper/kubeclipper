@@ -55,7 +55,7 @@ var _ = SIGDescribe("[Slow] [Serial] Online cluster upgrade", func() {
 	})
 })
 
-var _ = SIGDescribe("[Slow] [Serial] Offline cluster upgrade", func() {
+var _ = SIGDescribe("[Slow] [Serial] Online cluster upgrade", func() {
 	f := framework.NewDefaultFramework("aio")
 	clu := &corev1.Cluster{}
 
@@ -75,7 +75,7 @@ var _ = SIGDescribe("[Slow] [Serial] Offline cluster upgrade", func() {
 		clu = clus.Items[0].DeepCopy()
 
 		ginkgo.By("check resource exist")
-		meta, err := f.Client.GetComponentMeta(context.TODO())
+		meta, err := f.Client.GetComponentMeta(context.TODO(), nil)
 		framework.ExpectNoError(err)
 
 		if !isResourceExist(meta) {
