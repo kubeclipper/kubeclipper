@@ -246,6 +246,10 @@ var _ = SIGDescribe("[Serial]", func() {
 
 		ginkgo.By("delete registry")
 		err = f.Client.DeleteRegistry(context.TODO(), kcRegistry)
+
+		err = retryOperation(func() error {
+			return f.Client.DeleteRegistry(context.TODO(), kcRegistry)
+		}, 2)
 		framework.ExpectNoError(err)
 	})
 

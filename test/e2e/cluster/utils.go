@@ -206,3 +206,15 @@ func afterEachDeleteCluster(f *framework.Framework, clusterName *string) func() 
 		framework.ExpectNoError(err)
 	}
 }
+
+type fn func() error
+
+func retryOperation(f fn, times int) error {
+	var err error
+	for i := 0; i < times; i++ {
+		if err = f(); err == nil {
+			break
+		}
+	}
+	return err
+}
