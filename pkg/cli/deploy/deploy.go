@@ -163,7 +163,7 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "specifies the lock duration of the user")
 	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period", o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")
 	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries", o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
-	cmd.Flags().StringVar(&o.deployConfig.AuthenticationOpts.InitialPassword, "user-password", o.deployConfig.AuthenticationOpts.InitialPassword, "admin user password")
+	cmd.Flags().StringVar(&o.deployConfig.AuthenticationOpts.InitialPassword, "initial-password", o.deployConfig.AuthenticationOpts.InitialPassword, "admin user password")
 	o.deployConfig.AddFlags(cmd.Flags())
 	o.deployConfig.AuditOpts.AddFlags(cmd.Flags())
 
