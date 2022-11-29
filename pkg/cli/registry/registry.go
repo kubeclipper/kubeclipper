@@ -746,7 +746,7 @@ func (o *RegistryOptions) installDocker() error {
 	if err != nil {
 		return err
 	}
-	metas, err := o.Client.GetComponentMeta(context.TODO())
+	metas, err := o.Client.GetComponentMeta(context.TODO(), nil)
 	if err != nil {
 		return fmt.Errorf("get component meta failed: %s. please check .kc/config", err)
 	}
