@@ -16,7 +16,7 @@
  *
  */
 
-package node
+package kcctl
 
 import (
 	"context"
@@ -26,11 +26,11 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/test/e2e/cluster"
+	"github.com/kubeclipper/kubeclipper/test/framework/node"
 
 	"github.com/onsi/ginkgo"
 
 	"github.com/kubeclipper/kubeclipper/test/framework"
-	fcluster "github.com/kubeclipper/kubeclipper/test/framework/cluster"
 )
 
 var _ = SIGDescribe("[Medium] [Serial] Join node", func() {
@@ -54,11 +54,11 @@ var _ = SIGDescribe("[Medium] [Serial] Join node", func() {
 
 	ginkgo.It("join node", func() {
 		ginkgo.By("drain node")
-		err := drainNode(nodeID)
+		err := drainAgentNode(nodeID)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node not found")
-		err = fcluster.WaitForNodeNotFound(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		err = node.WaitForNodeNotFound(f.Client, nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("node %s drained\n", nodeIP)
 
@@ -67,7 +67,7 @@ var _ = SIGDescribe("[Medium] [Serial] Join node", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node join")
-		nodeID, err = fcluster.WaitForNodeJoin(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		nodeID, err = node.WaitForNodeJoin(f.Client, nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("node %s registered，id is:%s\n", nodeIP, nodeID)
 	})
@@ -100,16 +100,12 @@ var _ = cluster.SIGDescribe("[Medium] [Serial] Drain node", func() {
 
 	ginkgo.It("drain node", func() {
 		ginkgo.By("drain node")
-		err := drainNode(nodeID)
+		err := drainAgentNode(nodeID)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node not found")
-		err = fcluster.WaitForNodeNotFound(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		err = node.WaitForNodeNotFound(f.Client, nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("node %s drained\n", nodeIP)
 	})
 })
-
-func drainNode(nodeID string) error {
-	return runCmd(fmt.Sprintf("kcctl drain --agent %s", nodeID))
-}

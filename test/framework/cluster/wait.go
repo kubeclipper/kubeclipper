@@ -15,37 +15,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )
 
-const (
-	// poll is how often to poll clusters.
-	poll = 15 * time.Second
-)
-
-type timeoutError struct {
-	msg             string
-	observedObjects []interface{}
-}
-
-func (e *timeoutError) Error() string {
-	return e.msg
-}
-
-func TimeoutError(msg string, observedObjects ...interface{}) error {
-	return &timeoutError{
-		msg:             msg,
-		observedObjects: observedObjects,
-	}
-}
-
-func IsTimeout(err error) bool {
-	if err == wait.ErrWaitTimeout {
-		return true
-	}
-	if _, ok := err.(*timeoutError); ok {
-		return true
-	}
-	return false
-}
-
 type clusterCondition func(clu *corev1.Cluster) (bool, error)
 
 type backupCondition func(backup *corev1.Backup) (bool, error)
@@ -58,11 +27,11 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 		lastCluster      *corev1.Cluster
 		start            = time.Now()
 	)
-	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		clu, err := c.DescribeCluster(context.TODO(), clusterName)
 		lastClusterError = err
 		if err != nil || len(clu.Items) == 0 {
-			return handleWaitingAPIError(err, true, "getting cluster %s", clusterName)
+			return framework.HandleWaitingAPIError(err, true, "getting cluster %s", clusterName)
 		}
 		lastCluster = clu.Items[0].DeepCopy()
 		framework.Logf("Cluster %q: Phase=%q, Elapsed: %v",
@@ -81,8 +50,8 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) && lastCluster != nil {
-		return TimeoutError(fmt.Sprintf("timed out while waiting for cluster %s to be %s", clusterName, conditionDesc),
+	if framework.IsTimeout(err) && lastCluster != nil {
+		return framework.TimeoutError(fmt.Sprintf("timed out while waiting for cluster %s to be %s", clusterName, conditionDesc),
 			lastCluster,
 		)
 	}
@@ -90,17 +59,17 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 		// If the last API call was an error.
 		err = lastClusterError
 	}
-	return maybeTimeoutError(err, "waiting for cluster %s to be %s", clusterName, conditionDesc)
+	return framework.MaybeTimeoutError(err, "waiting for cluster %s to be %s", clusterName, conditionDesc)
 }
 
 func WaitForBackupCondition(c *kc.Client, clusterName, backupName, conditionDesc string, timeout time.Duration, condition backupCondition) error {
 	framework.Logf("Waiting up to %v for backup %q to be %q", timeout, backupName, conditionDesc)
 	bp := &corev1.Backup{}
 	start := time.Now()
-	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		backups, apiErr := c.ListBackupsWithCluster(context.TODO(), clusterName)
 		if apiErr != nil || len(backups.Items) == 0 {
-			return handleWaitingAPIError(apiErr, true, "getting backup %s", backupName)
+			return framework.HandleWaitingAPIError(apiErr, true, "getting backup %s", backupName)
 		}
 		bp = backups.Items[0].DeepCopy()
 		framework.Logf("Backup %q: Phase=%q, Elapsed: %v", backupName, bp.Status.ClusterBackupStatus, time.Since(start))
@@ -117,10 +86,10 @@ func WaitForBackupCondition(c *kc.Client, clusterName, backupName, conditionDesc
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) && bp != nil {
-		return TimeoutError(fmt.Sprintf("timed out while waiting for backup %s to be %s", backupName, conditionDesc), bp)
+	if framework.IsTimeout(err) && bp != nil {
+		return framework.TimeoutError(fmt.Sprintf("timed out while waiting for backup %s to be %s", backupName, conditionDesc), bp)
 	}
-	return maybeTimeoutError(err, "waiting for backup %s to be %s", backupName, conditionDesc)
+	return framework.MaybeTimeoutError(err, "waiting for backup %s to be %s", backupName, conditionDesc)
 }
 
 func WaitForClusterRunning(c *kc.Client, clusterName string, timeout time.Duration) error {
@@ -146,14 +115,14 @@ func WaitForClusterHealthy(c *kc.Client, clusterName string, timeout time.Durati
 // than "not found" then that error is returned and the wait stops.
 func WaitForClusterNotFound(c *kc.Client, clusterName string, timeout time.Duration) error {
 	var lastCluster *corev1.Cluster
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (done bool, err error) {
 		clu, err := c.DescribeCluster(context.TODO(), clusterName)
 		if apierror.IsNotFound(err) {
 			// done
 			return true, nil
 		}
 		if err != nil {
-			return handleWaitingAPIError(err, true, "getting cluster %s", clusterName)
+			return framework.HandleWaitingAPIError(err, true, "getting cluster %s", clusterName)
 		}
 		if len(clu.Items) == 0 {
 			framework.Logf("unexpected problem, cluster not be nil at this time")
@@ -165,18 +134,18 @@ func WaitForClusterNotFound(c *kc.Client, clusterName string, timeout time.Durat
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) && lastCluster != nil {
-		return TimeoutError(fmt.Sprintf("timeout while waiting for cluster %s to be Not Found", clusterName), lastCluster)
+	if framework.IsTimeout(err) && lastCluster != nil {
+		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for cluster %s to be Not Found", clusterName), lastCluster)
 	}
-	return maybeTimeoutError(err, "waiting for cluster %s not found", clusterName)
+	return framework.MaybeTimeoutError(err, "waiting for cluster %s not found", clusterName)
 }
 
 func WaitForComponentNotFound(c *kc.Client, clusterName string, timeout time.Duration) error {
 	var lastCluster *corev1.Cluster
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (done bool, err error) {
 		clu, err := c.DescribeCluster(context.TODO(), clusterName)
 		if err != nil {
-			return handleWaitingAPIError(err, true, "getting cluster %s", clusterName)
+			return framework.HandleWaitingAPIError(err, true, "getting cluster %s", clusterName)
 		}
 		if len(clu.Items) == 0 {
 			framework.Logf("unexpected problem, cluster not be nil at this time")
@@ -191,10 +160,10 @@ func WaitForComponentNotFound(c *kc.Client, clusterName string, timeout time.Dur
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) && lastCluster != nil {
-		return TimeoutError(fmt.Sprintf("timeout while waiting for cluster %s component to be Not Found", clusterName), lastCluster)
+	if framework.IsTimeout(err) && lastCluster != nil {
+		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for cluster %s component to be Not Found", clusterName), lastCluster)
 	}
-	return maybeTimeoutError(err, "waiting for cluster %s uninstall component not found", clusterName)
+	return framework.MaybeTimeoutError(err, "waiting for cluster %s uninstall component not found", clusterName)
 }
 
 func WaitForBackupAvailable(c *kc.Client, clusterName, backupName string, timeout time.Duration) error {
@@ -211,10 +180,10 @@ func WaitForBackupAvailable(c *kc.Client, clusterName, backupName string, timeou
 
 func WaitForBackupNotFound(c *kc.Client, clusterName, backupName string, timeout time.Duration) error {
 	bp := &corev1.Backup{}
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (done bool, err error) {
 		backups, waitErr := c.ListBackupsWithCluster(context.TODO(), clusterName)
 		if waitErr != nil {
-			return handleWaitingAPIError(waitErr, true, "getting backup %s", backupName)
+			return framework.HandleWaitingAPIError(waitErr, true, "getting backup %s", backupName)
 		}
 		if len(backups.Items) == 0 {
 			return true, nil
@@ -225,10 +194,10 @@ func WaitForBackupNotFound(c *kc.Client, clusterName, backupName string, timeout
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) && bp != nil {
-		return TimeoutError(fmt.Sprintf("timeout while waiting for backup %s to be Not Found", backupName), bp)
+	if framework.IsTimeout(err) && bp != nil {
+		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for backup %s to be Not Found", backupName), bp)
 	}
-	return maybeTimeoutError(err, "waiting for backup %s not found", backupName)
+	return framework.MaybeTimeoutError(err, "waiting for backup %s not found", backupName)
 }
 
 func WaitForRecovery(c *kc.Client, clusterName string, timeout time.Duration) error {
@@ -305,10 +274,10 @@ func WaitForJoinNode(c *kc.Client, nodeIP string, timeout time.Duration) error {
 	query := kc.Queries{
 		FieldSelector: fmt.Sprintf("status.ipv4DefaultIP=%s", nodeIP),
 	}
-	err := wait.PollImmediate(poll, timeout, func() (done bool, err error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (done bool, err error) {
 		nodes, waitErr := c.ListNodes(context.TODO(), query)
 		if waitErr != nil {
-			return handleWaitingAPIError(waitErr, true, "getting node %s", nodeIP)
+			return framework.HandleWaitingAPIError(waitErr, true, "getting node %s", nodeIP)
 		}
 		if len(nodes.Items) == 0 {
 			return true, nil
@@ -319,51 +288,8 @@ func WaitForJoinNode(c *kc.Client, nodeIP string, timeout time.Duration) error {
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) && node != nil {
-		return TimeoutError(fmt.Sprintf("timeout while waiting for node %s to be join", nodeIP), node)
+	if framework.IsTimeout(err) && node != nil {
+		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for node %s to be join", nodeIP), node)
 	}
-	return maybeTimeoutError(err, "waiting for node %s join", nodeIP)
-}
-
-// maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
-// taskFormat and taskArgs should be the task being performed when the error occurred,
-// e.g. "waiting for pod to be running".
-func maybeTimeoutError(err error, taskFormat string, taskArgs ...interface{}) error {
-	if IsTimeout(err) {
-		return TimeoutError(fmt.Sprintf("timed out while "+taskFormat, taskArgs...))
-	} else if err != nil {
-		return fmt.Errorf("error while %s: %w", fmt.Sprintf(taskFormat, taskArgs...), err)
-	} else {
-		return nil
-	}
-}
-
-// handleWaitingAPIErrror handles an error from an API request in the context of a Wait function.
-// If the error is retryable, sleep the recommended delay and ignore the error.
-// If the erorr is terminal, return it.
-func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, taskArgs ...interface{}) (bool, error) {
-	taskDescription := fmt.Sprintf(taskFormat, taskArgs...)
-	if retryNotFound && apierror.IsNotFound(err) {
-		framework.Logf("Ignoring NotFound error while " + taskDescription)
-		return false, nil
-	}
-	if retry, delay := shouldRetry(err); retry {
-		framework.Logf("Retryable error while %s, retrying after %v: %v", taskDescription, delay, err)
-		if delay > 0 {
-			time.Sleep(delay)
-		}
-		return false, nil
-	}
-	framework.Logf("Encountered non-retryable error while %s: %v", taskDescription, err)
-	return false, err
-}
-
-// Decide whether to retry an API request. Optionally include a delay to retry after.
-func shouldRetry(err error) (retry bool, retryAfter time.Duration) {
-	// these errors indicate a transient error that should be retried.
-	if apierror.IsInternalError(err) || apierror.IsTooManyRequests(err) {
-		return true, 0
-	}
-
-	return false, 0
+	return framework.MaybeTimeoutError(err, "waiting for node %s join", nodeIP)
 }
