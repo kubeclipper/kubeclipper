@@ -32,6 +32,8 @@ const (
 	defaultWorkerNodeVip = "169.254.169.100"
 )
 
+const DefaultE2EProject = "e2e-test"
+
 type TestContextType struct {
 	Host          string
 	InMemoryTest  bool

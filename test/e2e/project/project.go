@@ -11,8 +11,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )
 
-const DefaultE2EProject = "e2e"
-
 func CreateProject(f *framework.Framework) error {
 	project := &tenantv1.Project{
 		TypeMeta: metav1.TypeMeta{
@@ -20,7 +18,7 @@ func CreateProject(f *framework.Framework) error {
 			APIVersion: "tenant.kubeclipper.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: DefaultE2EProject,
+			Name: framework.DefaultE2EProject,
 			Annotations: map[string]string{
 				common.AnnotationDescription: "project for e2e",
 			},
@@ -31,7 +29,7 @@ func CreateProject(f *framework.Framework) error {
 		},
 	}
 
-	if oldProject, err := f.Client.DescribeProjects(context.Background(), DefaultE2EProject); err != nil {
+	if oldProject, err := f.Client.DescribeProjects(context.Background(), framework.DefaultE2EProject); err != nil {
 		if !strings.Contains(err.Error(), "not found") {
 			return err
 		}
@@ -50,7 +48,7 @@ func CreateProject(f *framework.Framework) error {
 }
 
 func DeleteProject(f *framework.Framework) error {
-	if err := f.Client.DeleteProject(context.Background(), DefaultE2EProject); err != nil && !strings.Contains(err.Error(), "not found") {
+	if err := f.Client.DeleteProject(context.Background(), framework.DefaultE2EProject); err != nil && !strings.Contains(err.Error(), "not found") {
 		return err
 	}
 	return nil

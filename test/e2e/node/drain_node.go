@@ -9,12 +9,11 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
-	cluster2 "github.com/kubeclipper/kubeclipper/test/e2e/cluster"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
 )
 
-var _ = cluster2.SIGDescribe("[Fast] [Serial] Force drain node", func() {
+var _ = SIGDescribe("[Fast] [Serial] Force drain node", func() {
 	f := framework.NewDefaultFramework("node")
 	nodeID := ""
 	nodeIP := ""
