@@ -59,6 +59,14 @@ func (q *Queries) ToRawQuery() url.Values {
 		queryParameters.Set(query.ParameterFieldSelector, q.FieldSelector)
 	}
 
+	if len(q.FuzzySearch) > 0 {
+		var fuzzy string
+		for k, v := range q.FuzzySearch {
+			fuzzy += fmt.Sprintf("%s~%s", k, v)
+		}
+		queryParameters.Set(query.ParameterFuzzySearch, fuzzy)
+	}
+
 	return queryParameters
 }
 
