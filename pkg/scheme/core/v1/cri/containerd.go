@@ -210,6 +210,10 @@ func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) string
 
 func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, dryRun bool) error {
 	// local registry not filled and is in online mode, the default repo mirror proxy will be used
+	if !runnable.Offline && runnable.LocalRegistry == "" {
+		runnable.LocalRegistry = component.GetRepoMirror(ctx)
+		logger.Info("render containerd config, the default repo mirror proxy will be used", zap.String("local_registry", runnable.LocalRegistry))
+	}
 	if runnable.RegistryConfigDir == "" {
 		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir
 	}
