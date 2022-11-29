@@ -33,7 +33,7 @@ import (
 	fcluster "github.com/kubeclipper/kubeclipper/test/framework/cluster"
 )
 
-var _ = cluster.SIGDescribe("[Medium] [Serial] Join node", func() {
+var _ = SIGDescribe("[Medium] [Serial] Join node", func() {
 	f := framework.NewDefaultFramework("node")
 	var nodeIP, nodeID string
 

@@ -57,5 +57,4 @@ jobs:
         run: |
           make build-e2e
           kcctl login -H http://localhost:80  -u admin -p Thinkbig1
-          ./dist/e2e.test -cluster-install-short-timeout=10m -ginkgo.focus="AIO"
-          
+          ./dist/e2e.test -cluster-install-short-timeout=10m -ginkgo.focus="\[Containerd\]"
