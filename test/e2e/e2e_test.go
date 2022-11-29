@@ -26,7 +26,6 @@ import (
 	"time"
 
 	_ "github.com/kubeclipper/kubeclipper/test/e2e/cluster"
-	_ "github.com/kubeclipper/kubeclipper/test/e2e/demo"
 	_ "github.com/kubeclipper/kubeclipper/test/e2e/node"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )

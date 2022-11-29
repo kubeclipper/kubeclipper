@@ -1,67 +1,16 @@
 package cluster
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 
-	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	nfsprovisioner "github.com/kubeclipper/kubeclipper/pkg/component/nfs"
 	"github.com/kubeclipper/kubeclipper/pkg/component/nfscsi"
-	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
-	"github.com/kubeclipper/kubeclipper/test/framework"
 )
-
-var _ = SIGDescribe("[Slow] [Serial] TemplateAddon", func() {
-	f := framework.NewDefaultFramework("addon-template")
-	ctx := context.TODO()
-
-	addonList, err := initAddonList()
-	framework.ExpectNoError(err)
-
-	ginkgo.It("addon template CURD", func() {
-		for _, addon := range addonList {
-			temp := initAddonTemplate(addon.name, addon.labels, addon.data)
-			ginkgo.By(fmt.Sprintf("Create %s addon-template", addon.name))
-			list, err := f.Client.CreateTemplate(ctx, temp)
-			framework.ExpectNoError(err)
-			actName := list.Items[0].Name
-
-			ginkgo.By(fmt.Sprintf("Describe %s addon-template", addon.name))
-			_, err = f.Client.DescribeTemplate(ctx, actName)
-			framework.ExpectNoError(err)
-
-			ginkgo.By(fmt.Sprintf("Update %s addon-template", addon.name))
-			t := &list.Items[0]
-			err = editReplace(t)
-			framework.ExpectNoError(err)
-			_, err = f.Client.UpdateTemplate(ctx, t)
-			framework.ExpectNoError(err)
-
-			ginkgo.By(fmt.Sprintf("List addon-template %s", addon.name))
-			q := query.New()
-			q.Limit = -1
-			q.LabelSelector = fmt.Sprintf("%s=%s,%s=%s,%s=v1", common.LabelCategory, addon.category, common.LabelComponentName, addon.component, common.LabelComponentVersion)
-			list, err = f.Client.ListTemplate(ctx, kc.Queries(*q))
-			framework.ExpectNoError(err)
-			if list.TotalCount == 0 {
-				framework.ExpectNoError(errors.New("template query result is empty"))
-			}
-
-			ginkgo.By(fmt.Sprintf("Delete addon-template %s", addon.name))
-			err = f.Client.DeleteTemplate(ctx, actName)
-			framework.ExpectNoError(err)
-		}
-	})
-
-})
 
 const (
 	nameNFSProvider = "nfs-provisioner"
@@ -178,4 +127,30 @@ func editReplace(t *corev1.Template) error {
 
 	t.Config.Raw = data
 	return err
+}
+
+func initClusterTemplate(clu *corev1.Cluster, name, displayname string) (*corev1.Template, error) {
+	data, err := json.Marshal(clu)
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.Template{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Template",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				common.AnnotationDisplayName: displayname,
+			},
+			Labels: map[string]string{
+				common.LabelCategory:         "kubernetes",
+				common.LabelComponentName:    "kubernetes",
+				common.LabelComponentVersion: "v1",
+			},
+			Name: name,
+		},
+		Config: runtime.RawExtension{Raw: data},
+	}, nil
 }

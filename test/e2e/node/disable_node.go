@@ -32,7 +32,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )
 
-var _ = cluster2.SIGDescribe("[Fast] [Serial] Disable node", func() {
+var _ = SIGDescribe("[Fast] [Serial] Disable node", func() {
 	f := framework.NewDefaultFramework("node")
 	nodeID := ""
 
