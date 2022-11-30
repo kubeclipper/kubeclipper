@@ -21,6 +21,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,8 +126,8 @@ func initCluster() *corev1.Cluster {
 		},
 		Networking: corev1.Networking{
 			IPFamily:      corev1.IPFamilyIPv4,
-			Services:      corev1.NetworkRanges{CIDRBlocks: []string{"10.96.0.0/16"}},
-			Pods:          corev1.NetworkRanges{CIDRBlocks: []string{"172.25.0.0/24"}},
+			Services:      corev1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
+			Pods:          corev1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
 			DNSDomain:     "cluster.local",
 			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",

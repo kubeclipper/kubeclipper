@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"net"
 	"os"
 	"strings"
@@ -341,8 +342,8 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		ContainerRuntime:  v1.ContainerRuntime{},
 		Networking: v1.Networking{
 			IPFamily:      v1.IPFamilyIPv4,
-			Services:      v1.NetworkRanges{CIDRBlocks: []string{"10.96.0.0/16"}},
-			Pods:          v1.NetworkRanges{CIDRBlocks: []string{"172.25.0.0/24"}},
+			Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
+			Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
 			DNSDomain:     "cluster.local",
 			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",
