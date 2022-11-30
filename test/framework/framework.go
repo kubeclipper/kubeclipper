@@ -1,14 +1,10 @@
 package framework
 
 import (
-	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/client-go/util/homedir"
 
-	cliconfig "github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
@@ -21,12 +17,10 @@ type Framework struct {
 	// beforeEachStarted indicates that BeforeEach has started
 	beforeEachStarted bool
 
-	// client is kubeclipper client
-	Client *kc.Client
-
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
 
+	Context *TestContextType
 	// To make sure that this framework cleans up after itself, no matter what,
 	// we install a Cleanup action before each test and clear it after.  If we
 	// should abort, the AfterSuite hook should run all Cleanup actions.
@@ -48,15 +42,15 @@ func NewFrameworkWithCustomTimeouts(baseName string, timeouts *TimeoutContext) *
 // NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
-	return NewFramework(baseName, nil)
+	return NewFramework(baseName)
 }
 
 // NewFramework creates a test framework.
-func NewFramework(baseName string, kcClient *kc.Client) *Framework {
+func NewFramework(baseName string) *Framework {
 	f := &Framework{
 		BaseName: baseName,
-		Client:   kcClient,
 		Timeouts: NewTimeoutContextWithDefaults(),
+		Context:  &TestContext,
 	}
 
 	// f.AddAfterEach("dumpLogs", func(f *Framework, failed bool) {
@@ -94,18 +88,6 @@ func (f *Framework) BeforeEach() {
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-	if f.Client == nil {
-		// TODO: when config not exist, login first
-		ginkgo.By("Creating a KubeClipper client")
-		cfg, err := cliconfig.TryLoadFromFile(filepath.Join(homedir.HomeDir(), ".kc", "config"))
-		ExpectNoError(err)
-		f.Client, err = kc.FromConfig(*cfg)
-		ExpectNoError(err)
-	}
-	// Check f.client is work
-	_, err := f.Client.Version(context.TODO())
-	ExpectNoError(err)
-	// Other init
 }
 
 // AfterEach deletes the resource, after reading its events.
@@ -119,7 +101,7 @@ func (f *Framework) AfterEach() {
 
 	// This should not happen. Given ClientSet is a public field a test must have updated it!
 	// Error out early before any API calls during cleanup.
-	if f.Client == nil {
+	if f.KcClient() == nil {
 		Failf("The framework ClientSet must not be nil at this point")
 	}
 
@@ -129,4 +111,8 @@ func (f *Framework) AfterEach() {
 	}
 
 	// TODO: other check
+}
+
+func (f *Framework) KcClient() *kc.Client {
+	return f.Context.Client
 }

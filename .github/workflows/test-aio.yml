@@ -58,6 +58,5 @@ jobs:
       - name: login and build-e2e
         run: |
           make build-e2e
-          kcctl login -H http://localhost:80  -u admin -p Thinkbig1
-          ./dist/e2e.test -cluster-install-short-timeout=10m -ginkgo.focus="\[Containerd\]"
+          ./dist/e2e.test -cluster-install-short-timeout=10m -server-address http://localhost:80 -ginkgo.focus="\[Containerd\]"
           

@@ -51,12 +51,12 @@ var _ = SIGDescribe("[Serial]", func() {
 		nodes := beforeEachCheckNodeEnough(f, 1)
 
 		ginkgo.By(" create backup point ")
-		_, err := f.Client.CreateBackupPoint(context.TODO(), initBackUpPoint(bp))
+		_, err := f.KcClient().CreateBackupPoint(context.TODO(), initBackUpPoint(bp))
 		framework.ExpectNoError(err)
 
 		f.AddAfterEach("delete backup point", func(f *framework.Framework, failed bool) {
 			ginkgo.By(" delete backup-point ")
-			_ = f.Client.DeleteBackupPoint(context.TODO(), bp)
+			_ = f.KcClient().DeleteBackupPoint(context.TODO(), bp)
 		})
 
 		InitClusterWithSetter(baseCluster, []Setter{SetClusterName(clusterName),
@@ -67,29 +67,29 @@ var _ = SIGDescribe("[Serial]", func() {
 		beforeEachCreateCluster(f, baseCluster)()
 
 		ginkgo.By(" get cluster node for backup ")
-		nodeLists, err := f.Client.DescribeNode(context.TODO(), nodes[0])
+		nodeLists, err := f.KcClient().DescribeNode(context.TODO(), nodes[0])
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" create backup ")
-		_, err = f.Client.CreateBackup(context.TODO(), clusterName, initBackup(&nodeLists.Items[0], backup, bp))
+		_, err = f.KcClient().CreateBackup(context.TODO(), clusterName, initBackup(&nodeLists.Items[0], backup, bp))
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" check if the backup was available ")
-		err = cluster.WaitForBackupAvailable(f.Client, clusterName, backup, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForBackupAvailable(f.KcClient(), clusterName, backup, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" create recovery ")
-		_, err = f.Client.CreateRecovery(context.TODO(), clusterName, initRecovery(backup))
+		_, err = f.KcClient().CreateRecovery(context.TODO(), clusterName, initRecovery(backup))
 		framework.ExpectError(err)
 		ginkgo.By(" check recovery successful")
-		err = cluster.WaitForRecovery(f.Client, clusterName, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForRecovery(f.KcClient(), clusterName, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" delete backup first ")
-		err = f.Client.DeleteBackup(context.TODO(), clusterName, backup)
+		err = f.KcClient().DeleteBackup(context.TODO(), clusterName, backup)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for backup to be deleted")
-		err = cluster.WaitForBackupNotFound(f.Client, clusterName, backup, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForBackupNotFound(f.KcClient(), clusterName, backup, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 	})
 
@@ -99,32 +99,32 @@ var _ = SIGDescribe("[Serial]", func() {
 		for _, addon := range addonList {
 			temp := initAddonTemplate(addon.name, addon.labels, addon.data)
 			ginkgo.By(fmt.Sprintf("Create %s addon-template", addon.name))
-			list, err := f.Client.CreateTemplate(context.TODO(), temp)
+			list, err := f.KcClient().CreateTemplate(context.TODO(), temp)
 			framework.ExpectNoError(err)
 			actName := list.Items[0].Name
 
 			ginkgo.By(fmt.Sprintf("Describe %s addon-template", addon.name))
-			_, err = f.Client.DescribeTemplate(context.TODO(), actName)
+			_, err = f.KcClient().DescribeTemplate(context.TODO(), actName)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Update %s addon-template", addon.name))
 			t := &list.Items[0]
 			err = editReplace(t)
 			framework.ExpectNoError(err)
-			_, err = f.Client.UpdateTemplate(context.TODO(), t)
+			_, err = f.KcClient().UpdateTemplate(context.TODO(), t)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("List addon-template %s", addon.name))
 			q := query.New()
 			q.Limit = -1
 			q.LabelSelector = fmt.Sprintf("%s=%s,%s=%s,%s=v1", common.LabelCategory, addon.category, common.LabelComponentName, addon.component, common.LabelComponentVersion)
-			list, err = f.Client.ListTemplate(context.TODO(), kc.Queries(*q))
+			list, err = f.KcClient().ListTemplate(context.TODO(), kc.Queries(*q))
 			framework.ExpectNoError(err)
 
 			framework.ExpectNotEqual(list.TotalCount, 0, "template query result is empty")
 
 			ginkgo.By(fmt.Sprintf("Delete addon-template %s", addon.name))
-			err = f.Client.DeleteTemplate(context.TODO(), actName)
+			err = f.KcClient().DeleteTemplate(context.TODO(), actName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -139,30 +139,30 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Create cluster-template from cluster")
-		_, err = f.Client.CreateTemplate(ctx, temp)
+		_, err = f.KcClient().CreateTemplate(ctx, temp)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("Describe cluster-template %s", displayName))
-		list, err := f.Client.DescribeTemplate(ctx, displayName)
+		list, err := f.KcClient().DescribeTemplate(ctx, displayName)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("Update cluster-template %s", displayName))
 		t := &list.Items[0]
 		cluster.Description = "update cluster template"
 		t.Config.Object = cluster
-		_, err = f.Client.UpdateTemplate(ctx, t)
+		_, err = f.KcClient().UpdateTemplate(ctx, t)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("List cluster-template %s", displayName))
 		q := query.New()
 		q.LabelSelector = fmt.Sprintf("%s=kubernetes,%s=kubernetes,%s=v1", common.LabelCategory, common.LabelComponentName, common.LabelComponentVersion)
-		list, err = f.Client.ListTemplate(ctx, kc.Queries(*q))
+		list, err = f.KcClient().ListTemplate(ctx, kc.Queries(*q))
 		framework.ExpectNoError(err)
 
 		framework.ExpectNotEqual(list.TotalCount, 0, "template query result should not be empty")
 
 		ginkgo.By(fmt.Sprintf("Delete cluster-template %s", displayName))
-		err = f.Client.DeleteTemplate(ctx, templateName)
+		err = f.KcClient().DeleteTemplate(ctx, templateName)
 		framework.ExpectNoError(err)
 	})
 
@@ -175,7 +175,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		sample := initRegistry(kcRegistry)
 
 		ginkgo.By("create registry")
-		_, err := f.Client.CreateRegistry(ctx, sample)
+		_, err := f.KcClient().CreateRegistry(ctx, sample)
 		framework.ExpectNoError(err)
 
 		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
@@ -191,15 +191,15 @@ var _ = SIGDescribe("[Serial]", func() {
 		}
 
 		ginkgo.By("update registries to the cluster")
-		err = f.Client.UpdateCluster(context.TODO(), clu)
+		err = f.KcClient().UpdateCluster(context.TODO(), clu)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check registries successful")
-		err = cluster.WaitForCriRegistry(f.Client, clu.Name, f.Timeouts.CommonTimeout, []string{sample.Host})
+		err = cluster.WaitForCriRegistry(f.KcClient(), clu.Name, f.Timeouts.CommonTimeout, []string{sample.Host})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("delete registry")
-		err = f.Client.DeleteRegistry(context.TODO(), kcRegistry)
+		err = f.KcClient().DeleteRegistry(context.TODO(), kcRegistry)
 		framework.ExpectNoError(err)
 	})
 
@@ -212,7 +212,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		sample := initRegistry(kcRegistry)
 
 		ginkgo.By("create registry")
-		_, err := f.Client.CreateRegistry(ctx, sample)
+		_, err := f.KcClient().CreateRegistry(ctx, sample)
 		framework.ExpectNoError(err)
 
 		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
@@ -228,16 +228,16 @@ var _ = SIGDescribe("[Serial]", func() {
 		}
 
 		ginkgo.By("update registries to the cluster")
-		err = f.Client.UpdateCluster(context.TODO(), clu)
+		err = f.KcClient().UpdateCluster(context.TODO(), clu)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check registries successful")
-		err = cluster.WaitForCriRegistry(f.Client, clu.Name, f.Timeouts.CommonTimeout, []string{sample.Host})
+		err = cluster.WaitForCriRegistry(f.KcClient(), clu.Name, f.Timeouts.CommonTimeout, []string{sample.Host})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("delete registry")
 		err = retryOperation(func() error {
-			return f.Client.DeleteRegistry(context.TODO(), kcRegistry)
+			return f.KcClient().DeleteRegistry(context.TODO(), kcRegistry)
 		}, 2)
 		framework.ExpectNoError(err)
 	})
@@ -250,7 +250,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		beforeEachCreateCluster(f, baseCluster)()
 
 		ginkgo.By("wait for cert init")
-		err := cluster.WaitForCertInit(f.Client, clusterName, f.Timeouts.CommonTimeout)
+		err := cluster.WaitForCertInit(f.KcClient(), clusterName, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("get cert expiration time")
@@ -263,7 +263,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for cert update")
-		err = cluster.WaitForCertUpdated(f.Client, clusterName, *t, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForCertUpdated(f.KcClient(), clusterName, *t, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 	})
 
@@ -279,23 +279,23 @@ var _ = SIGDescribe("[Serial]", func() {
 		beforeEachCreateCluster(f, baseCluster)()
 
 		ginkgo.By("add worker node")
-		_, err := f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(apiv1.NodesOperationAdd, nodes[1]), clusterName)
+		_, err := f.KcClient().AddOrRemoveNode(context.TODO(), initPatchNode(apiv1.NodesOperationAdd, nodes[1]), clusterName)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check cluster status is running")
-		err = cluster.WaitForClusterRunning(f.Client, clusterName, f.Timeouts.ClusterInstallShort)
+		err = cluster.WaitForClusterRunning(f.KcClient(), clusterName, f.Timeouts.ClusterInstallShort)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("remove worker node")
-		_, err = f.Client.AddOrRemoveNode(context.TODO(), initPatchNode(apiv1.NodesOperationRemove, nodes[1]), clusterName)
+		_, err = f.KcClient().AddOrRemoveNode(context.TODO(), initPatchNode(apiv1.NodesOperationRemove, nodes[1]), clusterName)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check cluster status is running")
-		err = cluster.WaitForClusterRunning(f.Client, clusterName, f.Timeouts.ClusterInstallShort)
+		err = cluster.WaitForClusterRunning(f.KcClient(), clusterName, f.Timeouts.ClusterInstallShort)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check node is removed")
-		clus, err := f.Client.DescribeCluster(context.TODO(), clusterName)
+		clus, err := f.KcClient().DescribeCluster(context.TODO(), clusterName)
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(clus.Items[0].Workers), 0, "cluster must not have worker node")
 	})
@@ -314,11 +314,11 @@ var _ = SIGDescribe("[Serial]", func() {
 		beforeEachCreateCluster(f, clu)()
 
 		ginkgo.By("upgrade cluster")
-		err := f.Client.UpgradeCluster(context.TODO(), clusterName, initUpgradeCluster(false, newVersion))
+		err := f.KcClient().UpgradeCluster(context.TODO(), clusterName, initUpgradeCluster(false, newVersion))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait cluster upgrade")
-		err = cluster.WaitForUpgrade(f.Client, clusterName, f.Timeouts.ClusterInstall)
+		err = cluster.WaitForUpgrade(f.KcClient(), clusterName, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
 	})
 
@@ -337,23 +337,23 @@ var _ = SIGDescribe("[Serial]", func() {
 		beforeEachCreateCluster(f, clu)()
 
 		ginkgo.By("upgrade cluster")
-		err := f.Client.UpgradeCluster(context.TODO(), clusterName, initUpgradeCluster(false, newVersion))
+		err := f.KcClient().UpgradeCluster(context.TODO(), clusterName, initUpgradeCluster(false, newVersion))
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait cluster upgrade")
-		err = cluster.WaitForUpgrade(f.Client, clusterName, f.Timeouts.ClusterInstall)
+		err = cluster.WaitForUpgrade(f.KcClient(), clusterName, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
 	})
 
 })
 
 func UpdateCert(f *framework.Framework, clusterName string) error {
-	_, err := f.Client.UpdateCert(context.TODO(), clusterName)
+	_, err := f.KcClient().UpdateCert(context.TODO(), clusterName)
 	return err
 }
 
 func GetCertExpirationTime(f *framework.Framework, clusterName string) (*metav1.Time, error) {
-	describeCluster, err := f.Client.DescribeCluster(context.TODO(), clusterName)
+	describeCluster, err := f.KcClient().DescribeCluster(context.TODO(), clusterName)
 	if err != nil {
 		return nil, err
 	}

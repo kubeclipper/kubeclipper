@@ -14,14 +14,14 @@ import (
 	"github.com/kubeclipper/kubeclipper/test/framework"
 )
 
-var _ = SIGDescribe("[Fast] [Serial] List Region", func() {
+var _ = SIGDescribe("[Fast] [Serial]", func() {
 	f := framework.NewDefaultFramework("region")
 	ginkgo.It("list region and check is default region exist", func() {
 		ctx := context.Background()
 		ginkgo.By("list region")
 		q := query.New()
 		q.Limit = -1
-		list, err := f.Client.ListRegion(ctx, kc.Queries(*q))
+		list, err := f.KcClient().ListRegion(ctx, kc.Queries(*q))
 		framework.ExpectNoError(err)
 
 		if getDefault(list.Items) == nil {
@@ -32,7 +32,7 @@ var _ = SIGDescribe("[Fast] [Serial] List Region", func() {
 		q = query.New()
 		q.Limit = -1
 		q.FuzzySearch = map[string]string{"name": "default"}
-		list, err = f.Client.ListRegion(ctx, kc.Queries(*q))
+		list, err = f.KcClient().ListRegion(ctx, kc.Queries(*q))
 		framework.ExpectNoError(err)
 		region := getDefault(list.Items)
 		if region == nil {
