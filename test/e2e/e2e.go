@@ -31,7 +31,7 @@ import (
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
-	//setupSuite()
+	SetupSuite()
 	return nil
 }, func(data []byte) {
 	// Run on all Ginkgo nodes

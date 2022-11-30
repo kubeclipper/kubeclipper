@@ -18,7 +18,14 @@
 
 package e2e
 
-import "github.com/kubeclipper/kubeclipper/test/framework"
+import (
+	"context"
+
+	"github.com/onsi/ginkgo"
+
+	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
+	"github.com/kubeclipper/kubeclipper/test/framework"
+)
 
 // CleanupSuite is the boilerplate that can be used after tests on ginkgo were run, on the SynchronizedAfterSuite step.
 // Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
@@ -34,4 +41,19 @@ func CleanupSuite() {
 func AfterSuiteActions() {
 	// Run only Ginkgo on node 1
 	framework.Logf("Running AfterSuite actions on node 1")
+}
+
+func SetupSuite() {
+	ginkgo.By("Initial kc client")
+	c, err := kc.NewClientWithOpts(kc.WithHost(framework.TestContext.Host))
+	framework.ExpectNoError(err)
+	resp, err := c.Login(context.TODO(), kc.LoginRequest{
+		Username: framework.TestContext.Username,
+		Password: framework.TestContext.Password,
+	})
+	framework.ExpectNoError(err)
+
+	c, err = kc.NewClientWithOpts(kc.WithHost(framework.TestContext.Host), kc.WithBearerAuth(resp.AccessToken))
+	framework.ExpectNoError(err)
+	framework.TestContext.Client = c
 }

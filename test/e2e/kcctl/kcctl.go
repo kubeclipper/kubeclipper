@@ -21,7 +21,7 @@ var _ = SIGDescribe("[Serial]", func() {
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Check that there are enough available nodes")
-		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
+		nodes, err := f.KcClient().ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
 			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeDisable),
 		})
@@ -31,13 +31,13 @@ var _ = SIGDescribe("[Serial]", func() {
 	})
 
 	//TODO: spoilt, need fix
-	ginkgo.It("[Medium] [Kcctl] [Join] [Drain] should join node to kubeclipper platform and drain it", func() {
+	ginkgo.It("[Medium] [Kcctl] [Join] [Spoilt] should join node to kubeclipper platform and drain it", func() {
 		ginkgo.By("drain node")
 		err := drainAgentNode(nodeID)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node not found")
-		err = node.WaitForNodeNotFound(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		err = node.WaitForNodeNotFound(f.KcClient(), nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("node %s drained\n", nodeIP)
 
@@ -46,7 +46,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node not found")
-		err = node.WaitForNodeNotFound(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		err = node.WaitForNodeNotFound(f.KcClient(), nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("node %s drained\n", nodeIP)
 
@@ -55,17 +55,17 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node join")
-		nodeID, err = node.WaitForNodeJoin(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		nodeID, err = node.WaitForNodeJoin(f.KcClient(), nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 		framework.Logf("node %s registered，id is:%s\n", nodeIP, nodeID)
 	})
-	ginkgo.It("[Medium] [Kcctl] [Drain] [Force] should drain node from kubeclipper platform force", func() {
+	ginkgo.It("[Medium] [Kcctl] [Drain] [Spoilt] should drain node from kubeclipper platform force", func() {
 		ginkgo.By("drain agent node")
 		err := drainAgentNodeForce(nodeID)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("waiting for node is deleted")
-		err = node.WaitForNodeNotFound(f.Client, nodeID, f.Timeouts.CommonTimeout)
+		err = node.WaitForNodeNotFound(f.KcClient(), nodeID, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("join agent node")
@@ -73,7 +73,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for node join")
-		err = cluster.WaitForJoinNode(f.Client, nodeIP, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForJoinNode(f.KcClient(), nodeIP, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 	})
 })

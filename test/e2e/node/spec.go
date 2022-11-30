@@ -23,7 +23,7 @@ var _ = SIGDescribe("[Serial]", func() {
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Check that there are enough available nodes")
-		nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
+		nodes, err := f.KcClient().ListNodes(context.TODO(), kc.Queries{
 			Pagination:    query.NoPagination(),
 			LabelSelector: fmt.Sprintf("!%s", common.LabelNodeDisable),
 		})
@@ -32,13 +32,13 @@ var _ = SIGDescribe("[Serial]", func() {
 		nodeIP = nodes.Items[0].Status.Ipv4DefaultIP
 	})
 
-	ginkgo.It("[Fast] [new-node] [Enable] [Disable] should disable and enable node of kubeclipper platform", func() {
+	ginkgo.It("[Fast] [AIO] should disable/enable node of kubeclipper platform", func() {
 		ginkgo.By("disable node")
-		err := f.Client.DisableNode(context.TODO(), nodeID)
+		err := f.KcClient().DisableNode(context.TODO(), nodeID)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check node is disabled")
-		nodeList, err := f.Client.DescribeNode(context.TODO(), nodeID)
+		nodeList, err := f.KcClient().DescribeNode(context.TODO(), nodeID)
 		framework.ExpectNoError(err)
 		if _, ok := nodeList.Items[0].Labels[common.LabelNodeDisable]; !ok {
 			framework.Failf("Fail to disable node")
@@ -47,11 +47,11 @@ var _ = SIGDescribe("[Serial]", func() {
 		}
 
 		ginkgo.By("enable node")
-		err = f.Client.EnableNode(context.TODO(), nodeID)
+		err = f.KcClient().EnableNode(context.TODO(), nodeID)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("check node is enabled")
-		nodeList, err = f.Client.DescribeNode(context.TODO(), nodeID)
+		nodeList, err = f.KcClient().DescribeNode(context.TODO(), nodeID)
 		framework.ExpectNoError(err)
 		if _, ok := nodeList.Items[0].Labels[common.LabelNodeDisable]; !ok {
 			ginkgo.By("node is enabled")
@@ -59,9 +59,9 @@ var _ = SIGDescribe("[Serial]", func() {
 			framework.Failf("Fail to enabled node")
 		}
 	})
-	ginkgo.It("[Fast] [new-node] [Terminal] should connect node ssh", func() {
+	ginkgo.It("[Fast] [AIO] [Terminal] should connect node ssh", func() {
 		ginkgo.By("Get public key")
-		pub, err := f.Client.GetPublicKey(context.TODO())
+		pub, err := f.KcClient().GetPublicKey(context.TODO())
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Get msg")
@@ -80,7 +80,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("connect node")
-		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.Client.Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, f.Client.Token(), msg)
+		url := fmt.Sprintf("ws://%s%s/%s/%sname=%s&token=%s&msg=%s", f.KcClient().Host(), kc.ListNodesPath, nodeID, "terminal?", nodeID, f.KcClient().Token(), msg)
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		framework.ExpectNoError(err)
 
@@ -98,9 +98,9 @@ var _ = SIGDescribe("[Serial]", func() {
 		err = ws.Close()
 		framework.ExpectNoError(err)
 	})
-	ginkgo.It("[Fast] [new-node] [Detail] [Info] should get info and detail of node", func() {
+	ginkgo.It("[Fast] [AIO] should get info and detail of node", func() {
 		ginkgo.By("show node info")
-		nodeList, err := f.Client.ListNodes(context.TODO(), kc.Queries{
+		nodeList, err := f.KcClient().ListNodes(context.TODO(), kc.Queries{
 			Pagination: query.NoPagination(),
 			FuzzySearch: map[string]string{
 				"default-ip": nodeIP,
@@ -112,7 +112,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		}
 
 		ginkgo.By("show node detail")
-		nodeList, err = f.Client.DescribeNode(context.TODO(), nodeID)
+		nodeList, err = f.KcClient().DescribeNode(context.TODO(), nodeID)
 		framework.ExpectNoError(err)
 		if len(nodeList.Items) == 0 {
 			framework.Failf("show node detail e2e test failed, no such node")

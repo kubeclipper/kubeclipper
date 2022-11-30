@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	apierror "github.com/kubeclipper/kubeclipper/pkg/errors"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -31,8 +34,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
-	"github.com/onsi/ginkgo"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Setter func(cluster *corev1.Cluster)
@@ -152,7 +153,7 @@ func initCluster() *corev1.Cluster {
 
 func beforeEachCheckNodeEnough(f *framework.Framework, min int) []string {
 	ginkgo.By("Check that there are enough available nodes")
-	nodes, err := f.Client.ListNodes(context.TODO(), kc.Queries{
+	nodes, err := f.KcClient().ListNodes(context.TODO(), kc.Queries{
 		Pagination:    query.NoPagination(),
 		LabelSelector: "!kubeclipper.io/nodeRole",
 	})
@@ -167,16 +168,16 @@ func beforeEachCheckNodeEnough(f *framework.Framework, min int) []string {
 
 func beforeEachCreateCluster(f *framework.Framework, c *corev1.Cluster) func() {
 	return func() {
-		clus, err := f.Client.CreateCluster(context.TODO(), c)
+		clus, err := f.KcClient().CreateCluster(context.TODO(), c)
 		framework.ExpectNoError(err)
 		framework.ExpectNotEqual(len(clus.Items), 0, "unexpected problem, cluster not be nil at this time")
 
 		ginkgo.By("check cluster status is running")
-		err = cluster.WaitForClusterRunning(f.Client, clus.Items[0].Name, f.Timeouts.ClusterInstall)
+		err = cluster.WaitForClusterRunning(f.KcClient(), clus.Items[0].Name, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait for cluster is healthy")
-		err = cluster.WaitForClusterHealthy(f.Client, clus.Items[0].Name, f.Timeouts.ClusterInstallShort)
+		err = cluster.WaitForClusterHealthy(f.KcClient(), clus.Items[0].Name, f.Timeouts.ClusterInstallShort)
 		framework.ExpectNoError(err)
 	}
 }
@@ -185,7 +186,7 @@ func afterEachDeleteCluster(f *framework.Framework, clusterName *string) func() 
 	return func() {
 		ginkgo.By("delete cluster")
 		err := retryOperation(func() error {
-			delErr := f.Client.DeleteCluster(context.TODO(), *clusterName)
+			delErr := f.KcClient().DeleteCluster(context.TODO(), *clusterName)
 			if apierror.IsNotFound(delErr) {
 				// cluster not exist
 				return nil
@@ -194,7 +195,7 @@ func afterEachDeleteCluster(f *framework.Framework, clusterName *string) func() 
 		}, 2)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for cluster to be deleted")
-		err = cluster.WaitForClusterNotFound(f.Client, *clusterName, f.Timeouts.ClusterDelete)
+		err = cluster.WaitForClusterNotFound(f.KcClient(), *clusterName, f.Timeouts.ClusterDelete)
 		framework.ExpectNoError(err)
 	}
 }
