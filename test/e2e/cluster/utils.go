@@ -21,6 +21,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -203,6 +204,7 @@ func retryOperation(f fn, times int) error {
 		if err = f(); err == nil {
 			break
 		}
+		time.Sleep(5 * time.Second)
 	}
 	return err
 }
