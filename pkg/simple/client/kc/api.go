@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/models"
 	"net/url"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -233,6 +234,33 @@ func (cli *Client) CreateUser(ctx context.Context, user *iamv1.User) (*UsersList
 	return &users, err
 }
 
+func (cli *Client) UpdateUser(ctx context.Context, user *iamv1.User) (*UsersList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", usersPath, user.Name), nil, user, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := iamv1.User{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	users := UsersList{
+		Items: []iamv1.User{v},
+	}
+	return &users, err
+}
+
+func (cli *Client) UpdateUserPassword(ctx context.Context, name, password string) error {
+	var pwd struct {
+		NewPassword string `json:"newPassword"`
+	}
+	pwd.NewPassword = password
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s/password", usersPath, name), nil, pwd, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cli *Client) AddOrRemoveNode(ctx context.Context, patchNode *corev1.PatchNodes, clusterName string) (*ClustersList, error) {
 	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s/%s", clustersPath, clusterName, "nodes"), nil, patchNode, nil)
 	defer ensureReaderClosed(serverResp)
@@ -249,6 +277,20 @@ func (cli *Client) AddOrRemoveNode(ctx context.Context, patchNode *corev1.PatchN
 
 func (cli *Client) CreateRole(ctx context.Context, role *iamv1.GlobalRole) (*RoleList, error) {
 	serverResp, err := cli.post(ctx, rolesPath, nil, role, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := iamv1.GlobalRole{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	roles := RoleList{
+		Items: []iamv1.GlobalRole{v},
+	}
+	return &roles, err
+}
+
+func (cli *Client) UpdateRole(ctx context.Context, role *iamv1.GlobalRole) (*RoleList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", rolesPath, role.Name), nil, role, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -626,4 +668,16 @@ func (cli *Client) ListOperations(ctx context.Context, query Queries) (*v1.Opera
 	ops := v1.OperationList{}
 	err = json.NewDecoder(serverResp.body).Decode(&ops)
 	return &ops, err
+}
+
+func (cli *Client) ListLoginRecords(ctx context.Context, name string, query Queries) (*models.PageableResponse, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/loginrecords", usersPath, name), query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	var resp models.PageableResponse
+
+	err = json.NewDecoder(serverResp.body).Decode(&resp)
+	return &resp, err
 }
