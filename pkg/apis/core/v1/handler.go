@@ -436,14 +436,8 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	ctx := request.Request.Context()
 	info, _ := reqpkg.InfoFrom(ctx)
 
-	// create cluster in manager platform,must select a project
-	if !info.IsProjectScope() {
-		if _, ok := c.Labels[common.LabelProject]; !ok {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster must belong to a project"))
-			return
-		}
-	}
-	// create in project scope,add label
+	// create cluster in manager platform,front will set a project in label
+	// if create in project scope,add label
 	if info.IsProjectScope() {
 		project := request.PathParameter("project")
 		if c.Labels == nil {
@@ -451,7 +445,13 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 		}
 		c.Labels[common.LabelProject] = project
 	}
+
+	// must specify a project,and can't be empty
 	project := c.Labels[common.LabelProject]
+	if project == "" {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster must belong to a project"))
+		return
+	}
 
 	// mutate name and add display-name
 	actualName := fmt.Sprintf("%s-%s", project, c.Name)
