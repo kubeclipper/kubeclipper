@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -343,6 +345,60 @@ var _ = SIGDescribe("[Serial]", func() {
 		ginkgo.By("wait cluster upgrade")
 		err = cluster.WaitForUpgrade(f.KcClient(), clusterName, f.Timeouts.ClusterInstall)
 		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("[Slow] [AIO] [Detail] cluster detail", func() {
+		clusterName = "e2e-aio-cluster-detail"
+		clu := baseCluster.DeepCopy()
+
+		nodes := beforeEachCheckNodeEnough(f, 1)
+		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
+			SetClusterNodes([]string{nodes[0]}, nil)})
+
+		ginkgo.By("create aio cluster")
+		beforeEachCreateCluster(f, clu)()
+
+		ginkgo.By("get cluster detail")
+		clusters, err := f.KcClient().DescribeCluster(context.Background(), clusterName)
+		framework.ExpectNoError(err)
+		if len(clusters.Items) == 0 {
+			framework.Failf("query cluster(%s)'s detail failed", clusterName)
+		}
+
+		ginkgo.By("get cluster detail-nodes")
+		q := query.New()
+		q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName)
+		listNodes, err := f.KcClient().ListNodes(context.TODO(), kc.Queries(*q))
+		framework.ExpectNoError(err)
+		if len(listNodes.Items) == 0 {
+			framework.Failf("cluster(%s)'s nodes not found", clusterName)
+		}
+
+		ginkgo.By("get cluster detail-operation")
+		q = query.New()
+		q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName)
+		operations, err := f.KcClient().ListOperations(context.Background(), kc.Queries(*q))
+		framework.ExpectNoError(err)
+		if len(operations.Items) == 0 {
+			framework.Failf("query cluster(%s)'s operations failed", clusterName)
+		}
+
+		ginkgo.By("connection to check operation detail")
+		opName := operations.Items[0].Name
+		url := fmt.Sprintf("ws://%s%s/?fieldSelector=metadata.name=%s&watch=true&token=%s", f.KcClient().Host(), kc.OperationPath, opName, f.KcClient().Token())
+		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+		framework.ExpectNoError(err)
+		for {
+			_, data, err := ws.ReadMessage()
+			if string(data) == "" || err != nil {
+				framework.Failf("connect operation detail failed")
+			} else {
+				break
+			}
+		}
+
+		ginkgo.By("close the connection")
+		framework.ExpectNoError(ws.Close())
 	})
 
 })

@@ -50,6 +50,7 @@ const (
 	templatePath         = "/api/core.kubeclipper.io/v1/templates"
 	registryPath         = "/api/core.kubeclipper.io/v1/registries"
 	regionPath           = "/api/core.kubeclipper.io/v1/regions"
+	OperationPath        = "/api/core.kubeclipper.io/v1/operations"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -614,4 +615,15 @@ func (cli *Client) ListRegion(ctx context.Context, query Queries) (*v1.RegionLis
 	regions := v1.RegionList{}
 	err = json.NewDecoder(serverResp.body).Decode(&regions)
 	return &regions, err
+}
+
+func (cli *Client) ListOperations(ctx context.Context, query Queries) (*v1.OperationList, error) {
+	serverResp, err := cli.get(ctx, OperationPath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	ops := v1.OperationList{}
+	err = json.NewDecoder(serverResp.body).Decode(&ops)
+	return &ops, err
 }
