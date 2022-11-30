@@ -196,11 +196,14 @@ func beforeEachCreateCluster(f *framework.Framework, c *corev1.Cluster) func() {
 func afterEachDeleteCluster(f *framework.Framework, clusterName *string) func() {
 	return func() {
 		ginkgo.By("delete cluster")
-		err := f.Client.DeleteCluster(context.TODO(), *clusterName)
-		if apierror.IsNotFound(err) {
-			// cluster not exist
-			return
-		}
+		err := retryOperation(func() error {
+			delErr := f.Client.DeleteCluster(context.TODO(), *clusterName)
+			if apierror.IsNotFound(delErr) {
+				// cluster not exist
+				return nil
+			}
+			return delErr
+		}, 2)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for cluster to be deleted")
 		err = cluster.WaitForClusterNotFound(f.Client, *clusterName, f.Timeouts.ClusterDelete)
