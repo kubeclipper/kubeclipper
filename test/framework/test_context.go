@@ -20,14 +20,15 @@ package framework
 
 import (
 	"flag"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 
 	"github.com/onsi/ginkgo/config"
 )
 
 const (
 	defaultHost          = "http://127.0.0.1:8080"
-	defaultServiceSubnet = "10.96.0.0/16"
-	defaultPodSubnet     = "172.25.0.0/24"
+	defaultServiceSubnet = constatns.ClusterServiceSubnet
+	defaultPodSubnet     = constatns.ClusterPodSubnet
 	defaultLocalRegistry = "127.0.0.1:5000"
 	defaultWorkerNodeVip = "169.254.169.100"
 )
@@ -61,9 +62,9 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flag.StringVar(&TestContext.Host, "server-address", defaultHost,
 		"Ki Server API Server IP/DNS, default 127.0.0.1:8080")
 	flag.StringVar(&TestContext.ServiceSubnet, "svc-subnet", defaultServiceSubnet,
-		"cluster svc sub net, default 10.96.0.0/16")
+		"cluster svc sub net, default 10.96.0.0/12")
 	flag.StringVar(&TestContext.PodSubnet, "pod-subnet", defaultPodSubnet,
-		"cluster pod sub net, default 172.25.0.0/24")
+		"cluster pod sub net, default 172.25.0.0/16")
 	flag.StringVar(&TestContext.LocalRegistry, "registry", defaultLocalRegistry,
 		"cri image registry addr, default 127.0.0.1:5000")
 	flag.StringVar(&TestContext.WorkerNodeVip, "vip", defaultWorkerNodeVip,
