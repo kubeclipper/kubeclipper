@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
@@ -65,8 +66,8 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				Etcd:                    v1.Etcd{DataDir: "/var/lib/etcd"},
 				Networking: v1.Networking{
 					IPFamily:      v1.IPFamilyIPv4,
-					Services:      v1.NetworkRanges{CIDRBlocks: []string{"10.96.0.0/16"}},
-					Pods:          v1.NetworkRanges{CIDRBlocks: []string{"172.25.0.0/24"}},
+					Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
+					Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
 					DNSDomain:     "cluster.local",
 					ProxyMode:     "ipvs",
 					WorkerNodeVip: "8.8.8.8",

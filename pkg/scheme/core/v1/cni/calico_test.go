@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
@@ -19,7 +20,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 			stepper: CalicoRunnable{
 				BaseCni{
 					DualStack:   false,
-					PodIPv4CIDR: "172.25.0.0/24",
+					PodIPv4CIDR: constatns.ClusterPodSubnet,
 					PodIPv6CIDR: "aaa:bbb",
 					CNI: v1.CNI{
 						LocalRegistry: "172.0.0.1:5000",
