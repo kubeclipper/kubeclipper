@@ -1,4 +1,4 @@
-package cluster
+package node
 
 import (
 	"context"
@@ -18,10 +18,10 @@ type nodeCondition func(nodes []corev1.Node) (bool, error)
 func waitForNodeCondition(c *kc.Client, nodeIP, conditionDesc string, timeout time.Duration, condition nodeCondition) error {
 	framework.Logf("Waiting up to %v for node %q to be %q", timeout, nodeIP, conditionDesc)
 	start := time.Now()
-	err := wait.PollImmediate(poll, timeout, func() (bool, error) {
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		nodes, apiErr := c.ListNodes(context.TODO(), kc.Queries{})
 		if apiErr != nil {
-			return handleWaitingAPIError(apiErr, true, "getting node %s", nodeIP)
+			return framework.HandleWaitingAPIError(apiErr, true, "getting node %s", nodeIP)
 		}
 		ok, err := condition(nodes.Items)
 		if err != nil {
@@ -33,10 +33,10 @@ func waitForNodeCondition(c *kc.Client, nodeIP, conditionDesc string, timeout ti
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) {
-		return TimeoutError(fmt.Sprintf("timed out while waiting for node %s to be %s", nodeIP, conditionDesc))
+	if framework.IsTimeout(err) {
+		return framework.TimeoutError(fmt.Sprintf("timed out while waiting for node %s to be %s", nodeIP, conditionDesc))
 	}
-	return maybeTimeoutError(err, "waiting for node %s to be %s", nodeIP, conditionDesc)
+	return framework.MaybeTimeoutError(err, "waiting for node %s to be %s", nodeIP, conditionDesc)
 }
 
 func WaitForNodeJoin(c *kc.Client, nodeIP string, timeout time.Duration) (string, error) {

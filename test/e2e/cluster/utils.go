@@ -21,6 +21,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,14 +196,30 @@ func beforeEachCreateCluster(f *framework.Framework, c *corev1.Cluster) func() {
 func afterEachDeleteCluster(f *framework.Framework, clusterName *string) func() {
 	return func() {
 		ginkgo.By("delete cluster")
-		err := f.Client.DeleteCluster(context.TODO(), *clusterName)
-		if apierror.IsNotFound(err) {
-			// cluster not exist
-			return
-		}
+		err := retryOperation(func() error {
+			delErr := f.Client.DeleteCluster(context.TODO(), *clusterName)
+			if apierror.IsNotFound(delErr) {
+				// cluster not exist
+				return nil
+			}
+			return delErr
+		}, 2)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for cluster to be deleted")
 		err = cluster.WaitForClusterNotFound(f.Client, *clusterName, f.Timeouts.ClusterDelete)
 		framework.ExpectNoError(err)
 	}
+}
+
+type fn func() error
+
+func retryOperation(f fn, times int) error {
+	var err error
+	for i := 0; i < times; i++ {
+		if err = f(); err == nil {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
+	return err
 }
