@@ -296,9 +296,9 @@ func NewDeployOptions() *DeployConfig {
 		IPDetect:  autodetection.MethodFirst,
 		SSHConfig: sshutils.NewSSH(),
 		EtcdConfig: &Etcd{
-			ClientPort:  2379,
-			PeerPort:    2380,
-			MetricsPort: 2381,
+			ClientPort:  12379,
+			PeerPort:    12380,
+			MetricsPort: 12381,
 			DataDir:     "/var/lib/kc-etcd",
 		},
 		Debug:            false,
