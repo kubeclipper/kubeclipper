@@ -168,40 +168,88 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 	})
 
+	ginkgo.It("[Fast] [AIO] [Registry] should create registry", func() {
+		ctx := context.TODO()
+
+		afterEachDeleteRegistries(ctx, f, 1)
+
+		registries := initRegistries()
+
+		for _, reg := range registries {
+			ginkgo.By(fmt.Sprintf("Create %s registry", reg.Name))
+
+			_, err := f.KcClient().CreateRegistry(ctx, reg)
+			framework.ExpectNoError(err)
+		}
+
+		ginkgo.By("Check whether registries is created successfully")
+		created, err := f.KcClient().ListRegistries(ctx, kc.Queries{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(created.Items), len(registries), fmt.Sprintf("%d registries have not been created", len(registries)))
+
+		for _, reg := range registries {
+			ginkgo.By(fmt.Sprintf("Delete %s registry", reg.Name))
+
+			err := f.KcClient().DeleteRegistry(ctx, reg.Name)
+			framework.ExpectNoError(err)
+		}
+
+		ginkgo.By("Check whether registries is deleted successfully")
+		deleted, err := f.KcClient().ListRegistries(ctx, kc.Queries{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(deleted.Items), 0, fmt.Sprintf("%d registries have not been deleted", len(registries)))
+	})
+
 	ginkgo.It("[Slow] [AIO] [Registry] [Docker] should add registry after cluster running", func() {
 		ctx := context.TODO()
 		clusterName = "e2e-aio-docker"
 		clu := baseCluster.DeepCopy()
 		nodes := beforeEachCheckNodeEnough(f, 1)
-		kcRegistry := "kubeclipper.io"
-		sample := initRegistry(kcRegistry)
 
-		ginkgo.By("create registry")
-		_, err := f.KcClient().CreateRegistry(ctx, sample)
-		framework.ExpectNoError(err)
+		afterEachDeleteRegistries(ctx, f, 2)
+
+		registries := initRegistries()
+
+		var registryHosts []string
+		var criRegistries []corev1.CRIRegistry
+		for _, reg := range registries {
+			ginkgo.By(fmt.Sprintf("Create %s registry", reg.Name))
+
+			_, err := f.KcClient().CreateRegistry(ctx, reg)
+			framework.ExpectNoError(err)
+
+			registryHosts = append(registryHosts, reg.Host)
+			criRegistries = append(criRegistries, corev1.CRIRegistry{
+				RegistryRef: &reg.Name,
+			})
+		}
 
 		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
 			SetClusterNodes([]string{nodes[0]}, nil),
 			SetDockerRuntime()})
+
 		ginkgo.By("create aio cluster with docker")
 		beforeEachCreateCluster(f, clu)()
 
-		clu.ContainerRuntime.Registries = []corev1.CRIRegistry{
-			{
-				RegistryRef: &kcRegistry,
-			},
-		}
+		clu.ContainerRuntime.Registries = criRegistries
 
 		ginkgo.By("update registries to the cluster")
-		err = f.KcClient().UpdateCluster(context.TODO(), clu)
+		err := f.KcClient().UpdateCluster(context.TODO(), clu)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("check registries successful")
-		err = cluster.WaitForCriRegistry(f.KcClient(), clu.Name, f.Timeouts.CommonTimeout, []string{sample.Host})
+		ginkgo.By("check add registries successful")
+		err = cluster.WaitForCriRegistry(f.KcClient(), clu.Name, f.Timeouts.CommonTimeout, registryHosts)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("delete registry")
-		err = f.KcClient().DeleteRegistry(context.TODO(), kcRegistry)
+		ginkgo.By("delete registries")
+		for _, reg := range registries {
+			_ = f.KcClient().DeleteRegistry(ctx, reg.Name)
+		}
+
+		ginkgo.By("check whether the cluster registries is automatically removed after registries are deleted")
+		err = cluster.WaitForClusterCondition(f.KcClient(), clu.Name, "delete cluster registries successful", f.Timeouts.CommonTimeout, func(clu *corev1.Cluster) (bool, error) {
+			return clu.Status.Registries == nil, nil
+		})
 		framework.ExpectNoError(err)
 	})
 
@@ -210,37 +258,51 @@ var _ = SIGDescribe("[Serial]", func() {
 		clusterName = "e2e-aio-containerd"
 		clu := baseCluster.DeepCopy()
 		nodes := beforeEachCheckNodeEnough(f, 1)
-		kcRegistry := "kubeclipper.io"
-		sample := initRegistry(kcRegistry)
 
-		ginkgo.By("create registry")
-		_, err := f.KcClient().CreateRegistry(ctx, sample)
-		framework.ExpectNoError(err)
+		afterEachDeleteRegistries(ctx, f, 3)
+
+		registries := initRegistries()
+
+		var registryHosts []string
+		var criRegistries []corev1.CRIRegistry
+		for _, reg := range registries {
+			ginkgo.By(fmt.Sprintf("Create %s registry", reg.Name))
+
+			_, err := f.KcClient().CreateRegistry(ctx, reg)
+			framework.ExpectNoError(err)
+
+			registryHosts = append(registryHosts, reg.Host)
+			criRegistries = append(criRegistries, corev1.CRIRegistry{
+				RegistryRef: &reg.Name,
+			})
+		}
 
 		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
 			SetClusterNodes([]string{nodes[0]}, nil),
 			SetContainerdRuntime()})
+
 		ginkgo.By("create aio cluster with containerd")
 		beforeEachCreateCluster(f, clu)()
 
-		clu.ContainerRuntime.Registries = []corev1.CRIRegistry{
-			{
-				RegistryRef: &kcRegistry,
-			},
-		}
+		clu.ContainerRuntime.Registries = criRegistries
 
 		ginkgo.By("update registries to the cluster")
-		err = f.KcClient().UpdateCluster(context.TODO(), clu)
+		err := f.KcClient().UpdateCluster(context.TODO(), clu)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("check registries successful")
-		err = cluster.WaitForCriRegistry(f.KcClient(), clu.Name, f.Timeouts.CommonTimeout, []string{sample.Host})
+		ginkgo.By("check add registries successful")
+		err = cluster.WaitForCriRegistry(f.KcClient(), clu.Name, f.Timeouts.CommonTimeout, registryHosts)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("delete registry")
-		err = retryOperation(func() error {
-			return f.KcClient().DeleteRegistry(context.TODO(), kcRegistry)
-		}, 2)
+		ginkgo.By("delete registries")
+		for _, reg := range registries {
+			_ = f.KcClient().DeleteRegistry(ctx, reg.Name)
+		}
+
+		ginkgo.By("check whether the cluster registries is automatically removed after registries are deleted")
+		err = cluster.WaitForClusterCondition(f.KcClient(), clu.Name, "delete cluster registries successful", f.Timeouts.CommonTimeout, func(clu *corev1.Cluster) (bool, error) {
+			return clu.Status.Registries == nil, nil
+		})
 		framework.ExpectNoError(err)
 	})
 
