@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"net/url"
 
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
-
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
 	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 
