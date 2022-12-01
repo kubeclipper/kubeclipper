@@ -16,11 +16,11 @@
  *
  */
 
-package acl
+package iam
 
 import "github.com/onsi/ginkgo"
 
 // SIGDescribe annotates the test with the SIG label.
 func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-acl] "+text, body)
+	return ginkgo.Describe("[sig-iam] "+text, body)
 }
