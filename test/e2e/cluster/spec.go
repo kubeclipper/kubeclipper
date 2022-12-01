@@ -42,6 +42,17 @@ var _ = SIGDescribe("[Serial]", func() {
 		ginkgo.By("create aio cluster")
 		beforeEachCreateCluster(f, baseCluster)()
 	})
+
+	ginkgo.It("[Slow] [AIO] [online] should create a aio minimal kubernetes cluster online", func() {
+		clusterName = "e2e-aio-online"
+		clu := baseCluster.DeepCopy()
+		nodes := beforeEachCheckNodeEnough(f, 1)
+		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
+			SetOnlineInstall(),
+			SetClusterNodes([]string{nodes[0]}, nil)})
+		ginkgo.By("create aio cluster")
+		beforeEachCreateCluster(f, clu)()
+	})
 	// other test case for 1 master 1 worker or 1 master 2 worker
 
 	// TODO: spoilt, need fix

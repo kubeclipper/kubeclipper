@@ -56,6 +56,15 @@ func SetDockerRuntime() Setter {
 	}
 }
 
+func SetOnlineInstall() Setter {
+	return func(c *corev1.Cluster) {
+		if c.Annotations == nil {
+			c.Annotations = make(map[string]string, 0)
+		}
+		c.Annotations[common.AnnotationOffline] = "false"
+	}
+}
+
 func SetClusterName(name string) Setter {
 	return func(c *corev1.Cluster) {
 		c.Name = name

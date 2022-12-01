@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/kubeclipper/kubeclipper/test/e2e/acl"
 	_ "github.com/kubeclipper/kubeclipper/test/e2e/cluster"
+	_ "github.com/kubeclipper/kubeclipper/test/e2e/iam"
 	_ "github.com/kubeclipper/kubeclipper/test/e2e/node"
 	_ "github.com/kubeclipper/kubeclipper/test/e2e/region"
 	"github.com/kubeclipper/kubeclipper/test/framework"
