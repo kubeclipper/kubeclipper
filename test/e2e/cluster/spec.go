@@ -401,6 +401,48 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(ws.Close())
 	})
 
+	ginkgo.It("[Slow] [AIO] [Describe] should get cluster info", func() {
+		clusterName = "e2e-aio-describe"
+		clu := baseCluster.DeepCopy()
+
+		nodes := beforeEachCheckNodeEnough(f, 1)
+		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
+			SetClusterNodes([]string{nodes[0]}, nil),
+		})
+		ginkgo.By("create aio cluster")
+		beforeEachCreateCluster(f, clu)()
+
+		ginkgo.By("get cluster description")
+		_, err := f.KcClient().DescribeCluster(context.TODO(), clusterName)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("[Slow] [AIO] [Update] should update cluster", func() {
+		clusterName = "e2e-aio-update"
+		clu := baseCluster.DeepCopy()
+
+		nodes := beforeEachCheckNodeEnough(f, 1)
+		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
+			SetClusterNodes([]string{nodes[0]}, nil),
+		})
+		ginkgo.By("create aio cluster")
+		beforeEachCreateCluster(f, clu)()
+
+		ginkgo.By("update cluster")
+
+		clu.Annotations[common.AnnotationDescription] = "test-des"
+		err := f.KcClient().UpdateCluster(context.TODO(), clu)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("check whether the cluster is updated")
+		clus, err := f.KcClient().DescribeCluster(context.TODO(), clusterName)
+		framework.ExpectNoError(err)
+
+		value, ok := clus.Items[0].Annotations[common.AnnotationDescription]
+		if !ok || value != "test-des" {
+			framework.ExpectNoError(fmt.Errorf("update cluster %s failed", clusterName))
+		}
+	})
 })
 
 func UpdateCert(f *framework.Framework, clusterName string) error {
