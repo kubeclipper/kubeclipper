@@ -20,9 +20,10 @@ package v1
 
 import (
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"reflect"
 	"testing"
+
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 
 	"k8s.io/apimachinery/pkg/runtime"
 

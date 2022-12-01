@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	apierror "github.com/kubeclipper/kubeclipper/pkg/errors"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -31,8 +34,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
-	"github.com/onsi/ginkgo"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Setter func(cluster *corev1.Cluster)

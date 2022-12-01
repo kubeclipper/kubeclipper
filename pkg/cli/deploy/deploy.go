@@ -37,10 +37,6 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/component-base/version"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
-
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -86,26 +82,26 @@ const (
   kcctl deploy
 
   # Deploy AIO env and change etcd port
-  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --passwd 'YOUR-SSH-PASSWORD' --pkg kc-minimal.tar.gz --etcd-port 12379 --etcd-peer-port 12380 --etcd-metric-port 12381
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --passwd 'YOUR-SSH-PASSWORD' --etcd-port 12379 --etcd-peer-port 12380 --etcd-metric-port 12381
 
   # Deploy HA env
-  kcctl deploy --server 192.168.234.3,192.168.234.4,192.168.234.5 --agent 192.168.234.3 --passwd 'YOUR-SSH-PASSWORD' --pkg kc-minimal.tar.gz --etcd-port 12379 --etcd-peer-port 12380 --etcd-metric-port 12381
+  kcctl deploy --server 192.168.234.3,192.168.234.4,192.168.234.5 --agent 192.168.234.3 --passwd 'YOUR-SSH-PASSWORD' --etcd-port 12379 --etcd-peer-port 12380 --etcd-metric-port 12381
 
   # Deploy env use SSH key instead of password
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg kc-minimal.tar.gz
 
   # Deploy env use remove http/https resource server
-  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
 
   # Deploy env with many agent node in same region.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124  --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124  --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
 
   # Deploy env with many agent node in different region.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
 
   # Deploy env with many agent node which has orderly ip.
   # this will add 10 agent,1.1.1.1, 1.1.1.2, ... 1.1.1.10.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
 
   # Deploy from config.
   kcctl deploy --deploy-config deploy-config.yaml
@@ -113,10 +109,7 @@ const (
   kcctl deploy --server 172.20.149.198 --agent us-west-1:10.0.0.10 --agent us-west-2:20.0.0.11 --fip 10.0.0.10:172.20.149.199 --fip 20.0.0.11:172.20.149.200
 
   Please read 'kcctl deploy -h' get more deploy flags`
-	defaultPkg              = "https://oss.kubeclipper.io/release/%s/kc-%s.tar.gz"
-	allInOneEtcdClientPort  = 12379
-	allInOneEtcdPeerPort    = 12380
-	allInOneEtcdMetricsPort = 12381
+	defaultPkg = "https://oss.kubeclipper.io/release/%s/kc-%s.tar.gz"
 )
 
 type DeployOptions struct {
@@ -177,20 +170,21 @@ func (d *DeployOptions) Complete() error {
 	if err = d.deployConfig.Complete(); err != nil {
 		return err
 	}
+	if d.deployConfig.Pkg == "" {
+		v := os.Getenv("KC_VERSION")
+		if v == "" {
+			//v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
+			// TODO: inject branch when run go build
+			// hard code master
+			v = "master"
+		}
+		d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, v, runtime.GOARCH)
+	}
+
 	// if both the server and agent are empty, set the all-in-one environment
 	if d.deployConfig.ServerIPs == nil && d.agents == nil {
 		d.aio = true
-		if d.deployConfig.Pkg == "" {
-			v := os.Getenv("KC_VERSION")
-			if v == "" {
-				v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
-			}
-			d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, v, runtime.GOARCH)
-		}
-		// set etcd port to avoid conflicts with k8s
-		d.deployConfig.EtcdConfig.ClientPort = allInOneEtcdClientPort
-		d.deployConfig.EtcdConfig.PeerPort = allInOneEtcdPeerPort
-		d.deployConfig.EtcdConfig.MetricsPort = allInOneEtcdMetricsPort
+
 		ip, err := netutil.GetDefaultIP(true, d.deployConfig.IPDetect)
 		if err != nil {
 			return err
@@ -221,13 +215,6 @@ func (d *DeployOptions) Complete() error {
 		}
 	}
 
-	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
-		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
-	}
-	if errs := d.deployConfig.AuthenticationOpts.Validate(); len(errs) != 0 {
-		return fmt.Errorf("%d errors in AuthenticationOpts occured: %v", len(errs), errs)
-	}
-
 	if d.aio {
 		logger.Infof("run in aio mode.")
 	}
@@ -236,6 +223,13 @@ func (d *DeployOptions) Complete() error {
 }
 
 func (d *DeployOptions) ValidateArgs() error {
+	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
+		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
+	}
+	if errs := d.deployConfig.AuthenticationOpts.Validate(); len(errs) != 0 {
+		return fmt.Errorf("%d errors in AuthenticationOpts occured: %v", len(errs), errs)
+	}
+
 	if d.deployConfig.IPDetect != "" && !autodetection.CheckMethod(d.deployConfig.IPDetect) {
 		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
 	}
