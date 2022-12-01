@@ -322,23 +322,25 @@ func (h *handler) DeleteUser(request *restful.Request, response *restful.Respons
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	oldRolebinding, err := h.iamOperator.GetRoleBindingEx(request.Request.Context(), role, "0")
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	for index, subjects := range oldRolebinding.Subjects {
-		if subjects.Kind == rbacv1.UserKind && subjects.Name == user.Name {
-			oldRolebinding.Subjects = append(oldRolebinding.Subjects[:index], oldRolebinding.Subjects[index+1:]...)
-			break
+	if role != "" {
+		// Notice: delete user and rolebinding not use transcation, should use controller
+		oldRolebinding, err := h.iamOperator.GetRoleBindingEx(request.Request.Context(), role, "0")
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+		for index, subjects := range oldRolebinding.Subjects {
+			if subjects.Kind == rbacv1.UserKind && subjects.Name == user.Name {
+				oldRolebinding.Subjects = append(oldRolebinding.Subjects[:index], oldRolebinding.Subjects[index+1:]...)
+				break
+			}
+		}
+		_, err = h.iamOperator.UpdateRoleBinding(request.Request.Context(), oldRolebinding)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
 		}
 	}
-	_, err = h.iamOperator.UpdateRoleBinding(request.Request.Context(), oldRolebinding)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
 	response.WriteHeader(http.StatusOK)
 }
 
