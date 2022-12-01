@@ -516,6 +516,19 @@ var _ = SIGDescribe("[Serial]", func() {
 			framework.ExpectNoError(fmt.Errorf("update cluster %s failed", clusterName))
 		}
 	})
+	ginkgo.It("[Slow] [AIO] [Storage] [NFS] install nfs storage", func() {
+		clusterName = "e2e-aio-cluster-nfs-storage-class"
+		clu := baseCluster.DeepCopy()
+		clu.Name = clusterName
+		nfsComponentTestBlock(f, clu, "10.10.10.184", "/nfs/data", "")
+	})
+
+	ginkgo.It("[Slow] [AIO] [Storage] [NFS] [Registry] install nfs storage", func() {
+		clusterName = "e2e-aio-cluster-nfs-storage-class-registry"
+		clu := baseCluster.DeepCopy()
+		clu.Name = clusterName
+		nfsComponentTestBlock(f, clu, "10.10.10.184", "/nfs/data", "")
+	})
 })
 
 func UpdateCert(f *framework.Framework, clusterName string) error {
