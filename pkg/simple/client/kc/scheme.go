@@ -234,6 +234,11 @@ type BackupPointList struct {
 	TotalCount int              `json:"totalCount,omitempty" description:"total count"`
 }
 
+type CronBackupList struct {
+	Items      []v1.CronBackup `json:"items" description:"paging data"`
+	TotalCount int             `json:"totalCount,omitempty" description:"total count"`
+}
+
 type ConfigMapList struct {
 	Items      []v1.ConfigMap `json:"items" description:"paging data"`
 	TotalCount int            `json:"totalCount,omitempty" description:"total count"`

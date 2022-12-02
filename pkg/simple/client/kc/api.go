@@ -26,9 +26,12 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/models"
 
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
@@ -41,6 +44,7 @@ const (
 	componentPath        = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
 	backupPath           = "/api/core.kubeclipper.io/v1/backups"
 	backupPonitPath      = "/api/core.kubeclipper.io/v1/backuppoints"
+	cronBackupPath       = "/api/core.kubeclipper.io/v1/cronbackups"
 	usersPath            = "/api/iam.kubeclipper.io/v1/users"
 	rolesPath            = "/api/iam.kubeclipper.io/v1/roles"
 	platformPath         = "/api/config.kubeclipper.io/v1/template"
@@ -417,6 +421,28 @@ func (cli *Client) ListBackupsWithCluster(ctx context.Context, clusterName strin
 	return &backups, err
 }
 
+func (cli *Client) ListBackupsCreateByCronBackup(ctx context.Context, clusterName string) ([]*v1.Backup, error) {
+	var (
+		b   v1.Backup
+		bps []*v1.Backup
+	)
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/backups", clustersPath, clusterName), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return bps, err
+	}
+	backups := BackupList{}
+	err = json.NewDecoder(serverResp.body).Decode(&backups)
+	for _, b = range backups.Items {
+		_, found := cronbackupcontroller.GetParentUIDFromBackup(&b)
+		if !found {
+			continue
+		}
+		bps = append(bps, &b)
+	}
+	return bps, err
+}
+
 func (cli *Client) DescribeBackup(ctx context.Context, backupName string) (*BackupList, error) {
 	resp, err := cli.get(ctx, fmt.Sprintf("%s/%s", backupPath, backupName), nil, nil)
 	defer ensureReaderClosed(resp)
@@ -437,10 +463,10 @@ func (cli *Client) CreateBackup(ctx context.Context, cluName string, backup *v1.
 	if err != nil {
 		return nil, err
 	}
-	bp := v1.Backup{}
-	err = json.NewDecoder(resp.body).Decode(&bp)
+	b := v1.Backup{}
+	err = json.NewDecoder(resp.body).Decode(&b)
 	backups := BackupList{
-		Items: []v1.Backup{bp},
+		Items: []v1.Backup{b},
 	}
 	return &backups, err
 }
@@ -467,6 +493,26 @@ func (cli *Client) CreateBackupPoint(ctx context.Context, point *v1.BackupPoint)
 
 func (cli *Client) DeleteBackupPoint(ctx context.Context, name string) error {
 	resp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", backupPonitPath, name), nil, nil)
+	defer ensureReaderClosed(resp)
+	return err
+}
+
+func (cli *Client) CreateCronBackup(ctx context.Context, cronBackup *v1.CronBackup) (*CronBackupList, error) {
+	resp, err := cli.post(ctx, cronBackupPath, nil, cronBackup, nil)
+	defer ensureReaderClosed(resp)
+	if err != nil {
+		return nil, err
+	}
+	cb := v1.CronBackup{}
+	err = json.NewDecoder(resp.body).Decode(&cb)
+	cronBackups := CronBackupList{
+		Items: []v1.CronBackup{cb},
+	}
+	return &cronBackups, err
+}
+
+func (cli *Client) DeleteCronBackup(ctx context.Context, cronBackupName string) error {
+	resp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", cronBackupPath, cronBackupName), nil, nil)
 	defer ensureReaderClosed(resp)
 	return err
 }

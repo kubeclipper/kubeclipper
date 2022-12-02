@@ -55,7 +55,6 @@ var _ = SIGDescribe("[Serial]", func() {
 	})
 	// other test case for 1 master 1 worker or 1 master 2 worker
 
-	// TODO: spoilt, need fix
 	ginkgo.It("[Slow] [AIO] [Backup] [Recovery] [Spoilt] should create backup and recovery from it", func() {
 		bp := "e2e-bp"
 		backup := "e2e-backup"
@@ -98,7 +97,10 @@ var _ = SIGDescribe("[Serial]", func() {
 		err = cluster.WaitForRecovery(f.KcClient(), clusterName, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
-		ginkgo.By(" delete backup first ")
+		ginkgo.By(" delete backup ")
+		backups, err := f.KcClient().ListBackupsWithCluster(context.TODO(), clusterName)
+		framework.ExpectNoError(err)
+		backup = backups.Items[0].Name
 		err = f.KcClient().DeleteBackup(context.TODO(), clusterName, backup)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for backup to be deleted")
@@ -515,6 +517,54 @@ var _ = SIGDescribe("[Serial]", func() {
 		if !ok || value != "test-des" {
 			framework.ExpectNoError(fmt.Errorf("update cluster %s failed", clusterName))
 		}
+	})
+
+	ginkgo.It("[fast] [AIO] [CronBackup] should create a cronBackup and make sure the cronBackup is effective", func() {
+		bp := "e2e-bp"
+		clusterName = "e2e-aio-cronBackup"
+		cronBackupName := "e2e-cron-backup"
+		clu := baseCluster.DeepCopy()
+		sample := initCronBackup(cronBackupName, clusterName)
+
+		f.AddAfterEach("delete backup point", func(f *framework.Framework, failed bool) {
+			ginkgo.By(" delete backup-point ")
+			_ = f.KcClient().DeleteBackupPoint(context.TODO(), bp)
+		})
+
+		ginkgo.By(" create backup point ")
+		_, err := f.KcClient().CreateBackupPoint(context.TODO(), initBackUpPoint(bp))
+		framework.ExpectNoError(err)
+
+		nodes := beforeEachCheckNodeEnough(f, 1)
+		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
+			SetClusterNodes([]string{nodes[0]}, nil),
+			SetClusterBackupPoint(bp)})
+
+		ginkgo.By("create aio cluster")
+		beforeEachCreateCluster(f, clu)()
+
+		ginkgo.By("create cronBackup")
+		_, err = f.KcClient().CreateCronBackup(context.TODO(), sample)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("wait backup to be created")
+		backup, err := cluster.WaitForCronBackupExec(f.KcClient(), clusterName, cronBackupName, 2*time.Minute)
+		framework.ExpectNoError(err)
+
+		ginkgo.By(" check if the backup was available ")
+		err = cluster.WaitForBackupAvailable(f.KcClient(), clusterName, backup.Name, f.Timeouts.CommonTimeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By(" delete backup first ")
+		err = f.KcClient().DeleteBackup(context.TODO(), clusterName, backup.Name)
+		framework.ExpectNoError(err)
+		ginkgo.By("waiting for backup to be deleted")
+		err = cluster.WaitForBackupNotFound(f.KcClient(), clusterName, backup.Name, f.Timeouts.CommonTimeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By(" delete cronBackup")
+		err = f.KcClient().DeleteCronBackup(context.TODO(), cronBackupName)
+		framework.ExpectNoError(err)
 	})
 	ginkgo.It("[Slow] [AIO] [Storage] [NFS] install nfs storage", func() {
 		clusterName = "e2e-aio-cluster-nfs-storage-class"
