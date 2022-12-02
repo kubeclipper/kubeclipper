@@ -200,6 +200,30 @@ func WaitForBackupNotFound(c *kc.Client, clusterName, backupName string, timeout
 	return framework.MaybeTimeoutError(err, "waiting for backup %s not found", backupName)
 }
 
+func WaitForCronBackupExec(c *kc.Client, clusterName, cronBackupName string, timeout time.Duration) (*corev1.Backup, error) {
+	framework.Logf("Waiting up to %v for cronBackup %q to execute", timeout, cronBackupName)
+	bp := &corev1.Backup{}
+	err := wait.PollImmediate(framework.Poll, timeout, func() (done bool, err error) {
+		backups, waitErr := c.ListBackupsCreateByCronBackup(context.TODO(), clusterName)
+		if waitErr != nil {
+			return framework.HandleWaitingAPIError(waitErr, true, "getting backup created by %s", cronBackupName)
+		}
+		if len(backups) != 0 {
+			bp = backups[0]
+			framework.Logf("The cronBackup %s successfully executed, backup : %s ", cronBackupName, bp.Name)
+			return true, nil
+		}
+		return false, nil
+	})
+	if err == nil {
+		return bp, nil
+	}
+	if framework.IsTimeout(err) && bp != nil {
+		return nil, framework.TimeoutError(fmt.Sprintf("timeout while waiting for backup created by %s to be created", cronBackupName), bp)
+	}
+	return nil, framework.MaybeTimeoutError(err, "waiting for backup created by %s to be created", cronBackupName)
+}
+
 func WaitForRecovery(c *kc.Client, clusterName string, timeout time.Duration) error {
 	return WaitForClusterCondition(c, clusterName, "recovery successful", timeout, func(clu *corev1.Cluster) (bool, error) {
 		if clu.Status.Phase == corev1.ClusterRunning {

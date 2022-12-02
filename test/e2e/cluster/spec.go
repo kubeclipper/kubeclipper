@@ -548,19 +548,18 @@ var _ = SIGDescribe("[Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("wait backup to be created")
-		time.Sleep(1 * time.Minute)
-		bps, err := f.KcClient().ListBackupsCreateByCronBackup(context.TODO(), clusterName)
+		backup, err := cluster.WaitForCronBackupExec(f.KcClient(), clusterName, cronBackupName, 2*time.Minute)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" check if the backup was available ")
-		err = cluster.WaitForBackupAvailable(f.KcClient(), clusterName, bps[0].Name, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForBackupAvailable(f.KcClient(), clusterName, backup.Name, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" delete backup first ")
-		err = f.KcClient().DeleteBackup(context.TODO(), clusterName, bps[0].Name)
+		err = f.KcClient().DeleteBackup(context.TODO(), clusterName, backup.Name)
 		framework.ExpectNoError(err)
 		ginkgo.By("waiting for backup to be deleted")
-		err = cluster.WaitForBackupNotFound(f.KcClient(), clusterName, bps[0].Name, f.Timeouts.CommonTimeout)
+		err = cluster.WaitForBackupNotFound(f.KcClient(), clusterName, backup.Name, f.Timeouts.CommonTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(" delete cronBackup")
