@@ -36,3 +36,7 @@ sysctl --system
 sysctl -p
 swapoff -a
 sed -i /swap/d /etc/fstab`
+
+func GetNodeScript() string {
+	return nodeScript
+}

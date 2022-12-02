@@ -289,3 +289,31 @@ func (n *TemplateList) TablePrint() ([]string, [][]string) {
 	}
 	return headers, data
 }
+
+type CloudProviderList struct {
+	Items      []v1.CloudProvider `json:"items" description:"paging data"`
+	TotalCount int                `json:"totalCount,omitempty" description:"total count"`
+}
+
+func (n *CloudProviderList) JSONPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.JSONPrinter(n.Items[0])
+	}
+	return printer.JSONPrinter(n)
+}
+
+func (n *CloudProviderList) YAMLPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.YAMLPrinter(n.Items[0])
+	}
+	return printer.YAMLPrinter(n)
+}
+
+func (n *CloudProviderList) TablePrint() ([]string, [][]string) {
+	headers := []string{"name", "create_timestamp"}
+	var data [][]string
+	for _, cm := range n.Items {
+		data = append(data, []string{cm.Name, cm.CreationTimestamp.String()})
+	}
+	return headers, data
+}

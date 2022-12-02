@@ -27,7 +27,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/pelletier/go-toml"
@@ -60,11 +59,11 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cl
 	metadata := component.GetExtraMetadata(ctx)
 	runnable.Version = cluster.ContainerRuntime.Version
 	runnable.Offline = metadata.Offline
-	runnable.DataRootDir = strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, cluster.ContainerRuntime.DataRootDir)
+	runnable.DataRootDir = strutil.StringDefaultIfEmpty(ContainerdDefaultConfigDir, cluster.ContainerRuntime.DataRootDir)
 	runnable.LocalRegistry = metadata.LocalRegistry
 	runnable.Registies = cluster.Status.Registries
 
-	runnable.PauseVersion = runnable.matchPauseVersion(metadata.KubeVersion)
+	runnable.PauseVersion = MatchPauseVersion(metadata.KubeVersion)
 	runtimeBytes, err := json.Marshal(runnable)
 	if err != nil {
 		return err
@@ -174,11 +173,11 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 		logger.Debug("remove containerd config dir successfully")
 	}
 	// remove containerd data dir
-	if err = os.RemoveAll(strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, runnable.DataRootDir)); err == nil {
+	if err = os.RemoveAll(strutil.StringDefaultIfEmpty(ContainerdDefaultConfigDir, runnable.DataRootDir)); err == nil {
 		logger.Debug("remove containerd data dir successfully")
 	}
 	// remove containerd config dir
-	if err = os.RemoveAll(containerdDefaultConfigDir); err == nil {
+	if err = os.RemoveAll(ContainerdDefaultConfigDir); err == nil {
 		logger.Debug("remove containerd config dir successfully")
 	}
 	// remove containerd data
@@ -197,17 +196,6 @@ func (runnable *ContainerdRunnable) OnlineUpgrade(ctx context.Context, dryRun bo
 	return nil, fmt.Errorf("ContainerdRunnable not supported onlineUpgrade")
 }
 
-func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) string {
-	if kubeVersion == "" {
-		return ""
-	}
-	kubeVersion = strings.ReplaceAll(kubeVersion, "v", "")
-	kubeVersion = strings.ReplaceAll(kubeVersion, ".", "")
-
-	kubeVersion = strings.Join(strings.Split(kubeVersion, "")[0:3], "")
-	return k8sMatchPauseVersion[kubeVersion]
-}
-
 func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, dryRun bool) error {
 	// local registry not filled and is in online mode, the default repo mirror proxy will be used
 	if !runnable.Offline && runnable.LocalRegistry == "" {
@@ -217,8 +205,8 @@ func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, d
 	if runnable.RegistryConfigDir == "" {
 		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir
 	}
-	cf := filepath.Join(containerdDefaultConfigDir, "config.toml")
-	if err := os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
+	cf := filepath.Join(ContainerdDefaultConfigDir, "config.toml")
+	if err := os.MkdirAll(ContainerdDefaultConfigDir, 0755); err != nil {
 		return err
 	}
 	if err := fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, runnable.renderTo, dryRun); err != nil {
@@ -258,7 +246,7 @@ func (runnable *ContainerdRunnable) disableContainerdService(ctx context.Context
 
 func (runnable *ContainerdRunnable) renderTo(w io.Writer) error {
 	at := tmplutil.New()
-	_, err := at.RenderTo(w, configTomlTemplate, runnable)
+	_, err := at.RenderTo(w, ConfigTomlTemplate, runnable)
 	return err
 }
 
