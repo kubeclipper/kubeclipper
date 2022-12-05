@@ -31,6 +31,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
+
 	"k8s.io/client-go/util/retry"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
@@ -295,7 +297,7 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 				return
 			}
 		}
-		pendingOperation, err := buildPendingOperation(operationType, timeoutSecs, c.ResourceVersion, pn)
+		pendingOperation, err := buildPendingOperation(operationType, buildOperationSponsor(h.genericConfig), timeoutSecs, c.ResourceVersion, pn)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -411,6 +413,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 	op.Status.Status = v1.OperationStatusRunning
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Labels[common.LabelOperationAction] = v1.OperationDeleteCluster
+	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	if !dryRun {
 		c.Status.Phase = v1.ClusterTerminating
 		_, err = h.clusterOperator.UpdateCluster(request.Request.Context(), c)
@@ -534,6 +537,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Labels[common.LabelOperationAction] = v1.OperationCreateCluster
+	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
 		op, err = h.opOperator.CreateOperation(context.TODO(), op)
@@ -703,9 +707,10 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 
 	op.Name = uuid.New().String()
 	op.Labels = map[string]string{
-		common.LabelClusterName:     c.Name,
-		common.LabelTimeoutSeconds:  v1.DefaultOperationTimeoutSecs,
-		common.LabelOperationAction: v1.OperationUpdateCertification,
+		common.LabelClusterName:      c.Name,
+		common.LabelTimeoutSeconds:   v1.DefaultOperationTimeoutSecs,
+		common.LabelOperationAction:  v1.OperationUpdateCertification,
+		common.LabelOperationSponsor: buildOperationSponsor(h.genericConfig),
 	}
 	op.Status.Status = v1.OperationStatusRunning
 	c.Status.Phase = v1.ClusterUpdating
@@ -1072,6 +1077,23 @@ func (h *handler) TerminationOperation(request *restful.Request, response *restf
 		return
 	}
 	if !dryRun {
+		// if the kc-server is not the initiator of the operation, the request is forwarded to the specified service
+		if sponsor := op.Labels[common.LabelOperationSponsor]; sponsor != "" && !strings.Contains(sponsor, h.genericConfig.BindAddress) {
+			headers := make(map[string]string)
+			reqURL := fmt.Sprintf("%s%s", parseOperationSponsor(sponsor), request.Request.RequestURI)
+			headers["Authorization"] = request.Request.Header.Get("Authorization")
+			_, code, err := httputil.CommonRequest(reqURL, "POST", headers, nil, nil)
+			if err != nil {
+				restplus.HandleInternalError(response, request, err)
+				return
+			}
+			if code != http.StatusOK {
+				restplus.HandleInternalError(response, request, errors.New("forwarding request error"))
+				return
+			}
+			_ = response.WriteHeaderAndEntity(http.StatusOK, nil)
+			return
+		}
 		// update the data before broadcasting the message
 		// write termination label
 		op.Labels[common.LabelOperationIntent] = common.OperationIntent
@@ -1584,6 +1606,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 	op.Name = uuid.New().String()
 	op.Labels = make(map[string]string)
 	op.Labels[common.LabelOperationAction] = v1.OperationBackupCluster
+	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = backup.Name
@@ -1674,6 +1697,7 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 	op.Labels = make(map[string]string)
 	op.Labels[common.LabelOperationAction] = v1.OperationDeleteBackup
 	op.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultBackupTimeoutSec)
+	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = b.Name
 	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
@@ -1972,6 +1996,7 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 	o.Labels = make(map[string]string)
 	o.Labels[common.LabelOperationAction] = v1.OperationRecoverCluster
 	o.Labels[common.LabelTimeoutSeconds] = strconv.Itoa(v1.DefaultRecoveryTimeoutSec)
+	o.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	o.Labels[common.LabelClusterName] = c.Name
 	o.Labels[common.LabelRecoveryName] = rName
 	o.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
@@ -2081,6 +2106,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Labels[common.LabelOperationAction] = operationAction
+	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Status.Status = v1.OperationStatusRunning
 
 	if !dryRun {
@@ -2219,6 +2245,7 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 
 	op.Labels[common.LabelTimeoutSeconds] = timeoutSecs
 	op.Labels[common.LabelOperationAction] = v1.OperationUpgradeCluster
+	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Labels[common.LabelUpgradeVersion] = body.Version
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {

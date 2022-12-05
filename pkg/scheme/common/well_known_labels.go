@@ -35,6 +35,7 @@ const (
 	LabelOperationName     = "kubeclipper.io/operation-name"
 	LabelOperationRetry    = "kubeclipper.io/operation-retry-times"
 	LabelOperationIntent   = "kubeclipper.io/operation-intent"
+	LabelOperationSponsor  = "kubeclipper.io/operation-sponsor"
 	LabelTimeoutSeconds    = "kubeclipper.io/timeout"
 	LabelRoleTemplate      = "kubeclipper.io/role-template"
 	LabelHidden            = "kubeclipper.io/hidden"

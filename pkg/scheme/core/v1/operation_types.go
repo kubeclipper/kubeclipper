@@ -173,6 +173,7 @@ type StepStatus struct {
 type PendingOperation struct {
 	OperationID            string `json:"operationID"`
 	OperationType          string `json:"operationType"`
+	OperationSponsor       string `json:"operationSponsor"`
 	Timeout                string `json:"timeout"`
 	ClusterResourceVersion string `json:"clusterResourceVersion"`
 	ExtraData              []byte `json:"extraData,omitempty"`
