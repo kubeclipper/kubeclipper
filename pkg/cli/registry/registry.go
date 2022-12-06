@@ -805,8 +805,9 @@ func (o *RegistryOptions) installRegistry() error {
 
 func (o *RegistryOptions) loadImages() error {
 	// docker load images
-	// find /root/kc/pkg/kc/resource -name images.tar.gz | grep 'x86-64' | awk '{print}' | sed -r 's#(.*)#docker load -i \1#'
-	hook := fmt.Sprintf("find %s/kc/resource -name images*.tar.gz | grep '%s' | awk '{print}' | sed -r 's#(.*)#docker load -i \\1#'", config.DefaultPkgPath, o.Arch)
+	// find /root/kc/pkg/kc/resource -name images.tar.gz | grep -v kc-extension | grep 'x86-64' | awk '{print}' | sed -r 's#(.*)#docker load -i \1#'
+	// TODO: for historical reasons and version stability, kcctl temporarily skips the load of the kc-extension image when deploying a private repository
+	hook := fmt.Sprintf("find %s/kc/resource -name images*.tar.gz ｜ grep -v kc-extension | grep '%s' | awk '{print}' | sed -r 's#(.*)#docker load -i \\1#'", config.DefaultPkgPath, o.Arch)
 	logger.V(3).Info("loadImages hook :", hook)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, hook)
 	if err != nil {
