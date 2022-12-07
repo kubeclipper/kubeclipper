@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +51,7 @@ type ContainerdRunnable struct {
 	LocalRegistry     string `json:"localRegistry"`
 	KubeVersion       string `json:"kubeVersion"`
 	PauseVersion      string `json:"pauseVersion"`
+	PauseRegistry     string `json:"pauseRegistry"`
 
 	installSteps   []v1.Step
 	uninstallSteps []v1.Step
@@ -64,7 +66,7 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cl
 	runnable.LocalRegistry = metadata.LocalRegistry
 	runnable.Registies = cluster.Status.Registries
 
-	runnable.PauseVersion = runnable.matchPauseVersion(metadata.KubeVersion)
+	runnable.PauseVersion, runnable.PauseRegistry = runnable.matchPauseVersion(metadata.KubeVersion)
 	runtimeBytes, err := json.Marshal(runnable)
 	if err != nil {
 		return err
@@ -197,15 +199,20 @@ func (runnable *ContainerdRunnable) OnlineUpgrade(ctx context.Context, dryRun bo
 	return nil, fmt.Errorf("ContainerdRunnable not supported onlineUpgrade")
 }
 
-func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) string {
+func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) (string, string) {
+	registry := "k8s.gcr.io"
 	if kubeVersion == "" {
-		return ""
+		return "", registry
 	}
 	kubeVersion = strings.ReplaceAll(kubeVersion, "v", "")
 	kubeVersion = strings.ReplaceAll(kubeVersion, ".", "")
 
 	kubeVersion = strings.Join(strings.Split(kubeVersion, "")[0:3], "")
-	return k8sMatchPauseVersion[kubeVersion]
+
+	if v, _ := strconv.Atoi(kubeVersion); v >= 125 {
+		registry = "registry.k8s.io"
+	}
+	return k8sMatchPauseVersion[kubeVersion], registry
 }
 
 func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, dryRun bool) error {

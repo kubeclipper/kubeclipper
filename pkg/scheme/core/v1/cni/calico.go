@@ -206,6 +206,8 @@ func (runnable *CalicoRunnable) CalicoTemplate() (string, error) {
 		return calicoV3212, nil
 	case "v3.22.4":
 		return calicoV3224, nil
+	case "v3.24.5":
+		return calicoV3245, nil
 	}
 	return "", fmt.Errorf("calico dose not support version: %s", runnable.Version)
 }
