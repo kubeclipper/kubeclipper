@@ -108,7 +108,7 @@ func (c *ClusterUpgradeOpts) Validates() error {
 		return err
 	}
 	if c.Version <= clu.KubernetesVersion {
-		return fmt.Errorf("your current version [%s] <= the version [%s] you specify", clu.KubernetesVersion, c.Version)
+		return fmt.Errorf("your current version [%s] is lower than the version [%s] you specify", clu.KubernetesVersion, c.Version)
 	}
 
 	return c.checkVersionSpan(&clu)
@@ -185,7 +185,7 @@ func (c *ClusterUpgradeOpts) checkVersionExist() error {
 func (c *ClusterUpgradeOpts) checkVersionSpan(clu *corev1.Cluster) error {
 	currentVersion := strings.Split(clu.KubernetesVersion[1:], ".")
 	targetVersion := strings.Split(c.Version[1:], ".")
-	for index := 0; index < len(targetVersion); index++ {
+	for index := 0; index < len(targetVersion)-1; index++ {
 		a, err := strconv.Atoi(targetVersion[index])
 		if err != nil {
 			return err
