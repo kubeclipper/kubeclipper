@@ -873,6 +873,9 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 			shellCommand = append(shellCommand, v1.Command{
 				Type:         v1.CommandShell,
 				ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl taint node %s node-role.kubernetes.io/master- || true", hostname)},
+			}, v1.Command{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl taint node %s node-role.kubernetes.io/control-plane- || true", hostname)},
 			})
 		} else {
 			for _, t := range v.Taints {

@@ -86,6 +86,7 @@ var k8sMatchPauseVersion = map[string]string{
 	"122": "3.5",
 	"123": "3.6",
 	"124": "3.7",
+	"125": "3.8",
 }
 
 var _ component.StepRunnable = (*ContainerdRunnable)(nil)
