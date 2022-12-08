@@ -447,7 +447,7 @@ var _ = SIGDescribe("[Serial]", func() {
 
 		framework.ExpectNoError(err)
 		ginkgo.By("wait cloud provider import cluster")
-		err = waitCloudProvider(f, provider.Name)
+		err = cluster.WaitForCloudProviderSync(f.KcClient(), provider.Name, 5*time.Minute)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("describe cloud provider")
@@ -471,7 +471,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		_, err = f.KcClient().UpdateCloudProvider(context.TODO(), &cp)
 		framework.ExpectNoError(err)
 		ginkgo.By("wait cloud provider sync and update cluster")
-		err = waitCloudProvider(f, cp.Name)
+		err = cluster.WaitForCloudProviderSync(f.KcClient(), provider.Name, 5*time.Minute)
 		framework.ExpectNoError(err)
 	})
 

@@ -19,6 +19,8 @@ type clusterCondition func(clu *corev1.Cluster) (bool, error)
 
 type backupCondition func(backup *corev1.Backup) (bool, error)
 
+type cloudProviderCondition func(cloudProvider *corev1.CloudProvider) (bool, error)
+
 // WaitForClusterCondition waits a cluster to be matched to the given condition.
 func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, timeout time.Duration, condition clusterCondition) error {
 	framework.Logf("Waiting up to %v for cluster %q to be %q", timeout, clusterName, conditionDesc)
@@ -90,6 +92,48 @@ func WaitForBackupCondition(c *kc.Client, clusterName, backupName, conditionDesc
 		return framework.TimeoutError(fmt.Sprintf("timed out while waiting for backup %s to be %s", backupName, conditionDesc), bp)
 	}
 	return framework.MaybeTimeoutError(err, "waiting for backup %s to be %s", backupName, conditionDesc)
+}
+
+func WaitForCloudProviderCondition(c *kc.Client, cloudProviderName, conditionDesc string, timeout time.Duration, condition cloudProviderCondition) error {
+	framework.Logf("Waiting up to %v for cloud provider %q to be %q", timeout, cloudProviderName, conditionDesc)
+	var (
+		lastCloudProviderError error
+		lastCloudProvider      *corev1.CloudProvider
+		start                  = time.Now()
+	)
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		cp, err := c.DescribeCloudProvider(context.TODO(), cloudProviderName)
+		lastCloudProviderError = err
+		if err != nil || len(cp.Items) == 0 {
+			return framework.HandleWaitingAPIError(err, true, "getting Cloud Provider %s", cloudProviderName)
+		}
+		lastCloudProvider = cp.Items[0].DeepCopy()
+		framework.Logf("Cloud Provider %q: Phase=%v, Elapsed: %v",
+			cloudProviderName, lastCloudProvider.Status.Conditions, time.Since(start))
+
+		if done, err := condition(lastCloudProvider); done {
+			if err == nil {
+				framework.Logf("cloud provider %q satisfied condition %q", cloudProviderName, conditionDesc)
+			}
+			return true, err
+		} else if err != nil {
+			framework.Logf("Error evaluating cloud provider condition %s: %v", conditionDesc, err)
+		}
+		return false, nil
+	})
+	if err == nil {
+		return nil
+	}
+	if framework.IsTimeout(err) && lastCloudProvider != nil {
+		return framework.TimeoutError(fmt.Sprintf("timed out while waiting for cloud provider %s to be %s", cloudProviderName, conditionDesc),
+			lastCloudProvider,
+		)
+	}
+	if lastCloudProviderError != nil {
+		// If the last API call was an error.
+		err = lastCloudProviderError
+	}
+	return framework.MaybeTimeoutError(err, "waiting for cloud provider %s to be %s", cloudProviderName, conditionDesc)
 }
 
 func WaitForClusterRunning(c *kc.Client, clusterName string, timeout time.Duration) error {
@@ -292,4 +336,37 @@ func WaitForJoinNode(c *kc.Client, nodeIP string, timeout time.Duration) error {
 		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for node %s to be join", nodeIP), node)
 	}
 	return framework.MaybeTimeoutError(err, "waiting for node %s join", nodeIP)
+}
+
+func WaitForCloudProviderSync(c *kc.Client, cloudProviderName string, timeout time.Duration) error {
+	return WaitForCloudProviderCondition(c, cloudProviderName, "cloud provider sync cluster successful", timeout, func(cloudProvider *corev1.CloudProvider) (bool, error) {
+		for _, cond := range cloudProvider.Status.Conditions {
+			if cond.Reason == corev1.CloudProviderSyncSucceed {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+func WaitForCloudProviderNotFound(c *kc.Client, cloudProviderName string, timeout time.Duration) error {
+	cp := &corev1.CloudProvider{}
+	err := wait.PollImmediate(framework.Poll, timeout, func() (done bool, err error) {
+		providers, cpErr := c.DescribeCloudProvider(context.TODO(), cloudProviderName)
+		if cpErr == nil {
+			_, err := c.DescribeCluster(context.TODO(), providers.Items[0].ClusterName)
+			if err != nil && c.NotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return c.NotFound(cpErr), nil
+	})
+	if err == nil {
+		return nil
+	}
+	if framework.IsTimeout(err) && cp != nil {
+		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for cloud provider %s to be Not Found", cloudProviderName), cp)
+	}
+	return framework.MaybeTimeoutError(err, "waiting for cloud provider %s not found", cloudProviderName)
 }

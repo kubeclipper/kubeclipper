@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
 	"net/url"
 	"os"
 	"strings"
@@ -366,49 +367,6 @@ func enableKcAgent(f *framework.Framework, ec *e2eCluster, enable bool) error {
 	return nil
 }
 
-func waitCloudProvider(f *framework.Framework, providerName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(3 * time.Second):
-			list, err := f.KcClient().DescribeCloudProvider(ctx, providerName)
-			if err == nil {
-				for _, cond := range list.Items[0].Status.Conditions {
-					if cond.Reason == corev1.CloudProviderSyncSucceed {
-						return nil
-					}
-				}
-			}
-		}
-	}
-}
-
-func waitRemoveCloudProvider(f *framework.Framework, providerName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(3 * time.Second):
-			providers, err := f.KcClient().DescribeCloudProvider(ctx, providerName)
-			if err == nil {
-				_, err := f.KcClient().DescribeCluster(ctx, providers.Items[0].ClusterName)
-				if err != nil && f.KcClient().NotFound(err) {
-					return nil
-				}
-				break
-			}
-			if f.KcClient().NotFound(err) {
-				return nil
-			}
-		}
-	}
-}
-
 func recoveryNode(ec *e2eCluster) {
 	ginkgo.By("The cloud cluster e2e test test is over. Tail work being processed")
 	errs := ""
@@ -436,16 +394,10 @@ func removeCloudProvider(f *framework.Framework, providerName, clusterName strin
 		errs = fmt.Sprintf("delete cloud provider err: %v.", err)
 	}
 	ginkgo.By("wait cloud provider remove")
-	err = waitRemoveCloudProvider(f, providerName)
+	err = cluster.WaitForCloudProviderNotFound(f.KcClient(), providerName, 5*time.Minute)
 	if err != nil && !f.KcClient().NotFound(err) {
 		errs = fmt.Sprintf("describe cloud provider err: %v.", err)
 	}
-
-	//clusterList, err := f.KcClient().DescribeCluster(context.TODO(), clusterName)
-	//if err != nil && !f.KcClient().NotFound(err) {
-	//	errs = fmt.Sprintf("delete cluster %s err: %v.", clusterName, err)
-	//}
-	//nodeID := clusterList.Items[0].Masters.GetNodeIDs()[0]
 
 	queryString := url.Values{}
 	queryString.Set(query.ParameterForce, "true")
@@ -453,11 +405,6 @@ func removeCloudProvider(f *framework.Framework, providerName, clusterName strin
 	if err != nil && !f.KcClient().NotFound(err) {
 		errs = fmt.Sprintf("delete cluster %s err: %v.", clusterName, err)
 	}
-	//
-	//err = f.KcClient().DeleteNode(context.TODO(), nodeID)
-	//if err != nil && !f.KcClient().NotFound(err) {
-	//	errs = fmt.Sprintf("delete node %s err: %v.", nodeID, err)
-	//}
 
 	if errs != "" {
 		framework.ExpectNoError(fmt.Errorf("%s", errs))
