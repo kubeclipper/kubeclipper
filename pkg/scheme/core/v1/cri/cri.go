@@ -20,6 +20,7 @@ package cri
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -65,7 +66,7 @@ const (
 	dockerDefaultCriDir = "/etc/containerd"
 
 	// containerdDefaultVersion    = "1.6.4"
-	containerdDefaultConfigDir         = "/etc/containerd"
+	ContainerdDefaultConfigDir         = "/etc/containerd"
 	ContainerdDefaultRegistryConfigDir = "/etc/containerd/certs.d"
 	// containerdDefaultSystemdDir = "/etc/systemd/system"
 	containerdDefaultDataDir = "/var/lib/containerd"
@@ -96,4 +97,16 @@ type Base struct {
 	Offline     bool              `json:"offline"`
 	DataRootDir string            `json:"rootDir"`
 	Registies   []v1.RegistrySpec `json:"registry,omitempty"`
+}
+
+// MatchPauseVersion match pause images version
+func MatchPauseVersion(kubeVersion string) string {
+	if kubeVersion == "" {
+		return ""
+	}
+	kubeVersion = strings.ReplaceAll(kubeVersion, "v", "")
+	kubeVersion = strings.ReplaceAll(kubeVersion, ".", "")
+
+	kubeVersion = strings.Join(strings.Split(kubeVersion, "")[0:3], "")
+	return k8sMatchPauseVersion[kubeVersion]
 }

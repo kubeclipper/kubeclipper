@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models"
 
@@ -52,12 +53,19 @@ const (
 	versionPath          = "/version"
 	componentMetaPath    = "/api/config.kubeclipper.io/v1/componentmeta"
 	configmapPath        = "/api/core.kubeclipper.io/v1/configmaps"
-	projectPath          = "/api/tenant.kubeclipper.io/v1/projects"
 	templatePath         = "/api/core.kubeclipper.io/v1/templates"
 	registryPath         = "/api/core.kubeclipper.io/v1/registries"
 	regionPath           = "/api/core.kubeclipper.io/v1/regions"
 	OperationPath        = "/api/core.kubeclipper.io/v1/operations"
+	cloudProviderPath    = "/api/core.kubeclipper.io/v1/cloudproviders"
 )
+
+func (cli *Client) NotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "not found") || strings.Contains(strings.ToLower(err.Error()), "notfound")
+}
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
 	serverResp, err := cli.get(ctx, ListNodesPath, query.ToRawQuery(), nil)
@@ -381,8 +389,8 @@ func (cli *Client) GetComponentMeta(ctx context.Context, query url.Values) (*Com
 }
 
 func (cli *Client) InstallOrUninstallComponent(ctx context.Context, cluName string, component *corev1.PatchComponents) (*ClustersList, error) {
-	url := fmt.Sprintf(componentPath, cluName)
-	resp, err := cli.patch(ctx, url, nil, component, nil)
+	urlPath := fmt.Sprintf(componentPath, cluName)
+	resp, err := cli.patch(ctx, urlPath, nil, component, nil)
 	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
@@ -724,7 +732,65 @@ func (cli *Client) ListLoginRecords(ctx context.Context, name string, query Quer
 		return nil, err
 	}
 	var resp models.PageableResponse
-
 	err = json.NewDecoder(serverResp.body).Decode(&resp)
 	return &resp, err
+}
+
+func (cli *Client) CreateCloudProvider(ctx context.Context, provider *v1.CloudProvider) (*CloudProviderList, error) {
+	serverResp, err := cli.post(ctx, cloudProviderPath, nil, provider, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.CloudProvider{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	list := CloudProviderList{
+		Items: []v1.CloudProvider{v},
+	}
+	return &list, err
+}
+
+func (cli *Client) DeleteCloudProvider(ctx context.Context, name string) error {
+	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", cloudProviderPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
+}
+
+func (cli *Client) UpdateCloudProvider(ctx context.Context, provider *v1.CloudProvider) (*CloudProviderList, error) {
+	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", cloudProviderPath, provider.Name), nil, provider, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.CloudProvider{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	list := CloudProviderList{
+		Items: []v1.CloudProvider{v},
+	}
+	return &list, err
+}
+
+func (cli *Client) ListCloudProvider(ctx context.Context, query Queries) (*CloudProviderList, error) {
+	serverResp, err := cli.get(ctx, cloudProviderPath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	list := CloudProviderList{}
+	err = json.NewDecoder(serverResp.body).Decode(&list)
+	return &list, err
+}
+
+func (cli *Client) DescribeCloudProvider(ctx context.Context, name string) (*CloudProviderList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", cloudProviderPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	v := v1.CloudProvider{}
+	err = json.NewDecoder(serverResp.body).Decode(&v)
+	list := CloudProviderList{
+		Items: []v1.CloudProvider{v},
+	}
+	return &list, err
 }

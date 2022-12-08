@@ -8825,7 +8825,7 @@ metadata:
 
 // apiVersion: policy/v1beta1 => apiVersion: policy/v1
 // https://projectcalico.docs.tigera.io/archive/v3.22/manifests/calico.yaml
-const calicoV3224 = `---
+const CalicoV3224 = `---
 kind: ConfigMap
 apiVersion: v1
 metadata:

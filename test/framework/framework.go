@@ -52,7 +52,6 @@ func NewFramework(baseName string) *Framework {
 		Timeouts: NewTimeoutContextWithDefaults(),
 		Context:  &TestContext,
 	}
-
 	// f.AddAfterEach("dumpLogs", func(f *Framework, failed bool) {
 	//	if !failed {
 	//		return
@@ -62,7 +61,6 @@ func NewFramework(baseName string) *Framework {
 	//	}
 	//	// TODO: dump logs
 	// })
-
 	ginkgo.BeforeEach(f.BeforeEach)
 	ginkgo.AfterEach(f.AfterEach)
 

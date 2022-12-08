@@ -7,17 +7,16 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-
-	"github.com/onsi/ginkgo"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	apiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
+	"github.com/onsi/ginkgo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = SIGDescribe("[Serial]", func() {
@@ -419,6 +418,62 @@ var _ = SIGDescribe("[Serial]", func() {
 
 		ginkgo.By("wait cluster upgrade")
 		err = cluster.WaitForUpgrade(f.KcClient(), clusterName, f.Timeouts.ClusterInstall)
+		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("[Slow] [AIO] [CloudProvider] cloud provider", func() {
+		ginkgo.By("Create external kubeadm  cluster")
+		ec, err := initE2ECluster(context.TODO(), f)
+		framework.ExpectNoError(err)
+		defer func() {
+			recoveryNode(ec)
+		}()
+		ginkgo.By(fmt.Sprintf("stopping %s kc-agent service", ec.NodeIP))
+		err = enableKcAgent(f, ec, false)
+		framework.ExpectNoError(err)
+		ginkgo.By(fmt.Sprintf("install cluster to %s node", ec.NodeIP))
+		err = installAIOCluster(ec)
+		framework.ExpectNoError(err)
+		ginkgo.By("Create external kubeadm cluster successfully")
+
+		ginkgo.By("init cloud provider")
+		clusterName := "e2e-kubeadm-provider-cluster"
+		provider, err := initCloudProvider(ec, clusterName)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("create cloud provider")
+		_, err = f.KcClient().CreateCloudProvider(context.TODO(), provider)
+		defer func() {
+			removeCloudProvider(f, provider.Name, clusterName)
+		}()
+
+		framework.ExpectNoError(err)
+		ginkgo.By("wait cloud provider import cluster")
+		err = cluster.WaitForCloudProviderSync(f.KcClient(), provider.Name, 5*time.Minute)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("describe cloud provider")
+		_, err = f.KcClient().DescribeCloudProvider(context.TODO(), provider.Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("list cloud provider")
+		list, err := f.KcClient().ListCloudProvider(context.TODO(), kc.Queries(*query.New()))
+		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(list.TotalCount, 0, "cloud-provider query result should not be empty")
+
+		ginkgo.By("sync and update cloud provider")
+		cp := list.Items[0]
+		conditionReady := cloudprovidercontroller.NewCondition(corev1.CloudProviderReady, corev1.ConditionFalse, corev1.CloudProviderSyncing, "user triggered sync")
+		cloudprovidercontroller.SetCondition(&cp.Status, *conditionReady)
+		// update annotation to trigger sync
+		if cp.Annotations == nil {
+			cp.Annotations = make(map[string]string)
+		}
+		cp.Annotations[common.AnnotationProviderSyncTime] = time.Now().Format(time.RFC3339)
+		_, err = f.KcClient().UpdateCloudProvider(context.TODO(), &cp)
+		framework.ExpectNoError(err)
+		ginkgo.By("wait cloud provider sync and update cluster")
+		err = cluster.WaitForCloudProviderSync(f.KcClient(), provider.Name, 5*time.Minute)
 		framework.ExpectNoError(err)
 	})
 

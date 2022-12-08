@@ -42,7 +42,7 @@ const daemonConfigTemplate = `{
 `
 
 // not implement Registry TLS
-const configTomlTemplate = `disabled_plugins = []
+const ConfigTomlTemplate = `disabled_plugins = []
 imports = []
 oom_score = 0
 plugin_dir = ""
