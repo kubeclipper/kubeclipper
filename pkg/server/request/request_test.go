@@ -214,3 +214,29 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 		})
 	}
 }
+
+func Test_splitPath(t *testing.T) {
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			name: "url is not empty",
+			args: args{
+				path: "baidu.com/login",
+			},
+			want: []string{"baidu.com", "login"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := splitPath(tt.args.path); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("splitPath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
