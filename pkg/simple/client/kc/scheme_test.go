@@ -1014,7 +1014,7 @@ func TestTemplateList_TablePrint(t *testing.T) {
 		want1  [][]string
 	}{
 		{
-			name: "base",
+			name: "base test",
 			fields: fields{
 				Items: []corev1.Template{
 					{
