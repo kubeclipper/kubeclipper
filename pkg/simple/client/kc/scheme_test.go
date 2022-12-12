@@ -8,8 +8,9 @@ import (
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 
-	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 func TestNodesList_JSONPrint(t *testing.T) {
