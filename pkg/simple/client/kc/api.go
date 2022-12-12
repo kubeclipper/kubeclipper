@@ -150,7 +150,7 @@ func (cli *Client) DescribeCluster(ctx context.Context, name string) (*ClustersL
 }
 
 func (cli *Client) DescribeClusterInProject(ctx context.Context, projectName, clusterName string) (*ClustersList, error) {
-	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/cluster/%s", clusterInProjectPath, projectName, clusterName), nil, nil)
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/clusters/%s", clusterInProjectPath, projectName, clusterName), nil, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -449,7 +449,7 @@ func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCl
 }
 
 func (cli *Client) UpgradeClusterInProject(ctx context.Context, proName, cluName string, upgradeCluster *corev1.ClusterUpgrade) error {
-	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/cluster/%s/upgrade", clusterInProjectPath, proName, cluName), nil, upgradeCluster, nil)
+	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/clusters/%s/upgrade", clusterInProjectPath, proName, cluName), nil, upgradeCluster, nil)
 	defer ensureReaderClosed(resp)
 	return err
 }
