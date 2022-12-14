@@ -50,9 +50,25 @@
 </details>
 
 <details>
+  <summary><b>🎈 Cluster hosting</b></summary>
+  <ul>
+  <li>kubeadm Cluster hosting</li>
+  <li>Cluster plug-in installation/uninstallation</li>
+  <li>Real-time logs during cluster operations</li>
+  <li>Access to cluster kubectl web console</li>
+  <li>Edit clusters (metadata, etc.)</li>
+  <li>Adding / removing cluster nodes</li>
+  <li>Cluster backup and restore, scheduled backups</li>
+  <li>Cluster backup space management</li>
+  <li>Remove cluster from kubeclipper</li>
+  </ul>
+</details>
+
+<details>
   <summary><b>☸️ Cluster Management</b></summary>
   <ul>
     <li>Multi-region, multi-cluster management</li>
+    <li>Cluster plug-in installation/uninstallation</li>
     <li>Access to cluster kubectl web console</li>
     <li>Real-time logs during cluster operations</li>
     <li>Edit clusters (metadata, etc.)</li>
@@ -62,7 +78,7 @@
     <li>Cluster backup and restore, scheduled backups</li>
     <li>Cluster version upgrade</li>
     <li>Save entire cluster / individual plugins as templates</li>
-    <li>Cluster backup storage management</li>
+    <li>Cluster backup space management</li>
   </ul>
 </details>
 
