@@ -177,7 +177,7 @@ func (c *ClusterUpgradeOpts) checkVersionExist() error {
 		}
 	}
 	if !versions.Has(c.Version) {
-		return fmt.Errorf("version [%s] you specify does not exist", c.Version)
+		return fmt.Errorf("version [%s] you specify is not avalible", c.Version)
 	}
 	return nil
 }
