@@ -19,157 +19,167 @@
 package nfsprovisioner
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRenderTo(t *testing.T) {
-	// TODO: test failed
+	expected := `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-client-provisioner
+  namespace: kube-system
 
-	/*expected := `
-	---
-	apiVersion: v1
-	kind: Namespace
-	metadata:
-	  name: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nfs-client-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
 
-	---
-	apiVersion: v1
-	kind: ServiceAccount
-	metadata:
-	  name: nfs-client-provisioner
-	  namespace: kube-system
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-nfs-client-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: nfs-client-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
 
-	---
-	kind: ClusterRole
-	apiVersion: rbac.authorization.k8s.io/v1
-	metadata:
-	  name: nfs-client-provisioner-runner
-	rules:
-	  - apiGroups: [""]
-	    resources: ["nodes"]
-	    verbs: ["get", "list", "watch"]
-	  - apiGroups: [""]
-	    resources: ["persistentvolumes"]
-	    verbs: ["get", "list", "watch", "create", "delete"]
-	  - apiGroups: [""]
-	    resources: ["persistentvolumeclaims"]
-	    verbs: ["get", "list", "watch", "update"]
-	  - apiGroups: ["storage.k8s.io"]
-	    resources: ["storageclasses"]
-	    verbs: ["get", "list", "watch"]
-	  - apiGroups: [""]
-	    resources: ["events"]
-	    verbs: ["create", "update", "patch"]
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
 
-	---
-	kind: ClusterRoleBinding
-	apiVersion: rbac.authorization.k8s.io/v1
-	metadata:
-	  name: run-nfs-client-provisioner
-	subjects:
-	  - kind: ServiceAccount
-	    name: nfs-client-provisioner
-	    namespace: kube-system
-	roleRef:
-	  kind: ClusterRole
-	  name: nfs-client-provisioner-runner
-	  apiGroup: rbac.authorization.k8s.io
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-client-provisioner
+  apiGroup: rbac.authorization.k8s.io
 
-	---
-	kind: Role
-	apiVersion: rbac.authorization.k8s.io/v1
-	metadata:
-	  name: leader-locking-nfs-client-provisioner
-	  namespace: kube-system
-	rules:
-	  - apiGroups: [""]
-	    resources: ["endpoints"]
-	    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner-nfs-sc
+  labels:
+    app: nfs-client-provisioner-nfs-sc
+  namespace: kube-system
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner-nfs-sc
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner-nfs-sc
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: In
+                values:
+                - ""
+      containers:
+        - name: nfs-client-provisioner
+          image: 192.168.1.1:5000/caas4/nfs-subdir-external-provisioner:v4.0.2
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: k8s-sigs.io/nfs-subdir-external-provisioner-nfs-sc
+            - name: NFS_SERVER
+              value: 192.168.1.2
+            - name: NFS_PATH
+              value: /nfs/data
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: 192.168.1.2
+            path: /nfs/data
 
-	---
-	kind: RoleBinding
-	apiVersion: rbac.authorization.k8s.io/v1
-	metadata:
-	  name: leader-locking-nfs-client-provisioner
-	  namespace: kube-system
-	subjects:
-	  - kind: ServiceAccount
-	    name: nfs-client-provisioner
-	    namespace: kube-system
-	roleRef:
-	  kind: Role
-	  name: leader-locking-nfs-client-provisioner
-	  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+parameters:
+  archiveOnDelete: "false"
+reclaimPolicy: ""
+mountOptions:
+  - nfsvers=3
+  - time=60
+provisioner: k8s-sigs.io/nfs-subdir-external-provisioner-nfs-sc
+`
 
-	---
-	apiVersion: apps/v1
-	kind: Deployment
-	metadata:
-	  name: nfs-client-provisioner
-	  labels:
-	    app: nfs-client-provisioner
-	  namespace: kube-system
-	spec:
-	  replicas: 1
-	  strategy:
-	    type: Recreate
-	  selector:
-	    matchLabels:
-	      app: nfs-client-provisioner
-	  template:
-	    metadata:
-	      labels:
-	        app: nfs-client-provisioner
-	    spec:
-	      serviceAccountName: nfs-client-provisioner
-	      containers:
-	        - name: nfs-client-provisioner
-	          image: 192.168.1.1:5000/caas4/nfs-subdir-external-provisioner:v4.0.2
-	          volumeMounts:
-	            - name: nfs-client-root
-	              mountPath: /persistentvolumes
-	          env:
-	            - name: PROVISIONER_NAME
-	              value: k8s-sigs.io/nfs-subdir-external-provisioner
-	            - name: NFS_SERVER
-	              value: 192.168.1.2
-	            - name: NFS_PATH
-	              value: /nfs/data
-	      volumes:
-	        - name: nfs-client-root
-	          nfs:
-	            server: 192.168.1.2
-	            path: /nfs/data
+	np := &NFSProvisioner{
+		Namespace:  namespace,
+		ServerAddr: "192.168.1.2",
+		SharedPath: "/nfs/data",
 
-	---
-	apiVersion: storage.k8s.io/v1
-	kind: StorageClass
-	metadata:
-	  name: nfs-sc
-	  annotations:
-	    storageclass.kubernetes.io/is-default-class: "true"
-	parameters:
-	  archiveOnDelete: "false"
-	mountOptions:
-	  - nfsvers=3
-	  - time=60
-	provisioner: k8s-sigs.io/nfs-subdir-external-provisioner
-	`
-
-		np := &NFSProvisioner{
-			Namespace:  namespace,
-			ServerAddr: "192.168.1.2",
-			SharedPath: "/nfs/data",
-
-			StorageClassName:  "nfs-sc",
-			IsDefault:         true,
-			ArchiveOnDelete:   false,
-			MountOptions:      []string{"nfsvers=3", "time=60"},
-			ImageRegistryAddr: "192.168.1.1:5000",
-		}
-		sb := &strings.Builder{}
-		if err := np.renderTo(sb); err != nil {
-			assert.FailNow(t, "template renderring failed, err: %v", err)
-		}
-		assert.Equal(t, expected, sb.String())*/
+		StorageClassName: "nfs-sc",
+		IsDefault:        true,
+		ArchiveOnDelete:  false,
+		MountOptions:     []string{"nfsvers=3", "time=60"},
+		ImageRepoMirror:  "192.168.1.1:5000",
+	}
+	sb := &strings.Builder{}
+	if err := np.renderTo(sb); err != nil {
+		assert.FailNow(t, "template renderring failed, err: %v", err)
+	}
+	if !assert.Equal(t, expected, sb.String()) {
+		t.Errorf("expected is not the same as actual")
+	}
 }
