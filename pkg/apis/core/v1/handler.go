@@ -3331,12 +3331,26 @@ func (h *handler) CreateBackupPoint(request *restful.Request, response *restful.
 func (h *handler) DeleteBackupPoint(request *restful.Request, response *restful.Response) {
 	name := request.PathParameter(query.ParameterName)
 	q := query.ParseQueryParameter(request)
+	clusters, err := h.clusterOperator.ListClusters(request.Request.Context(), &query.Query{
+		Pagination:      query.NoPagination(),
+		ResourceVersion: "0",
+		LabelSelector:   common.LabelBackupPoint,
+		FieldSelector:   "",
+	})
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if clus := h.checkBackupPointInUseByCluster(clusters, name); len(clus) > 0 {
+		restplus.HandleInternalError(response, request, fmt.Errorf("backup point is in use by clusters %v, please update cluster first", clus))
+		return
+	}
 	backups, err := h.clusterOperator.ListBackups(request.Request.Context(), q)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	if ok := h.checkBackupPointInUse(backups, name); ok {
+	if ok := h.checkBackupPointInUseByBackup(backups, name); ok {
 		restplus.HandleInternalError(response, request, errors.New("backup point is in use, please delete backup first"))
 		return
 	}

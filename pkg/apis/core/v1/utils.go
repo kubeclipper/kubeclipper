@@ -344,13 +344,24 @@ func (h *handler) parseUpdateCertOperation(clu *v1.Cluster, extraMetadata *compo
 	return op, nil
 }
 
-func (h *handler) checkBackupPointInUse(backups *v1.BackupList, name string) bool {
+func (h *handler) checkBackupPointInUseByBackup(backups *v1.BackupList, name string) bool {
 	for _, item := range backups.Items {
 		if item.BackupPointName == name {
 			return true
 		}
 	}
 	return false
+}
+
+func (h *handler) checkBackupPointInUseByCluster(clusters *v1.ClusterList, name string) []string {
+	var clus []string
+	for _, item := range clusters.Items {
+		if item.Labels[common.LabelBackupPoint] == name {
+			clus = append(clus, item.Name)
+			return clus
+		}
+	}
+	return clus
 }
 
 func MarkToOriginNode(ctx context.Context, operator cluster.Operator, kcNodeID string) (*v1.Node, error) {
