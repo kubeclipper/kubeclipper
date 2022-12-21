@@ -402,3 +402,39 @@ func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDi
 		return nil
 	}
 }
+
+func SendPackageLocal(location string, dstDir string, after *string) error {
+	location, _, err := downloadFile(location)
+	if err != nil {
+		return errors.Wrap(err, "downloadFile")
+	}
+
+	mkDstDir := fmt.Sprintf("mkdir -p %s || true", dstDir)
+	if err = sshutils.Cmd("/bin/sh", "-c", mkDstDir); err != nil {
+		return err
+	}
+
+	fullPath := fmt.Sprintf("%s/%s", dstDir, path.Base(location))
+	// remove if exist
+	rm := fmt.Sprintf("rm -rf %s || true", fullPath)
+	if err = sshutils.Cmd("/bin/sh", "-c", rm); err != nil {
+		return err
+	}
+	// move to dst
+	cp := fmt.Sprintf("cp %s %s", location, fullPath)
+	if err = sshutils.Cmd("/bin/sh", "-c", cp); err != nil {
+		return err
+	}
+
+	if after != nil {
+		ret, err := sshutils.RunCmdAsSSH(*after)
+		if err != nil {
+			return err
+		}
+		if err = ret.Error(); err != nil {
+			return errors.WithMessage(err, "run after hook")
+		}
+	}
+
+	return nil
+}
