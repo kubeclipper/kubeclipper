@@ -22,11 +22,14 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"math"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -669,8 +672,53 @@ func (d *DeployOptions) deployKcServer() {
 		if err = ret.Error(); err != nil {
 			logger.Fatalf("[%s]deploy kc server failed due to %s", host, err.Error())
 		}
-		// TODO: check server healthz endpoint instead of time sleep
-		time.Sleep(1 * time.Second)
+
+		// wait kc-server start
+		ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
+		defer cancel()
+		err = retryFunc(ctx, 3*time.Second, "waitServiceRunning", host, d.waitServerRunning)
+		if err != nil {
+			logger.Fatalf("kc server status is not ready: %s", err.Error())
+		}
+	}
+}
+
+func (d *DeployOptions) waitServerRunning(host string) error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+
+	addr := fmt.Sprintf("http:%s:%v/healthz", host, d.deployConfig.ServerPort)
+	resp, err := client.Get(addr)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if string(body) == "ok" {
+		return nil
+	}
+
+	return fmt.Errorf("%s kc server status is unhealth", host)
+}
+
+func retryFunc(ctx context.Context, intervalTime time.Duration, funcName, host string, fn func(host string) error) error {
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Warnf("retry function '%s' timeout...", funcName)
+			return ctx.Err()
+		case <-time.After(intervalTime):
+			err := fn(host)
+			if err == nil {
+				return nil
+			}
+			logger.Infof("function '%s' running error: %s. about to enter retry", funcName, err.Error())
+		}
 	}
 }
 
