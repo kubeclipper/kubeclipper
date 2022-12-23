@@ -9,12 +9,12 @@ pip3 install gabbi
 ## 2. 运行
 
 ```bash
-ls test/api/*.yaml | xargs gabbi-run 139.196.13.9:28300 --
-ls test/api/*.yaml | xargs gabbi-run localhost:28300 --
+find test/api -name '*.yaml' | xargs gabbi-run 139.196.13.9 --
+find test/api -name '*.yaml' | xargs gabbi-run localhost --
 
 # show verbose
-gabbi-run -v all 139.196.13.9:28300 -- test/api/*.yaml
-gabbi-run -v all localhost:28300 -- test/api/*.yaml
+gabbi-run -v all 139.196.13.9 -- test/api/*.yaml
+gabbi-run -v all localhost -- test/api/*.yaml
 ```
 
 ## 3. 覆盖率
@@ -23,3 +23,4 @@ gabbi-run -v all localhost:28300 -- test/api/*.yaml
 
 [创建集群](./create_get_cluster.yaml)
 [查看集群列表](./create_get_cluster.yaml)
+[集群添加节点和移除节点](./add_remove_node/)
