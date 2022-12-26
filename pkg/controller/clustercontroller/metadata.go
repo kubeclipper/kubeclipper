@@ -47,6 +47,7 @@ func (r *ClusterReconciler) convertNodes(ctx context.Context, nodes v1.WorkerNod
 		item := component.Node{
 			ID:       n.Name,
 			IPv4:     n.Status.Ipv4DefaultIP,
+			NodeIPv4: n.Status.NodeIpv4DefaultIP,
 			Region:   n.Labels[common.LabelTopologyRegion],
 			Hostname: n.Labels[common.LabelHostname],
 			Role:     n.Labels[common.LabelNodeRole],

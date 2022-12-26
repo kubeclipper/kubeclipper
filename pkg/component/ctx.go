@@ -54,6 +54,7 @@ type ExtraMetadata struct {
 type Node struct {
 	ID       string
 	IPv4     string
+	NodeIPv4 string
 	Region   string
 	Hostname string
 	Role     string
@@ -130,6 +131,22 @@ func (e ExtraMetadata) GetWorkerNodeIP() map[string]string {
 	nodes := make(map[string]string)
 	for _, node := range e.Workers {
 		nodes[node.ID] = node.IPv4
+	}
+	return nodes
+}
+
+func (e ExtraMetadata) GetMasterNodeClusterIP() map[string]string {
+	nodes := make(map[string]string)
+	for _, node := range e.Masters {
+		nodes[node.ID] = node.NodeIPv4
+	}
+	return nodes
+}
+
+func (e ExtraMetadata) GetWorkerNodeClusterIP() map[string]string {
+	nodes := make(map[string]string)
+	for _, node := range e.Workers {
+		nodes[node.ID] = node.NodeIPv4
 	}
 	return nodes
 }

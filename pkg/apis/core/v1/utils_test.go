@@ -106,31 +106,36 @@ var (
 	extraMeta = &component.ExtraMetadata{
 		Masters: []component.Node{
 			{
-				ID:     "1e3ea00f-1403-46e5-a486-70e4cb29d541",
-				IPv4:   "192.168.1.1",
-				Region: "default",
+				ID:       "1e3ea00f-1403-46e5-a486-70e4cb29d541",
+				IPv4:     "192.168.1.1",
+				NodeIPv4: "192.168.2.1",
+				Region:   "default",
 			},
 			{
-				ID:     "43ed594a-a76f-4370-a14d-551e7b6153de",
-				IPv4:   "192.168.1.2",
-				Region: "default",
+				ID:       "43ed594a-a76f-4370-a14d-551e7b6153de",
+				IPv4:     "192.168.1.2",
+				NodeIPv4: "192.168.2.2",
+				Region:   "default",
 			},
 			{
-				ID:     "c7a91d86-cd53-4c3f-85b0-fbc657778067",
-				IPv4:   "192.168.1.3",
-				Region: "default",
+				ID:       "c7a91d86-cd53-4c3f-85b0-fbc657778067",
+				IPv4:     "192.168.1.3",
+				NodeIPv4: "192.168.2.3",
+				Region:   "default",
 			},
 		},
 		Workers: []component.Node{
 			{
-				ID:     "4cf1ad74-704c-4290-a523-e524e930245d",
-				IPv4:   "192.168.1.4",
-				Region: "default",
+				ID:       "4cf1ad74-704c-4290-a523-e524e930245d",
+				IPv4:     "192.168.1.4",
+				NodeIPv4: "192.168.2.4",
+				Region:   "default",
 			},
 			{
-				ID:     "ae4ba282-27f9-4a93-8fe9-63f786781d48",
-				IPv4:   "192.168.1.5",
-				Region: "default",
+				ID:       "ae4ba282-27f9-4a93-8fe9-63f786781d48",
+				IPv4:     "192.168.1.5",
+				NodeIPv4: "192.168.2.5",
+				Region:   "default",
 			},
 		},
 	}
@@ -406,7 +411,8 @@ func Test_parseActBackupSteps(t *testing.T) {
 			},
 			ProxyIpv4CIDR: "10.0.0.0/32",
 			Status: v1.NodeStatus{
-				Ipv4DefaultIP: "127.0.0.1",
+				Ipv4DefaultIP:     "127.0.0.1",
+				NodeIpv4DefaultIP: "127.0.0.1",
 				NodeInfo: v1.NodeSystemInfo{
 					Hostname: "test",
 				},

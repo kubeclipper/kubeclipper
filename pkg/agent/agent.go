@@ -44,7 +44,7 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	if err != nil {
 		return errors.WithMessage(err, "config hosts")
 	}
-	s.taskService = task.NewService(s.Config.AgentID, s.Config.Metadata.Region, s.Config.IPDetect, s.Config.RegisterNode, s.Config.MQOptions,
+	s.taskService = task.NewService(s.Config.AgentID, s.Config.Metadata.Region, s.Config.IPDetect, s.Config.NodeIPDetect, s.Config.RegisterNode, s.Config.MQOptions,
 		task.WithNodeStatusUpdateFrequency(s.Config.NodeStatusUpdateFrequency),
 		task.WithLeaseDurationSeconds(240),
 		task.WithOplog(opLog),

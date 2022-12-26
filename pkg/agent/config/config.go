@@ -53,6 +53,7 @@ type Config struct {
 	AgentID                   string              `json:"agentID,omitempty" yaml:"agentID"`
 	Metadata                  options.Metadata    `json:"metadata,omitempty" yaml:"metadata"`
 	IPDetect                  string              `json:"ipDetect,omitempty" yaml:"ipDetect"`
+	NodeIPDetect              string              `json:"nodeIPDetect,omitempty" yaml:"nodeIPDetect"`
 	RegisterNode              bool                `json:"registerNode,omitempty" yaml:"registerNode"`
 	NodeStatusUpdateFrequency time.Duration       `json:"nodeStatusUpdateFrequency,omitempty" yaml:"nodeStatusUpdateFrequency"`
 	DownloaderOptions         *downloader.Options `json:"downloader" yaml:"downloader" mapstructure:"downloader"`

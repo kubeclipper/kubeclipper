@@ -49,8 +49,8 @@ import (
 // Setters may partially mutate the node before returning an error.
 type Setter func(node *v1.Node) error
 
-func NodeAddress(ipDetectMethod string) Setter {
-	log.Println("ip detect method:", ipDetectMethod)
+func NodeAddress(ipDetectMethod, nodeIPDetectMethod string) Setter {
+	log.Printf("ip detect method: %s, node ip detect methd: %s \n", ipDetectMethod, nodeIPDetectMethod)
 	return func(node *v1.Node) error {
 		var nodeAddress []v1.NodeAddress
 		addresses, err := net.InterfaceAddrs()
@@ -70,11 +70,17 @@ func NodeAddress(ipDetectMethod string) Setter {
 		if err != nil {
 			return err
 		}
+		nodeIP, err := netutil.GetDefaultIP(true, nodeIPDetectMethod)
+		if err != nil {
+			return err
+		}
 		gw, err := netutil.GetDefaultGateway(true)
 		if err != nil {
 			return err
 		}
-		node.Status.Ipv4DefaultIP, node.Status.Ipv4DefaultGw = ip.To4().String(), gw.To4().String()
+		node.Status.Ipv4DefaultIP = ip.To4().String()
+		node.Status.Ipv4DefaultGw = gw.To4().String()
+		node.Status.NodeIpv4DefaultIP = nodeIP.To4().String()
 		return nil
 	}
 }

@@ -181,6 +181,7 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 			workers = append(workers, component.Node{
 				ID:       node.Name,
 				IPv4:     node.Status.Ipv4DefaultIP,
+				NodeIPv4: node.Status.NodeIpv4DefaultIP,
 				Hostname: node.Status.NodeInfo.Hostname,
 			})
 			continue
@@ -190,6 +191,7 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 		masters = append(masters, component.Node{
 			ID:       node.Name,
 			IPv4:     node.Status.Ipv4DefaultIP,
+			NodeIPv4: node.Status.NodeIpv4DefaultIP,
 			Hostname: node.Status.NodeInfo.Hostname,
 		})
 	}
@@ -310,6 +312,7 @@ func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1
 	meta.Masters = []component.Node{{
 		ID:       b.PreferredNode, // the preferred node is used by default
 		IPv4:     pNode.Status.Ipv4DefaultIP,
+		NodeIPv4: pNode.Status.NodeIpv4DefaultIP,
 		Hostname: pNode.Status.NodeInfo.Hostname,
 	}}
 	ctx := component.WithExtraMetadata(context.TODO(), meta)

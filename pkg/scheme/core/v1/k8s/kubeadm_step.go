@@ -383,7 +383,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 	cpEndpoint := fmt.Sprintf("%s:6443", apiServerDomain)
 	if _, ok := c.Labels[common.LabelClusterProviderName]; ok {
-		cpEndpoint = fmt.Sprintf("%s:6443", metadata.Masters[0].IPv4)
+		cpEndpoint = fmt.Sprintf("%s:6443", metadata.Masters[0].NodeIPv4)
 	}
 
 	stepper.ClusterConfigAPIVersion = ""
@@ -398,6 +398,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	stepper.CertSANs = c.CertSANs
 	stepper.LocalRegistry = c.LocalRegistry
 	stepper.Offline = metadata.Offline
+	stepper.AdvertiseAddress = metadata.Masters[0].NodeIPv4
 
 	return stepper
 }
@@ -535,7 +536,7 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	stepper.Masters = metadata.GetMasterNodeIP()
 	stepper.LocalRegistry = c.LocalRegistry
 	stepper.APIServerDomainName = apiServerDomain
-	stepper.JoinMasterIP = metadata.Masters[0].IPv4
+	stepper.JoinMasterIP = metadata.Masters[0].NodeIPv4
 	stepper.EtcdDataPath = c.Etcd.DataDir
 
 	return stepper
@@ -557,7 +558,7 @@ func GetKubeConfig(ctx context.Context, name string, node component.Node, delive
 		return "", err
 	}
 
-	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.IPv4)
+	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.NodeIPv4)
 	config, err := clientcmd.Write(kubeConfig)
 	if err != nil {
 		return "", err
@@ -917,7 +918,10 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 				RetryTimes: 1,
 				Nodes: []v1.StepNode{
 					{
-						ID: metadata.Masters[0].ID, IPv4: metadata.Masters[0].IPv4, Hostname: metadata.GetMasterHostname(metadata.Masters[0].ID),
+						ID:       metadata.Masters[0].ID,
+						IPv4:     metadata.Masters[0].IPv4,
+						NodeIPv4: metadata.Masters[0].NodeIPv4,
+						Hostname: metadata.GetMasterHostname(metadata.Masters[0].ID),
 					},
 				},
 				Commands: shellCommand,

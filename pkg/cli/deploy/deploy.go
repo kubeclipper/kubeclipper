@@ -105,6 +105,12 @@ const (
   # Deploy env with many agent node which has orderly ip.
   # this will add 10 agent,1.1.1.1, 1.1.1.2, ... 1.1.1.10.
   kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
+  
+  # Deploy env with many agent nodes and specify ip detect method for these nodes
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 --ip-detect=interface=eth0 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
+
+  # Deploy env with many agent nodes and specify node ip detect method for these nodes, used for routing between nodes in the kubernetes cluster
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 --node-ip-detect=interface=eth1 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
 
   # Deploy from config.
   kcctl deploy --deploy-config deploy-config.yaml
@@ -218,6 +224,11 @@ func (d *DeployOptions) Complete() error {
 		}
 	}
 
+	if d.deployConfig.NodeIPDetect == "" {
+		logger.Infof("node-ip-detect inherits from ip-detect: %s", d.deployConfig.IPDetect)
+		d.deployConfig.NodeIPDetect = d.deployConfig.IPDetect
+	}
+
 	if d.aio {
 		logger.Infof("run in aio mode.")
 	}
@@ -235,6 +246,9 @@ func (d *DeployOptions) ValidateArgs() error {
 
 	if d.deployConfig.IPDetect != "" && !autodetection.CheckMethod(d.deployConfig.IPDetect) {
 		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
+	}
+	if d.deployConfig.NodeIPDetect != "" && !autodetection.CheckMethod(d.deployConfig.NodeIPDetect) {
+		return fmt.Errorf("invalid node ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
 	}
 	if d.deployConfig.Pkg == "" {
 		return fmt.Errorf("--pkg must be specified")

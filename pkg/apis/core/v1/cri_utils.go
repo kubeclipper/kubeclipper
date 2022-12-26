@@ -158,6 +158,7 @@ func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, no
 		allNodes = append(allNodes, v1.StepNode{
 			ID:       node.Name,
 			IPv4:     node.Status.Ipv4DefaultIP,
+			NodeIPv4: node.Status.NodeIpv4DefaultIP,
 			Hostname: node.Labels[common.LabelHostname],
 		})
 	}

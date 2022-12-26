@@ -90,6 +90,9 @@ volumeStatsAggPeriod: 1m
 ---
 apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
 kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: {{.AdvertiseAddress}}
+  bindPort: 6443
 nodeRegistration:
 {{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock

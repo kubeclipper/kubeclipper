@@ -295,6 +295,7 @@ mq:
 
 const KcAgentConfigTmpl = `agentID: {{.AgentID}}
 ipDetect: {{.IPDetect}}
+nodeIPDetect: {{.NodeIPDetect}}
 metadata:
   region: {{.Region}}
 {{- if .FloatIP}}
