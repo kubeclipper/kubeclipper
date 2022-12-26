@@ -674,7 +674,7 @@ func (d *DeployOptions) deployKcServer() {
 		}
 
 		// wait kc-server start
-		ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 		err = retryFunc(ctx, 3*time.Second, "waitServiceRunning", host, d.waitServerRunning)
 		if err != nil {
@@ -689,7 +689,7 @@ func (d *DeployOptions) waitServerRunning(host string) error {
 	}
 	client := &http.Client{Transport: tr}
 
-	addr := fmt.Sprintf("http:%s:%v/healthz", host, d.deployConfig.ServerPort)
+	addr := fmt.Sprintf("http://%s:%v/healthz", host, d.deployConfig.ServerPort)
 	resp, err := client.Get(addr)
 	if err != nil {
 		return err
