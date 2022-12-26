@@ -729,7 +729,7 @@ func (d *DeployOptions) waitServerRunning(host string) error {
 	}
 	client := &http.Client{Transport: tr}
 
-	addr := fmt.Sprintf("http:%s:%v/healthz", host, d.deployConfig.ServerPort)
+	addr := fmt.Sprintf("http://%s:%v/healthz", host, d.deployConfig.ServerPort)
 	if d.deployConfig.TLS {
 		addr = fmt.Sprintf("https://%s:%v/healthz", host, d.deployConfig.ServerPort)
 	}
