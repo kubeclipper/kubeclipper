@@ -71,9 +71,10 @@ type Service struct {
 	leaseOperator     lease.Operator
 	opOperator        operation.Operator
 	stepStatusChan    chan stepStatus
+	terminationChan   *chan struct{}
 }
 
-func NewService(opts *natsio.NatsOptions, clusterOperator cluster.Operator, leaseOperator lease.Operator, opOperator operation.Operator) *Service {
+func NewService(opts *natsio.NatsOptions, clusterOperator cluster.Operator, leaseOperator lease.Operator, opOperator operation.Operator, terminationChan *chan struct{}) *Service {
 	s := &Service{
 		external:          opts.External,
 		client:            natsio.NewNats(opts),
@@ -84,6 +85,7 @@ func NewService(opts *natsio.NatsOptions, clusterOperator cluster.Operator, leas
 		leaseOperator:     leaseOperator,
 		opOperator:        opOperator,
 		stepStatusChan:    make(chan stepStatus, 256),
+		terminationChan:   terminationChan,
 	}
 	s.client.SetReconnectHandler(s.defaultMQReconnectHandler)
 	s.client.SetDisconnectErrHandler(s.defaultMQDisconnectHandler)
@@ -404,6 +406,7 @@ func (s *Service) DeliverTaskOperation(ctx context.Context, operation *v1.Operat
 	errChan := make(chan error, 1)
 	defer close(errChan)
 	operation.Status.Conditions = make([]v1.OperationCondition, len(operation.Steps))
+	var termination bool
 	go func() {
 		for {
 			select {
@@ -412,6 +415,25 @@ func (s *Service) DeliverTaskOperation(ctx context.Context, operation *v1.Operat
 				stepCtxCancel()
 				go s.updateOperationStatus(operation.Name, v1.OperationStatusFailed, opts.DryRun)
 				return
+			case <-*s.terminationChan:
+				if operation.Status.Status == v1.OperationStatusRunning {
+					// get latest edition operation
+					op, err := s.opOperator.GetOperationEx(context.TODO(), operation.Name, "0")
+					if err != nil {
+						logger.Error("get latest edition operation failed", zap.String("op", op.Name), zap.Error(err))
+						continue
+					}
+					logger.Debugf("get latest operation: %v, label intent: %v", operation.Name, op.Labels[common.LabelOperationIntent])
+					if op.Labels[common.LabelOperationIntent] == common.OperationIntent {
+						// termination operation
+						stepCtxCancel()
+						// termination step flag
+						termination = true
+
+						go s.updateOperationStatus(operation.Name, v1.OperationStatusTermination, opts.DryRun)
+						return
+					}
+				}
 			case <-doneChan:
 				// all step done, set operation status successful
 				go s.updateOperationStatus(operation.Name, v1.OperationStatusSuccessful, opts.DryRun)
@@ -425,6 +447,10 @@ func (s *Service) DeliverTaskOperation(ctx context.Context, operation *v1.Operat
 	}()
 	var err error
 	for i, step := range operation.Steps {
+		if termination {
+			logger.Debug("termination delivery task step", zap.String("operation", operation.Name), zap.String("step", step.Name))
+			break
+		}
 		// TODO: add retry steps
 		// TODO: refactor
 		// Notice: 目前只针对 CUSTOM 命令有用，下一步骤依赖上一步骤的输出，比如 K8S 安装时初始化一个 K8S 控制节点后得到 kubeadm join 命令，需要传给其他节点进行执行

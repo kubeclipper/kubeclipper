@@ -102,12 +102,14 @@ type APIServer struct {
 	databaseAuditBackend  auditing.Backend
 	internalInformerUser  string
 	InternalInformerToken string
+	terminationChan       chan struct{}
 }
 
 func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.internalInformerUser = "system:kc-server"
 	s.InternalInformerToken = uuid.New().String()
 	s.storageFactory = registry.NewSharedStorageFactory(s.RESTOptionsGetter)
+	s.terminationChan = make(chan struct{})
 
 	var err error
 	switch s.Config.CacheOptions.CacheProvider {
@@ -262,7 +264,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
 	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator, clusterOperator)
 
-	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator)
+	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator, &s.terminationChan)
 	s.Services = append(s.Services, deliverySvc)
 
 	platformOperator := platform.NewPlatformOperator(s.storageFactory.PlatformSettings(), s.storageFactory.Events())
@@ -317,7 +319,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		}
 	}
 
-	ctrl, err := manager.NewControllerManager(rc, s.storageFactory, deliverySvc, s.SetupController)
+	ctrl, err := manager.NewControllerManager(rc, s.storageFactory, deliverySvc, &s.terminationChan, s.SetupController)
 	if err != nil {
 		return err
 	}
@@ -325,7 +327,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 
 	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator,
 		leaseOperator, coreOperator, deliverySvc, tokenOperator, tenantOperator,
-		s.Config.GenericServerRunOptions); err != nil {
+		s.Config.GenericServerRunOptions, &s.terminationChan); err != nil {
 		return err
 	}
 	if err = proxy.AddToContainer(s.container, clusterOperator); err != nil {

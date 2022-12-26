@@ -725,6 +725,28 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Operation{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
+	webservice.Route(webservice.POST("/operations/{name}/termination").
+		To(h.TerminationOperation).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("clusters termination operation.").
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run clusters termination operation.").
+			Required(false).DataType("boolean")).
+		Param(webservice.PathParameter(query.ParameterName, "operation name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+	webservice.Route(webservice.POST("/projects/{project}/operations/{name}/termination").
+		To(h.TerminationOperation).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("clusters termination operation.").
+		Param(webservice.PathParameter("project", "project name")).
+		Param(webservice.QueryParameter(query.ParamDryRun, "dry run clusters termination operation.").
+			Required(false).DataType("boolean")).
+		Param(webservice.PathParameter(query.ParameterName, "operation name").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
 	webservice.Route(webservice.POST("/operations/{name}/retry").
 		To(h.RetryCluster).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
@@ -1617,8 +1639,8 @@ func AddToContainer(c *restful.Container, clusterOperator cluster.Operator,
 	op operation.Operator, platform platform.Operator, leaseOperator lease.Operator,
 	coreOperator core.Operator, delivery service.IDelivery,
 	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator,
-	conf *generic.ServerRunOptions) error {
-	h := newHandler(conf, clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tokenOperator, tenantOperator)
+	conf *generic.ServerRunOptions, terminationChan *chan struct{}) error {
+	h := newHandler(conf, clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tokenOperator, tenantOperator, terminationChan)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

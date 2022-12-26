@@ -23,6 +23,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
+
+	"github.com/kubeclipper/kubeclipper/pkg/simple/generic"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 
@@ -452,10 +455,11 @@ func CreateBasic(serverURL, clusterName, userName string, caCert []byte) *client
 
 // BuildPendingOperation build PendingOperation struct
 // @param operationType Operation type
+// @param operationSponsor Address of the service that initiates the operation
 // @param timeout The timeout time of the entire operation
 // @param clusterResourceVersion The resource version of the cluster at the time the request was submitted
 // @param extra Additional data necessary to create the operation
-func buildPendingOperation(operationType, timeout, clusterResourceVersion string, extra interface{}) (v1.PendingOperation, error) {
+func buildPendingOperation(operationType, operationSponsor, timeout, clusterResourceVersion string, extra interface{}) (v1.PendingOperation, error) {
 	extraData, err := json.Marshal(extra)
 	if err != nil {
 		return v1.PendingOperation{}, nil
@@ -464,8 +468,30 @@ func buildPendingOperation(operationType, timeout, clusterResourceVersion string
 	return v1.PendingOperation{
 		OperationID:            strutil.GetUUID(),
 		OperationType:          operationType,
+		OperationSponsor:       operationSponsor,
 		Timeout:                timeout,
 		ClusterResourceVersion: clusterResourceVersion,
 		ExtraData:              extraData,
 	}, nil
+}
+
+// buildOperationSponsor build operation sponsor label
+func buildOperationSponsor(cfg *generic.ServerRunOptions) string {
+	scheme := "http"
+	port := cfg.InsecurePort
+	if cfg.SecurePort != 0 {
+		scheme = "https"
+		port = cfg.SecurePort
+	}
+	// FIXME floatIP or domain?
+	return fmt.Sprintf("%s-%s-%d", scheme, cfg.BindAddress, port)
+}
+
+// parseOperationSponsor parse operation sponsor label
+func parseOperationSponsor(sponsor string) string {
+	items := strings.Split(sponsor, "-")
+	if len(items) == 3 {
+		return fmt.Sprintf("%s://%s:%s", items[0], items[1], items[2])
+	}
+	return ""
 }

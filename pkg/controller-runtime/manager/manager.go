@@ -112,6 +112,8 @@ type ControllerManager struct {
 
 	// per cluster map storing cluster clientset
 	clusterClientMap *clusterClientMap
+
+	terminationChan *chan struct{}
 }
 
 type workerLoop struct {
@@ -153,7 +155,7 @@ func (s *ControllerManager) GetCmdDelivery() service.CmdDelivery {
 	return s.cmdDelivery
 }
 
-func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, setupFunc SetupFunc) (*ControllerManager, error) {
+func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, terminationChan *chan struct{}, setupFunc SetupFunc) (*ControllerManager, error) {
 	s := &ControllerManager{
 		leaderStopChan:          make(chan struct{}, 1),
 		defaultWorkerLoopPeriod: time.Second,
@@ -161,6 +163,7 @@ func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorage
 		cmdDelivery:             cmdDelivery,
 		storageFactory:          storageFactory,
 		setupFunc:               setupFunc,
+		terminationChan:         terminationChan,
 	}
 	s.lock = leaderelect.NewLock(resourceLockNS, resourceLockName, lease.NewLeaseOperator(storageFactory.Leases()), resourcelock.ResourceLockConfig{
 		Identity:      uuid.New().String(),

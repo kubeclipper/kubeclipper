@@ -3174,6 +3174,38 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/operations/{name}/termination": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "clusters termination operation.",
+        "operationId": "TerminationOperation",
+        "parameters": [
+          {
+            "type": "boolean",
+            "description": "dry run clusters termination operation.",
+            "name": "dryRun",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "operation name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/projects/{project}/backuppoints": {
       "get": {
         "produces": [
@@ -4565,6 +4597,45 @@
             "schema": {
               "$ref": "#/definitions/v1.Cluster"
             }
+          }
+        }
+      }
+    },
+    "/api/core.kubeclipper.io/v1/projects/{project}/operations/{name}/termination": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "clusters termination operation.",
+        "operationId": "TerminationOperation",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "project name",
+            "name": "project",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "dry run clusters termination operation.",
+            "name": "dryRun",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "operation name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
