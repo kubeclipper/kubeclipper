@@ -181,17 +181,17 @@ func (r *OperationReconciler) distributeOperation(ctx context.Context, log logge
 				if _, err = r.ClusterOperator.UpdateCluster(ctx, clu.DeepCopy()); err != nil {
 					return err
 				}
+				// update operation
+				newOp.Status.Status = v1.OperationStatusRunning
+				if _, err = r.OperationWriter.UpdateOperation(ctx, newOp); err != nil {
+					return err
+				}
 				return nil
 			}); err != nil {
-				log.Error("automatic retry, update cluster failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+				log.Error("automatic retry, update cluster and operation failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
 				return err
 			}
-			// update operation
-			newOp.Status.Status = v1.OperationStatusRunning
-			if _, err = r.OperationWriter.UpdateOperation(ctx, newOp); err != nil {
-				log.Error("retry on conflict, update operation failed", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
-				return err
-			}
+
 			// process delivery steps
 			newOp.Steps = continueSteps
 			go func() {
