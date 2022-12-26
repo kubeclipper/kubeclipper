@@ -289,7 +289,7 @@ func (s *ClusterStatusMon) updateClusterControlPlaneStatus(clu *v1.Cluster) erro
 		}
 		proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
 		floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
-		apiServer := node.Status.Ipv4DefaultIP + ":6443"
+		apiServer := node.Status.NodeIpv4DefaultIP + ":6443"
 		if floatIP != "" {
 			apiServer = floatIP + ":6443"
 		}

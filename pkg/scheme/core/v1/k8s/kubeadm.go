@@ -117,6 +117,7 @@ type KubeadmConfig struct {
 	CACertHashes         string        `json:"caCertHashes,omitempty"`
 	BootstrapToken       string        `json:"bootstrapToken,omitempty"`
 	CertificateKey       string        `json:"certificateKey,omitempty"`
+	AdvertiseAddress     string        `json:"advertiseAddress,omitempty"`
 }
 
 type ControlPlane struct {
@@ -284,6 +285,7 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 		stepper.BootstrapToken = masterJoinCmd[4]
 		stepper.CACertHashes = masterJoinCmd[6]
 		stepper.CertificateKey = masterJoinCmd[9]
+		// TODO: When adding a master node, can set the `--apiserver-advertise-address` and `--apiserver-bind-port` parameters.
 	} else {
 		workerJoinCmd := strings.Split(cmds[1], " ")
 		if len(workerJoinCmd) < 6 {
@@ -396,7 +398,7 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 	if err != nil {
 		return nil, errors.WithMessage(err, "load agent config")
 	}
-	ipnet, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
+	ipnet, err := netutil.GetDefaultIP(true, agentConfig.NodeIPDetect)
 	if err != nil {
 		return nil, err
 	}
@@ -680,7 +682,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 		if err != nil {
 			return nil, errors.WithMessage(err, "load agent config")
 		}
-		ipnet, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
+		ipnet, err := netutil.GetDefaultIP(true, agentConfig.NodeIPDetect)
 		if err != nil {
 			return nil, err
 		}

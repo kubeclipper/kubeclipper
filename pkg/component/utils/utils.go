@@ -82,6 +82,7 @@ func UnwrapNodeList(nl component.NodeList) (nodes []v1.StepNode) {
 		nodes = append(nodes, v1.StepNode{
 			ID:       v.ID,
 			IPv4:     v.IPv4,
+			NodeIPv4: v.NodeIPv4,
 			Hostname: v.Hostname,
 		})
 	}

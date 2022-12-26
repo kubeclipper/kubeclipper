@@ -57,6 +57,7 @@ type Service struct {
 	NodeReportSubject string
 	AgentID           string
 	IPDetect          string
+	NodeIPDetect      string
 	Region            string
 	AgentSubject      string
 	RegisterNode      bool
@@ -154,7 +155,7 @@ func defaultRepeatedHeartbeatFailure() {
 	logger.Debug("repeated heartbeat failure ...")
 }
 
-func NewService(agentID, region, ipDetectMethod string, registerNode bool, natOpts *natsio.NatsOptions, opts ...ServiceOption) *Service {
+func NewService(agentID, region, ipDetectMethod, nodeIPDetectMethod string, registerNode bool, natOpts *natsio.NatsOptions, opts ...ServiceOption) *Service {
 	nc := natsio.NewNats(natOpts)
 	nc.SetReconnectHandler(defaultMQReconnectHandler)
 	nc.SetDisconnectErrHandler(defaultMQDisconnectHandler)
@@ -165,6 +166,7 @@ func NewService(agentID, region, ipDetectMethod string, registerNode bool, natOp
 		NodeReportSubject:          natOpts.Client.NodeReportSubject,
 		AgentID:                    agentID,
 		IPDetect:                   ipDetectMethod,
+		NodeIPDetect:               nodeIPDetectMethod,
 		Region:                     region,
 		AgentSubject:               fmt.Sprintf(service.MsgSubjectFormat, agentID, natOpts.Client.SubjectSuffix),
 		RegisterNode:               registerNode,
@@ -206,7 +208,7 @@ func (s *Service) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	var setters []func(n *v1.Node) error
 	setters = append(setters,
 		nodestatus.Metadata(),
-		nodestatus.NodeAddress(s.IPDetect),
+		nodestatus.NodeAddress(s.IPDetect, s.NodeIPDetect),
 		nodestatus.MachineInfo(),
 		nodestatus.ReadyCondition(s.clock.Now, TODO, TODO, TODO))
 

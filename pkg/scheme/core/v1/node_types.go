@@ -164,8 +164,13 @@ type AttachedVolume struct {
 }
 
 type NodeStatus struct {
+	// Note: It is usually used for routing between kc nodes and belongs to the operation and maintenance management network.
 	Ipv4DefaultIP string `json:"ipv4DefaultIP" description:"node ipv4 default gateway interface ip"`
 	Ipv4DefaultGw string `json:"ipv4DefaultGw" description:"node ipv4 default gateway ip"`
+	// Note: It is commonly used for routing between nodes in a kubernetes cluster.
+	// If the `--node-ip-detect` parameter is not specified at deployment time, it is the same as `Ipv4DefaultIP`;
+	// otherwise, it depends on the ip detect method.
+	NodeIpv4DefaultIP string `json:"nodeIpv4DefaultIP"`
 	// Capacity represents the total resources of a node.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
 	// +optional

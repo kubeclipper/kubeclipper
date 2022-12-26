@@ -81,10 +81,11 @@ type JoinOptions struct {
 	cliOpts      *options.CliOptions
 	client       *kc.Client
 
-	agents     []string // user input agents,maybe with region,need to parse.
-	floatIPs   []string // format: ip:floatIP,e.g. 192.168.10.11:172.20.149.199
-	ipDetect   string
-	parseAgent options.Agents
+	agents       []string // user input agents,maybe with region,need to parse.
+	floatIPs     []string // format: ip:floatIP,e.g. 192.168.10.11:172.20.149.199
+	ipDetect     string
+	nodeIPDetect string
+	parseAgent   options.Agents
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -115,7 +116,8 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 		},
 	}
 	o.cliOpts.AddFlags(cmd.Flags())
-	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, "Kc ip detect method.")
+	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, fmt.Sprintf("Kc agent node ip detect method. Used to route between nodes. \n%s", options.IPDetectDescription))
+	cmd.Flags().StringVar(&o.nodeIPDetect, "node-ip-detect", o.nodeIPDetect, fmt.Sprintf("Kc agent node ip detect method. Used for routing between nodes in the kubernetes cluster. If not specified, ip-detect is inherited. \n%s", options.IPDetectDescription))
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))
@@ -157,6 +159,11 @@ func (c *JoinOptions) Complete() error {
 	if c.ipDetect != "" {
 		c.deployConfig.IPDetect = c.ipDetect
 	}
+	if c.nodeIPDetect == "" {
+		logger.Infof("node-ip-detect inherits from ip-detect: %s", c.ipDetect)
+	} else {
+		c.deployConfig.NodeIPDetect = c.nodeIPDetect
+	}
 	return nil
 }
 
@@ -166,6 +173,9 @@ func (c *JoinOptions) ValidateArgs() error {
 	}
 	if c.ipDetect != "" && !autodetection.CheckMethod(c.ipDetect) {
 		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
+	}
+	if c.nodeIPDetect != "" && !autodetection.CheckMethod(c.nodeIPDetect) {
+		return fmt.Errorf("invalid node ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
 	}
 	if len(c.agents) == 0 {
 		return fmt.Errorf("must specified at least one agent node")
@@ -312,6 +322,7 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata)
 	data["Region"] = metadata.Region
 	data["FloatIP"] = metadata.FloatIP
 	data["IPDetect"] = c.deployConfig.IPDetect
+	data["NodeIPDetect"] = c.deployConfig.NodeIPDetect
 	data["AgentID"] = metadata.AgentID
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.StaticServerPort)
 	if c.deployConfig.Debug {

@@ -118,6 +118,7 @@ type Step struct {
 type StepNode struct {
 	ID       string `json:"id,omitempty"`
 	IPv4     string `json:"ipv4,omitempty"`
+	NodeIPv4 string `json:"nodeIPv4,omitempty"`
 	Hostname string `json:"hostname,omitempty"`
 }
 

@@ -145,10 +145,12 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 	// nodes to be added or removed
 	var stepNodes []corev1.StepNode
 	workerIPs := extra.GetWorkerNodeIP()
+	workerClusterIPs := extra.GetWorkerNodeClusterIP()
 	for _, nodeID := range p.Nodes.GetNodeIDs() {
 		stepNode := corev1.StepNode{
 			ID:       nodeID,
 			IPv4:     workerIPs[nodeID],
+			NodeIPv4: workerClusterIPs[nodeID],
 			Hostname: extra.GetWorkerHostname(nodeID),
 		}
 		stepNodes = append(stepNodes, stepNode)
