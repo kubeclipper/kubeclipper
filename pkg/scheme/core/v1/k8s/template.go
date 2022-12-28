@@ -112,6 +112,9 @@ discovery:
   timeout: 5m0s
 {{- if .IsControlPlane}}
 controlPlane: 
+  localAPIEndpoint:
+    advertiseAddress: {{.AdvertiseAddress}}
+    bindPort: 6443
   certificateKey: {{.CertificateKey}}{{end}}
 nodeRegistration:
 {{- if eq .ContainerRuntime  "containerd"}}
