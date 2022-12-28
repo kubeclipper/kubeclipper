@@ -1824,8 +1824,7 @@ func (h *handler) RetryCluster(request *restful.Request, response *restful.Respo
 	}
 
 	op = opList.Items[0].(*v1.Operation)
-	if op.Status.Status == v1.OperationStatusSuccessful || op.Status.Status == v1.OperationStatusRunning ||
-		op.Status.Status == v1.OperationStatusTermination || op.Name != name {
+	if op.Status.Status == v1.OperationStatusSuccessful || op.Status.Status == v1.OperationStatusRunning || op.Name != name {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("only the latest faild operation can do a retry"))
 		return
 	}
