@@ -278,6 +278,15 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d --control-plane --certificate-key 46518267766fc19772ecc334c13190f8131f1bf48a213538879f6427f74fe8e2
 	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d
 	if stepper.IsControlPlane {
+		agentConfig, err := config.TryLoadFromDisk()
+		if err != nil {
+			return nil, errors.WithMessage(err, "load agent config")
+		}
+		ip, err := netutil.GetDefaultIP(true, agentConfig.NodeIPDetect)
+		if err != nil {
+			logger.Errorf("get node ip failed: %s", err.Error())
+			return nil, err
+		}
 		masterJoinCmd := strings.Split(cmds[0], " ")
 		if len(masterJoinCmd) < 10 {
 			return nil, fmt.Errorf("master join command invalid")
@@ -285,7 +294,7 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 		stepper.BootstrapToken = masterJoinCmd[4]
 		stepper.CACertHashes = masterJoinCmd[6]
 		stepper.CertificateKey = masterJoinCmd[9]
-		// TODO: When adding a master node, can set the `--apiserver-advertise-address` and `--apiserver-bind-port` parameters.
+		stepper.AdvertiseAddress = ip.String()
 	} else {
 		workerJoinCmd := strings.Split(cmds[1], " ")
 		if len(workerJoinCmd) < 6 {
