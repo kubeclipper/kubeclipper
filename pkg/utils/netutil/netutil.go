@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func IsValidPort(port int) bool {
@@ -65,4 +66,12 @@ func InetAtoN(ip string) int64 {
 // input: 3232235777 output 192.168.1.1
 func InetNtoA(ip int64) string {
 	return fmt.Sprintf("%d.%d.%d.%d", byte(ip>>24), byte(ip>>16), byte(ip>>8), byte(ip))
+}
+
+func Reachable(protocol string, addr string, timeout time.Duration) error {
+	connection, err := net.DialTimeout(protocol, addr, timeout)
+	if err == nil {
+		connection.Close()
+	}
+	return err
 }

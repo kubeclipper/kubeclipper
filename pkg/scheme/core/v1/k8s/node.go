@@ -106,7 +106,12 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 	if err != nil {
 		return err
 	}
-	masters := utils.UnwrapNodeList(metadata.Masters)
+	avaMasters, err := metadata.Masters.AvailableKubeMasters()
+	if err != nil {
+		return err
+	}
+	masters := utils.UnwrapNodeList(avaMasters)
+
 	// add node to cluster
 	if len(stepper.installSteps) == 0 {
 		// We should use kubeadm to create join token on the first control plane node.
@@ -185,7 +190,11 @@ func (stepper *GenNode) MakeUninstallSteps(metadata *component.ExtraMetadata, pa
 	if err != nil {
 		return err
 	}
-	masters := utils.UnwrapNodeList(metadata.Masters)
+	avaMasters, err := metadata.Masters.AvailableKubeMasters()
+	if err != nil {
+		return err
+	}
+	masters := utils.UnwrapNodeList(avaMasters)
 	if len(stepper.uninstallSteps) == 0 {
 		args := []string{"--ignore-daemonsets", "--delete-local-data"}
 		for _, node := range patchNodes {

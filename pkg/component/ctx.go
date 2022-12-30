@@ -20,6 +20,11 @@ package component
 
 import (
 	"context"
+	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
+	"strconv"
+	"sync"
+	"time"
 
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
@@ -68,6 +73,31 @@ func (l NodeList) GetNodeIDs() (nodes []string) {
 		nodes = append(nodes, node.ID)
 	}
 	return
+}
+
+func (l NodeList) AvailableKubeMasters() (NodeList, error) {
+	masters := l.ReachableNodes("tcp", 6443, time.Second*2)
+	if len(masters) == 0 {
+		return nil, fmt.Errorf("no master node available: all master nodes 6443 port unreachable")
+	}
+
+	return masters, nil
+}
+
+func (l NodeList) ReachableNodes(protocol string, port int, timeout time.Duration) NodeList {
+	wg := sync.WaitGroup{}
+	wg.Add(len(l))
+	var list NodeList
+	for _, no := range l {
+		go func(no Node) {
+			if netutil.Reachable(protocol, no.NodeIPv4+":"+strconv.Itoa(port), timeout) == nil {
+				list = append(list, no)
+			}
+			wg.Done()
+		}(no)
+	}
+	wg.Wait()
+	return list
 }
 
 func (e ExtraMetadata) GetAllNodeIDs() []string {

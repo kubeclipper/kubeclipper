@@ -18,7 +18,11 @@
 
 package netutil
 
-import "testing"
+import (
+	"strings"
+	"testing"
+	"time"
+)
 
 const (
 	NIP  = 3232235777
@@ -64,6 +68,35 @@ func TestInetAtoN(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := InetAtoN(tt.args.ip); got != tt.want {
 				t.Errorf("InetAtoN() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReachable(t *testing.T) {
+	type args struct {
+		protocol string
+		addr     string
+		timeout  time.Duration
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "base",
+			args: args{
+				protocol: "tcp",
+				addr:     "127.0.0.1:6443",
+				timeout:  time.Second,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Reachable(tt.args.protocol, tt.args.addr, tt.args.timeout)
+			if err != nil && !strings.Contains(err.Error(), "connect: connection refused") {
+				t.Errorf("test result: %v", err)
 			}
 		})
 	}

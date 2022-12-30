@@ -587,14 +587,17 @@ func (stepper *ActBackup) makeInstallSteps(metadata *component.ExtraMetadata) er
 	if err != nil {
 		return err
 	}
-
+	avaMasters, err := metadata.Masters.AvailableKubeMasters()
+	if err != nil {
+		return err
+	}
 	step := v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "createBackup",
 		Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 0,
-		Nodes:      utils.UnwrapNodeList(metadata.Masters[:1]),
+		Nodes:      utils.UnwrapNodeList(avaMasters[:1]),
 		Action:     v1.ActionInstall,
 		Commands: []v1.Command{
 			{
@@ -616,14 +619,17 @@ func (stepper *ActBackup) makeUninstallSteps(metadata *component.ExtraMetadata) 
 		return err
 	}
 
-	metadata.Masters.GetNodeIDs()
+	avaMasters, err := metadata.Masters.AvailableKubeMasters()
+	if err != nil {
+		return err
+	}
 	step := v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "deleteBackup",
 		Timeout:    metav1.Duration{Duration: 2 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 0,
-		Nodes:      utils.UnwrapNodeList(metadata.Masters[:1]),
+		Nodes:      utils.UnwrapNodeList(avaMasters[:1]),
 		Action:     v1.ActionUninstall,
 		Commands: []v1.Command{
 			{
@@ -697,7 +703,8 @@ func (stepper *Recovery) GetInstallSteps() []v1.Step {
 }
 
 func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *component.ExtraMetadata) error {
-	if !metadata.IsAllMasterAvailable() {
+	avaMasters, _ := metadata.Masters.AvailableKubeMasters()
+	if len(avaMasters) != len(metadata.Masters) {
 		return errors.New("there is an unavailable master node in the cluster, please check the cluster master node status")
 	}
 	rBytes, err := json.Marshal(stepper)
@@ -746,7 +753,7 @@ func (stepper *Recovery) MakeInstallSteps(ctx context.Context, metadata *compone
 		Timeout:    metav1.Duration{Duration: 5 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 1,
-		Nodes:      []v1.StepNode{utils.UnwrapNodeList(metadata.Masters)[0]},
+		Nodes:      []v1.StepNode{utils.UnwrapNodeList(avaMasters)[0]},
 		Action:     v1.ActionInstall,
 		Commands: []v1.Command{
 			{
