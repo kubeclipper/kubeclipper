@@ -124,6 +124,7 @@ func (e ExtraMetadata) GetMasterNodeIP() map[string]string {
 	for _, node := range e.Masters {
 		nodes[node.ID] = node.IPv4
 	}
+	
 	return nodes
 }
 
