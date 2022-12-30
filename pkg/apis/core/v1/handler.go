@@ -771,7 +771,13 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 			extraMeta.ClusterName = clu.Annotations[common.AnnotationActualName]
 		}
 
-		kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, extraMeta.Masters[0], h.delivery)
+		masters, err := extraMeta.Masters.AvailableKubeMasters()
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
+
+		kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, masters[0], h.delivery)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return

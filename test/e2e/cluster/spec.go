@@ -280,7 +280,6 @@ var _ = SIGDescribe("[Serial]", func() {
 		InitClusterWithSetter(clu, []Setter{SetClusterName(clusterName),
 			SetClusterNodes([]string{nodes[0]}, nil),
 			SetContainerdRuntime()})
-
 		ginkgo.By("create aio cluster with containerd")
 		beforeEachCreateCluster(f, clu)()
 

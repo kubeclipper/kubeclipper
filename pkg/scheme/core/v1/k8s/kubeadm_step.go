@@ -151,6 +151,7 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	installSteps = append(installSteps, steps...)
 
 	kubeConf := KubeadmConfig{}
+	// TODO: No vip is currently introduced as controlPlaneEndpoint
 	steps, err = kubeConf.InitStepper(&c, metadata).InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
@@ -383,6 +384,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	apiServerDomain := APIServerDomainPrefix + strutil.StringDefaultIfEmpty("cluster.local", c.Networking.DNSDomain)
 	cpEndpoint := fmt.Sprintf("%s:6443", apiServerDomain)
 	if _, ok := c.Labels[common.LabelClusterProviderName]; ok {
+		// TODO: No vip is currently introduced as controlPlaneEndpoint
 		cpEndpoint = fmt.Sprintf("%s:6443", metadata.Masters[0].NodeIPv4)
 	}
 
@@ -398,6 +400,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	stepper.CertSANs = c.CertSANs
 	stepper.LocalRegistry = c.LocalRegistry
 	stepper.Offline = metadata.Offline
+	// TODO: No vip is currently introduced as controlPlaneEndpoint
 	stepper.AdvertiseAddress = metadata.Masters[0].NodeIPv4
 
 	return stepper
@@ -536,6 +539,7 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	stepper.Masters = metadata.GetMasterNodeIP()
 	stepper.LocalRegistry = c.LocalRegistry
 	stepper.APIServerDomainName = apiServerDomain
+	// TODO: No vip is currently introduced as controlPlaneEndpoint
 	stepper.JoinMasterIP = metadata.Masters[0].NodeIPv4
 	stepper.EtcdDataPath = c.Etcd.DataDir
 
@@ -909,6 +913,15 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 	}
 
 	if len(shellCommand) > 0 {
+		avaMasters := metadata.Masters
+		var err error
+		if len(metadata.Masters) > 1 {
+			avaMasters, err = metadata.Masters.AvailableKubeMasters()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		return []v1.Step{
 			{
 				ID:         strutil.GetUUID(),
@@ -918,10 +931,10 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 				RetryTimes: 1,
 				Nodes: []v1.StepNode{
 					{
-						ID:       metadata.Masters[0].ID,
-						IPv4:     metadata.Masters[0].IPv4,
-						NodeIPv4: metadata.Masters[0].NodeIPv4,
-						Hostname: metadata.GetMasterHostname(metadata.Masters[0].ID),
+						ID:       avaMasters[0].ID,
+						IPv4:     avaMasters[0].IPv4,
+						NodeIPv4: avaMasters[0].NodeIPv4,
+						Hostname: metadata.GetMasterHostname(avaMasters[0].ID),
 					},
 				},
 				Commands: shellCommand,

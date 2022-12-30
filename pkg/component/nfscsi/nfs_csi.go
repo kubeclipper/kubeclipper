@@ -289,14 +289,18 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 		return err
 	}
 
-	stepMaster0 := utils.UnwrapNodeList(metadata.Masters[:1])
+	avaMasters, err := metadata.Masters.AvailableKubeMasters()
+	if err != nil {
+		return err
+	}
+	master := utils.UnwrapNodeList(avaMasters[:1])
 	rs := v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "renderNFSCSIManifests",
 		Timeout:    metav1.Duration{Duration: 3 * time.Second},
 		ErrIgnore:  true,
 		RetryTimes: 1,
-		Nodes:      stepMaster0,
+		Nodes:      master,
 		Action:     v1.ActionInstall,
 		Commands: []v1.Command{
 			{
@@ -316,7 +320,7 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 			Timeout:    metav1.Duration{Duration: 3 * time.Second},
 			ErrIgnore:  true,
 			RetryTimes: 1,
-			Nodes:      stepMaster0,
+			Nodes:      master,
 			Action:     v1.ActionInstall,
 			Commands: []v1.Command{
 				{
@@ -328,7 +332,7 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 	}...)
 
 	c := new(common.CSIHealthCheck)
-	checkCSIHealthStep, err := c.GetCheckCSIHealthStep(stepMaster0, n.StorageClassName)
+	checkCSIHealthStep, err := c.GetCheckCSIHealthStep(master, n.StorageClassName)
 	if err != nil {
 		return err
 	}
@@ -343,7 +347,7 @@ func (n *NFS) InitSteps(ctx context.Context) error {
 				Timeout:    metav1.Duration{Duration: 10 * time.Minute},
 				ErrIgnore:  true,
 				RetryTimes: 1,
-				Nodes:      stepMaster0,
+				Nodes:      master,
 				Action:     v1.ActionInstall,
 				Commands: []v1.Command{
 					{
