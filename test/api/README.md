@@ -21,6 +21,8 @@ gabbi-run -v all localhost -- test/api/*.yaml
 
 ### 3.1 覆盖范围
 
-[创建集群](./create_get_cluster.yaml)
-[查看集群列表](./create_get_cluster.yaml)
-[集群添加节点和移除节点](./add_remove_node/)
+1.  [创建集群](./create_get_cluster.yaml)
+2.  [查看集群列表](./create_get_cluster.yaml)
+3.  [集群添加节点和移除节点](./add_remove_node/)
+4.  [集群备份和恢复-存储类型为 fs](./fs_backup_recovery.yaml)
+5.  [集群备份和恢复-存储类型为 s3](./s3_backup_recovery.yaml)
