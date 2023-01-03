@@ -28,6 +28,7 @@ var (
 	ErrInvalidSCName        = errors.New("invalid name of storage class")
 	ErrInvalidNamespace     = errors.New("invalid namespace")
 	ErrInvalidReclaimPolicy = errors.New("invalid reclaim policy")
+	ErrInvalidLBMode        = errors.New("invalid load balancer mode")
 )
 
 const (
@@ -69,4 +70,11 @@ func MatchKubernetesReclaimPolicy(policy string) error {
 		return nil
 	}
 	return ErrInvalidReclaimPolicy
+}
+
+func MatchLoadBalancerMode(mode string) error {
+	if mode == "L2" || mode == "BGP" {
+		return nil
+	}
+	return ErrInvalidLBMode
 }

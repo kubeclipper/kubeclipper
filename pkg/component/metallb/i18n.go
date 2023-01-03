@@ -16,24 +16,31 @@
  *
  */
 
-package main
+package metallb
 
-import (
-	"fmt"
-	"os"
+import "github.com/kubeclipper/kubeclipper/pkg/component"
 
-	"github.com/kubeclipper/kubeclipper/cmd/kubeclipper-agent/app"
-	_ "github.com/kubeclipper/kubeclipper/pkg/component/metallb"
-	_ "github.com/kubeclipper/kubeclipper/pkg/component/nfs"
-	_ "github.com/kubeclipper/kubeclipper/pkg/component/nfscsi"
-	_ "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
-	_ "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
-)
-
-func main() {
-	cmds := app.NewKiAgentCommand(os.Stdin, os.Stdout, os.Stderr)
-	if err := cmds.Execute(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+func initI18nForComponentMeta() error {
+	return component.AddI18nMessages(component.I18nMessages{
+		{
+			ID:      "metallb.metaTitle",
+			English: "metallb Setting",
+			Chinese: "metallb 设置",
+		},
+		{
+			ID:      "metallb.mode",
+			English: "Mode",
+			Chinese: "模式",
+		},
+		{
+			ID:      "metallb.addresses",
+			English: "IPAddressPool",
+			Chinese: "IP 地址池",
+		},
+		{
+			ID:      "metallb.imageRepoMirror",
+			English: "metallb Image Repository Mirror",
+			Chinese: "metallb 镜像仓库代理",
+		},
+	})
 }
