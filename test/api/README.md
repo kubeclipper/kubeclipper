@@ -26,3 +26,4 @@ gabbi-run -v all localhost -- test/api/*.yaml
 3.  [集群添加节点和移除节点](./add_remove_node/)
 4.  [集群备份和恢复-存储类型为 fs](./fs_backup_recovery.yaml)
 5.  [集群备份和恢复-存储类型为 s3](./s3_backup_recovery.yaml)
+6.  [集群模版&插件模版](./template)(共9个API)
