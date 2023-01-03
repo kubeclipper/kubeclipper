@@ -1136,6 +1136,7 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
 		ClusterName:        c.Name,
+		ClusterStatus:      c.Status.Phase,
 		Offline:            c.Offline(),
 		LocalRegistry:      c.LocalRegistry,
 		CRI:                c.ContainerRuntime.Type,

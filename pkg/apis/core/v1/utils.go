@@ -214,6 +214,7 @@ func (h *handler) parseRecoverySteps(c *v1.Cluster, b *v1.Backup, restoreDir str
 func getRecoveryStep(c *v1.Cluster, bp *v1.BackupPoint, b *v1.Backup, restoreDir string, masters, workers []component.Node, nodeNames, nodeIPs []string, action v1.StepAction) (steps []v1.Step, err error) {
 	meta := component.ExtraMetadata{
 		ClusterName:        c.Name,
+		ClusterStatus:      c.Status.Phase,
 		Masters:            masters,
 		Workers:            workers,
 		CNI:                c.CNI.Type,
@@ -307,7 +308,8 @@ func (h *handler) parseActBackupSteps(c *v1.Cluster, b *v1.Backup, action v1.Ste
 func getActBackupStep(c *v1.Cluster, b *v1.Backup, bp *v1.BackupPoint, pNode *v1.Node, action v1.StepAction) (steps []v1.Step, err error) {
 	var actBackup *k8s.ActBackup
 	meta := component.ExtraMetadata{
-		ClusterName: c.Name,
+		ClusterName:   c.Name,
+		ClusterStatus: c.Status.Phase,
 	}
 	meta.Masters = []component.Node{{
 		ID:       b.PreferredNode, // the preferred node is used by default

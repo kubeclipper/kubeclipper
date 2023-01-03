@@ -184,11 +184,14 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 		return err
 	}
 
-	avaMasters, err := metadata.Masters.AvailableKubeMasters()
-	if err != nil {
-		return err
+	master := utils.UnwrapNodeList(metadata.Masters[:1])
+	if len(metadata.Masters) > 1 && metadata.ClusterStatus == v1.ClusterRunning {
+		avaMasters, err := metadata.Masters.AvailableKubeMasters()
+		if err != nil {
+			return err
+		}
+		master = utils.UnwrapNodeList(avaMasters[:1])
 	}
-	master := utils.UnwrapNodeList(avaMasters[:1])
 	rs := v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "renderNFSProvisionerManifests",

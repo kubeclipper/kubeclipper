@@ -915,13 +915,12 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 	if len(shellCommand) > 0 {
 		avaMasters := metadata.Masters
 		var err error
-		if len(metadata.Masters) > 1 {
+		if len(metadata.Masters) > 1 && metadata.ClusterStatus != "" {
 			avaMasters, err = metadata.Masters.AvailableKubeMasters()
 			if err != nil {
 				return nil, err
 			}
 		}
-
 		return []v1.Step{
 			{
 				ID:         strutil.GetUUID(),

@@ -42,6 +42,7 @@ type (
 type ExtraMetadata struct {
 	Masters            NodeList
 	Workers            NodeList
+	ClusterStatus      v1.ClusterPhase
 	Offline            bool
 	LocalRegistry      string
 	CRI                string
