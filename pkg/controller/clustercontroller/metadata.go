@@ -12,6 +12,7 @@ import (
 func (r *ClusterReconciler) assembleClusterExtraMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
 	meta := &component.ExtraMetadata{
 		ClusterName:        c.Name,
+		ClusterStatus:      c.Status.Phase,
 		Offline:            c.Offline(),
 		LocalRegistry:      c.LocalRegistry,
 		CRI:                c.ContainerRuntime.Type,
