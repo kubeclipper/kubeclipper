@@ -88,7 +88,7 @@ tests:
     request_headers:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
     status: 200
-  
+
   - name: update_cluster_template
     url: /apis/api/core.kubeclipper.io/v1/templates/$HISTORY['list_cluster_template'].$RESPONSE['$.items[0].metadata.name']
     method: PUT
