@@ -42,6 +42,7 @@ const (
 	InternalCategoryKubernetes = "kubernetes"
 	InternalCategoryStorage    = "storage"
 	InternalCategoryPAAS       = "PAAS"
+	InternalCategoryLB         = "LB"
 )
 
 type Props struct {
