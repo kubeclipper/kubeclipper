@@ -134,7 +134,7 @@ func Retry(op *v1.Operation) (context.Context, *v1.Operation, []v1.Step, error) 
 		var failedNodes []v1.StepNode
 		successStatus := make([]v1.StepStatus, 0)
 		for _, status := range op.Status.Conditions[failedIndex].Status {
-			if status.Status == v1.StepStatusFailed {
+			if status.Status == "" || status.Status == v1.StepStatusFailed {
 				// select the nodes whose execution fails
 				if node := findStepNode(op.Steps[failedIndex].Nodes, status.Node); node.ID != "" {
 					failedNodes = append(failedNodes, node)
