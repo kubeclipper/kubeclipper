@@ -86,6 +86,8 @@ type JoinOptions struct {
 	ipDetect     string
 	nodeIPDetect string
 	parseAgent   options.Agents
+
+	sshConfig *sshutils.SSH
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -94,6 +96,7 @@ func NewJoinOptions(streams options.IOStreams) *JoinOptions {
 		IOStreams:    streams,
 		deployConfig: options.NewDeployOptions(),
 		ipDetect:     autodetection.MethodFirst,
+		sshConfig:    sshutils.NewSSH(),
 	}
 }
 
@@ -120,21 +123,9 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.nodeIPDetect, "node-ip-detect", o.nodeIPDetect, fmt.Sprintf("Kc agent node ip detect method. Used for routing between nodes in the kubernetes cluster. If not specified, ip-detect is inherited. \n%s", options.IPDetectDescription))
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
+	options.AddFlagsToSSH(o.sshConfig, cmd.Flags())
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))
 	return cmd
-}
-
-func (c *JoinOptions) preCheck() bool {
-	if !sudo.PreCheck("sudo", c.deployConfig.SSHConfig, c.IOStreams, append(c.parseAgent.ListIP(), c.deployConfig.ServerIPs...)) {
-		return false
-	}
-	// check if the node is already added
-	for _, agent := range c.parseAgent.ListIP() {
-		if !c.preCheckKcAgent(agent) {
-			return false
-		}
-	}
-	return sudo.MultiNIC("ipDetect", c.deployConfig.SSHConfig, c.IOStreams, c.parseAgent.ListIP(), c.ipDetect)
 }
 
 func (c *JoinOptions) Complete() error {
@@ -164,11 +155,37 @@ func (c *JoinOptions) Complete() error {
 	} else {
 		c.deployConfig.NodeIPDetect = c.nodeIPDetect
 	}
+	// When joining agent nodes, the corresponding pk-file or password is not saved,
+	// which causes operational complexity but avoids problems caused by different pk-file or password
+	// between nodes
+	if c.sshConfig != nil {
+		if c.sshConfig.Port == 0 {
+			c.sshConfig.Port = sshutils.NewSSH().Port
+		}
+		if c.sshConfig.User == "" {
+			c.sshConfig.User = sshutils.NewSSH().User
+		}
+	} else {
+		c.sshConfig = c.deployConfig.SSHConfig
+	}
 	return nil
 }
 
+func (c *JoinOptions) preCheck() bool {
+	if !sudo.PreCheck("sudo", c.sshConfig, c.IOStreams, append(c.parseAgent.ListIP(), c.deployConfig.ServerIPs...)) {
+		return false
+	}
+	// check if the node is already added
+	for _, agent := range c.parseAgent.ListIP() {
+		if !c.preCheckKcAgent(agent) {
+			return false
+		}
+	}
+	return sudo.MultiNIC("ipDetect", c.sshConfig, c.IOStreams, c.parseAgent.ListIP(), c.ipDetect)
+}
+
 func (c *JoinOptions) ValidateArgs() error {
-	if c.deployConfig.SSHConfig.PkFile == "" && c.deployConfig.SSHConfig.Password == "" {
+	if c.sshConfig.PkFile == "" && c.sshConfig.Password == "" {
 		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", c.deployConfig.Config)
 	}
 	if c.ipDetect != "" && !autodetection.CheckMethod(c.ipDetect) {
@@ -235,7 +252,7 @@ func (c *JoinOptions) preCheckKcAgent(ip string) bool {
 		return false
 	}
 	// check if kc-agent is running
-	ret, err := sshutils.SSHCmdWithSudo(c.deployConfig.SSHConfig, ip, "systemctl --all --type service | grep kc-agent | wc -l")
+	ret, err := sshutils.SSHCmdWithSudo(c.sshConfig, ip, "systemctl --all --type service | grep kc-agent | wc -l")
 	logger.V(2).Info(ret.String())
 	if err != nil {
 		logger.Errorf("check node %s failed: %s", ip, err.Error())
@@ -256,7 +273,7 @@ func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) err
 		config.DefaultPkgPath,
 		filepath.Join(config.DefaultPkgPath, "kc/bin/kubeclipper-agent"))
 	logger.V(3).Info("join agent node hook:", hook)
-	err := utils.SendPackageV2(c.deployConfig.SSHConfig, c.deployConfig.Pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackageV2(c.sshConfig, c.deployConfig.Pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
 	if err != nil {
 		return errors.Wrap(err, "SendPackageV2")
 	}
@@ -271,7 +288,7 @@ func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) err
 		sshutils.WrapEcho(agentConfig, "/etc/kubeclipper-agent/kubeclipper-agent.yaml"), // write agent.yaml
 	}
 	for _, cmd := range cmdList {
-		ret, err := sshutils.SSHCmdWithSudo(c.deployConfig.SSHConfig, node, cmd)
+		ret, err := sshutils.SSHCmdWithSudo(c.sshConfig, node, cmd)
 		if err != nil {
 			return err
 		}
@@ -284,7 +301,7 @@ func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) err
 
 func (c *JoinOptions) enableAgent(node string, metadata options.Metadata) error {
 	// enable agent service
-	ret, err := sshutils.SSHCmdWithSudo(c.deployConfig.SSHConfig, node, "systemctl daemon-reload && systemctl enable kc-agent --now")
+	ret, err := sshutils.SSHCmdWithSudo(c.sshConfig, node, "systemctl daemon-reload && systemctl enable kc-agent --now")
 	if err != nil {
 		return errors.Wrap(err, "enable kc agent")
 	}
@@ -374,7 +391,7 @@ func (c *JoinOptions) sendCerts(ip string) error {
 			return errors.WithMessage(err, "check file exist")
 		}
 		if !exist {
-			if err = c.deployConfig.SSHConfig.DownloadSudo(c.deployConfig.ServerIPs[0], file, file); err != nil {
+			if err = c.sshConfig.DownloadSudo(c.deployConfig.ServerIPs[0], file, file); err != nil {
 				return errors.WithMessage(err, "download cert from server")
 			}
 		}
@@ -390,18 +407,15 @@ func (c *JoinOptions) sendCerts(ip string) error {
 			destKey = filepath.Dir(c.deployConfig.MQ.ClientKey)
 		}
 
-		err := utils.SendPackageV2(c.deployConfig.SSHConfig,
-			c.deployConfig.MQ.CA, []string{ip}, destCa, nil, nil)
+		err := utils.SendPackageV2(c.sshConfig, c.deployConfig.MQ.CA, []string{ip}, destCa, nil, nil)
 		if err != nil {
 			return err
 		}
-		err = utils.SendPackageV2(c.deployConfig.SSHConfig,
-			c.deployConfig.MQ.ClientCert, []string{ip}, destCert, nil, nil)
+		err = utils.SendPackageV2(c.sshConfig, c.deployConfig.MQ.ClientCert, []string{ip}, destCert, nil, nil)
 		if err != nil {
 			return err
 		}
-		err = utils.SendPackageV2(c.deployConfig.SSHConfig,
-			c.deployConfig.MQ.ClientKey, []string{ip}, destKey, nil, nil)
+		err = utils.SendPackageV2(c.sshConfig, c.deployConfig.MQ.ClientKey, []string{ip}, destKey, nil, nil)
 		return err
 	}
 
