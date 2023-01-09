@@ -23,11 +23,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
+
+	"github.com/onsi/ginkgo"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -40,11 +47,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
 	"github.com/kubeclipper/kubeclipper/test/framework"
-	"github.com/onsi/ginkgo"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (

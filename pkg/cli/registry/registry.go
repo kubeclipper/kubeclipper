@@ -940,7 +940,7 @@ func (o *RegistryOptions) pushImage() error {
 }
 
 func (o *RegistryOptions) normalTag() error {
-	retag := fmt.Sprintf(`docker images | grep / | grep -v k8s.gcr.io | grep -v %s:%d | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort, o.Node, o.RegistryPort)
+	retag := fmt.Sprintf(`docker images | grep / | grep -v k8s.gcr.io | grep -v registry.k8s.io | grep -v %s:%d | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort, o.Node, o.RegistryPort)
 	logger.V(3).Info("normalTag hook:", retag)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, retag)
 	if err != nil {
@@ -970,7 +970,7 @@ func (o *RegistryOptions) normalTag() error {
 
 func (o *RegistryOptions) specialTag() error {
 	// add 'ip:port/library'
-	dockerTag := fmt.Sprintf(`docker images | grep -v registry | grep -v / | grep -v k8s.gcr.io | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/library/"$1":"$2}'`, o.Node, o.RegistryPort)
+	dockerTag := fmt.Sprintf(`docker images | grep -v registry | grep -v / | grep -v k8s.gcr.io | grep -v registry.k8s.io | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/library/"$1":"$2}'`, o.Node, o.RegistryPort)
 	logger.V(3).Info("specialTag hook:", dockerTag)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, dockerTag)
 	if err != nil {
@@ -996,30 +996,35 @@ func (o *RegistryOptions) specialTag() error {
 		}
 	}
 
-	// remove tag 'k8s.gcr.io'
-	dockerTag2 := fmt.Sprintf(`docker images | grep k8s.gcr.io | sed 's/k8s.gcr.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort)
-	logger.V(3).Info("dockerTag2 hook:", dockerTag2)
-	ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, dockerTag2)
-	if err != nil {
-		return err
+	// remove tag 'k8s.gcr.io' and 'registry.k8s.io'
+	dockerTagCmds := []string{
+		fmt.Sprintf(`docker images | grep k8s.gcr.io | sed 's/k8s.gcr.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort),
+		fmt.Sprintf(`docker images | grep registry.k8s.io | sed 's/registry.k8s.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort),
 	}
-	if err = ret.Error(); err != nil {
-		return err
-	}
-	logger.V(4).Info("dockerTag2 out:", ret.Stdout)
-	split = strings.Split(ret.Stdout, "\n")
-	logger.V(4).Info("dockerTag2 out cmd count:", len(split))
-	logger.V(4).Info("dockerTag2 out cmd list:", split)
-	for _, cmd := range split {
-		if cmd == "" {
-			continue
-		}
-		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
+	for _, tagCmd := range dockerTagCmds {
+		logger.V(3).Info("dockerTag2 hook:", tagCmd)
+		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, tagCmd)
 		if err != nil {
 			return err
 		}
 		if err = ret.Error(); err != nil {
 			return err
+		}
+		logger.V(4).Info("dockerTag2 out:", ret.Stdout)
+		split = strings.Split(ret.Stdout, "\n")
+		logger.V(4).Info("dockerTag2 out cmd count:", len(split))
+		logger.V(4).Info("dockerTag2 out cmd list:", split)
+		for _, cmd := range split {
+			if cmd == "" {
+				continue
+			}
+			ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, cmd)
+			if err != nil {
+				return err
+			}
+			if err = ret.Error(); err != nil {
+				return err
+			}
 		}
 	}
 
