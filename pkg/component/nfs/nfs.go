@@ -214,8 +214,8 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 		{
 			ID:         strutil.GetUUID(),
 			Name:       "deployNFSProvisionerNameSpace",
-			Timeout:    metav1.Duration{Duration: 3 * time.Second},
-			ErrIgnore:  true,
+			Timeout:    metav1.Duration{Duration: 30 * time.Second},
+			ErrIgnore:  false,
 			RetryTimes: 1,
 			Nodes:      stepMaster0,
 			Action:     v1.ActionInstall,
@@ -229,8 +229,8 @@ func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 		{
 			ID:         strutil.GetUUID(),
 			Name:       "deployNFSProvisioner",
-			Timeout:    metav1.Duration{Duration: 3 * time.Second},
-			ErrIgnore:  true,
+			Timeout:    metav1.Duration{Duration: 30 * time.Second},
+			ErrIgnore:  false,
 			RetryTimes: 1,
 			Nodes:      stepMaster0,
 			Action:     v1.ActionInstall,
