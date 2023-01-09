@@ -290,9 +290,9 @@ func TestGetStringValueWithDefault(t *testing.T) {
 			args: args{
 				req:  request,
 				name: ParameterName,
-				dv:   "小明",
+				dv:   "Jack",
 			},
-			want: "小明",
+			want: "Jack",
 		},
 	}
 	for _, tt := range tests {
