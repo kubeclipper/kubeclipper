@@ -120,3 +120,77 @@ func TestStringMask(t *testing.T) {
 		})
 	}
 }
+
+func TestHasString(t *testing.T) {
+	type args struct {
+		slice []string
+		str   string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "slice has string",
+			args: args{
+				slice: []string{
+					"a", "b", "c",
+				},
+				str: "a",
+			},
+			want: true,
+		},
+		{
+			name: "slice has string",
+			args: args{
+				slice: []string{
+					"a", "b", "c",
+				},
+				str: "d",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := HasString(tt.args.slice, tt.args.str); got != tt.want {
+				t.Errorf("HasString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRemoveString(t *testing.T) {
+	type args struct {
+		slice  []string
+		remove func(item string) bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			name: "remove string",
+			args: args{
+				slice: []string{
+					"a", "b", "c",
+				},
+				remove: func(item string) bool {
+					return item == "c"
+				},
+			},
+			want: []string{
+				"a", "b",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RemoveString(tt.args.slice, tt.args.remove); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("RemoveString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
