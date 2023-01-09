@@ -178,10 +178,7 @@ func TestRemoveString(t *testing.T) {
 					"a", "b", "c",
 				},
 				remove: func(item string) bool {
-					if item == "c" {
-						return true
-					}
-					return false
+					return item == "c"
 				},
 			},
 			want: []string{
