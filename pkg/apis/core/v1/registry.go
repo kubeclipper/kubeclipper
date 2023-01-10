@@ -123,6 +123,8 @@ func SetupWebService(h *handler) *restful.WebService {
 		Param(webservice.PathParameter("name", "cluster name")).
 		Param(webservice.QueryParameter(query.ParameterForce, "force delete cluster, will ignore operation error").
 			Required(false).DataType("boolean").DefaultValue("false")).
+		Param(webservice.QueryParameter("delegateToCloudProvider", "deleting machines directly by the cloud provider, skipping the operation of deleting the cluster and deleting only the data").
+			Required(false).DataType("boolean").DefaultValue("false")).
 		Param(webservice.QueryParameter(query.ParamDryRun, "dry run delete clusters").
 			Required(false).DataType("boolean")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
