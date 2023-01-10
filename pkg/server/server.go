@@ -28,7 +28,6 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
@@ -41,7 +40,6 @@ import (
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/apis/iam/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/apis/oauth"
 	"github.com/kubeclipper/kubeclipper/pkg/apis/proxy"
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/apis/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/auditing"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/mfa"
@@ -61,9 +59,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/dnscontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/projectcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/regioncontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/tokencontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/healthz"
@@ -74,10 +70,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
-	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-	schemetenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/server/config"
 	"github.com/kubeclipper/kubeclipper/pkg/server/filters"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry"
@@ -117,7 +111,7 @@ func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 		s.cache, err = cache.NewMemory()
 	case cache.ProviderEtcd:
 		iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-			s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
+			s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
 		s.cache, err = cache.NewEtcd(iamOperator, iamOperator)
 	case cache.ProviderRedis:
 		s.cache, err = cache.NewRedis(s.Config.CacheOptions.RedisOptions)
@@ -190,14 +184,11 @@ func (s *APIServer) Run(stopCh <-chan struct{}) (err error) {
 func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 	infoFactory := &request.InfoFactory{
 		APIPrefixes: sets.NewString("api", "cluster"),
-		GlobalResources: []schema.GroupResource{
-			schemetenantv1.Resource("projects"),
-		},
 	}
 	s.container.Filter(filters.WithRequestInfo(infoFactory))
 
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
+		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
 	tokenOperator := auth.NewTokenOperator(iamOperator, s.Config.AuthenticationOptions)
 
 	authnPathAuthenticator, err := authnpath.NewAuthenticator([]string{"/oauth/login", "/version", "/metrics", "/healthz"})
@@ -261,7 +252,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	leaseOperator := lease.NewLeaseOperator(s.storageFactory.Leases())
 	opOperator := operation.NewOperationOperator(s.storageFactory.Operations())
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
+		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
 	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator, clusterOperator)
 
 	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator, &s.terminationChan)
@@ -276,13 +267,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 
 	tokenOperator := auth.NewTokenOperator(iamOperator, s.Config.AuthenticationOptions)
 
-	tenantOperator := tenant.NewProjectOperator(s.storageFactory.Project())
-
-	if err := iamv1.AddToContainer(s.container, iamOperator, tenantOperator, s.rbacAuthorizer, tokenOperator); err != nil {
-		return err
-	}
-
-	if err := tenantv1.AddToContainer(s.container, tenantOperator, clusterOperator, iamOperator, s.rbacAuthorizer); err != nil {
+	if err := iamv1.AddToContainer(s.container, iamOperator, s.rbacAuthorizer, tokenOperator); err != nil {
 		return err
 	}
 
@@ -326,8 +311,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	s.Services = append(s.Services, ctrl)
 
 	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator,
-		leaseOperator, coreOperator, deliverySvc, tokenOperator, tenantOperator,
-		s.Config.GenericServerRunOptions, &s.terminationChan); err != nil {
+		leaseOperator, coreOperator, deliverySvc, tokenOperator, s.Config.GenericServerRunOptions, &s.terminationChan); err != nil {
 		return err
 	}
 	if err = proxy.AddToContainer(s.container, clusterOperator); err != nil {
@@ -343,7 +327,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 
 func (s *APIServer) migrate() error {
 	operator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
-		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
+		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
 	if err := s.migrateRole(operator); err != nil {
 		return err
 	}
@@ -364,13 +348,6 @@ func (s *APIServer) migrateRole(operator iam.Operator) error {
 
 	for index := range Roles {
 		if _, err = operator.CreateRole(context.TODO(), &Roles[index]); err != nil {
-			return err
-		}
-	}
-
-	for index := range ProjectRolesTemplate {
-		fmt.Println("ProjectRolesTemplate :", ProjectRolesTemplate[index].Name)
-		if _, err = operator.CreateProjectRole(context.TODO(), &ProjectRolesTemplate[index]); err != nil {
 			return err
 		}
 	}
@@ -436,15 +413,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	coreOperator := core.NewOperator(storageFactory.ConfigMaps())
 	opOperator := operation.NewOperationOperator(storageFactory.Operations())
 	iamOperator := iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(), storageFactory.GlobalRoleBindings(),
-		storageFactory.Tokens(), storageFactory.LoginRecords(), s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding())
-	projectOperator := tenant.NewProjectOperator(storageFactory.Project())
-	if err = (&nodecontroller.NodeReconciler{
-		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
-		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
-		NodeWriter:    clusterOperator,
-	}).SetupWithManager(mgr, informerFactory); err != nil {
-		return err
-	}
+		storageFactory.Tokens(), storageFactory.LoginRecords())
 	if err = (&regioncontroller.RegionReconciler{
 		NodeLister:   informerFactory.Core().V1().Nodes().Lister(),
 		RegionLister: informerFactory.Core().V1().Regions().Lister(),
@@ -525,16 +494,6 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
-	if err = (&projectcontroller.ProjectReconciler{
-		ProjectLister: informerFactory.Tenant().V1().Projects().Lister(),
-		ProjectWriter: projectOperator,
-		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
-		NodeWriter:    clusterOperator,
-		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
-		IAMOperator:   iamOperator,
-	}).SetupWithManager(mgr, informerFactory); err != nil {
-		return err
-	}
 	(&controller.ClusterStatusMon{
 		ClusterWriter:       clusterOperator,
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
@@ -553,8 +512,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	}).SetupWithManager(mgr)
 	(&controller.IAMStatusMon{
 		IAMOperator: iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(),
-			storageFactory.GlobalRoleBindings(), storageFactory.Tokens(), storageFactory.LoginRecords(),
-			s.storageFactory.ProjectRole(), s.storageFactory.ProjectRoleBinding()),
+			storageFactory.GlobalRoleBindings(), storageFactory.Tokens(), storageFactory.LoginRecords()),
 		AuthenticationOpts: s.Config.AuthenticationOptions,
 	}).SetupWithManager(mgr)
 	return nil

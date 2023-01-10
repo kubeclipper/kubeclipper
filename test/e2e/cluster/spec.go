@@ -283,8 +283,6 @@ var _ = SIGDescribe("[Serial]", func() {
 		ginkgo.By("create aio cluster with containerd")
 		beforeEachCreateCluster(f, clu)()
 
-		clusterName = fmt.Sprintf("%s-%s", framework.DefaultE2EProject, clusterName)
-
 		clus, err := f.Client.DescribeCluster(ctx, clusterName)
 		framework.ExpectNoError(err)
 

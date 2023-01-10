@@ -34,7 +34,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 )
 
@@ -131,55 +130,6 @@ func (a *Authorizer) visitRulesFor(ctx context.Context, requestAttributes author
 			}
 		}
 	}
-
-	project := requestAttributes.GetProject()
-	if project == "" &&
-		requestAttributes.GetResource() == "cluster" &&
-		requestAttributes.GetSubresource() == "proxy" {
-		c, err := a.cm.GetClusterEx(ctx, requestAttributes.GetName(), "")
-		if err != nil && !visitor(nil, "", nil, err) {
-			return
-		}
-		if c != nil {
-			project = c.Labels[common.LabelProject]
-		}
-	}
-
-	if requestAttributes.GetResourceScope() == request.ProjectScope {
-		if projectRoleBindings, err := a.am.ListProjectRoleBinding(ctx, &query.Query{
-			Pagination:      query.NoPagination(),
-			ResourceVersion: "0",
-			LabelSelector:   fmt.Sprintf("%s=%s", common.LabelProject, project),
-			FieldSelector:   "",
-		}); err != nil {
-			if !visitor(nil, "", nil, err) {
-				return
-			}
-		} else {
-			sourceDescriber := &projectRoleBindingDescriber{}
-			for _, projectRoleBinding := range projectRoleBindings.Items {
-				subjectIndex, applies := appliesTo(requestAttributes.GetUser(), projectRoleBinding.Subjects, "")
-				if !applies {
-					continue
-				}
-				regoPolicy, rules, err := a.getRoleReferenceRules(ctx, projectRoleBinding.RoleRef)
-				if err != nil {
-					visitor(nil, "", nil, err)
-					continue
-				}
-				sourceDescriber.binding = projectRoleBinding.DeepCopy()
-				sourceDescriber.subject = &projectRoleBinding.Subjects[subjectIndex]
-				if !visitor(sourceDescriber, regoPolicy, nil, nil) {
-					return
-				}
-				for i := range rules {
-					if !visitor(sourceDescriber, "", &rules[i], nil) {
-						return
-					}
-				}
-			}
-		}
-	}
 }
 
 // TODO: add am interface rather than iam.Operator
@@ -195,16 +145,6 @@ func (a *Authorizer) getRoleReferenceRules(ctx context.Context, roleRef rbacv1.R
 			return "", nil, err
 		}
 		return globalRole.Annotations[common.RegoOverrideAnnotation], globalRole.Rules, nil
-	case common.ResourceKindProjectGlobalRole:
-		projectRole, err := a.am.GetProjectRoleEx(ctx, roleRef.Name, "0")
-		if err != nil {
-			if errors.IsNotFound(err) {
-				return "", empty, nil
-			}
-			return "", nil, err
-		}
-		return projectRole.Annotations[common.RegoOverrideAnnotation], projectRole.Rules, nil
-
 	default:
 		return "", nil, fmt.Errorf("unsupported role reference kind: %q", roleRef.Kind)
 	}
@@ -217,20 +157,6 @@ type globalRoleBindingDescriber struct {
 
 func (d *globalRoleBindingDescriber) String() string {
 	return fmt.Sprintf("GlobalRoleBinding %q of %s %q to %s",
-		d.binding.Name,
-		d.binding.RoleRef.Kind,
-		d.binding.RoleRef.Name,
-		describeSubject(d.subject, ""),
-	)
-}
-
-type projectRoleBindingDescriber struct {
-	binding *iamv1.ProjectRoleBinding
-	subject *rbacv1.Subject
-}
-
-func (d *projectRoleBindingDescriber) String() string {
-	return fmt.Sprintf("ProjectRoleBinding %q of %s %q to %s",
 		d.binding.Name,
 		d.binding.RoleRef.Kind,
 		d.binding.RoleRef.Name,

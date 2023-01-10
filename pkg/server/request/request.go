@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -56,20 +55,10 @@ type Info struct {
 	Name string
 	// Parts are the path parts for the request, always starting with /{resource}/{name}
 	// Parts []string
-	// Project of requested resource, for non-Project resources, this may be empty
-	Project string
-	// Scope of requested resource.
-	ResourceScope string
-}
-
-// IsProjectScope check request is project scope
-func (info Info) IsProjectScope() bool {
-	return info.ResourceScope == ProjectScope
 }
 
 type InfoFactory struct {
-	APIPrefixes     sets.String
-	GlobalResources []schema.GroupResource
+	APIPrefixes sets.String
 }
 
 /*
@@ -78,8 +67,7 @@ Resource paths
 eg: /api/core.kubeclipper.io/v1/nodes, /api/core.kubeclipper.io/v1/clusters
 /api/{api-group}/{version}/{resource}/{resourceName}
 eg: /api/core.kubeclipper.io/v1/nodes/node1
-/api/{api-group}/{version}/projects/{project}/{resource}/{resourceName}
-eg: /api/core.kubeclipper.io/v1/projects/demo1/nodes/node1
+
 
 Kubernetes proxy paths
 /cluster/{cluster-name}/{k8s-resource}
@@ -138,20 +126,10 @@ func (i *InfoFactory) NewRequestInfo(req *http.Request) (*Info, error) {
 		requestInfo.IsResourceRequest = true
 		requestInfo.Resource = "clusters"
 		requestInfo.Subresource = "proxy"
-		requestInfo.ResourceScope = ProjectScope
 		return &requestInfo, nil
 	}
 	// parsing successful, so we now know the proper value for .Parts
 	// requestInfo.Parts = currentParts
-	// URL forms: /projects/{project}/*
-	if currentParts[0] == "projects" {
-		if len(currentParts) > 1 {
-			requestInfo.Project = currentParts[1]
-		}
-		if len(currentParts) > 2 {
-			currentParts = currentParts[2:]
-		}
-	}
 
 	// parts look like: resource/resourceName/subresource/other/stuff/we/don't/interpret
 	switch {
@@ -164,8 +142,6 @@ func (i *InfoFactory) NewRequestInfo(req *http.Request) (*Info, error) {
 	case len(currentParts) >= 1:
 		requestInfo.Resource = currentParts[0]
 	}
-
-	requestInfo.ResourceScope = i.resolveResourceScope(requestInfo)
 
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
@@ -193,30 +169,4 @@ func splitPath(path string) []string {
 		return []string{}
 	}
 	return strings.Split(path, "/")
-}
-
-// request scope enum
-const (
-	GlobalScope  = "Global"
-	ProjectScope = "Project"
-)
-
-func (i *InfoFactory) resolveResourceScope(request Info) string {
-	if i.isGlobalScopeResource(request.APIGroup, request.Resource) {
-		return GlobalScope
-	}
-	if request.Project != "" {
-		return ProjectScope
-	}
-
-	return GlobalScope
-}
-
-func (i *InfoFactory) isGlobalScopeResource(apiGroup, resource string) bool {
-	for _, groupResource := range i.GlobalResources {
-		if groupResource.Group == apiGroup && groupResource.Resource == resource {
-			return true
-		}
-	}
-	return false
 }

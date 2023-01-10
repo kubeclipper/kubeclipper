@@ -26,19 +26,16 @@ import (
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/typed/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/typed/iam/v1"
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/typed/tenant/v1"
 )
 
 type Interface interface {
 	CoreV1() corev1.CoreV1Interface
 	IamV1() iamv1.IamV1Interface
-	TenantV1() tenantv1.TenantV1Interface
 }
 
 type Clientset struct {
-	corev1   *corev1.CoreV1Client
-	iamv1    *iamv1.IamV1Client
-	tenantv1 *tenantv1.TenantV1Client
+	corev1 *corev1.CoreV1Client
+	iamv1  *iamv1.IamV1Client
 }
 
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
@@ -47,11 +44,6 @@ func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 
 func (c *Clientset) IamV1() iamv1.IamV1Interface {
 	return c.iamv1
-}
-
-// TenantV1 return tenant v1 client
-func (c *Clientset) TenantV1() tenantv1.TenantV1Interface {
-	return c.tenantv1
 }
 
 func NewForConfig(c *rest.Config) (*Clientset, error) {
@@ -69,10 +61,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.iamv1, err = iamv1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.tenantv1, err = tenantv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}

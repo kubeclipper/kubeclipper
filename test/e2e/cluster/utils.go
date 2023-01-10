@@ -62,15 +62,6 @@ func SetClusterName(name string) Setter {
 	}
 }
 
-func SetClusterProject(name string) Setter {
-	return func(c *corev1.Cluster) {
-		if c.Labels == nil {
-			c.Labels = make(map[string]string, 0)
-		}
-		c.Labels[common.LabelProject] = framework.DefaultE2EProject
-	}
-}
-
 func SetClusterVersion(version string) Setter {
 	return func(c *corev1.Cluster) {
 		c.KubernetesVersion = version
@@ -121,9 +112,6 @@ func initCluster() *corev1.Cluster {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-cluster",
-			Labels: map[string]string{
-				common.LabelProject: framework.DefaultE2EProject,
-			},
 			Annotations: map[string]string{
 				common.AnnotationOffline: "true",
 			},

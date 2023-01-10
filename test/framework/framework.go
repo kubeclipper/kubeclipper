@@ -5,11 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
-
 	"github.com/onsi/ginkgo"
 	"k8s.io/client-go/util/homedir"
 
@@ -110,24 +105,6 @@ func (f *Framework) BeforeEach() {
 	// Check f.client is work
 	_, err := f.Client.Version(context.TODO())
 	ExpectNoError(err)
-
-	// Create e2e-test project
-	_, _ = f.Client.CreateProject(context.TODO(), &tenantv1.Project{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Project",
-			APIVersion: "tenant.kubeclipper.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: DefaultE2EProject,
-			Annotations: map[string]string{
-				common.AnnotationDescription: "project for e2e",
-			},
-		},
-		Spec: tenantv1.ProjectSpec{
-			Manager: "admin",
-			Nodes:   []string{},
-		},
-	})
 	// Other init
 }
 
@@ -150,9 +127,6 @@ func (f *Framework) AfterEach() {
 	for _, afterEachFn := range f.afterEaches {
 		afterEachFn(f, ginkgo.CurrentGinkgoTestDescription().Failed)
 	}
-
-	// clean e2e-test project
-	_ = f.Client.DeleteProject(context.TODO(), DefaultE2EProject)
 
 	// TODO: other check
 }
