@@ -21,7 +21,6 @@ package scheme
 import (
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -43,5 +42,4 @@ var (
 func init() {
 	_ = corev1.AddToScheme(Scheme)
 	_ = iamv1.AddToScheme(Scheme)
-	_ = tenantv1.AddToScheme(Scheme)
 }

@@ -76,12 +76,6 @@ type Attributes interface {
 
 	// GetPath returns the path of the request
 	GetPath() string
-
-	// GetProject returns the project of the request
-	GetProject() string
-
-	// GetResourceScope returns the scope of the resource requested, if a request is for a REST object.
-	GetResourceScope() string
 }
 
 type Authorizer interface {

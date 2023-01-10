@@ -111,7 +111,6 @@ const (
 	CloudProviderFinalizer = "finalizer.cloudprovider.kubeclipper.io"
 	OperationFinalizer     = "finalizer.operation.kubeclipper.io"
 	BackupFinalizer        = "finalizer.backup.kubeclipper.io"
-	ProjectFinalizer       = "finalizer.project.kubeclipper.io"
 )
 
 type ClusterStatus struct {

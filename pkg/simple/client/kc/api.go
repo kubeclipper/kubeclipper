@@ -29,31 +29,27 @@ import (
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 
-	tenantv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/tenant/v1"
-
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
 
 const (
-	ListNodesPath        = "/api/core.kubeclipper.io/v1/nodes"
-	clustersPath         = "/api/core.kubeclipper.io/v1/clusters"
-	clusterInProjectPath = "/api/core.kubeclipper.io/v1/projects"
-	clustersCertPath     = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
-	componentPath        = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
-	backupPath           = "/api/core.kubeclipper.io/v1/backups"
-	backupPonitPath      = "/api/core.kubeclipper.io/v1/backuppoints"
-	usersPath            = "/api/iam.kubeclipper.io/v1/users"
-	rolesPath            = "/api/iam.kubeclipper.io/v1/roles"
-	platformPath         = "/api/config.kubeclipper.io/v1/template"
-	publicKeyPath        = "/api/config.kubeclipper.io/v1/terminal.key"
-	versionPath          = "/version"
-	componentMetaPath    = "/api/config.kubeclipper.io/v1/componentmeta"
-	configmapPath        = "/api/core.kubeclipper.io/v1/configmaps"
-	projectPath          = "/api/tenant.kubeclipper.io/v1/projects"
-	templatePath         = "/api/core.kubeclipper.io/v1/templates"
-	registryPath         = "/api/core.kubeclipper.io/v1/registries"
-	regionPath           = "/api/core.kubeclipper.io/v1/regions"
+	ListNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
+	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
+	clustersCertPath  = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
+	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
+	backupPath        = "/api/core.kubeclipper.io/v1/backups"
+	backupPonitPath   = "/api/core.kubeclipper.io/v1/backuppoints"
+	usersPath         = "/api/iam.kubeclipper.io/v1/users"
+	rolesPath         = "/api/iam.kubeclipper.io/v1/roles"
+	platformPath      = "/api/config.kubeclipper.io/v1/template"
+	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
+	versionPath       = "/version"
+	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
+	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
+	templatePath      = "/api/core.kubeclipper.io/v1/templates"
+	registryPath      = "/api/core.kubeclipper.io/v1/registries"
+	regionPath        = "/api/core.kubeclipper.io/v1/regions"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -137,20 +133,6 @@ func (cli *Client) ListClusters(ctx context.Context, query Queries) (*ClustersLi
 
 func (cli *Client) DescribeCluster(ctx context.Context, name string) (*ClustersList, error) {
 	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", clustersPath, name), nil, nil)
-	defer ensureReaderClosed(serverResp)
-	if err != nil {
-		return nil, err
-	}
-	cluster := v1.Cluster{}
-	err = json.NewDecoder(serverResp.body).Decode(&cluster)
-	clusters := ClustersList{
-		Items: []v1.Cluster{cluster},
-	}
-	return &clusters, err
-}
-
-func (cli *Client) DescribeClusterInProject(ctx context.Context, projectName, clusterName string) (*ClustersList, error) {
-	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/clusters/%s", clusterInProjectPath, projectName, clusterName), nil, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
@@ -448,12 +430,6 @@ func (cli *Client) UpgradeCluster(ctx context.Context, cluName string, upgradeCl
 	return err
 }
 
-func (cli *Client) UpgradeClusterInProject(ctx context.Context, proName, cluName string, upgradeCluster *corev1.ClusterUpgrade) error {
-	resp, err := cli.post(ctx, fmt.Sprintf("%s/%s/clusters/%s/upgrade", clusterInProjectPath, proName, cluName), nil, upgradeCluster, nil)
-	defer ensureReaderClosed(resp)
-	return err
-}
-
 func (cli *Client) ListConfigMaps(ctx context.Context, query Queries) (*ConfigMapList, error) {
 	serverResp, err := cli.get(ctx, configmapPath, query.ToRawQuery(), nil)
 	defer ensureReaderClosed(serverResp)
@@ -514,68 +490,6 @@ func (cli *Client) UpdateConfigMap(ctx context.Context, cm *v1.ConfigMap) (*Conf
 		Items: []v1.ConfigMap{v},
 	}
 	return &cms, err
-}
-
-func (cli *Client) CreateProject(ctx context.Context, project *tenantv1.Project) (*tenantv1.ProjectList, error) {
-	serverResp, err := cli.post(ctx, projectPath, nil, project, nil)
-	defer ensureReaderClosed(serverResp)
-	if err != nil {
-		return nil, err
-	}
-	v := tenantv1.Project{}
-	err = json.NewDecoder(serverResp.body).Decode(&v)
-	projects := tenantv1.ProjectList{
-		Items: []tenantv1.Project{v},
-	}
-	return &projects, err
-}
-
-func (cli *Client) UpdateProject(ctx context.Context, cm *tenantv1.Project) (*tenantv1.ProjectList, error) {
-	serverResp, err := cli.put(ctx, fmt.Sprintf("%s/%s", projectPath, cm.Name), nil, cm, nil)
-	defer ensureReaderClosed(serverResp)
-	if err != nil {
-		return nil, err
-	}
-	v := tenantv1.Project{}
-	err = json.NewDecoder(serverResp.body).Decode(&v)
-	projects := &tenantv1.ProjectList{
-		Items: []tenantv1.Project{v},
-	}
-	return projects, err
-}
-
-func (cli *Client) DeleteProject(ctx context.Context, name string) error {
-	serverResp, err := cli.delete(ctx, fmt.Sprintf("%s/%s", projectPath, name), nil, nil)
-	defer ensureReaderClosed(serverResp)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (cli *Client) ListProjects(ctx context.Context, query Queries) (*tenantv1.ProjectList, error) {
-	serverResp, err := cli.get(ctx, projectPath, query.ToRawQuery(), nil)
-	defer ensureReaderClosed(serverResp)
-	if err != nil {
-		return nil, err
-	}
-	projects := tenantv1.ProjectList{}
-	err = json.NewDecoder(serverResp.body).Decode(&projects)
-	return &projects, err
-}
-
-func (cli *Client) DescribeProjects(ctx context.Context, name string) (*tenantv1.ProjectList, error) {
-	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", projectPath, name), nil, nil)
-	defer ensureReaderClosed(serverResp)
-	if err != nil {
-		return nil, err
-	}
-	project := tenantv1.Project{}
-	err = json.NewDecoder(serverResp.body).Decode(&project)
-	projects := &tenantv1.ProjectList{
-		Items: []tenantv1.Project{project},
-	}
-	return projects, err
 }
 
 func (cli *Client) CreateTemplate(ctx context.Context, template *v1.Template) (*TemplateList, error) {

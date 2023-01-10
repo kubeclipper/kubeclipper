@@ -39,7 +39,6 @@ const (
 
 type ClusterUpgradeOpts struct {
 	BaseOptions
-	ProjectName   string
 	ClusterName   string
 	Version       string
 	Online        bool
@@ -70,7 +69,6 @@ func NewCmdClusterUpgrade(streams options.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&c.ProjectName, "project-name", "p", c.ProjectName, "project name")
 	cmd.Flags().StringVarP(&c.ClusterName, "cluster-name", "c", c.ClusterName, "cluster name")
 	cmd.Flags().StringVarP(&c.Version, "version", "v", c.Version, "target version")
 	cmd.Flags().BoolVar(&c.Online, "online", c.Online, "The way to upgrade")
@@ -103,7 +101,7 @@ func (c *ClusterUpgradeOpts) Validates() error {
 		return err
 	}
 
-	clu, err := c.checkClusterAndProjectExist()
+	clu, err := c.checkClusterExist()
 	if err != nil {
 		return err
 	}
@@ -121,27 +119,13 @@ func (c *ClusterUpgradeOpts) Run() error {
 		LocalRegistry: c.LocalRegistry,
 	}
 
-	var err error
-	if c.ProjectName != "" {
-		err = c.Client.UpgradeClusterInProject(context.TODO(), c.ProjectName, c.ClusterName, clusterUpgrade)
-	} else {
-		err = c.Client.UpgradeCluster(context.TODO(), c.ClusterName, clusterUpgrade)
-	}
-	return err
+	return c.Client.UpgradeCluster(context.TODO(), c.ClusterName, clusterUpgrade)
 }
 
-func (c *ClusterUpgradeOpts) checkClusterAndProjectExist() (corev1.Cluster, error) {
+func (c *ClusterUpgradeOpts) checkClusterExist() (corev1.Cluster, error) {
 	var err error
 	var clusterList *kc.ClustersList
-	if c.ProjectName != "" {
-		_, err = c.Client.DescribeProjects(context.TODO(), c.ProjectName)
-		if err != nil {
-			return corev1.Cluster{}, err
-		}
-		clusterList, err = c.Client.DescribeClusterInProject(context.TODO(), c.ProjectName, c.ClusterName)
-	} else {
-		clusterList, err = c.Client.DescribeCluster(context.TODO(), c.ClusterName)
-	}
+	clusterList, err = c.Client.DescribeCluster(context.TODO(), c.ClusterName)
 	if err != nil {
 		return corev1.Cluster{}, err
 	}

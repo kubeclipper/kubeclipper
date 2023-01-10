@@ -1791,7 +1791,7 @@ func (in *Step) DeepCopyInto(out *Step) {
 		*out = make([]StepNode, len(*in))
 		copy(*out, *in)
 	}
-	in.Timeout.DeepCopyInto(&out.Timeout)
+	out.Timeout = in.Timeout
 	if in.Commands != nil {
 		in, out := &in.Commands, &out.Commands
 		*out = make([]Command, len(*in))

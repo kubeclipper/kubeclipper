@@ -48,14 +48,10 @@ const (
 
 	LabelClusterProviderType = "kubeclipper.io/clusterProviderType"
 	LabelClusterProviderName = "kubeclipper.io/clusterProviderName"
-
-	LabelProject                   = "kubeclipper.io/project"
-	LabelProjectRoleBindingManager = "kubeclipper.io/project-role-binding-manager"
 )
 
 const (
-	ResourceKindGlobalRole        = "GlobalRole"
-	ResourceKindProjectGlobalRole = "ProjectRole"
+	ResourceKindGlobalRole = "GlobalRole"
 )
 
 const (

@@ -44,17 +44,13 @@ import (
 	"go.uber.org/zap"
 	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	r "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
-	"github.com/kubeclipper/kubeclipper/pkg/models"
-
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
@@ -69,7 +65,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
-	"github.com/kubeclipper/kubeclipper/pkg/models/tenant"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -77,7 +72,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
 	apirequest "github.com/kubeclipper/kubeclipper/pkg/server/request"
-	reqpkg "github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
@@ -101,7 +95,6 @@ type handler struct {
 	platformOperator platform.Operator
 	coreOperator     core.Operator
 	delivery         service.IDelivery
-	tenantOperator   tenant.Operator
 	tokenOperator    auth.TokenManagementInterface
 	terminationChan  *chan struct{}
 }
@@ -120,7 +113,7 @@ var (
 
 func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
 	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery,
-	tokenOperator auth.TokenManagementInterface, tenantOperator tenant.Operator, terminationChan *chan struct{}) *handler {
+	tokenOperator auth.TokenManagementInterface, terminationChan *chan struct{}) *handler {
 	return &handler{
 		genericConfig:    conf,
 		clusterOperator:  clusterOperator,
@@ -129,7 +122,6 @@ func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator
 		platformOperator: platform,
 		leaseOperator:    leaseOperator,
 		coreOperator:     coreOperator,
-		tenantOperator:   tenantOperator,
 		tokenOperator:    tokenOperator,
 		terminationChan:  terminationChan,
 	}
@@ -140,12 +132,6 @@ func (h *handler) ListClusters(request *restful.Request, response *restful.Respo
 	if q.Watch {
 		h.watchCluster(request, response, q)
 		return
-	}
-
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
 	}
 
 	if clientrest.IsInformerRawQuery(request.Request) {
@@ -178,14 +164,6 @@ func (h *handler) DescribeCluster(request *restful.Request, response *restful.Re
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleNotFound(response, request, fmt.Errorf("cluster %s not belong to project %s", name, project))
-			return
-		}
-	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
@@ -213,15 +191,6 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clu, project))
-			return
-		}
-	}
-
 	// backing up old masters and workers
 	nodeSet := c.GetAllNodes()
 
@@ -351,15 +320,6 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster not belong to project %s", project))
-			return
-		}
-	}
-
 	if _, ok := c.Labels[common.LabelClusterProviderName]; ok {
 		restplus.HandleBadRequest(response, request, errors.New("can't delete cluster which belongs to provider"))
 		return
@@ -439,42 +399,6 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	c := v1.Cluster{}
 	if err := request.ReadEntity(&c); err != nil {
 		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-	ctx := request.Request.Context()
-	info, _ := reqpkg.InfoFrom(ctx)
-
-	// create cluster in manager platform,front will set a project in label
-	// if create in project scope,add label
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels == nil {
-			c.Labels = make(map[string]string)
-		}
-		c.Labels[common.LabelProject] = project
-	}
-
-	// must specify a project,and can't be empty
-	project := c.Labels[common.LabelProject]
-	if project == "" {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster must belong to a project"))
-		return
-	}
-
-	// mutate name and add display-name
-	actualName := fmt.Sprintf("%s-%s", project, c.Name)
-	if c.Annotations == nil {
-		c.Annotations = make(map[string]string)
-	}
-	c.Annotations[common.AnnotationDisplayName] = c.Name
-	c.Name = actualName
-
-	if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleBadRequest(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
 		return
 	}
 
@@ -558,25 +482,6 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		restplus.HandleBadRequest(response, request, err)
 		return
 	}
-	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
-
-	ctx := request.Request.Context()
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels == nil || c.Labels[common.LabelProject] == "" {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster must belong to one project"))
-			return
-		}
-		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-			if apimachineryErrors.IsNotFound(err) {
-				restplus.HandleBadRequest(response, request, err)
-				return
-			}
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-	}
 
 	// TODO: vlidate update-cluster struct
 	if ip, ok := c.Labels[common.LabelExternalIP]; ok {
@@ -586,6 +491,7 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		}
 	}
 
+	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
 	if !dryRun {
 		clu, err := h.clusterOperator.GetCluster(context.TODO(), name)
 		if err != nil {
@@ -594,12 +500,6 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 				return
 			}
 			restplus.HandleInternalError(response, request, err)
-			return
-		}
-
-		oldProject, ok := clu.Labels[common.LabelProject]
-		if ok && oldProject != c.Labels[common.LabelProject] {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster already belong to project %s", oldProject))
 			return
 		}
 
@@ -617,65 +517,6 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 	response.WriteHeader(http.StatusOK)
 }
 
-type clusterJoinProject struct {
-	Cluster string `json:"cluster"`
-	Project string `json:"project"`
-}
-
-func (h *handler) ClusterJoinProject(request *restful.Request, response *restful.Response) {
-	clusterName := request.PathParameter("cluster")
-	c := clusterJoinProject{}
-	if err := request.ReadEntity(&c); err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-	if c.Cluster != clusterName {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster in URL(%s) not match cluster in body(%s)", clusterName, c.Cluster))
-		return
-	}
-	ctx := request.Request.Context()
-	clu, err := h.clusterOperator.GetCluster(ctx, clusterName)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	if oldProject, ok := clu.Labels[common.LabelProject]; ok {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s already belong to project %s,can't edit", clusterName, oldProject))
-		return
-	}
-	project, err := h.tenantOperator.GetProject(ctx, c.Project)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	// join node to project
-	set := sets.NewString(project.Spec.Nodes...)
-	set.Insert(clu.GetAllNodes().List()...)
-	project.Spec.Nodes = set.List()
-	if _, err = h.tenantOperator.UpdateProject(ctx, project); err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	// join cluster to project
-	if clu.Labels == nil {
-		clu.Labels = make(map[string]string)
-	}
-	clu.Labels[common.LabelProject] = c.Project
-	if _, err = h.clusterOperator.UpdateCluster(ctx, clu); err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	response.WriteHeader(http.StatusOK)
-}
-
 func (h *handler) UpdateClusterCertification(request *restful.Request, response *restful.Response) {
 	cluName := request.PathParameter(query.ParameterName)
 	ctx := request.Request.Context()
@@ -684,14 +525,6 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 	if err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
-	}
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", cluName, project))
-			return
-		}
 	}
 
 	extraMeta, err := h.getClusterMetadata(ctx, c, false)
@@ -740,15 +573,6 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
-	}
-
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if clu.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", name, project))
-			return
-		}
 	}
 
 	var (
@@ -866,14 +690,6 @@ func (h *handler) DescribeNode(request *restful.Request, response *restful.Respo
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleNotFound(response, request, fmt.Errorf("node %s not belong to project %s", name, project))
-			return
-		}
-	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
@@ -890,15 +706,6 @@ func (h *handler) DisableNode(request *restful.Request, response *restful.Respon
 		}
 		restplus.HandleInternalError(response, request, err)
 		return
-	}
-
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if node.Labels[common.LabelProject] != project {
-			restplus.HandleNotFound(response, request, fmt.Errorf("node %s not belong to project %s", name, project))
-			return
-		}
 	}
 
 	err = h.syncNodeDisable(node, true)
@@ -931,15 +738,6 @@ func (h *handler) EnableNode(request *restful.Request, response *restful.Respons
 		}
 		restplus.HandleInternalError(response, request, err)
 		return
-	}
-
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if node.Labels[common.LabelProject] != project {
-			restplus.HandleNotFound(response, request, fmt.Errorf("node %s not belong to project %s", name, project))
-			return
-		}
 	}
 
 	err = h.syncNodeDisable(node, false)
@@ -1307,44 +1105,6 @@ func (h *handler) ListRegions(request *restful.Request, response *restful.Respon
 	}
 }
 
-func (h *handler) ListRegionsInProject(request *restful.Request, response *restful.Response) {
-	q := query.ParseQueryParameter(request)
-	project := request.PathParameter("project")
-	ctx := request.Request.Context()
-
-	// list node and extract region
-	nodeQ := query.New()
-	nodeQ.LabelSelector = fmt.Sprintf("%s=%s", common.LabelProject, project)
-	nodes, err := h.clusterOperator.ListNodes(ctx, nodeQ)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	regions := sets.NewString()
-	for _, node := range nodes.Items {
-		regions.Insert(node.Labels[common.LabelTopologyRegion])
-	}
-
-	list := make([]v1.Region, 0, regions.Len())
-	for _, region := range regions.List() {
-		getRegion, err := h.clusterOperator.GetRegion(ctx, region)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		list = append(list, *getRegion)
-	}
-	// build a pageable response
-	regionList := &v1.RegionList{Items: list}
-	result, err := models.DefaultList(regionList.DeepCopyObject(), q, cluster.RegionFuzzyFilter, nil, nil)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, result)
-}
-
 func (h *handler) watchRegions(req *restful.Request, resp *restful.Response, q *query.Query) {
 	timeout := time.Duration(0)
 	if q.TimeoutSeconds != nil {
@@ -1532,15 +1292,6 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
-			return
-		}
-	}
-
 	if c.Status.Phase != v1.ClusterRunning {
 		restplus.HandleInternalError(response, request, fmt.Errorf("cluster %s current is %s, can't back up",
 			c.Name, c.Status.Phase))
@@ -1683,15 +1434,6 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
-			return
-		}
-	}
-
 	if b.PreferredNode != "" {
 		_, err = h.clusterOperator.GetNodeEx(ctx, b.PreferredNode, "0")
 		if err != nil {
@@ -1752,24 +1494,6 @@ func (h *handler) UpdateBackup(request *restful.Request, response *restful.Respo
 	// cluster name in path
 	clusterName := request.PathParameter("cluster")
 	ctx := request.Request.Context()
-	clu, err := h.clusterOperator.GetClusterEx(ctx, clusterName, "0")
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if clu.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
-			return
-		}
-	}
 
 	// backup name in path
 	backupName := request.PathParameter("backup")
@@ -1939,15 +1663,6 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if c.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
-			return
-		}
-	}
-
 	q := query.New()
 	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, c.Name)
 	nodeList, err := h.clusterOperator.ListNodes(context.TODO(), q)
@@ -2072,14 +1787,6 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if clu.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", clusterName, project))
-			return
-		}
-	}
 
 	// We need IP addresses of all master nodes later.
 	extraMeta, err := h.getClusterMetadata(ctx, clu, false)
@@ -2193,15 +1900,6 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 		return
 	}
 
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if clu.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", name, project))
-			return
-		}
-	}
-
 	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
 	// TODO: validate cluster struct
 	timeoutSecs := v1.DefaultOperationTimeoutSecs
@@ -2273,15 +1971,6 @@ func (h *handler) ResetClusterStatus(request *restful.Request, response *restful
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
-	}
-
-	info, _ := reqpkg.InfoFrom(request.Request.Context())
-	if info.IsProjectScope() {
-		project := request.PathParameter("project")
-		if clu.Labels[common.LabelProject] != project {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not belong to project %s", cluName, project))
-			return
-		}
 	}
 
 	switch clu.Status.Phase {
@@ -2400,69 +2089,6 @@ func (h *handler) watchDomain(req *restful.Request, resp *restful.Response, q *q
 		return
 	}
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Domain"), req, resp, timeout)
-}
-
-func (h *handler) ListDomainsProject(request *restful.Request, response *restful.Response) {
-	q := query.ParseQueryParameter(request)
-	ctx := request.Request.Context()
-
-	project := request.PathParameter("project")
-	if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	globalQuery := q.DeepCopy()
-	globalQuery.AddLabelSelector([]string{fmt.Sprintf("!%s", common.LabelProject)})
-	projectQuery := q.DeepCopy()
-	projectQuery.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-
-	if q.Watch {
-		h.watchDomainProject(request, response, []*query.Query{globalQuery, projectQuery})
-		return
-	}
-
-	global, err := h.clusterOperator.ListDomains(request.Request.Context(), globalQuery)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	projectRet, err := h.clusterOperator.ListDomains(request.Request.Context(), projectQuery)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	result, err := models.DefaultListMerge([]runtime.Object{global.DeepCopyObject(), projectRet.DeepCopyObject()}, cluster.DNSFuzzyFilter, nil, nil)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, result)
-}
-
-func (h *handler) watchDomainProject(req *restful.Request, resp *restful.Response, querys []*query.Query) {
-	watchers := make([]watch.Interface, 0, len(querys))
-	timeout := time.Duration(0)
-	for _, q := range querys {
-		if q.TimeoutSeconds != nil {
-			timeout = time.Duration(*q.TimeoutSeconds) * time.Second
-		}
-		if timeout == 0 {
-			timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
-		}
-
-		watcher, err := h.clusterOperator.WatchDomain(req.Request.Context(), q)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
-		watchers = append(watchers, watcher)
-	}
-	multiWatcher := restplus.NewMultiWatcher(watchers)
-	restplus.ServeWatch(multiWatcher, v1.SchemeGroupVersion.WithKind("Domain"), req, resp, timeout)
 }
 
 func (h *handler) CheckDomainExists(request *restful.Request, response *restful.Response) {
@@ -3084,70 +2710,6 @@ func (h *handler) watchTemplates(req *restful.Request, resp *restful.Response, q
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Templates"), req, resp, timeout)
 }
 
-func (h *handler) ListTemplatesProject(request *restful.Request, response *restful.Response) {
-	q := query.ParseQueryParameter(request)
-	ctx := request.Request.Context()
-
-	project := request.PathParameter("project")
-	if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	globalQuery := q.DeepCopy()
-	globalQuery.AddLabelSelector([]string{fmt.Sprintf("!%s", common.LabelProject)})
-	projectQuery := q.DeepCopy()
-	projectQuery.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-
-	if q.Watch {
-		h.watchTemplatesProject(request, response, []*query.Query{globalQuery, projectQuery})
-		return
-	}
-
-	global, err := h.clusterOperator.ListTemplates(request.Request.Context(), globalQuery)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	projectRet, err := h.clusterOperator.ListTemplates(request.Request.Context(), projectQuery)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	result, err := models.DefaultListMerge([]runtime.Object{global.DeepCopyObject(), projectRet.DeepCopyObject()}, cluster.TemplateFuzzyFilter, nil, nil)
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, result)
-}
-
-func (h *handler) watchTemplatesProject(req *restful.Request, resp *restful.Response, querys []*query.Query) {
-	watchers := make([]watch.Interface, 0, len(querys))
-	timeout := time.Duration(0)
-	for _, q := range querys {
-		if q.TimeoutSeconds != nil {
-			timeout = time.Duration(*q.TimeoutSeconds) * time.Second
-		}
-		if timeout == 0 {
-			timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
-		}
-
-		watcher, err := h.clusterOperator.WatchTemplates(req.Request.Context(), q)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
-		watchers = append(watchers, watcher)
-	}
-	multiWatcher := restplus.NewMultiWatcher(watchers)
-	restplus.ServeWatch(multiWatcher, v1.SchemeGroupVersion.WithKind("Templates"), req, resp, timeout)
-}
-
 func (h *handler) DescribeTemplate(request *restful.Request, response *restful.Response) {
 	templateName := request.PathParameter(query.ParameterName)
 	template, err := h.clusterOperator.GetTemplateEx(request.Request.Context(), templateName, "0")
@@ -3261,20 +2823,6 @@ func (h *handler) ListBackupPoints(request *restful.Request, response *restful.R
 	q := query.ParseQueryParameter(request)
 	ctx := request.Request.Context()
 
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() && !q.HasLabelSelector(fmt.Sprintf("!%s", common.LabelProject)) {
-		project := request.PathParameter("project")
-		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-			if apimachineryErrors.IsNotFound(err) {
-				restplus.HandleNotFound(response, request, err)
-				return
-			}
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-	}
-
 	if q.Watch {
 		h.watchBackupPoints(request, response, q)
 		return
@@ -3311,70 +2859,6 @@ func (h *handler) watchBackupPoints(req *restful.Request, resp *restful.Response
 		return
 	}
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("BackupPoint"), req, resp, timeout)
-}
-
-func (h *handler) ListBackupPointsProject(req *restful.Request, resp *restful.Response) {
-	q := query.ParseQueryParameter(req)
-	ctx := req.Request.Context()
-
-	project := req.PathParameter("project")
-	if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(resp, req, err)
-			return
-		}
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-
-	globalQuery := q.DeepCopy()
-	globalQuery.AddLabelSelector([]string{fmt.Sprintf("!%s", common.LabelProject)})
-	projectQuery := q.DeepCopy()
-	projectQuery.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-
-	if q.Watch {
-		h.watchBackupPointsProject(req, resp, []*query.Query{globalQuery, projectQuery})
-		return
-	}
-
-	global, err := h.clusterOperator.ListBackupPoints(ctx, globalQuery)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	projectRet, err := h.clusterOperator.ListBackupPoints(ctx, projectQuery)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	result, err := models.DefaultListMerge([]runtime.Object{global.DeepCopyObject(), projectRet.DeepCopyObject()}, cluster.BackupPointFuzzyFilter, nil, nil)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
-}
-
-func (h *handler) watchBackupPointsProject(req *restful.Request, resp *restful.Response, querys []*query.Query) {
-	watchers := make([]watch.Interface, 0, len(querys))
-	timeout := time.Duration(0)
-	for _, q := range querys {
-		if q.TimeoutSeconds != nil {
-			timeout = time.Duration(*q.TimeoutSeconds) * time.Second
-		}
-		if timeout == 0 {
-			timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
-		}
-
-		watcher, err := h.clusterOperator.WatchBackupPoints(req.Request.Context(), q)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
-		watchers = append(watchers, watcher)
-	}
-	multiWatcher := restplus.NewMultiWatcher(watchers)
-	restplus.ServeWatch(multiWatcher, v1.SchemeGroupVersion.WithKind("BackupPoint"), req, resp, timeout)
 }
 
 func (h *handler) CreateBackupPoint(request *restful.Request, response *restful.Response) {
@@ -3945,19 +3429,6 @@ func (h *handler) CreateCloudProvider(req *restful.Request, resp *restful.Respon
 		restplus.HandleBadRequest(resp, req, err)
 		return
 	}
-	projectName := cp.Labels[common.LabelProject]
-	if projectName == "" {
-		restplus.HandleBadRequest(resp, req, errors.New("cloudprovider must belong to a  project"))
-		return
-	}
-	if _, err = h.tenantOperator.GetProject(ctx, projectName); err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleBadRequest(resp, req, err)
-			return
-		}
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
 	check, err := provider.PreCheck(ctx)
 	if err != nil {
 		restplus.HandleBadRequest(resp, req, fmt.Errorf("preCheck connect failed: %v", err))
@@ -4011,11 +3482,6 @@ func (h *handler) UpdateCloudProvider(req *restful.Request, resp *restful.Respon
 			return
 		}
 		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-
-	if cp.Labels[common.LabelProject] != oldCP.Labels[common.LabelProject] {
-		restplus.HandleBadRequest(resp, req, fmt.Errorf("provider already belong to project %s", cp.Labels[common.LabelProject]))
 		return
 	}
 
@@ -4179,20 +3645,6 @@ func (h *handler) ListRegistry(req *restful.Request, resp *restful.Response) {
 	q := query.ParseQueryParameter(req)
 	ctx := req.Request.Context()
 
-	info, _ := reqpkg.InfoFrom(ctx)
-	if info.IsProjectScope() && !q.HasLabelSelector(fmt.Sprintf("!%s", common.LabelProject)) {
-		project := req.PathParameter("project")
-		if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-			if apimachineryErrors.IsNotFound(err) {
-				restplus.HandleNotFound(resp, req, err)
-				return
-			}
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
-		q.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-	}
-
 	if q.Watch {
 		h.watchRegistries(req, resp, q)
 		return
@@ -4229,69 +3681,6 @@ func (h *handler) watchRegistries(req *restful.Request, resp *restful.Response, 
 		return
 	}
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Registry"), req, resp, timeout)
-}
-
-func (h *handler) ListRegistryProject(req *restful.Request, resp *restful.Response) {
-	q := query.ParseQueryParameter(req)
-	ctx := req.Request.Context()
-
-	project := req.PathParameter("project")
-	if _, err := h.tenantOperator.GetProject(ctx, project); err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(resp, req, err)
-			return
-		}
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-
-	globalQuery := q.DeepCopy()
-	globalQuery.AddLabelSelector([]string{fmt.Sprintf("!%s", common.LabelProject)})
-	projectQuery := q.DeepCopy()
-	projectQuery.AddLabelSelector([]string{fmt.Sprintf("%s=%s", common.LabelProject, project)})
-	if q.Watch {
-		h.watchRegistriesProject(req, resp, []*query.Query{globalQuery, projectQuery})
-		return
-	}
-
-	global, err := h.clusterOperator.ListRegistries(ctx, globalQuery)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	projectRet, err := h.clusterOperator.ListRegistries(ctx, projectQuery)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	result, err := models.DefaultListMerge([]runtime.Object{global.DeepCopyObject(), projectRet.DeepCopyObject()}, cluster.RegistryFuzzyFilter, nil, nil)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, result)
-}
-
-func (h *handler) watchRegistriesProject(req *restful.Request, resp *restful.Response, querys []*query.Query) {
-	watchers := make([]watch.Interface, 0, len(querys))
-	timeout := time.Duration(0)
-	for _, q := range querys {
-		if q.TimeoutSeconds != nil {
-			timeout = time.Duration(*q.TimeoutSeconds) * time.Second
-		}
-		if timeout == 0 {
-			timeout = time.Duration(float64(query.MinTimeoutSeconds) * (rand.Float64() + 1.0))
-		}
-
-		watcher, err := h.clusterOperator.WatchRegistries(req.Request.Context(), q)
-		if err != nil {
-			restplus.HandleInternalError(resp, req, err)
-			return
-		}
-		watchers = append(watchers, watcher)
-	}
-	multiWatcher := restplus.NewMultiWatcher(watchers)
-	restplus.ServeWatch(multiWatcher, v1.SchemeGroupVersion.WithKind("Registry"), req, resp, timeout)
 }
 
 func (h *handler) DeleteRegistry(req *restful.Request, resp *restful.Response) {
