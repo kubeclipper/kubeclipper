@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/onsi/ginkgo"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	apiv1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cloudprovidercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -15,8 +18,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/test/framework"
 	"github.com/kubeclipper/kubeclipper/test/framework/cluster"
-	"github.com/onsi/ginkgo"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = SIGDescribe("[Serial]", func() {

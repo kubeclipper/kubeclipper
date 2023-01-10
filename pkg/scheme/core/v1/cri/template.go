@@ -109,7 +109,7 @@ version = 2
 {{- if .LocalRegistry }}
     sandbox_image = "{{.LocalRegistry}}/pause:{{$.PauseVersion}}"
 {{- else}}
-    sandbox_image = "k8s.gcr.io/pause:{{.PauseVersion}}"
+    sandbox_image = "{{.PauseRegistry}}/pause:{{.PauseVersion}}"
 {{- end}}
     selinux_category_range = 1024
     stats_collect_period = 10
