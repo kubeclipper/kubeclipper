@@ -312,6 +312,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 	}
 	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
 	force := query.GetBoolValueWithDefault(request, query.ParameterForce, false)
+	onlyDeleteData := query.GetBoolValueWithDefault(request, "delegateToCloudProvider", false)
 	c, err := h.clusterOperator.GetClusterEx(request.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
@@ -319,6 +320,13 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 			return
 		}
 		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if onlyDeleteData {
+		err = h.onlyDeleteClusterData(request.Request.Context(), c)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+		}
 		return
 	}
 
@@ -394,6 +402,24 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 		}
 	}(op, &service.Options{DryRun: dryRun, ForceSkipError: force})
 	response.WriteHeader(http.StatusOK)
+}
+
+func (h *handler) onlyDeleteClusterData(ctx context.Context, clu *v1.Cluster) error {
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clu.Name)
+	nodeList, err := h.clusterOperator.ListNodes(ctx, q)
+	if err != nil && !apimachineryErrors.IsNotFound(err) {
+		return err
+	}
+
+	for _, node := range nodeList.Items {
+		err = h.clusterOperator.DeleteNode(ctx, node.Name)
+		if err != nil && !apimachineryErrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return h.clusterOperator.DeleteCluster(ctx, clu.Name)
 }
 
 func (h *handler) CreateClusters(request *restful.Request, response *restful.Response) {

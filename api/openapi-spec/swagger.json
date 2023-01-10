@@ -1288,6 +1288,13 @@
           },
           {
             "type": "boolean",
+            "default": false,
+            "description": "deleting machines directly by the cloud provider, skipping the operation of deleting the cluster and deleting only the data",
+            "name": "delegateToCloudProvider",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
             "description": "dry run delete clusters",
             "name": "dryRun",
             "in": "query"
