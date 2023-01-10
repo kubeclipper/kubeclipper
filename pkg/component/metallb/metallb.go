@@ -148,9 +148,7 @@ func (n *MetalLB) Validate() error {
 				}
 			}
 		} else {
-			if !netutil.IsValidIP(address) {
-				return errInvalidAddressPool
-			}
+			return errInvalidAddressPool
 		}
 	}
 
@@ -365,7 +363,7 @@ func (n *MetalLB) GetComponentMeta(lang component.Lang) component.Meta {
 			Properties:   nil,
 			Type:         component.JSONSchemaTypeArray,
 			Default:      nil,
-			Description:  "ip address pool",
+			Description:  "A list of IP address ranges over which MetalLB has authority. You can list multiple ranges in a single pool, they will all share the same settings. Each range can be either a CIDR prefix, or an explicit start-end range of IPs.",
 			Priority:     3,
 			Dependencies: []string{"enabled"},
 		},
