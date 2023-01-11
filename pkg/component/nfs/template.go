@@ -120,12 +120,22 @@ spec:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
+      - key: node-role.kubernetes.io/control-plane
+        operator: "Exists"
+        effect: NoSchedule
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
               - key: node-role.kubernetes.io/master
+                operator: In
+                values:
+                - ""
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
                 operator: In
                 values:
                 - ""
