@@ -99,6 +99,7 @@ nodeRegistration:
 {{end}}
   kubeletExtraArgs:
     root-dir: {{.Kubelet.RootDir}}
+    node-ip: {{.Kubelet.NodeIP}}
 `
 
 const KubeadmJoinTemplate = `apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
@@ -121,7 +122,8 @@ nodeRegistration:
   criSocket: /run/containerd/containerd.sock
 {{end}}
   kubeletExtraArgs:
-    root-dir: {{.Kubelet.RootDir}}`
+    root-dir: {{.Kubelet.RootDir}}
+    node-ip: {{.Kubelet.NodeIP}}`
 
 const lvscareV111 = `
 apiVersion: v1

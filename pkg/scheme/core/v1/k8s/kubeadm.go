@@ -275,18 +275,16 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 	if stepper.Kubelet.RootDir == "" {
 		stepper.Kubelet.RootDir = KubeletDefaultDataDir
 	}
+	agentIP, err := stepper.getAgentNodeIP()
+	if err != nil {
+		logger.Errorf("get node ip failed: %s", err.Error())
+		return nil, err
+	}
+	// NodeIP is used for kubelet communication and api-server host ip
+	stepper.Kubelet.NodeIP = agentIP
 	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d --control-plane --certificate-key 46518267766fc19772ecc334c13190f8131f1bf48a213538879f6427f74fe8e2
 	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d
 	if stepper.IsControlPlane {
-		agentConfig, err := config.TryLoadFromDisk()
-		if err != nil {
-			return nil, errors.WithMessage(err, "load agent config")
-		}
-		ip, err := netutil.GetDefaultIP(true, agentConfig.NodeIPDetect)
-		if err != nil {
-			logger.Errorf("get node ip failed: %s", err.Error())
-			return nil, err
-		}
 		masterJoinCmd := strings.Split(cmds[0], " ")
 		if len(masterJoinCmd) < 10 {
 			return nil, fmt.Errorf("master join command invalid")
@@ -294,7 +292,7 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 		stepper.BootstrapToken = masterJoinCmd[4]
 		stepper.CACertHashes = masterJoinCmd[6]
 		stepper.CertificateKey = masterJoinCmd[9]
-		stepper.AdvertiseAddress = ip.String()
+		stepper.AdvertiseAddress = agentIP
 	} else {
 		workerJoinCmd := strings.Split(cmds[1], " ")
 		if len(workerJoinCmd) < 6 {
@@ -332,6 +330,12 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 		stepper.LocalRegistry = component.GetRepoMirror(ctx)
 		logger.Info("render kubernetes config, the default repo mirror proxy will be used", zap.String("local_registry", stepper.LocalRegistry))
 	}
+	agentIP, err := stepper.getAgentNodeIP()
+	if err != nil {
+		logger.Errorf("get node ip failed: %s", err.Error())
+		return err
+	}
+	stepper.Kubelet.NodeIP = agentIP
 
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
 		return err
@@ -375,6 +379,21 @@ func (stepper *KubeadmConfig) matchClusterConfigAPIVersion() (string, error) {
 	}
 	// +1.22.x version
 	return "v1beta3", nil
+}
+
+func (stepper *KubeadmConfig) getAgentNodeIP() (string, error) {
+	agentConfig, err := config.TryLoadFromDisk()
+	if err != nil {
+		return "", errors.WithMessage(err, "load agent config")
+	}
+	ip, err := netutil.GetDefaultIP(true, agentConfig.NodeIPDetect)
+	if err != nil {
+		return "", err
+	}
+	if ip.String() == "" {
+		return "", fmt.Errorf("agent node ip is empty, adjust the node-ip-detect configuration")
+	}
+	return ip.String(), nil
 }
 
 func (stepper *ControlPlane) NewInstance() component.ObjectMeta {
