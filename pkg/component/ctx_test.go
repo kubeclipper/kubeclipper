@@ -335,7 +335,7 @@ func TestExtraMetadata_GetWorkerHostname(t *testing.T) {
 		{
 			name: "base",
 			fields: fields{
-				Masters: NodeList{
+				Workers: NodeList{
 					{
 						ID:       "Node1",
 						Hostname: "Host1",
@@ -354,7 +354,7 @@ func TestExtraMetadata_GetWorkerHostname(t *testing.T) {
 		{
 			name: "Worker ID is not exist",
 			fields: fields{
-				Masters: NodeList{
+				Workers: NodeList{
 					{
 						ID:       "Node1",
 						Hostname: "Host1",
