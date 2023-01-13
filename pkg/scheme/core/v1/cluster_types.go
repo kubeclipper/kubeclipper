@@ -258,6 +258,7 @@ type Etcd struct {
 
 type Kubelet struct {
 	RootDir string `json:"rootDir" yaml:"rootDir"`
+	NodeIP  string `json:"nodeIP" yaml:"nodeIP"`
 }
 
 type KubeProxy struct {

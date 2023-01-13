@@ -440,7 +440,7 @@ func (stepper *KubeadmConfig) JoinSteps(isControlPlane bool, nodes []v1.StepNode
 	}
 	step := v1.Step{
 		ID:         strutil.GetUUID(),
-		Name:       "renderMasterJoinConfig",
+		Name:       "renderWorkerJoinConfig",
 		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
 		ErrIgnore:  false,
 		RetryTimes: 1,
@@ -456,7 +456,7 @@ func (stepper *KubeadmConfig) JoinSteps(isControlPlane bool, nodes []v1.StepNode
 		},
 	}
 	if isControlPlane {
-		step.Name = "renderWorkerJoinConfig"
+		step.Name = "renderMasterJoinConfig"
 	}
 	return []v1.Step{step}, nil
 
