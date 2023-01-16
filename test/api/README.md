@@ -21,6 +21,7 @@ gabbi-run -v all localhost -- test/api/*.yaml
 
 ### 3.1 覆盖范围
 
+
 1.  [创建集群](./create_get_cluster.yaml)
 2.  [查看集群列表](./create_get_cluster.yaml)
 3.  [集群添加节点和移除节点](./add_remove_node/)
