@@ -262,9 +262,10 @@ func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDi
 				//	decor.EwmaETA(decor.ET_STYLE_GO, 60, decor.WCSyncWidth), "done",
 				//),
 				//decor.EwmaETA(decor.ET_STYLE_GO, 90),
-				decor.EwmaETA(decor.ET_STYLE_GO, 60),
-				decor.Name(" ] "),
-				decor.EwmaSpeed(decor.UnitKiB, "% .2f", 60),
+				//decor.EwmaETA(decor.ET_STYLE_GO, 60),
+				//decor.Name(" ] "),
+				decor.AverageSpeed(decor.UnitKiB, "% .2f", decor.WCSyncSpace),
+				//decor.EwmaSpeed(decor.UnitKiB, "% .2f", 60),
 			),
 		)
 
