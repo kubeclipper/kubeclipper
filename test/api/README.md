@@ -21,10 +21,15 @@ gabbi-run -v all localhost -- test/api/*.yaml
 
 ### 3.1 覆盖范围
 
+1.  创建集群
 
-1.  [创建集群](./create_get_cluster.yaml)
-2.  [查看集群列表](./create_get_cluster.yaml)
+-   [创建带存储插件 nfs 的集群](./add_remove_node/nfs_cluster.yaml)
+-   [创建单机集群](./add_remove_node/one_two_nodes_cluster.yaml)
+-   [创建高可用集群](./create_high_availability_cluster.yaml)
+-   [创建同名集群](./add_remove_node/one_two_nodes_cluster.yaml)
+
+2.  [查看集群列表](./add_remove_node/nfs_cluster.yaml)
 3.  [集群添加节点和移除节点](./add_remove_node/)
-4.  [集群备份和恢复-存储类型为 fs](./fs_backup_recovery.yaml)
-5.  [集群备份和恢复-存储类型为 s3](./s3_backup_recovery.yaml)
-6.  [集群模版&插件模版](./template)(共9个API)
+4.  [集群备份和恢复](./backup_recovery_cluster.yaml)
+5.  [定时备份](./backup_recovery_cluster.yaml)
+6.  [集群模版&插件模版](./template)(共 9 个 API)
