@@ -126,6 +126,18 @@ tests:
     response_json_paths:
       $.status.phase: "Running"
 
+  - name: cluster_list
+    url: /apis/api/core.kubeclipper.io/v1/clusters?fieldSelector=&limit=10
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+    response_json_paths:
+      $.items[?(@.metadata.name=='nfs_cluster_name')].status.phase: Running
+      $.items[?(@.metadata.name=='nfs_cluster_name')].addons[0].config.serverAddr: *nfs_serverAddr
+      $.items[?(@.metadata.name=='nfs_cluster_name')].metadata.labels['topology.kubeclipper.io/region']: default
+      $.items[?(@.metadata.name=='nfs_cluster_name')].metadata.annotations['kubeclipper.io/description']: cluster_description
+
   - name: add_one_node_in_nfs_cluster
     url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']/nodes
     method: PUT
