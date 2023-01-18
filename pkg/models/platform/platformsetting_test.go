@@ -81,3 +81,35 @@ func Test_platformOperator_eventFilter(t *testing.T) {
 		})
 	}
 }
+
+func Test_eventCustomFilter(t *testing.T) {
+	type args struct {
+		ev    *v1.Event
+		key   string
+		value string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "base",
+			args: args{
+				ev: &v1.Event{
+					Username: "Tom",
+				},
+				key:   "name",
+				value: "Tom",
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eventCustomFilter(tt.args.ev, tt.args.key, tt.args.value); got != tt.want {
+				t.Errorf("eventCustomFilter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
