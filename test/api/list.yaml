@@ -19,3 +19,43 @@ apitest:
         - template_nfs:
             file_name: template_nfs.yaml
             number: 4
+    - add_remove_node:
+       - add_remove_get_node:
+            file_name: add_remove_get_node.yaml
+            number: 13
+
+    - backup_recovery_cluster:
+      - create_backup_space:
+            file_name: create_backup_space.yaml
+            number: 2
+      - get_edit_backup_space:
+            file_name: get_edit_backup_space.yaml
+            number: 4
+      - create_cluster_backup:
+            file_name: create_cluster_backup.yaml
+            number: 10
+      - get_cluster_backup:
+            file_name: get_cluster_backup.yaml
+            number: 2
+      - recovery_cluster:
+            file_name: recovery_cluster.yaml
+            number: 6
+      - delete_cluster_backup:
+            file_name: delete_cluster_backup.yaml
+            number: 2
+      - delete_backup_space:
+            file_name: delete_backup_space.yaml
+            number: 4
+
+      - create_scheduled_backups:
+            file_name: create_scheduled_backups.yaml
+            number: 2
+      - get_edit_scheduled_backups:
+            file_name: get_edit_scheduled_backups.yaml
+            number: 4
+      - disable_enable_scheduled_backups:
+            file_name: disable_enable_scheduled_backups.yaml
+            number: 2
+      - delete_scheduled_backups:
+            file_name: delete_scheduled_backups.yaml
+            number: 2

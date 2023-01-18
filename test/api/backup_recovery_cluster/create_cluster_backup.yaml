@@ -1,0 +1,263 @@
+# 创建集群备份
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+  - &cluster_name "test"
+  - &backupspace_des "有效备份空间"
+  - &fs_backupRootDir "/opt/kc/backups"
+  - &s3_endpoint "172.20.163.233:9000"
+  - &s3_username "admin"
+  - &s3_password "Aa123456"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_cluster_detail
+    url: /api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: get_node_list
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: kubeclipper.io/cluster=test
+      limit: 10
+      page: 1
+      reverse: false
+      silent: false
+    status: 200
+    
+  - name: edit_cluster_to_select_fs_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Cluster
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: test
+        labels:
+          topology.kubeclipper.io/region: default
+          kubeclipper.io/backupPoint: test-fs
+        annotations:
+          kubeclipper.io/offline: ""
+        finalizers:
+          - finalizer.cluster.kubeclipper.io
+        resourceVersion: $HISTORY['get_cluster_detail'].$RESPONSE['$.metadata.resourceVersion']
+      masters:
+        - id: $HISTORY['get_node_list'].$RESPONSE['$.items[0].metadata.name']
+          containerRuntime:
+            type: ""
+      workers: []
+      kubernetesVersion: v1.23.6
+      kubeProxy: {}
+      etcd:
+        dataDir: /var/lib/etcd
+      kubelet:
+        rootDir: /var/lib/kubelet
+      networking:
+        ipFamily: ipvs
+        services:
+          cidrBlocks:
+            - 172.25.0.0/24
+        pods:
+          cidrBlocks:
+            - 10.96.0.0/16
+        dnsDomain: cluster.local
+        proxyMode: ipvs
+        workerNodeVip: 169.254.169.100
+      containerRuntime:
+        type: containerd
+        version: 1.6.4
+        rootDir: /var/lib/containerd
+      cni:
+        localRegistry: ""
+        type: calico
+        version: v3.22.4
+        criType: containerd
+        offline: true
+        namespace: kube-system
+        calico:
+          IPv4AutoDetection: first-found
+          IPv6AutoDetection: ""
+          mode: Overlay-Vxlan-All
+          IPManger: true
+          mtu: 1440
+      kubeConfig: $HISTORY['get_cluster_detail'].$RESPONSE['$.kubeConfig']
+      addons: []
+      status:
+        phase: Running
+        versions:
+          controlPlane: ""
+          apiserver: ""
+          controllerManager: ""
+          scheduler: ""
+    status: 200
+
+  - name: create_cluster_backup_fs
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/backups
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      metadata:
+        name: test-backup-fs
+        annotations: {}
+      description: ""
+    response_json_paths:
+      $.backupPointName: test-fs
+
+  - name: check_cluster_status_is_BackingUp
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.status.phase: "BackingUp"
+
+  - name: check_cluster_status_is_running_1
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: wait_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: edit_cluster_to_select_s3_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Cluster
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: test
+        labels:
+          topology.kubeclipper.io/region: default
+          kubeclipper.io/backupPoint: apitest-s3
+        annotations:
+          kubeclipper.io/offline: ""
+        finalizers:
+          - finalizer.cluster.kubeclipper.io
+        resourceVersion: $HISTORY['get_cluster_detail'].$RESPONSE['$.metadata.resourceVersion']
+      masters:
+        - id: $HISTORY['get_node_list'].$RESPONSE['$.items[0].metadata.name']
+          containerRuntime:
+            type: ""
+      workers: []
+      kubernetesVersion: v1.23.6
+      kubeProxy: {}
+      etcd:
+        dataDir: /var/lib/etcd
+      kubelet:
+        rootDir: /var/lib/kubelet
+      networking:
+        ipFamily: ipvs
+        services:
+          cidrBlocks:
+            - 172.25.0.0/24
+        pods:
+          cidrBlocks:
+            - 10.96.0.0/16
+        dnsDomain: cluster.local
+        proxyMode: ipvs
+        workerNodeVip: 169.254.169.100
+      containerRuntime:
+        type: containerd
+        version: 1.6.4
+        rootDir: /var/lib/containerd
+      cni:
+        localRegistry: ""
+        type: calico
+        version: v3.22.4
+        criType: containerd
+        offline: true
+        namespace: kube-system
+        calico:
+          IPv4AutoDetection: first-found
+          IPv6AutoDetection: ""
+          mode: Overlay-Vxlan-All
+          IPManger: true
+          mtu: 1440
+      kubeConfig: $HISTORY['get_cluster_detail'].$RESPONSE['$.kubeConfig']
+      addons: []
+      status:
+        phase: Running
+        versions:
+          controlPlane: ""
+          apiserver: ""
+          controllerManager: ""
+          scheduler: ""
+    status: 200
+
+  - name: create_cluster_backup_s3
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/backups
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      metadata:
+        name: test-backup-s3
+        annotations: {}
+      description: ""
+    response_json_paths:
+      $.backupPointName: apitest-s3
+
+  - name: check_cluster_status_is_BackingUp
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.status.phase: "BackingUp"
+
+  - name: check_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
