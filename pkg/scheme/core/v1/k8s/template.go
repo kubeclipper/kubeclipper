@@ -94,6 +94,9 @@ localAPIEndpoint:
   advertiseAddress: {{.AdvertiseAddress}}
   bindPort: 6443
 nodeRegistration:
+{{- if .Kubelet.IPAsName }}
+  name: "{{.Kubelet.NodeIP}}"
+{{- end}}
 {{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock
 {{end}}
@@ -118,6 +121,9 @@ controlPlane:
     bindPort: 6443
   certificateKey: {{.CertificateKey}}{{end}}
 nodeRegistration:
+{{- if .Kubelet.IPAsName }}
+  name: "{{.Kubelet.NodeIP}}"
+{{- end}}
 {{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock
 {{end}}
