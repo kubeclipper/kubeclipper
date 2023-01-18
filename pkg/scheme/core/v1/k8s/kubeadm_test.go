@@ -81,6 +81,29 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				LocalRegistry:        "127.0.0.1:5000",
 			},
 		},
+		{
+			name: "node-ip as node-name",
+			fields: fields{
+				ClusterConfigAPIVersion: "v1beta3",
+				ContainerRuntime:        "containerd",
+				Etcd:                    v1.Etcd{DataDir: "/var/lib/etcd"},
+				Networking: v1.Networking{
+					IPFamily:      v1.IPFamilyIPv4,
+					Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
+					Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
+					DNSDomain:     "cluster.local",
+					ProxyMode:     "ipvs",
+					WorkerNodeVip: "8.8.8.8",
+				},
+				KubeProxy:            v1.KubeProxy{},
+				Kubelet:              v1.Kubelet{RootDir: "/var/lib/kubelet", NodeIP: "127.0.0.1", IPAsName: true},
+				ClusterName:          "test-cluster",
+				KubernetesVersion:    "v1.23.6",
+				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
+				CertSANs:             []string{"127.0.0.1"},
+				LocalRegistry:        "127.0.0.1:5000",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -99,6 +122,91 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 			}
 			w := &bytes.Buffer{}
 			err := stepper.renderTo(w)
+			if err != nil {
+				t.Errorf("renderTo() error = %v", err)
+				return
+			}
+			t.Log(w.String())
+		})
+	}
+}
+
+func TestKubeadmConfig_renderJoin(t *testing.T) {
+	type fields struct {
+		ClusterConfigAPIVersion string
+		ContainerRuntime        string
+		Etcd                    v1.Etcd
+		Networking              v1.Networking
+		KubeProxy               v1.KubeProxy
+		Kubelet                 v1.Kubelet
+		ClusterName             string
+		KubernetesVersion       string
+		ControlPlaneEndpoint    string
+		CertSANs                []string
+		LocalRegistry           string
+		Offline                 bool
+		IsControlPlane          bool
+		CACertHashes            string
+		BootstrapToken          string
+		CertificateKey          string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantW   string
+		wantErr bool
+	}{
+		{
+			name: "node-ip as node-name",
+			fields: fields{
+				ClusterConfigAPIVersion: "v1beta3",
+				ContainerRuntime:        "containerd",
+				Etcd:                    v1.Etcd{DataDir: "/var/lib/etcd"},
+				Networking: v1.Networking{
+					IPFamily:      v1.IPFamilyIPv4,
+					Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
+					Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
+					DNSDomain:     "cluster.local",
+					ProxyMode:     "ipvs",
+					WorkerNodeVip: "8.8.8.8",
+				},
+				KubeProxy:            v1.KubeProxy{},
+				Kubelet:              v1.Kubelet{RootDir: "/var/lib/kubelet", NodeIP: "127.0.0.1", IPAsName: true},
+				ClusterName:          "test-cluster",
+				KubernetesVersion:    "v1.23.6",
+				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
+				CertSANs:             []string{"127.0.0.1"},
+				LocalRegistry:        "127.0.0.1:5000",
+				Offline:              true,
+				IsControlPlane:       true,
+				CACertHashes:         "hash1",
+				BootstrapToken:       "BootstrapToken",
+				CertificateKey:       "CertificateKey",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stepper := &KubeadmConfig{
+				ClusterConfigAPIVersion: tt.fields.ClusterConfigAPIVersion,
+				ContainerRuntime:        tt.fields.ContainerRuntime,
+				Etcd:                    tt.fields.Etcd,
+				Networking:              tt.fields.Networking,
+				KubeProxy:               tt.fields.KubeProxy,
+				Kubelet:                 tt.fields.Kubelet,
+				ClusterName:             tt.fields.ClusterName,
+				KubernetesVersion:       tt.fields.KubernetesVersion,
+				ControlPlaneEndpoint:    tt.fields.ControlPlaneEndpoint,
+				CertSANs:                tt.fields.CertSANs,
+				LocalRegistry:           tt.fields.LocalRegistry,
+				Offline:                 tt.fields.Offline,
+				IsControlPlane:          tt.fields.IsControlPlane,
+				CACertHashes:            tt.fields.CACertHashes,
+				BootstrapToken:          tt.fields.BootstrapToken,
+				CertificateKey:          tt.fields.CertificateKey,
+			}
+			w := &bytes.Buffer{}
+			err := stepper.renderJoin(w)
 			if err != nil {
 				t.Errorf("renderTo() error = %v", err)
 				return

@@ -91,6 +91,9 @@ volumeStatsAggPeriod: 1m
 apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
 kind: InitConfiguration
 nodeRegistration:
+{{- if .Kubelet.IPAsName }}
+  name: "{{.Kubelet.NodeIP}}"
+{{- end}}
 {{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock
 {{end}}
@@ -111,6 +114,9 @@ discovery:
 controlPlane: 
   certificateKey: {{.CertificateKey}}{{end}}
 nodeRegistration:
+{{- if .Kubelet.IPAsName }}
+  name: "{{.Kubelet.NodeIP}}"
+{{- end}}
 {{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock
 {{end}}
