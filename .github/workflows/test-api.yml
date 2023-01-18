@@ -73,6 +73,13 @@ jobs:
           script: |
             set -e
             pushd /root/apitest/kubeclipper/github/workspace
-            find test/api -name '*.yaml' | xargs gabbi-run 172.20.139.223 --
-            echo api-test finished
+            pushd test/api
+            python3 run.py
+            ssh root@172.16.30.27 "mkdir -pv /var/www/html/caas-api-test/github/${{ steps.extract_branch.outputs.branch }}"
+            scp -r report root@172.16.30.27:/var/www/html/caas-api-test/github/${{ steps.extract_branch.outputs.branch }}/
+            if [ -f "result" ];then
+            echo api-test successfully
+            else
+            echo api-test failed
+            exit 110
             fi

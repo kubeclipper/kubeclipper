@@ -32,4 +32,4 @@ gabbi-run -v all localhost -- test/api/*.yaml
 3.  [集群添加节点和移除节点](./add_remove_node/)
 4.  [集群备份和恢复](./backup_recovery_cluster.yaml)
 5.  [定时备份](./backup_recovery_cluster.yaml)
-6.  [集群模版&插件模版](./template)(共 9 个 API)
+6.  [集群模版&插件模版](./template)(共 5 个 API)
