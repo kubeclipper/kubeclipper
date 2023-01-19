@@ -338,8 +338,21 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 
 	steps := make([]v1.Step, 0)
 	var actBackup *k8s.ActBackup
+	var masters component.NodeList
+	for _, no := range nodeList {
+		masters = append(masters, component.Node{
+			ID:       no.Name,
+			IPv4:     no.Status.Ipv4DefaultIP,
+			NodeIPv4: no.Status.NodeIpv4DefaultIP,
+			Region:   no.Labels[common.LabelTopologyRegion],
+			Hostname: no.Labels[common.LabelHostname],
+			Role:     no.Labels[common.LabelNodeRole],
+			//Disable:  no.Labels[common.LabelNodeDisable]
+		})
+	}
 	meta := component.ExtraMetadata{
 		ClusterName: c.Name,
+		Masters:     masters,
 	}
 	meta.Masters = append(meta.Masters, component.Node{ID: backup.PreferredNode})
 	ctx := component.WithExtraMetadata(context.TODO(), meta)
