@@ -21,6 +21,8 @@ package logger
 import (
 	"testing"
 
+	"go.uber.org/zap/zapcore"
+
 	"go.uber.org/zap"
 )
 
@@ -84,4 +86,84 @@ func BenchmarkInfoWithJsonEncode(b *testing.B) {
 		}
 	})
 	b.StopTimer()
+}
+
+func Test_convertZapLogLevel(t *testing.T) {
+	type args struct {
+		level string
+	}
+	tests := []struct {
+		name string
+		args args
+		want zapcore.Level
+	}{
+		{
+			name: "info log",
+			args: args{
+				level: "info",
+			},
+			want: 0,
+		},
+		{
+			name: "debug log",
+			args: args{
+				level: "debug",
+			},
+			want: -1,
+		},
+		{
+			name: "warn log",
+			args: args{
+				level: "warn",
+			},
+			want: 1,
+		},
+		{
+			name: "error log",
+			args: args{
+				level: "error",
+			},
+			want: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := convertZapLogLevel(tt.args.level); got != tt.want {
+				t.Errorf("convertZapLogLevel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_convertZapLogEncode(t *testing.T) {
+	type args struct {
+		encode string
+	}
+	tests := []struct {
+		name string
+		args args
+		want EncodeType
+	}{
+		{
+			name: "Json encode",
+			args: args{
+				encode: "json",
+			},
+			want: 2,
+		},
+		{
+			name: "console encode",
+			args: args{
+				encode: "console",
+			},
+			want: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := convertZapLogEncode(tt.args.encode); got != tt.want {
+				t.Errorf("convertZapLogEncode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
