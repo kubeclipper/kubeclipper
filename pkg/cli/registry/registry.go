@@ -90,8 +90,8 @@ const (
   # Clean docker registry, specify data directory.
   # If you used custom data directory when deploy,then must specify it in this cmd to clear data.
   kcctl registry clean --pk-file key --node 10.0.0.111 --registry-volume /opt/registry --data-root /var/lib/docker
-  # Clean docker registry and uninstall docker
-  kcctl registry clean --pk-file key --node 10.0.0.111 --remove-docker
+  # Clean docker registry
+  kcctl registry clean --pk-file key --node 10.0.0.111
   # Forced to clean docker registry
   kcctl registry clean --pk-file key --node 10.0.0.111  --force
 
