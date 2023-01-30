@@ -20,6 +20,7 @@ package k8s
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"syscall"
 	"time"
@@ -29,11 +30,14 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"github.com/pkg/errors"
 )
 
 func getJoinCmdFromStdOut(output string, cutBegin string) string {
@@ -137,4 +141,19 @@ func deleteContainer(namespace string) error {
 	}
 
 	return nil
+}
+
+func getAgentNodeIP() (string, error) {
+	agentConfig, err := config.TryLoadFromDisk()
+	if err != nil {
+		return "", errors.WithMessage(err, "load agent config")
+	}
+	ip, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
+	if err != nil {
+		return "", err
+	}
+	if ip.String() == "" {
+		return "", fmt.Errorf("agent node ip is empty, adjust the node-ip-detect configuration")
+	}
+	return ip.String(), nil
 }

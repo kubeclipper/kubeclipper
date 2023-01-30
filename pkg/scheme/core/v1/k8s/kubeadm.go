@@ -274,6 +274,12 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 	if stepper.Kubelet.RootDir == "" {
 		stepper.Kubelet.RootDir = KubeletDefaultDataDir
 	}
+	if stepper.Kubelet.IPAsName {
+		stepper.Kubelet.NodeIP, err = getAgentNodeIP()
+		if err != nil {
+			return nil, err
+		}
+	}
 	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d --control-plane --certificate-key 46518267766fc19772ecc334c13190f8131f1bf48a213538879f6427f74fe8e2
 	// kubeadm join apiserver.cluster.local:6443 --token s9afr8.tsibqbmgddqku6xu --discovery-token-ca-cert-hash sha256:e34ec831f206237b38a1b29d46b5df599018c178959b874f6b14fe2438194f9d
 	if stepper.IsControlPlane {
@@ -315,6 +321,12 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 
 	if stepper.Kubelet.RootDir == "" {
 		stepper.Kubelet.RootDir = KubeletDefaultDataDir
+	}
+	if stepper.Kubelet.IPAsName {
+		stepper.Kubelet.NodeIP, err = getAgentNodeIP()
+		if err != nil {
+			return err
+		}
 	}
 	// local registry not filled and is in online mode, the default repo mirror proxy will be used
 	if !stepper.Offline && stepper.LocalRegistry == "" {
@@ -392,16 +404,13 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 	if err != nil {
 		return nil, err
 	}
-	agentConfig, err := config.TryLoadFromDisk()
-	if err != nil {
-		return nil, errors.WithMessage(err, "load agent config")
-	}
-	ipnet, err := netutil.GetDefaultIP(true, agentConfig.IPDetect)
+
+	agenIP, err := getAgentNodeIP()
 	if err != nil {
 		return nil, err
 	}
 	// add apiserver domain name to /etc/hosts
-	hosts.AddHost(ipnet.String(), stepper.APIServerDomainName)
+	hosts.AddHost(agenIP, stepper.APIServerDomainName)
 	if err := hosts.Save(); err != nil {
 		return nil, err
 	}
