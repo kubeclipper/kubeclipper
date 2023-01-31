@@ -77,3 +77,10 @@ tests:
     response_json_paths:
       $.kind: CronBackup
       $.spec.runAt: "2026-01-26T16:03:00Z"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

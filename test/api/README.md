@@ -9,6 +9,11 @@ pip3 install gabbi
 ## 2. 运行
 
 ```bash
+#run with list.yaml
+cd test/api
+python3 run.py
+
+#run all
 find test/api -name '*.yaml' | xargs gabbi-run 139.196.13.9 --
 find test/api -name '*.yaml' | xargs gabbi-run localhost --
 

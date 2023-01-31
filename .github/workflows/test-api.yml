@@ -28,7 +28,7 @@ jobs:
           key: ${{ secrets.CHJ_REMOTE_KEY }}
           port: ${{ secrets.CHJ_REMOTE_PORT }}
           script: |
-            rm -rf /root/kubeclipper
+            rm -rf /root/apitest/kubeclipper
       - name: Copy
         uses: appleboy/scp-action@master
         env: 
@@ -77,6 +77,7 @@ jobs:
             python3 run.py
             ssh root@172.16.30.27 "mkdir -pv /var/www/html/caas-api-test/github/${{ steps.extract_branch.outputs.branch }}"
             scp -r report root@172.16.30.27:/var/www/html/caas-api-test/github/${{ steps.extract_branch.outputs.branch }}/
+            scp -r err.log root@172.16.30.27:/var/www/html/caas-api-test/github/${{ steps.extract_branch.outputs.branch }}/
             if [ -f "result" ];then
             echo api-test successfully
             else

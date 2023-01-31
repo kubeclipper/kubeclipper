@@ -29,3 +29,5 @@ tools/kcctldocs-gen/generators/includes/
 tools/kcctldocs-gen/generators/manifest.json
 
 test/api/report
+test/api/err.log
+test/api/result

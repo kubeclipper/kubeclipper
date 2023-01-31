@@ -13,7 +13,7 @@ vars:
   - &username 'admin'
   - &password 'Thinkbig1'
   - &nfs_serverAddr '172.20.151.105'
-  - &nfs_sharedPath '/tmp/nfs/data/mcc-host'
+  - &nfs_sharedPath '/tmp/nfs/data/e2e-test'
 
 tests:
   - name: user_login
@@ -91,3 +91,10 @@ tests:
     request_headers:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
     data: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

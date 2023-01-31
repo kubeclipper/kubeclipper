@@ -46,3 +46,10 @@ tests:
       delay: 10
     response_json_paths:
       $.items[0].status.addresses[0].address: "172.20.139.223"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

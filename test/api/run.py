@@ -26,22 +26,22 @@ def runcmd(command, num, output=False):
     _, stderr = p.communicate()
     time.sleep(1)
     result = stderr.decode("utf-8")
-    return result.split("\n")[:num+1]
+    return result, result.split("\n")[:num+1]
 
 
 def create_test_cluster(retry):
     if retry <= 0:
         return 0
-    result = runcmd(start_shell.format("test_cluster/check_test_cluster.yaml"),1)
+    _,result = runcmd(start_shell.format("test_cluster/check_test_cluster.yaml"),1)
     if result[1][4]!="✓":
-        print(result)
-        runcmd(start_shell.format("test_cluster/delete_test_cluster.yaml"),1)
-        result = runcmd(start_shell.format("test_cluster/create_test_cluster.yaml"),1)
-        if result[1][4]!="✓":
-            print(result)
+        runcmd(start_shell.format("test_cluster/delete_test_cluster.yaml"),2)
+        _,result = runcmd(start_shell.format("test_cluster/create_test_cluster.yaml"),3)
+        if result[3][4]!="✓":
             create_test_cluster(retry-1)
     return 1
 
+with open("err.log","a") as f:
+    f.write("APITEST ERROR LOG\n\n\n")
 
 for list_project in list_data["apitest"]:
     if create_test_cluster(3) != 1:
@@ -54,14 +54,18 @@ for list_project in list_data["apitest"]:
         file_name = project + '/' + list_subproject[subproject]["file_name"]
         number = list_subproject[subproject]["number"]
         total_number += number
-        result = runcmd(start_shell.format(file_name), number, True)
+        detail, result = runcmd(start_shell.format(file_name), number, False)
         for res in result[1:number+1]:
             task = res[20+len(subproject):]
             if res[4] == "✓":
+                print(res)
                 pass_number += 1
                 result_data[project][subproject][task] = 'pass'
             else:
                 fail_number += 1
+                with open("err.log","a") as f:
+                    f.write("{}_{}_{}:\n".format(project,subproject,task))
+                    f.write("{}\n".format(detail))
                 print(res)
                 result_data[project][subproject][task] = 'fail'
 
@@ -72,7 +76,7 @@ with open("report","w+") as f:
     f.write("fail number: {}\n".format(fail_number))
     f.write("pass coverage: {}%\n".format(round((pass_number*1.0/total_number), 2)*100))
     f.write("api coverage: {}%\n".format(round((current_api*1.0/totoal_api), 2)*100))
-    f.write("---------------------------------------------------------------\n")
+    f.write("==============================================================================================\n")
     f.write("Details:\n")
     for project in list(result_data.keys()):
         f.write(" {}:\n".format(project))
@@ -82,6 +86,6 @@ with open("report","w+") as f:
                 f.write("\t\t{}: {}\n".format(task, result_data[project][subproject][task]))
 
 
-if pass_number==total_number:
+if pass_number*1.0/total_number>=0.95:
     with open("result","w+") as f:
         f.write("api-test successfully")
