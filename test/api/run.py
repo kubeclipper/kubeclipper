@@ -7,8 +7,8 @@ start_shell = "gabbi-run -v all 172.20.139.223 -- {}"
 
 
 result_data = {}
-totoal_api = 89
-current_api = 34
+totoal_api = 69
+current_api = 5
 total_number = 0
 pass_number = 0
 fail_number = 0
@@ -53,6 +53,8 @@ for list_project in list_data["apitest"]:
         result_data[project][subproject] = {}
         file_name = project + '/' + list_subproject[subproject]["file_name"]
         number = list_subproject[subproject]["number"]
+        api_number = list_subproject[subproject]["api_number"]
+        current_api += api_number
         total_number += number
         detail, result = runcmd(start_shell.format(file_name), number, False)
         for res in result[1:number+1]:

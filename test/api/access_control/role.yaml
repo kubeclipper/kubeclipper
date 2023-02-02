@@ -1,0 +1,102 @@
+# 角色模块
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: create_role
+    url: /apis/api/iam.kubeclipper.io/v1/roles
+    method: POST
+    data:
+      kind: GlobalRole
+      apiVersion: iam.kubeclipper.io/v1
+      metadata: {
+        name: 'test',
+        annotations: {
+          kubeclipper.io/aggregation-roles: "[\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-view-clusters\",\"role-template-edit-clusters\",\"role-template-view-backuppoints\",\"role-template-delete-clusters\",\"role-template-create-clusters\",\"role-template-access-clusters\",\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-edit-backuppoints\"]",
+          kubeclipper.io/description: "test"
+          }
+      }
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: list_role
+    url: /apis/api/iam.kubeclipper.io/v1/roles
+    method: GET
+    query_parameters:
+      fuzzy: name~test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: edit_role
+    url: /apis/api/iam.kubeclipper.io/v1/roles/test
+    method: PUT
+    data:
+      metadata: {
+        name: 'test',
+        resourceVersion: "$HISTORY['list_role'].$RESPONSE['$.items[0].metadata.resourceVersion']",
+        annotations: {
+          kubeclipper.io/aggregation-roles: "[\"role-template-view-registries\",\"role-template-edit-registries\",\"role-template-view-clusters\",\"role-template-edit-clusters\",\"role-template-view-backuppoints\",\"role-template-delete-clusters\",\"role-template-create-clusters\",\"role-template-access-clusters\",\"role-template-view-cloudproviders\",\"role-template-edit-cloudproviders\",\"role-template-edit-backuppoints\"]",
+          kubeclipper.io/description: "edit-test"
+          }
+      }
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: check_role
+    url: /apis/api/iam.kubeclipper.io/v1/roles
+    method: HEAD
+    query_parameters:
+      fieldSelector: metadata.name=test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: describe_role
+    url: /apis/api/iam.kubeclipper.io/v1/roles/test
+    method: GET
+    query_parameters:
+      name: test
+      resourceVersion: $HISTORY['list_role'].$RESPONSE['$.items[0].metadata.resourceVersion']
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: delete_role
+    url: /apis/api/iam.kubeclipper.io/v1/roles/test
+    method: DELETE
+    query_parameters:
+      name: test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
