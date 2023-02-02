@@ -14,7 +14,7 @@ vars:
   - &password "Thinkbig1"
   - &cluster_name "apitest_cluster_name"
   - &backupspace_des "有效备份空间"
-  - &fs_backupRootDir "/opt/kc/backups"
+  - &fs_backupRootDir "/tmp/nfs/data/e2e-test"
   - &s3_endpoint "172.20.163.233:9000"
   - &s3_username "admin"
   - &s3_password "Aa123456"
@@ -85,3 +85,10 @@ tests:
     response_json_paths:
       $.items[0].description: *backupspace_des
       $.totalCount: 1
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

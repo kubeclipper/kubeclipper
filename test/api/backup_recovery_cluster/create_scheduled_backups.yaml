@@ -71,3 +71,10 @@ tests:
         clusterName: test
         runAt: "2023-01-02T00:03:00+08:00"
     status: 400
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

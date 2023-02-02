@@ -39,3 +39,10 @@ tests:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
     response_json_paths:
       $.metadata.labels["kubeclipper.io/cronBackupEnable"]: ""
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
