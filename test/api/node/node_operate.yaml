@@ -1,0 +1,69 @@
+# 节点
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: list_node
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      limit: 10
+    status: 200
+
+  - name: connect_terminal
+    url: /apis/api/config.kubeclipper.io/v1/terminal.key
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: disable_node
+    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_node'].$RESPONSE['$.items[0].metadata.name']/disable
+    method: PATCH
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: enable_node
+    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_node'].$RESPONSE['$.items[0].metadata.name']/enable
+    method: PATCH
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: list_node_detail
+    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_node'].$RESPONSE['$.items[0].metadata.name']
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
