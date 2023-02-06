@@ -217,7 +217,7 @@ func (stepper *GenNode) MakeUninstallSteps(metadata *component.ExtraMetadata, pa
 			doCommandRemoveStep("removeDockershimDataDir", patchNodes, DockershimDefaultDataDir),
 		)
 		heal := Health{}
-		steps, err = heal.InitStepper().UninstallSteps(&stepper.Cluster.Networking, patchNodes...)
+		steps, err = heal.InitStepper(metadata.KubeVersion).UninstallSteps(&stepper.Cluster.Networking, patchNodes...)
 		if err != nil {
 			return err
 		}

@@ -141,7 +141,9 @@ type ClusterNode struct {
 	EtcdDataPath        string
 }
 
-type Health struct{}
+type Health struct {
+	KubernetesVersion string
+}
 
 type Certification struct{}
 
@@ -847,6 +849,43 @@ func (stepper *Health) checkPodStatus(ctx context.Context, opts component.Option
 		return fmt.Errorf("there are no running pods: %s", strings.Join(ec.Args[1:], ","))
 	}
 	return err
+}
+
+func (stepper *Health) getRegisterServiceAccountCommands() ([]v1.Command, error) {
+	commands := []v1.Command{
+		{
+			Type:         v1.CommandShell,
+			ShellCommand: []string{"kubectl", "create", "sa", "kc-server", "-n", "kube-system"},
+		},
+		{
+			Type:         v1.CommandShell,
+			ShellCommand: []string{"kubectl", "create", "clusterrolebinding", "kc-server", "--clusterrole=cluster-admin", "--serviceaccount=kube-system:kc-server"},
+		},
+	}
+	ver, err := strutil.StealKubernetesMajorVersionNumber(stepper.KubernetesVersion)
+	if err != nil {
+		return nil, err
+	}
+	// Kubernetes does not automatically create a secret for `ServiceAccount` after v1.24. You need to do so yourself.
+	if ver >= 124 {
+		secretJSON := `{"apiVersion":"v1","kind":"Secret","metadata":{"annotations":{"kubernetes.io/service-account.name":"kc-server"},"name":"kc-server-secret","namespace":"kube-system"},"type":"kubernetes.io/service-account-token"}`
+		filePath := filepath.Join(ManifestDir, "kc-server-secret.json")
+		createSecretCmd := fmt.Sprintf("echo '%s' > %s | kubectl create -f %s -n kube-system", secretJSON, filePath, filePath)
+		// 1. create service-account-token secret
+		// 2. patch service-account secrets
+		patchCommand := []v1.Command{
+			{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"bash", "-c", createSecretCmd},
+			},
+			{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"bash", "-c", `kubectl patch sa kc-server -n kube-system -p '{"secrets":[{"name":"kc-server-secret"}]}'`},
+			},
+		}
+		commands = append(commands[:1], append(patchCommand, commands[1])...)
+	}
+	return commands, nil
 }
 
 func (stepper *Certification) NewInstance() component.ObjectMeta {
