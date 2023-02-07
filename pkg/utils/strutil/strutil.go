@@ -20,6 +20,7 @@ package strutil
 
 import (
 	"encoding/base64"
+	"strconv"
 	"strings"
 )
 
@@ -61,4 +62,14 @@ func ParseGitDescribeInfo(v string) (string, bool) {
 		nc = true
 	}
 	return i[0], nc
+}
+
+// StealKubernetesMajorVersionNumber get kubernetes major version number
+// e.g.: v1.23.6 convert to 123, v125 convert to 125
+func StealKubernetesMajorVersionNumber(version string) (int, error) {
+	version = strings.ReplaceAll(version, "v", "")
+	version = strings.ReplaceAll(version, ".", "")
+
+	version = strings.Join(strings.Split(version, "")[0:3], "")
+	return strconv.Atoi(version)
 }

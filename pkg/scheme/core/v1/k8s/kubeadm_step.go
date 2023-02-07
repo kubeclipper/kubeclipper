@@ -225,7 +225,7 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	installSteps = append(installSteps, steps...)
 
 	heal := Health{}
-	steps, err = heal.InitStepper().InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = heal.InitStepper(c.KubernetesVersion).InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) 
 	uninstallSteps = append(uninstallSteps, steps...)
 
 	heal := Health{}
-	steps, err = heal.InitStepper().UninstallSteps(&runnable.Networking, nodes...)
+	steps, err = heal.InitStepper(c.KubernetesVersion).UninstallSteps(&runnable.Networking, nodes...)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +602,8 @@ func (stepper *ClusterNode) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 	return nil, nil
 }
 
-func (stepper *Health) InitStepper() *Health {
+func (stepper *Health) InitStepper(version string) *Health {
+	stepper.KubernetesVersion = version
 	return stepper
 }
 
@@ -611,6 +612,11 @@ func (stepper *Health) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 	if err != nil {
 		return nil, err
 	}
+	registerSaCommands, err := stepper.getRegisterServiceAccountCommands()
+	if err != nil {
+		return nil, err
+	}
+
 	return []v1.Step{
 		{
 			ID:         strutil.GetUUID(),
@@ -636,16 +642,7 @@ func (stepper *Health) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 			RetryTimes: 1,
 			Nodes:      nodes,
 			Action:     v1.ActionInstall,
-			Commands: []v1.Command{
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"kubectl", "create", "sa", "kc-server", "-n", "kube-system"},
-				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"kubectl", "create", "clusterrolebinding", "kc-server", "--clusterrole=cluster-admin", "--serviceaccount=kube-system:kc-server"},
-				},
-			},
+			Commands:   registerSaCommands,
 		}}, nil
 }
 

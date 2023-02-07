@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
@@ -723,11 +724,39 @@ func (r *Kubeadm) clusterServiceAccount(ctx context.Context, action v1.StepActio
 
 	switch action {
 	case v1.ActionInstall:
-		_, err = w.KubeCli.CoreV1().ServiceAccounts("kube-system").Create(ctx, sa, metav1.CreateOptions{})
+		kcSa, err := w.KubeCli.CoreV1().ServiceAccounts("kube-system").Create(ctx, sa, metav1.CreateOptions{})
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
 			return err
 		}
-
+		if kcSa.Secrets == nil {
+			logger.Debugf("need to actively create a service account secret token, start now")
+			srt := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("kc-server-secret-%s", rand.String(4)),
+					Annotations: map[string]string{
+						"kubernetes.io/service-account.name": "kc-server",
+					},
+				},
+				Type: "kubernetes.io/service-account-token",
+			}
+			kcSecret, err := w.KubeCli.CoreV1().Secrets("kube-system").Create(ctx, srt, metav1.CreateOptions{})
+			if err != nil && !strings.Contains(err.Error(), "already exists") {
+				return err
+			}
+			logger.Debugf("create kc-server secret")
+			kcSa.Secrets = []corev1.ObjectReference{
+				{
+					Kind:      kcSecret.Kind,
+					Namespace: kcSecret.Namespace,
+					Name:      kcSecret.Name,
+				},
+			}
+			_, err = w.KubeCli.CoreV1().ServiceAccounts("kube-system").Update(ctx, kcSa, metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+			logger.Debugf("update the kc-server service-account")
+		}
 		_, err = w.KubeCli.RbacV1().ClusterRoleBindings().Create(ctx, crb, metav1.CreateOptions{})
 		if err != nil && !strings.Contains(err.Error(), "already exists") {
 			return err
