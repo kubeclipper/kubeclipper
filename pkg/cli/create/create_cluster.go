@@ -71,26 +71,36 @@ const (
 
 type CreateClusterOptions struct {
 	BaseOptions
-	Masters       []string
-	Workers       []string
-	UntaintMaster bool
-	Offline       bool
-	LocalRegistry string
-	CRI           string
-	CRIVersion    string
-	K8sVersion    string
-	CNI           string
-	CNIVersion    string
-	Name          string
-	createdByIP   bool
-	CertSans      []string
-	CaCertFile    string
-	CaKeyFile     string
+	Masters                   []string
+	Workers                   []string
+	UntaintMaster             bool
+	Offline                   bool
+	LocalRegistry             string
+	CRI                       string
+	CRIVersion                string
+	K8sVersion                string
+	CNI                       string
+	CNIVersion                string
+	Name                      string
+	createdByIP               bool
+	CertSans                  []string
+	CaCertFile                string
+	CaKeyFile                 string
+	DNSDomain                 string
+	IPv4AutoDetection         string
+	DetectionMethodExpression string
 }
 
+const (
+	firstFoundIPDetectionMethod = "first-found"
+	canReachIPDetectionMethod   = "can-reach"
+	interfaceIPDetectionMethod  = "interface"
+)
+
 var (
-	allowedCRI = sets.NewString("containerd", "docker")
-	allowedCNI = sets.NewString("calico")
+	allowedCRI               = sets.NewString("containerd", "docker")
+	allowedCNI               = sets.NewString("calico")
+	allowedIPDetectionMethod = sets.NewString(firstFoundIPDetectionMethod, canReachIPDetectionMethod, interfaceIPDetectionMethod)
 )
 
 func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
@@ -105,6 +115,7 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 		CRI:           "containerd",
 		CNI:           "calico",
 		createdByIP:   false,
+		DNSDomain:     "cluster.local",
 	}
 }
 
@@ -138,6 +149,9 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
+	cmd.Flags().StringVar(&o.DNSDomain, "dns-domain", o.DNSDomain, "k8s cluster domain")
+	cmd.Flags().StringVar(&o.IPv4AutoDetection, "ipv4-auto-detection", o.IPv4AutoDetection, "pod ipv4 auto detection")
+	cmd.Flags().StringVar(&o.DetectionMethodExpression, "detection-method-expression", o.DetectionMethodExpression, "ip address、 domain or regex expression when ip detection method is can-reach or interface")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -217,6 +231,12 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	}
 	if !allowedCNI.Has(l.CNI) {
 		return utils.UsageErrorf(cmd, "unsupported cni,support %v now", allowedCNI.List())
+	}
+	if !allowedIPDetectionMethod.Has(l.IPv4AutoDetection) {
+		return utils.UsageErrorf(cmd, "unsupported pod ip detection method, support %v now", allowedIPDetectionMethod.List())
+	}
+	if l.IPv4AutoDetection != firstFoundIPDetectionMethod && l.DetectionMethodExpression == "" {
+		return utils.UsageErrorf(cmd, "must specify '--detection-method-expression' flag when ip detection method is can-reach or interface")
 	}
 	if len(l.Masters)%2 == 0 {
 		return utils.UsageErrorf(cmd, "master node must be odd")
@@ -323,6 +343,10 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		annotations[common.AnnotationOffline] = ""
 	}
 
+	ipDetection := l.IPv4AutoDetection
+	if l.IPv4AutoDetection != firstFoundIPDetectionMethod {
+		ipDetection = fmt.Sprintf("%s=%s", l.IPv4AutoDetection, l.DetectionMethodExpression)
+	}
 	c := &v1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
@@ -345,7 +369,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			IPFamily:      v1.IPFamilyIPv4,
 			Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
 			Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
-			DNSDomain:     "cluster.local",
+			DNSDomain:     l.DNSDomain,
 			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",
 		},
@@ -357,7 +381,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Type:          l.CNI,
 			Version:       l.CNIVersion,
 			Calico: &v1.Calico{
-				IPv4AutoDetection: "first-found",
+				IPv4AutoDetection: ipDetection,
 				IPv6AutoDetection: "first-found",
 				Mode:              "Overlay-Vxlan-All",
 				IPManger:          true,
@@ -450,7 +474,13 @@ func (l *CreateClusterOptions) listK8s(toComplete string) []string {
 }
 
 func (l *CreateClusterOptions) componentVersions(component, toComplete string) []string {
-	metas, err := l.Client.GetComponentMeta(context.TODO(), nil)
+	var metas *kc.ComponentMeta
+	var err error
+	if l.Offline {
+		metas, err = l.Client.GetComponentMeta(context.TODO(), map[string][]string{"online": {"false"}})
+	} else {
+		metas, err = l.Client.GetComponentMeta(context.TODO(), map[string][]string{"online": {"true"}})
+	}
 	if err != nil {
 		logger.Errorf("get component meta failed: %s. please check .kc/config", err)
 		return nil
