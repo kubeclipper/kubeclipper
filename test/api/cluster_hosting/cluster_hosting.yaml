@@ -1,0 +1,122 @@
+# 集群托管
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+  - &kubeConfig ${{ secrets.kubeconfig }}
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: add_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders
+    method: POST
+    data:
+      kind: CloudProvider
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        annotations: {}
+        name: testkubeadm
+      ssh:
+        user: root
+        password: VGhpbmtiaWcx
+        port: 22
+        privateKey: ''
+      type: kubeadm
+      region: default
+      config:
+        clusterName: test-kubeadm1
+        kubeConfig: *kubeConfig
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 201
+
+  - name: list_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: update_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']
+    method: PUT
+    data:
+      kind: CloudProvider
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: testkubeadm
+        finalizers:
+          - finalizer.cloudprovider.kubeclipper.io
+        annotations:
+          kubeclipper.io/description: description
+        resourceVersion: $HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.resourceVersion']
+      type: kubeadm
+      region: default
+      ssh:
+        user: root
+        password: VGhpbmtiaWcx
+        port: 22
+        privateKey: ''
+      config:
+        clusterName: test-kubeadm1
+        kubeConfig: *kubeConfig
+      status:
+        conditions:
+          - type: 创建
+            status: 'True'
+            reason: Created
+            message: provider created success
+          - type: 同步
+            status: 'True'
+            reason: SyncSucceed
+            message: sync successful
+        status: true
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: sync_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']/sync
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: describe_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: delete_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

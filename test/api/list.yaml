@@ -101,6 +101,12 @@ apitest:
             number: 3
             api_number: 3
 
+    - cluster_hosting:
+        - cluster_hosting: 
+            file_name: cluster_hosting.yaml
+            number: 6
+            api_number: 6
+
     - cluster_operator:
         - certificate_management: 
             file_name: certificate_management.yaml
