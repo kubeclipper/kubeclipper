@@ -69,28 +69,73 @@ const (
   Please read 'kcctl create cluster -h' get more create cluster flags.`
 )
 
+const IPDetectDescription = `
+When Calico is used for routing, each node must be configured with an IPv4 address and/or an IPv6 address that 
+will beused to route between nodes. To eliminate node specific IP address configuration, the calico/node container
+can be configuredto autodetect these IP addresses. In many systems, there might be multiple physical interfaces on
+a host, or possibly multipleIP addresses configured on a physical interface. In these cases, there are multiple
+addresses to choose from and so autodetectionof the correct address can be tricky.
+
+The IP autodetection methods are provided to improve the selection of the correct address, by limiting the 
+selection basedon suitable criteria for your deployment.
+
+The following sections describe the available IP autodetection methods.
+
+1. first-found
+The first-found option enumerates all interface IP addresses and returns the first valid IP address 
+(based on IP versionand type of address) on the first valid interface. 
+Certain known “local” interfaces are omitted, such as the docker bridge.The order that both the interfaces 
+and the IPaddresses are listed is system dependent.
+
+This is the default detection method. 
+However, since this method only makes a very simplified guess,it is recommended to either configure the node with
+a specific IP address,or to use one of the other detection methods.
+
+2. interface=INTERFACE-REGEX
+The interface method uses the supplied interface regular expression to enumerate matching interfaces and to 
+return thefirst IP address on the first matching interface. 
+The order that both the interfaces and the IP addresses are listed is system dependent.
+
+Example with valid IP address on interface eth0, eth1, eth2 etc.:
+interface=eth.*
+
+3. can-reach=DESTINATION
+The can-reach method uses your local routing to determine which IP address will be used to reach the supplied
+destination.Both IP addresses and domain names may be used.
+
+Example using IP addresses:
+IP_AUTODETECTION_METHOD=can-reach=8.8.8.8
+IP6_AUTODETECTION_METHOD=can-reach=2001:4860:4860::8888
+
+Example using domain names:
+IP_AUTODETECTION_METHOD=can-reach=www.google.com
+IP6_AUTODETECTION_METHOD=can-reach=www.google.com`
+
 type CreateClusterOptions struct {
 	BaseOptions
-	Masters       []string
-	Workers       []string
-	UntaintMaster bool
-	Offline       bool
-	LocalRegistry string
-	CRI           string
-	CRIVersion    string
-	K8sVersion    string
-	CNI           string
-	CNIVersion    string
-	Name          string
-	createdByIP   bool
-	CertSans      []string
-	CaCertFile    string
-	CaKeyFile     string
+	Masters           []string
+	Workers           []string
+	UntaintMaster     bool
+	Offline           bool
+	LocalRegistry     string
+	CRI               string
+	CRIVersion        string
+	K8sVersion        string
+	CNI               string
+	CNIVersion        string
+	Name              string
+	createdByIP       bool
+	CertSans          []string
+	CaCertFile        string
+	CaKeyFile         string
+	DNSDomain         string
+	IPv4AutoDetection string
 }
 
 var (
-	allowedCRI = sets.NewString("containerd", "docker")
-	allowedCNI = sets.NewString("calico")
+	allowedCRI               = sets.NewString("containerd", "docker")
+	allowedCNI               = sets.NewString("calico")
+	allowedIPDetectionMethod = sets.NewString("first-found", "can-reach", "interface")
 )
 
 func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
@@ -105,6 +150,7 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 		CRI:           "containerd",
 		CNI:           "calico",
 		createdByIP:   false,
+		DNSDomain:     "cluster.local",
 	}
 }
 
@@ -138,6 +184,8 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
+	cmd.Flags().StringVar(&o.DNSDomain, "cluster-dns-domain", o.DNSDomain, "k8s cluster domain")
+	cmd.Flags().StringVar(&o.IPv4AutoDetection, "calico.ipv4-auto-detection", o.IPv4AutoDetection, fmt.Sprintf("node ipv4 auto detection. \n%s", IPDetectDescription))
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -217,6 +265,9 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	}
 	if !allowedCNI.Has(l.CNI) {
 		return utils.UsageErrorf(cmd, "unsupported cni,support %v now", allowedCNI.List())
+	}
+	if !allowedIPDetectionMethod.Has(l.IPv4AutoDetection) {
+		return utils.UsageErrorf(cmd, "unsupported pod ip detection method, support %v now", allowedIPDetectionMethod.List())
 	}
 	if len(l.Masters)%2 == 0 {
 		return utils.UsageErrorf(cmd, "master node must be odd")
@@ -345,7 +396,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			IPFamily:      v1.IPFamilyIPv4,
 			Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
 			Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
-			DNSDomain:     "cluster.local",
+			DNSDomain:     l.DNSDomain,
 			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",
 		},
@@ -357,7 +408,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Type:          l.CNI,
 			Version:       l.CNIVersion,
 			Calico: &v1.Calico{
-				IPv4AutoDetection: "first-found",
+				IPv4AutoDetection: l.IPv4AutoDetection,
 				IPv6AutoDetection: "first-found",
 				Mode:              "Overlay-Vxlan-All",
 				IPManger:          true,
@@ -450,7 +501,13 @@ func (l *CreateClusterOptions) listK8s(toComplete string) []string {
 }
 
 func (l *CreateClusterOptions) componentVersions(component, toComplete string) []string {
-	metas, err := l.Client.GetComponentMeta(context.TODO(), nil)
+	var metas *kc.ComponentMeta
+	var err error
+	if l.Offline {
+		metas, err = l.Client.GetComponentMeta(context.TODO(), map[string][]string{"online": {"false"}})
+	} else {
+		metas, err = l.Client.GetComponentMeta(context.TODO(), map[string][]string{"online": {"true"}})
+	}
 	if err != nil {
 		logger.Errorf("get component meta failed: %s. please check .kc/config", err)
 		return nil
