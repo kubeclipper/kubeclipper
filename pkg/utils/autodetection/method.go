@@ -34,6 +34,7 @@ const (
 	MethodFirst     = "first-found"
 	MethodInterface = "interface="
 	MethodCidr      = "cidr="
+	MethodCanReach  = "can-reach="
 )
 
 const (
@@ -46,7 +47,7 @@ func CheckMethod(method string) bool {
 		return true
 	}
 
-	return strings.HasPrefix(method, MethodInterface) || strings.HasPrefix(method, MethodCidr)
+	return strings.HasPrefix(method, MethodInterface) || strings.HasPrefix(method, MethodCidr) || strings.HasPrefix(method, MethodCanReach)
 }
 
 // AutoDetectCIDR auto-detects the IP and Network using the requested detection method.
