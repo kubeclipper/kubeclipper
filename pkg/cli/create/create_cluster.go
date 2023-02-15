@@ -269,7 +269,7 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	if len(l.Masters)%2 == 0 {
 		return utils.UsageErrorf(cmd, "master node must be odd")
 	}
-	if l.IPv4AutoDetection != "" && !autodetection.CheckMethod(l.IPv4AutoDetection) {
+	if l.IPv4AutoDetection != "" && !autodetection.CheckCalicoMethod(l.IPv4AutoDetection) {
 		return utils.UsageErrorf(cmd, "unsupported ip detect method, support [first-found,interface=xxx,can-reach=xxx] now")
 	}
 	if l.Name == "" {

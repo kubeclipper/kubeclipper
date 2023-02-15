@@ -47,7 +47,15 @@ func CheckMethod(method string) bool {
 		return true
 	}
 
-	return strings.HasPrefix(method, MethodInterface) || strings.HasPrefix(method, MethodCidr) || strings.HasPrefix(method, MethodCanReach)
+	return strings.HasPrefix(method, MethodInterface) || strings.HasPrefix(method, MethodCidr)
+}
+
+func CheckCalicoMethod(method string) bool {
+	if method == "" || method == MethodFirst {
+		return true
+	}
+
+	return strings.HasPrefix(method, MethodInterface) || strings.HasPrefix(method, MethodCanReach)
 }
 
 // AutoDetectCIDR auto-detects the IP and Network using the requested detection method.
