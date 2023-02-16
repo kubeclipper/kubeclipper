@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"net"
 	"os"
 	"strings"
@@ -133,9 +134,8 @@ type CreateClusterOptions struct {
 }
 
 var (
-	allowedCRI               = sets.NewString("containerd", "docker")
-	allowedCNI               = sets.NewString("calico")
-	allowedIPDetectionMethod = sets.NewString("first-found", "can-reach", "interface")
+	allowedCRI = sets.NewString("containerd", "docker")
+	allowedCNI = sets.NewString("calico")
 )
 
 func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
@@ -266,11 +266,11 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	if !allowedCNI.Has(l.CNI) {
 		return utils.UsageErrorf(cmd, "unsupported cni,support %v now", allowedCNI.List())
 	}
-	if !allowedIPDetectionMethod.Has(l.IPv4AutoDetection) {
-		return utils.UsageErrorf(cmd, "unsupported pod ip detection method, support %v now", allowedIPDetectionMethod.List())
-	}
 	if len(l.Masters)%2 == 0 {
 		return utils.UsageErrorf(cmd, "master node must be odd")
+	}
+	if l.IPv4AutoDetection != "" && !autodetection.CheckCalicoMethod(l.IPv4AutoDetection) {
+		return utils.UsageErrorf(cmd, "unsupported ip detect method, support [first-found,interface=xxx,can-reach=xxx] now")
 	}
 	if l.Name == "" {
 		return utils.UsageErrorf(cmd, "cluster name must be specified")
