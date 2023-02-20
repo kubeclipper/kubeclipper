@@ -53,7 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/sethvargo/go-password/password"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/sudo"
 

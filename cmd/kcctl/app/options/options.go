@@ -34,8 +34,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
-	"gopkg.in/yaml.v2"
 	"k8s.io/client-go/util/homedir"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 

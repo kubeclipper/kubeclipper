@@ -32,7 +32,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/imageproxy"
 
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
