@@ -32,8 +32,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 	"k8s.io/component-base/version"
+	"sigs.k8s.io/yaml"
 )
 
 const (

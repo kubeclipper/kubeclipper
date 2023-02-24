@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 

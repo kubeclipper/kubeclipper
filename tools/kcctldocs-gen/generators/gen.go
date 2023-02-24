@@ -28,7 +28,7 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 )
 
 var (

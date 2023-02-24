@@ -29,8 +29,8 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/registry/client"
 

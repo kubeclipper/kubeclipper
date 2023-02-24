@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/component"

@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	agentconfig "github.com/kubeclipper/kubeclipper/pkg/agent/config"

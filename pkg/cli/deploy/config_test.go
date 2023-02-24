@@ -21,7 +21,7 @@ package deploy
 import (
 	"testing"
 
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 )
