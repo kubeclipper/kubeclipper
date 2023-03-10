@@ -1,0 +1,33 @@
+# sync script to  oss
+
+name: sync-script
+
+on:
+  push:
+    branches:
+      - 'release*'
+
+# This ensures that previous jobs for the branch are canceled when the branch is updated.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name:  sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Setup ossutil
+        uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint:  ${{ secrets.OSS_ENDPOINT }}
+          access-key-id: ${{ secrets.OSS_ACCESS_KEY }}
+          access-key-secret: ${{ secrets.OSS_ACCESS_SECRET }}
+          #sts-token: "sts_token"
+      - name: Upload to oss
+        run: |
+          ossutil cp -rf scripts/get-kubeclipper.sh oss://${{ secrets.OSS_BUCKET }}/
