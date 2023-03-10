@@ -94,8 +94,8 @@ verify_arch() {
 }
 
 verify_downloader() {
-  [ -x "$(command -v $1)" ] || return 1
-  DOWNLOADER=$1
+  [ -x "$(command -v "$1")" ] || return 1
+  DOWNLOADER="$1"
   return 0
 }
 
@@ -115,7 +115,7 @@ set_env() {
   if [ -n "${KC_BIN_DIR}" ]; then
     BIN_DIR=${KC_BIN_DIR}
   else
-    IFS=":" read -ra dirs <<<"$(echo ${PATH})"
+    IFS=":" read -ra dirs <<<"$(echo "${PATH}")"
     for dirx in "${dirs[@]}"; do
       if [ "$dirx" == "/usr/local/bin" ] || [ "$dirx" == "/usr/bin" ]; then
         BIN_DIR=$dirx
@@ -142,13 +142,13 @@ install_pkg() {
   REMOTE=${DOWNLOAD_URL}/${KC_VERSION}/kc-${OS_TYPE}-${ARCH}.tar.gz
   TARGET=${TMP_DIR}"/kcctl.tar.gz"
   # download
-  download ${TARGET} ${REMOTE}
+  download "${TARGET}" "${REMOTE}"
   # decompress the file to the specified directory
-  tar -zxvf ${TARGET} -C ${TMP_DIR} --strip-components ${STRIP}
+  tar -zxvf "${TARGET}" -C "${TMP_DIR}" --strip-components "${STRIP}"
   info "Installing kcctl to ${BIN_DIR}/kcctl"
   # move binary file to BIN_DIR
-  $SUDO mv ${TMP_DIR}/kcctl ${BIN_DIR}/
-  rm -rf ${TMP_DIR}
+  $SUDO mv "${TMP_DIR}"/kcctl "${BIN_DIR}"/
+  rm -rf "${TMP_DIR}"
 }
 
 download() {
@@ -157,10 +157,10 @@ download() {
   info "Downloading package $2"
   case $DOWNLOADER in
   curl)
-    curl -o $1 $2
+    curl -o "$1" "$2"
     ;;
   wget)
-    wget -O $1 $2
+    wget -O "$1" "$2"
     ;;
   *)
     fatal "Incorrect executable '$DOWNLOADER'"
