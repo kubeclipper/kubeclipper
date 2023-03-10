@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/random"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -137,8 +139,7 @@ func (t *tokenOperator) cacheToken(username, token string, tokenType iamv1.Token
 			Labels: map[string]string{
 				common.LabelUsername: username,
 			},
-			GenerateName: fmt.Sprintf("%s-", username),
-			//Name:         hashutil.MD5(token),
+			Name: fmt.Sprintf("%s-%s", username, random.GenerateString(6)),
 		},
 		Spec: iamv1.TokenSpec{
 			TokenType: tokenType,
@@ -162,7 +163,7 @@ func (t *tokenOperator) tokenCacheValidate(username, tokenStr string) error {
 	if err != nil {
 		return err
 	}
-	if len(tokens.Items) == 1 {
+	if len(tokens.Items) > 0 {
 		return nil
 	}
 	return errors.New("token invalid in cache")
