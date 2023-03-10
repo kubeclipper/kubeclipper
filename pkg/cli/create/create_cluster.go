@@ -23,10 +23,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"net"
 	"os"
 	"strings"
+
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 
