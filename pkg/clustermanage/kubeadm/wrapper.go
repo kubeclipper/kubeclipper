@@ -146,7 +146,11 @@ func (w *Wrapper) completeKubeadm(kubeadmConf *corev1.ConfigMap, c *v1.Cluster) 
 	c.KubernetesVersion = clusterConf.KubernetesVersion
 	c.CertSANs = clusterConf.APIServer.CertSANs
 	c.KubeProxy = v1.KubeProxy{}
-	c.Etcd.DataDir = clusterConf.Etcd.Local.DataDir
+	if clusterConf.Etcd.Local == nil {
+		c.Etcd.DataDir = "External"
+	} else {
+		c.Etcd.DataDir = clusterConf.Etcd.Local.DataDir
+	}
 	c.Kubelet.RootDir = ""
 	c.Networking.IPFamily = ipFamily
 	c.Networking.Services = v1.NetworkRanges{CIDRBlocks: serviceSubnet}
