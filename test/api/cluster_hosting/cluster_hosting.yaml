@@ -1,0 +1,122 @@
+# 集群托管
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+  - &kubeConfig 'YXBpVmVyc2lvbjogdjEKY2x1c3RlcnM6Ci0gY2x1c3RlcjoKICAgIGNlcnRpZmljYXRlLWF1dGhvcml0eS1kYXRhOiBMUzB0TFMxQ1JVZEpUaUJEUlZKVVNVWkpRMEZVUlMwdExTMHRDazFKU1VNdmFrTkRRV1ZoWjBGM1NVSkJaMGxDUVVSQlRrSm5hM0ZvYTJsSE9YY3dRa0ZSYzBaQlJFRldUVkpOZDBWUldVUldVVkZFUlhkd2NtUlhTbXdLWTIwMWJHUkhWbnBOUWpSWVJGUkplVTFVUlhwTlJFRTBUa1JOTVUxc2IxaEVWRTE1VFZSRmVVNTZRVFJPUkUweFRXeHZkMFpVUlZSTlFrVkhRVEZWUlFwQmVFMUxZVE5XYVZwWVNuVmFXRkpzWTNwRFEwRlRTWGRFVVZsS1MyOWFTV2gyWTA1QlVVVkNRbEZCUkdkblJWQkJSRU5EUVZGdlEyZG5SVUpCVFVGeENsQTNMM1JTZGpGM1ZDOWtlRElyYmpGMVZHVmtRMmhpYVZoQ2JscFdWREl3Ym5KaFJYWldWV1Z1T0VFMFZFRkROblp2TDBOUE5tWnNia0pUU21rNWJub0tRa3hhVjNWemQydzFhMmM0T0RSWmFGTkNUbVVyYmxKSFlrODVSaXR6TWs5dU1tVlRhWFpoTlc5VmJXOUtjakIzWWk5R2FWbHpZV3hYUWxaM1RrMUdZUXBOV1d0cVpWQmpUelpTUkVKT2VtcHFhazQ1UkdocVdFOVRVbEJTZDBOMVkwRlFja013YzJsMVRGaERPVGxCYVRCdU9HZ3dkVWxUVkZKeWFqUTJXVlp0Q2l0SmRXUnJkU3RRS3pJclZsbE9PRWxYYmpGcVFXSmtRWFZIUXl0a1NtbGxSVEExVUVsMllrbGhTMHRHY0RkQloyTnZWRUpSZVZONlprdHZTRlprTjJnS2VtRjJaWEJWZDIwMlZtRk9kSHBUT0hnNVNWbDZWRWt6VFZocloycFZXbWRwV1RaMVpETTRibFp3WXk5R1QwWXlZU3M1Vkc4d1NreGhSRmt4Ym5STWJ3bzBjUzl5VTI5WVpraHlhRVExVEZsR2MxZEZRMEYzUlVGQllVNWFUVVpqZDBSbldVUldVakJRUVZGSUwwSkJVVVJCWjB0clRVRTRSMEV4VldSRmQwVkNDaTkzVVVaTlFVMUNRV1k0ZDBoUldVUldVakJQUWtKWlJVWktNMDlxV2xKVk4xRnhORXhtUVZCNlkyNHlXV3RzTW5jemFXZE5RbFZIUVRGVlpFVlJVVThLVFVGNVEwTnRkREZaYlZaNVltMVdNRnBZVFhkRVVWbEtTMjlhU1doMlkwNUJVVVZNUWxGQlJHZG5SVUpCUjNJNU5sbERTRkpsV25GeGQyMDJjbm81Y2dveU1VZE9iME5qWVZBNE16VTRiVVkwTlc5SGR6SmxhVUp0Wm5WSlRuSnpVbTlKV0c5WU5UbEZXRmgzZWxkalRHcEZSaTkyYW5CbFpXRlNSMWxCTm5KNkNrVktVM012ZEdobVVsaEZWalpKYXpGNldtOWlNM05rVTNGclYwSklPSEp2U2pGc2RtazBMM2hWY1dkSVJrTldORms0V0Vkek5saHNiMkpuYzBoalFsb0tjSEV6U1dWRlRYTXhPRWt2Wm5oU0syaE1OMHMwTTNadVowSXhRWFJZZGxoRVptSjJURzVOSzFKaVpqQnNWelUyVVU1NWNGQTJXakp6VUdSSUt5dFRXUXBYVEVoVlduVlNSa2RDWW1GRVJHY3pkM0ZSVkhSTWFqZzNVWFU1ZDNVM1NqazJSV3h4ZFhodmRrMW1SRTVUWkhsVFdGVlFZMU5rTUVwaFZXUlBUR3h0Q2k5TGVsTXZRbk5TWlRWc1dIbENWRkYwTkdWcU5tWXJiaTlWTnl0S1ZITjBkbFJQUldGMVdFOTRWREV6TlVOa2RsWnVRbUowY3pGWVFteEJWbVE1U2pRS2RtWnpQUW90TFMwdExVVk9SQ0JEUlZKVVNVWkpRMEZVUlMwdExTMHRDZz09CiAgICBzZXJ2ZXI6IGh0dHBzOi8vMTcyLjIwLjEzOS4yNDc6NjQ0MwogIG5hbWU6IGt1YmVybmV0ZXMKY29udGV4dHM6Ci0gY29udGV4dDoKICAgIGNsdXN0ZXI6IGt1YmVybmV0ZXMKICAgIHVzZXI6IGt1YmVybmV0ZXMtYWRtaW4KICBuYW1lOiBrdWJlcm5ldGVzLWFkbWluQGt1YmVybmV0ZXMKY3VycmVudC1jb250ZXh0OiBrdWJlcm5ldGVzLWFkbWluQGt1YmVybmV0ZXMKa2luZDogQ29uZmlnCnByZWZlcmVuY2VzOiB7fQp1c2VyczoKLSBuYW1lOiBrdWJlcm5ldGVzLWFkbWluCiAgdXNlcjoKICAgIGNsaWVudC1jZXJ0aWZpY2F0ZS1kYXRhOiBMUzB0TFMxQ1JVZEpUaUJEUlZKVVNVWkpRMEZVUlMwdExTMHRDazFKU1VSSlZFTkRRV2R0WjBGM1NVSkJaMGxKUjFKRFQyTjBMeTlLVUZsM1JGRlpTa3R2V2tsb2RtTk9RVkZGVEVKUlFYZEdWRVZVVFVKRlIwRXhWVVVLUVhoTlMyRXpWbWxhV0VwMVdsaFNiR042UVdWR2R6QjVUV3BGZUUxNlFYZFBSRkY2VGxSS1lVWjNNSGxOZWtWNFRYcEJkMDlFVVhwT1ZGWmhUVVJSZUFwR2VrRldRbWRPVmtKQmIxUkViazQxWXpOU2JHSlVjSFJaV0U0d1dsaEtlazFTYTNkR2QxbEVWbEZSUkVWNFFuSmtWMHBzWTIwMWJHUkhWbnBNVjBackNtSlhiSFZOU1VsQ1NXcEJUa0puYTNGb2EybEhPWGN3UWtGUlJVWkJRVTlEUVZFNFFVMUpTVUpEWjB0RFFWRkZRVE54WTFCT1FqZFFSVGxVVjBjeGMxQUtLMlpOY0ZSMlFsQnpiemh0UzA5MmQyRmlaMjQxTUZac01EUkJSMjQxUkRST2FITnNZVnBPVTJSM1lWQmtiWFJsYlVreGFTdHZXbGxpUVROYVJVaHNiQXBuYUcwclYyOXZiM0F3UmtoTE1tcFlXRXRrYUhoNlVteFlXSFZZVm5aTlEwWk5ZWGt4VFRFMkx6WlFWbmxXVDNkVlJpOUhXVmx4Y1hsalpFUlpjbWhLQ25GWGIyZHRkVW81VWpoWGNIZElXVUZoTjJ0SlJXRnhabGxOWVc1TVpXaE1iVmx4YkVKd1FWRmlNWE5YVG1SWGFteDBhRlkxUkd4U1puRjBPRFpLZDJzS1RrTk9kbUpuTmxsQ05UQmtSVmhZTVc5MlZIQkxaMGhIZEdKNFoyVkJVbkJsZDFoU01uWnNMemhpVFVGbE1HdHdablZvVlU0MFpsRTRObk4zY2xoVmRBcEJUMHBuYUVOSFUwMWpNa2gzY25FeVRVbHhLemhWVVRSWFNXd3pjMW8wVDBSa1ZYRnpjR2xyWkZKbVRGaHhNREZFVUM5dWN6QnNhaTg0UWxwRlF6QjFDbmxYVVhoWGQwbEVRVkZCUW04eFdYZFdSRUZQUW1kT1ZraFJPRUpCWmpoRlFrRk5RMEpoUVhkRmQxbEVWbEl3YkVKQmQzZERaMWxKUzNkWlFrSlJWVWdLUVhkSmQwUkJXVVJXVWpCVVFWRklMMEpCU1hkQlJFRm1RbWRPVmtoVFRVVkhSRUZYWjBKVFpIcHZNbFZXVHpCTGRVTXpkMFE0TTBvNWJVcEtaSE5PTkFwdlJFRk9RbWRyY1docmFVYzVkekJDUVZGelJrRkJUME5CVVVWQmNIWndRVnBVZUVORmNXeHJOM05NVjI4M05tTmphbkJNZGtoM0wxUmtUR05UZEUxWkNsRm5WVkF3UTJGSFNGWXhMMEZNV0U5VVUyMUhiMWhuYjJkbGFYZEVOMFo2ZFVwaFVDODBZM0pXU1VoWGNGVnVZWE5OTTBsVVduY3ZNU3RVU1VvM2VUWUtNREV4TDB4cWFXRlBiakZrVkZSNWVrZ3JSRFk0WXpsb2VGTlRNRXh5Tm1SYVQxbHNkWHBxVkVaTE0wZExka1pSVG01MlUwaE5NVTFLY0hOVGRIaFFRUXB0UmxJM1oxRnJObk4wVG1WT2ExTTJkVkZvVUM5cVVUVlVaMlJEU0UxTFNIQnljVzV5ZFVaRFdIbHdZWEJvZG1OR1EwRTRSa1Y1VlhOR1VVMDNiemRZQ25KUU1HeEhWaXN3U1dONGRqSlJSMGw1YjI4NGFqRkRhVVIzVmtsdmJWZEliMmRJWTJWRk5IbzNWWEF4UVRGWFYwODRZbXRKWTNNMFNHeE9iVFl6TDBzS2JHbFljMVZJUzFGd1NYbEtXbXhsTmk5eVFUWndRMEZOUmpGcVVYZHZkMEYwU1dvNVZVSmtVbGt5YWsxc04wSnZSR2M5UFFvdExTMHRMVVZPUkNCRFJWSlVTVVpKUTBGVVJTMHRMUzB0Q2c9PQogICAgY2xpZW50LWtleS1kYXRhOiBMUzB0TFMxQ1JVZEpUaUJTVTBFZ1VGSkpWa0ZVUlNCTFJWa3RMUzB0TFFwTlNVbEZjRUZKUWtGQlMwTkJVVVZCTTNGalVFNUNOMUJGT1ZSWFJ6RnpVQ3RtVFhCVWRrSlFjMjg0YlV0UGRuZGhZbWR1TlRCV2JEQTBRVWR1TlVRMENrNW9jMnhoV2s1VFpIZGhVR1J0ZEdWdFNURnBLMjlhV1dKQk0xcEZTR3hzWjJodEsxZHZiMjl3TUVaSVN6SnFXRmhMWkdoNGVsSnNXRmgxV0ZaMlRVTUtSazFoZVRGTk1UWXZObEJXZVZaUGQxVkdMMGRaV1hGeGVXTmtSRmx5YUVweFYyOW5iWFZLT1ZJNFYzQjNTRmxCWVRkclNVVmhjV1paVFdGdVRHVm9UQXB0V1hGc1FuQkJVV0l4YzFkT1pGZHFiSFJvVmpWRWJGSm1jWFE0TmtwM2EwNURUblppWnpaWlFqVXdaRVZZV0RGdmRsUndTMmRJUjNSaWVHZGxRVkp3Q21WM1dGSXlkbXd2T0dKTlFXVXdhM0JtZFdoVlRqUm1VVGcyYzNkeVdGVjBRVTlLWjJoRFIxTk5ZekpJZDNKeE1rMUpjU3M0VlZFMFYwbHNNM05hTkU4S1JHUlZjWE53YVd0a1VtWk1XSEV3TVVSUUwyNXpNR3hxTHpoQ1drVkRNSFY1VjFGNFYzZEpSRUZSUVVKQmIwbENRVkZETkZOSFpHbERWRzR4ZGxGNE1RcFhaSEZSVlRNeFYwMDNjVlJJVERWR01HNXhTekZtZUZwQkszaDVjMG94UzNoeE9XRkJVQzl1VFZOT2NFWnZialZTYjJKdFJuVm1ZMWRSVDI5ak5VYzRDbVVyTTFSVU9FWnZjVXc1WWtvNFJtcEpXVkpYTUUxamVVaExSR3hVWkRCR0x6RTBlVzFtTnpjclVrdGljMmgyU2xwaVdXZzBRazlRVDJwc0wyaHhhVEFLWkdKdGNVOW5aa0ZwYTA5TkszZEpNRXBNWWxkamFrSkhhSGRWYUVRNU9EUkNiMWhJYlcxemMxTlZVbEZwZVZoNVJGWXJWbWxsVkZaVFYxSkJNME56YkFvd2EzQlhhMFkwTVc1dWVGUkJUMnRqVmtSbGIycEZSbFlyV1UxMGN5OXhRamc1YVZoeFZsTlNjbEJVVFdsUmNsRmxTVXB1YkdGYVpEbGFhMGd3V2tSTkNpczRTRVV2UVRncmQyUktRa1V4ZHpCYWJYSldReTlSUTI1VlFXNHlMM05VUVhoV1dubGljVVZ3T0hWSlpXZzNVMHd6U1doamVVRXZRV3haY0RFM05Ia0tZMUZKT1dwNGMxSkJiMGRDUVU5UFlsQk5LMWhtVjNBd09EWkNVbXA0VVZkTFlqUjZTQ3RYZW5aVVMyTXlWMlJyWWxwQ1NUTXJlbkkyYWk5SFRuQllOUXBMZW5kblMxcGxkREp6VDA5S2EySktNMUZYU3pKalFTdEJkMjUyUkZkNlZEY3paVFV6TTAxSVVqUlFSa2tyWVU1MU5VMDNhbU5VUjJreFJXWnBSbVYxQ2xRMmNuVnFXVGhqZGtOblQyMXZMemRpY0ZkcmNsbENaRk14SzFWRWJIWXdURVV6Tm1WVGMzQnZhbGhwTHk5Qk5ETlBaV05pTVU5VVFXOUhRa0ZRY0hRS2JtdGhSRU5QVnpNemNtMXhaMGxKVTNaclZsTjNkRXcwT0hkME5tOTBjMlpQV21waVRscG1VMWQ1YUVkVmJVOWFUREJtYVc5UWQyazJjUzlhWnk5NGFBcDRjMlZUTjB4RFJHMVFLMWxtZUdwV04ybHdNREExVUhFck4weHVZVmxXVG5wSlRrMVBjR0Y1VVVKb1MxcHlRM3BzWXpBd1NFTmhNakF5U1dSamJFTXlDa1ZTVFRKRFIzcDJaRlY1U3pCRGQwNXRWVFZDV0haTGFIazFZMk5oUmsxV1ZXNXNaVzA1WjFwQmIwZEJSM1JpUkZwUVpFbEpjbGRJZUU4dldrZ3hWVGtLZEhRdmQyTjJWM1UyWW1veFMyVjJPWFl6V0ZsalpXVm1lRGhXYm5sdFpVaFpXaXR3VWl0dFNWVnRZMEYyU0dkNFVpdFpTSEF4VDI5eFFrMDBWV2Q2Y2dwM1FVbzNRblZXYXpKWVZERjBjMjltZUVWNlVtVjBTM1YxZGtsek9HRnVjMWQzZFcxU1lXNTBlR2QwZVhwdFpXNXpjREp2YkN0d2IyRlBlbU5vU25SWENsaG9kV0pFYVhaeGNFNUJVSFpvVURKbFNteEtlREpGUTJkWlJVRjJaRmcyT1ZacEwyeGxVV05aYjBwMGFVTjZUa3cxTDJSTlJFTnVhbFIzV2pKRFIwUUtaQ3QzTUZwRVMwTkNOMWhJU0hScmQycHFNblEyTTFKTmF6WkZMeTlGU0dsbVkyUlRlRlIyT0Rjd1UyRnNRMnRZYzJaa09YRTVUMnh0WVdwNWVFdHhSZ3BNWTB4TVduaEZXWEJXUmtKS2VFZzNjazlMYW5SSVZrUkxSVEZMUzNkVVdsUk5ZbGt2UkhSS2IwRjRZVmxuY1hNdlJGWjRNVVoyZVVOVmNuWnBiM1pRQ2xOV1NDdHpXVVZEWjFsQ2IzRnZXUzlXWVZkMVIwUmxWbFJpY0c5cGIySnlRVmhhUjB0eVoybHpSbVZyWkRkMlNGUm9hbFl3YlZFNFV5dFFPVXBUYUhVS01rRnpXaXM1UlVoTVZ6UmtRemxESzFJemRuUnFNRFJyVjFFeFZETkdiekZETTBGYVFTOURVV1VyTTFNMlFrOUlhbnB5TDJoM1VGWTVWMHRzZG5CTFV3cDJTVkZUTkdjeFNVdE9TSFphUTBSSVFrSXdiVFpCVXpJMVZDdFVjbU56WkdsRU0yRmljazFGVkhVekwyOVhSREUwUjJzNFoyYzlQUW90TFMwdExVVk9SQ0JTVTBFZ1VGSkpWa0ZVUlNCTFJWa3RMUzB0TFFvPQogICAg'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: add_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders
+    method: POST
+    data:
+      kind: CloudProvider
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        annotations: {}
+        name: testkubeadm
+      ssh:
+        user: root
+        password: VGhpbmtiaWcx
+        port: 22
+        privateKey: ''
+      type: kubeadm
+      region: default
+      config:
+        clusterName: test-kubeadm2
+        kubeConfig: *kubeConfig
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 201
+
+  - name: list_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: update_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']
+    method: PUT
+    data:
+      kind: CloudProvider
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: testkubeadm
+        finalizers:
+          - finalizer.cloudprovider.kubeclipper.io
+        annotations:
+          kubeclipper.io/description: description
+        resourceVersion: $HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.resourceVersion']
+      type: kubeadm
+      region: default
+      ssh:
+        user: root
+        password: VGhpbmtiaWcx
+        port: 22
+        privateKey: ''
+      config:
+        clusterName: test-kubeadm2
+        kubeConfig: *kubeConfig
+      status:
+        conditions:
+          - type: 创建
+            status: 'True'
+            reason: Created
+            message: provider created success
+          - type: 同步
+            status: 'True'
+            reason: SyncSucceed
+            message: sync successful
+        status: true
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: sync_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']/sync
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: describe_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: delete_provider
+    url: /apis/api/core.kubeclipper.io/v1/cloudproviders/$HISTORY['list_provider'].$RESPONSE['$.items[0].metadata.name']
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

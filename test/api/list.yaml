@@ -44,7 +44,7 @@ apitest:
             api_number: 2
         - create_cluster_backup:
             file_name: create_cluster_backup.yaml
-            number: 10
+            number: 11
             api_number: 4
         - get_cluster_backup:
             file_name: get_cluster_backup.yaml
@@ -114,3 +114,9 @@ apitest:
             file_name: cluster_upgrade.yaml
             number: 3
             api_number: 1
+    
+    - cluster_hosting:
+        - cluster_hosting: 
+            file_name: cluster_hosting.yaml
+            number: 6
+            api_number: 6
