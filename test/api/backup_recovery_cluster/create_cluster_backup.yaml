@@ -161,6 +161,13 @@ tests:
     response_json_paths:
       $.status.phase: "Running"
 
+  - name: get_cluster_detail_1
+    url: /api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
   - name: edit_cluster_to_select_s3_backup_space
     url: /apis/api/core.kubeclipper.io/v1/clusters/test
     method: PUT
@@ -178,7 +185,7 @@ tests:
           kubeclipper.io/offline: ""
         finalizers:
           - finalizer.cluster.kubeclipper.io
-        resourceVersion: $HISTORY['get_cluster_detail'].$RESPONSE['$.metadata.resourceVersion']
+        resourceVersion: $HISTORY['get_cluster_detail_1'].$RESPONSE['$.metadata.resourceVersion']
       masters:
         - id: $HISTORY['get_node_list'].$RESPONSE['$.items[0].metadata.name']
           containerRuntime:

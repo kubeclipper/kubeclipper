@@ -25,15 +25,15 @@ tests:
       $.token_type: Bearer
 
   - name: add_plugin
-    url: /apis/api/core.kubeclipper.io/v1/clusters/test1/plugins
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/plugins
     method: PATCH
     data:
       addons:
         - name: nfs-csi
           version: v1
           config:
-            serverAddr: 10.10.10.184
-            sharedPath: /nfs/data
+            serverAddr: 172.20.151.105
+            sharedPath: /tmp/nfs/data/e2e-test
             scName: nfs-sc
             reclaimPolicy: Delete
             replicas: 1
