@@ -41,6 +41,7 @@ const (
 	LabelHidden            = "kubeclipper.io/hidden"
 	LabelUserReference     = "iam.kubeclipper.io/user-ref"
 	LabelExternalIP        = "kubeclipper.io/externalIP"
+	LabelExternalPort      = "kubeclipper.io/externalPort"
 	LabelUpgradeVersion    = "kubeclipper.io/upgrade-version"
 	LabelBackupPoint       = "kubeclipper.io/backupPoint"
 	LabelCronBackupDisable = "kubeclipper.io/cronBackupDisable"

@@ -147,7 +147,7 @@ func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, c *v1.Clu
 		ClusterName:             metadata.ClusterName,
 		KubernetesVersion:       c.KubernetesVersion,
 		ControlPlaneEndpoint:    cpEndpoint,
-		CertSANs:                c.CertSANs,
+		CertSANs:                c.GetAllCertSANs(),
 		LocalRegistry:           c.LocalRegistry,
 	}
 	stepper.Offline = metadata.Offline

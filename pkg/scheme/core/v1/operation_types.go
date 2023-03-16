@@ -88,17 +88,18 @@ const (
 )
 
 const (
-	OperationCreateCluster       = "CreateCluster"
-	OperationDeleteCluster       = "DeleteCluster"
-	OperationUpgradeCluster      = "UpgradeCluster"
-	OperationAddNodes            = "AddNodes"
-	OperationRemoveNodes         = "RemoveNodes"
-	OperationBackupCluster       = "BackupCluster"
-	OperationDeleteBackup        = "DeleteBackup"
-	OperationRecoverCluster      = "RecoveryCluster"
-	OperationInstallComponents   = "InstallComponents"
-	OperationUninstallComponents = "UninstallComponents"
-	OperationUpdateCertification = "UpdateCertifications"
+	OperationCreateCluster                = "CreateCluster"
+	OperationDeleteCluster                = "DeleteCluster"
+	OperationUpgradeCluster               = "UpgradeCluster"
+	OperationAddNodes                     = "AddNodes"
+	OperationRemoveNodes                  = "RemoveNodes"
+	OperationBackupCluster                = "BackupCluster"
+	OperationDeleteBackup                 = "DeleteBackup"
+	OperationRecoverCluster               = "RecoveryCluster"
+	OperationInstallComponents            = "InstallComponents"
+	OperationUninstallComponents          = "UninstallComponents"
+	OperationUpdateCertification          = "UpdateCertifications"
+	OperationUpdateAPIServerCertification = "UpdateAPIServerCertifications"
 )
 
 // Step TODO: add commands struct instead of string

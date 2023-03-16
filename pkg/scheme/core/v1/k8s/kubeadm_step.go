@@ -21,9 +21,14 @@ package k8s
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
@@ -397,7 +402,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	stepper.ClusterName = metadata.ClusterName
 	stepper.KubernetesVersion = c.KubernetesVersion
 	stepper.ControlPlaneEndpoint = cpEndpoint
-	stepper.CertSANs = c.CertSANs
+	stepper.CertSANs = c.GetAllCertSANs()
 	stepper.LocalRegistry = c.LocalRegistry
 	stepper.Offline = metadata.Offline
 	// TODO: No vip is currently introduced as controlPlaneEndpoint
@@ -1088,4 +1093,184 @@ func (stepper *KubectlTerminal) InstallSteps(stepMaster0 []v1.StepNode) ([]v1.St
 
 func (stepper *KubectlTerminal) UninstallSteps() ([]v1.Step, error) {
 	return nil, fmt.Errorf("KubectlTerminal dose not support uninstall")
+}
+
+func (stepper *SAN) InitStepper() *SAN {
+	return stepper
+}
+
+func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step, error) {
+	updater := KubeadmConfigUpdater{
+		SANs:       sans,
+		ConfigFile: "/tmp/.k8s/kubeadm-new.yaml",
+	}
+	stepData, err := json.Marshal(&updater)
+	if err != nil {
+		return nil, fmt.Errorf("step marshal:%w", err)
+	}
+	checkHealth := &Health{}
+	checkBytes, err := json.Marshal(checkHealth)
+	if err != nil {
+		return nil, err
+	}
+
+	step := []v1.Step{
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "getKubeadmConfig",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: time.Second * 30},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", "kubectl -n kube-system get configmap kubeadm-config -o jsonpath='{.data.ClusterConfiguration}' > /tmp/.k8s/kubeadm-new.yaml"},
+				},
+			},
+		},
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "updateKubeadmConfig",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: time.Second * 30},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Commands: []v1.Command{
+				{
+					Type:          v1.CommandCustom,
+					Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, kubeadmConfigUpdaterName, kubeadmConfigUpdaterVersion, component.TypeStep),
+					CustomCommand: stepData,
+				},
+			},
+		},
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "backupCerts",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: time.Second * 10},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			BeforeRunCommands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"mkdir", "-pv", "/tmp/.k8s/pki"},
+				},
+			},
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", "mv -f /etc/kubernetes/pki/apiserver.{crt,key} /tmp/.k8s/pki/"},
+				},
+			},
+		},
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "generateCerts",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: time.Second * 30},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"kubeadm", "init", "phase", "certs", "apiserver", "--config", "/tmp/.k8s/kubeadm-new.yaml"},
+				},
+			},
+		},
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "restartPods",
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Timeout:    metav1.Duration{Duration: 3 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			BeforeRunCommands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"mkdir", "-pv", "/tmp/.k8s/config"},
+				},
+			},
+			Commands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"bash", "-c", "mv -f /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/.k8s/config && sleep 20"},
+				},
+			},
+			AfterRunCommands: []v1.Command{
+				{
+					Type:         v1.CommandShell,
+					ShellCommand: []string{"mv", "/tmp/.k8s/config/kube-apiserver.yaml", "/etc/kubernetes/manifests"},
+				},
+			},
+		},
+		{
+			ID:         strutil.GetUUID(),
+			Name:       "checkHealth",
+			Timeout:    metav1.Duration{Duration: 3 * time.Minute},
+			ErrIgnore:  false,
+			RetryTimes: 1,
+			Nodes:      nodes,
+			Action:     v1.ActionInstall,
+			Commands: []v1.Command{
+				{
+					Type:          v1.CommandCustom,
+					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, health, version, component.TypeStep),
+					CustomCommand: checkBytes,
+				},
+			},
+		},
+	}
+
+	return step, nil
+}
+
+type KubeadmConfigUpdater struct {
+	SANs       []string
+	ConfigFile string
+}
+
+const (
+	kubeadmConfigUpdaterName    = "KubeadmConfigUpdater"
+	kubeadmConfigUpdaterVersion = "v1"
+)
+
+func (d *KubeadmConfigUpdater) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	// update kubeadm config
+	buf, err := os.ReadFile(d.ConfigFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read config file: %s failed: %w", d.ConfigFile, err)
+	}
+
+	var config ClusterConfiguration
+	if err = yaml.Unmarshal(buf, &config); err != nil {
+		return nil, fmt.Errorf("unmarshal config file: %s failed: %w", d.ConfigFile, err)
+	}
+	config.APIServer.CertSANs = sets.NewString(d.SANs...).List()
+	marshal, err := yaml.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+
+	if !opts.DryRun {
+		if err = os.WriteFile(d.ConfigFile, marshal, 0600); err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, nil
+}
+
+func (d *KubeadmConfigUpdater) Uninstall(_ context.Context, _ component.Options) ([]byte, error) {
+	// nothing
+	return nil, nil
+}
+
+func (d *KubeadmConfigUpdater) NewInstance() component.ObjectMeta {
+	return new(KubeadmConfigUpdater)
 }
