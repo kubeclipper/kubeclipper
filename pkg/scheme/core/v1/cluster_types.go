@@ -38,10 +38,11 @@ type Cluster struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
-	LocalRegistry     string             `json:"localRegistry,omitempty" optional:"true"`
-	Masters           WorkerNodeList     `json:"masters"`
-	Workers           WorkerNodeList     `json:"workers" optional:"true"`
-	KubernetesVersion string             `json:"kubernetesVersion" enum:"v1.20.13"`
+	LocalRegistry     string         `json:"localRegistry,omitempty" optional:"true"`
+	Masters           WorkerNodeList `json:"masters"`
+	Workers           WorkerNodeList `json:"workers" optional:"true"`
+	KubernetesVersion string         `json:"kubernetesVersion" enum:"v1.20.13"`
+	// when generate cert,use GetAllCertSANs
 	CertSANs          []string           `json:"certSANs,omitempty" optional:"true"`
 	ExternalCaCert    string             `json:"externalCaCert,omitempty" optional:"true"`
 	ExternalCaKey     string             `json:"externalCaKey,omitempty" optional:"true"`
@@ -146,6 +147,16 @@ func (c *Cluster) Offline() bool {
 		return true
 	}
 	return false
+}
+
+// GetAllCertSANs if api server set externalIP,use it as certSans
+func (c *Cluster) GetAllCertSANs() []string {
+	list := c.CertSANs
+	ip, ok := c.Labels[common.LabelExternalIP]
+	if ok {
+		list = append(list, ip)
+	}
+	return list
 }
 
 func (c *Cluster) Complete() {
@@ -362,7 +373,7 @@ func (l WorkerNodeList) Complement(nodes ...WorkerNode) WorkerNodeList {
 	return out
 }
 
-func (c Cluster) GetAllNodes() sets.String {
+func (c *Cluster) GetAllNodes() sets.String {
 	s := sets.NewString(c.Masters.GetNodeIDs()...)
 	s.Insert(c.Workers.GetNodeIDs()...)
 	return s

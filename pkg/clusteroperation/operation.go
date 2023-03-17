@@ -58,6 +58,7 @@ func BuildOperationAdapter(
 	case v1.OperationDeleteBackup:
 	case v1.OperationRecoverCluster:
 	case v1.OperationUpdateCertification:
+	case v1.OperationUpdateAPIServerCertification:
 		// TODO support all operations
 	default:
 		return &v1.Operation{}, fmt.Errorf("unsupported %s operation type", pendingOp.OperationType)
