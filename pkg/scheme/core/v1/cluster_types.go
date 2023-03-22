@@ -156,6 +156,10 @@ func (c *Cluster) GetAllCertSANs() []string {
 	if ok {
 		list = append(list, ip)
 	}
+	domain, ok := c.Labels[common.LabelExternalDomain]
+	if ok {
+		list = append(list, domain)
+	}
 	return list
 }
 
