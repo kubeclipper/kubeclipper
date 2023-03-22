@@ -24,7 +24,7 @@ func AddOrRemoveInsecureRegistryToCRI(ctx context.Context, criType, registry str
 	case "docker":
 		return addOrRemoveDockerInsecureRegistry(ctx, registry, add, dryRun)
 	default:
-		return fmt.Errorf("%s CNI is not supported", criType)
+		return fmt.Errorf("%s CRI is not supported", criType)
 	}
 }
 
