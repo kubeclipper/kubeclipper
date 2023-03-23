@@ -20,11 +20,20 @@ package clustercontroller
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	buildinerrors "errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	pkgerr "github.com/pkg/errors"
+	"k8s.io/client-go/util/cert"
+
+	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -70,6 +79,8 @@ type ClusterReconciler struct {
 	OperationWriter     operation.Writer
 	CronBackupWriter    cluster.CronBackupWriter
 	CloudProviderLister listerv1.CloudProviderLister
+	OperationOperator   operation.Operator
+	ClusterOperator     cluster.Operator
 }
 
 func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
@@ -209,6 +220,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = r.syncClusterClient(ctx, log, clu); err != nil {
 		return ctrl.Result{}, nil
 	}
+	if err = r.updateAPIServerCerts(ctx, clu); err != nil {
+		log.Error("update apiServer cert error", zap.Error(err))
+		return ctrl.Result{}, nil
+	}
+
 	return ctrl.Result{}, r.updateCRIRegistries(ctx, clu)
 }
 
@@ -383,6 +399,134 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 	return kubeconfig, nil
 }
 
+func (r *ClusterReconciler) updateAPIServerCerts(ctx context.Context, c *v1.Cluster) error {
+	log := logger.FromContext(ctx)
+
+	if c.Status.Phase != v1.ClusterRunning {
+		return nil
+	}
+	nodeList, err := r.canUpdate(c) // if some master node is unavailable,can't update cert.
+	if err != nil {
+		return err
+	}
+	needUpdate, err := r.needUpdate(ctx, c)
+	if err != nil {
+		return err
+	}
+	if !needUpdate {
+		log.Infof("cluster %s api server cert included all sans %v,skip update", c.Name, c.GetAllCertSANs())
+		return nil
+	}
+	return r.doUpdateAPIServerCerts(ctx, c, nodeList)
+}
+
+func (r *ClusterReconciler) doUpdateAPIServerCerts(ctx context.Context, c *v1.Cluster, nl component.NodeList) error {
+	sanOperation := generateUpdateSANOperation(c, nl)
+
+	_, err := r.OperationOperator.CreateOperation(ctx, sanOperation)
+	if err != nil {
+		return pkgerr.WithMessage(err, "create san update operation failed")
+	}
+
+	c.Status.Phase = v1.ClusterUpdating
+	_, err = r.ClusterOperator.UpdateCluster(ctx, c)
+	if err != nil {
+		return pkgerr.WithMessage(err, "create san update operation,update cluster status failed")
+	}
+
+	return nil
+}
+
+func generateUpdateSANOperation(c *v1.Cluster, nodeList component.NodeList) *v1.Operation {
+	san := &k8s.SAN{}
+	op := &v1.Operation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: uuid.New().String(),
+			Labels: map[string]string{
+				common.LabelClusterName:     c.Name,
+				common.LabelTimeoutSeconds:  v1.DefaultOperationTimeoutSecs,
+				common.LabelOperationAction: v1.OperationUpdateAPIServerCertification,
+			}},
+		Steps: nil,
+		Status: v1.OperationStatus{
+			Status:     v1.OperationStatusPending,
+			Conditions: nil,
+		},
+	}
+	nodes := utils.UnwrapNodeList(nodeList)
+	op.Steps, _ = san.InstallSteps(nodes, c.GetAllCertSANs())
+	return op
+}
+
+func (r *ClusterReconciler) needUpdate(ctx context.Context, c *v1.Cluster) (bool, error) {
+	for _, nodeID := range c.Masters.GetNodeIDs() {
+		certificate, err := getCert(ctx, r.CmdDelivery, nodeID)
+		if err != nil {
+			return false, err
+		}
+		// if current cert not included all san，need update it
+		if !includeAllSan(c, certificate) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *ClusterReconciler) canUpdate(c *v1.Cluster) (component.NodeList, error) {
+	meta := component.ExtraMetadata{ControlPlaneStatus: c.Status.ControlPlaneHealth}
+	if !meta.IsAllMasterAvailable() {
+		return nil, buildinerrors.New("there is an unavailable master node in the cluster, please check the cluster master node status")
+	}
+
+	nl := make(component.NodeList, 0, len(c.Masters))
+	for _, nodeID := range c.Masters.GetNodeIDs() {
+		node, err := r.NodeLister.Get(nodeID)
+		if err != nil {
+			return nil, err
+		}
+		nl = append(nl, component.Node{
+			ID:   node.Name,
+			IPv4: node.Status.Ipv4DefaultIP,
+			//NodeIPv4: node.Status.NodeIpv4DefaultIP,
+			Region:   node.Labels[common.LabelTopologyRegion],
+			Hostname: node.Status.NodeInfo.Hostname,
+			Role:     node.Labels[common.LabelNodeRole],
+			Disable:  false,
+		})
+	}
+	return nl, nil
+}
+
+func getCert(ctx context.Context, cmdDelivery service.CmdDelivery, nodeID string) (*x509.Certificate, error) {
+	content, err := cmdDelivery.DeliverCmd(ctx, nodeID, []string{"cat", "/etc/kubernetes/pki/apiserver.crt"}, time.Second*30)
+	if err != nil {
+		return nil, pkgerr.WithMessagef(err, "cat /etc/kubernetes/pki/apiserver.crt on %s failed", nodeID)
+	}
+	certificates, err := cert.ParseCertsPEM(content)
+	if err != nil {
+		return nil, pkgerr.WithMessagef(err, "parse /etc/kubernetes/pki/apiserver.crt from %s,data:%s failed", nodeID, content)
+	}
+	if len(certificates) != 1 {
+		return nil, fmt.Errorf("invlaid apiserver cert")
+	}
+	return certificates[0], nil
+}
+
+// includeAllSan check is cert included all sans
+func includeAllSan(c *v1.Cluster, cert *x509.Certificate) bool {
+	set := sets.NewString(cert.DNSNames...)
+	for _, ip := range cert.IPAddresses {
+		set.Insert(ip.String())
+	}
+	sans := c.GetAllCertSANs()
+	for _, san := range sans {
+		if !set.Has(san) {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {
 	registries, err := r.getClusterCRIRegistries(c)
 	if err != nil {
@@ -413,7 +557,7 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 		}
 		nodes, err := r.NodeLister.List(labels.NewSelector().Add(*clusterSelector))
 		if err != nil {
-			return fmt.Errorf("list")
+			return fmt.Errorf("list:%w", err)
 		}
 
 		step, err := criRegistryUpdateStep(c, registries, nodes)

@@ -347,6 +347,16 @@ func (s *Service) syncClusterCondition(op *v1.Operation, clu *v1.Cluster) error 
 			return err
 		}
 		return nil
+	case v1.OperationUpdateAPIServerCertification:
+		if op.Status.Status == v1.OperationStatusSuccessful {
+			clu.Status.Phase = v1.ClusterRunning
+		} else {
+			clu.Status.Phase = v1.ClusterUpdateFailed
+		}
+		if _, err := s.clusterOperator.UpdateCluster(context.TODO(), clu); err != nil {
+			return err
+		}
+		return nil
 	default:
 		logger.Error("unsupported operation action", zap.String("operation", op.Name),
 			zap.String("cluster", clu.Name), zap.String("action", v))

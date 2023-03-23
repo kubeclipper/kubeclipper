@@ -76,6 +76,9 @@ func init() {
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, kubectl, version, component.TypeStep), &Kubectl{}); err != nil {
 		panic(err)
 	}
+	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, kubeadmConfigUpdaterName, kubeadmConfigUpdaterVersion, component.TypeStep), &KubeadmConfigUpdater{}); err != nil {
+		panic(err)
+	}
 }
 
 var (
@@ -636,6 +639,8 @@ func (stepper *ControlPlane) waitPVReclaim(ctx context.Context, opts component.O
 	return nil
 }
 
+type SAN struct{}
+
 func (stepper *ClusterNode) NewInstance() component.ObjectMeta {
 	return &ClusterNode{}
 }
@@ -906,4 +911,16 @@ func (stepper *KubectlTerminal) Render(ctx context.Context, opts component.Optio
 	manifestFile := filepath.Join(ManifestDir, "kc-kubectl.yaml")
 	return fileutil.WriteFileWithContext(ctx, manifestFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644,
 		stepper.renderTo, opts.DryRun)
+}
+
+func (stepper *SAN) NewInstance() component.ObjectMeta {
+	return &SAN{}
+}
+
+func (stepper *SAN) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	return nil, nil
+}
+
+func (stepper *SAN) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
+	return nil, nil
 }
