@@ -115,23 +115,24 @@ IP6_AUTODETECTION_METHOD=can-reach=www.google.com`
 
 type CreateClusterOptions struct {
 	BaseOptions
-	Masters           []string
-	Workers           []string
-	UntaintMaster     bool
-	Offline           bool
-	LocalRegistry     string
-	CRI               string
-	CRIVersion        string
-	K8sVersion        string
-	CNI               string
-	CNIVersion        string
-	Name              string
-	createdByIP       bool
-	CertSans          []string
-	CaCertFile        string
-	CaKeyFile         string
-	DNSDomain         string
-	IPv4AutoDetection string
+	Masters            []string
+	Workers            []string
+	UntaintMaster      bool
+	Offline            bool
+	LocalRegistry      string
+	InsecureRegistries []string
+	CRI                string
+	CRIVersion         string
+	K8sVersion         string
+	CNI                string
+	CNIVersion         string
+	Name               string
+	createdByIP        bool
+	CertSans           []string
+	CaCertFile         string
+	CaKeyFile          string
+	DNSDomain          string
+	IPv4AutoDetection  string
 }
 
 var (
@@ -177,6 +178,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().BoolVar(&o.UntaintMaster, "untaint-master", o.UntaintMaster, "untaint master node after cluster create")
 	cmd.Flags().BoolVar(&o.Offline, "offline", o.Offline, "create cluster online or offline")
 	cmd.Flags().StringVar(&o.LocalRegistry, "local-registry", o.LocalRegistry, "use local registry address to pull image")
+	cmd.Flags().StringSliceVar(&o.InsecureRegistries, "insecure-registry", o.InsecureRegistries, "use remote registry address to pull image")
 	cmd.Flags().StringVar(&o.CRI, "cri", o.CRI, "k8s cri type, docker or containerd")
 	cmd.Flags().StringVar(&o.CRIVersion, "cri-version", o.CRIVersion, "k8s cri version")
 	cmd.Flags().StringVar(&o.K8sVersion, "k8s-version", o.K8sVersion, "k8s version")
@@ -198,6 +200,9 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("local-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listRegistry(toComplete), cobra.ShellCompDirectiveNoFileComp
+	}))
+	utils.CheckErr(cmd.RegisterFlagCompletionFunc("insecure-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return o.registry(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("cri", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return allowedCRI.List(), cobra.ShellCompDirectiveNoFileComp
@@ -461,7 +466,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		c.ContainerRuntime = v1.ContainerRuntime{
 			Type:             v1.CRIDocker,
 			Version:          l.CRIVersion,
-			InsecureRegistry: insecureRegistry,
+			InsecureRegistry: append(insecureRegistry, l.InsecureRegistries...),
 		}
 	case "containerd":
 		fallthrough
@@ -469,7 +474,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		c.ContainerRuntime = v1.ContainerRuntime{
 			Type:             v1.CRIContainerd,
 			Version:          l.CRIVersion,
-			InsecureRegistry: insecureRegistry,
+			InsecureRegistry: append(insecureRegistry, l.InsecureRegistries...),
 		}
 	}
 	return c
