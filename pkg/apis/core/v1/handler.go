@@ -35,6 +35,10 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 
 	"github.com/emicklei/go-restful"
@@ -2485,32 +2489,19 @@ type SSHCredential struct {
 
 func (h *handler) SSHToPod(request *restful.Request, response *restful.Response) {
 	clusterName := request.PathParameter(query.ParameterName)
-	clu, err := h.clusterOperator.GetCluster(context.TODO(), clusterName)
+	clientcfg, clientset, err := h.getCluster(clusterName)
 	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s not exists", clusterName))
-			return
-		}
-		logger.Errorf("get cluster %s failed: %v", clusterName, err)
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	if clu.KubeConfig == nil {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("cluster %s clientset not init", clusterName))
-		return
-	}
-
-	clientcfg, clientset, err := client.FromKubeConfig(clu.KubeConfig)
-	if err != nil {
-		logger.Errorf("cluster %s generate clientset failed: %v", clusterName, err)
-		restplus.HandleInternalError(response, request, err)
+		restplus.HandleError(response, request, err)
 		return
 	}
 
 	// find kubectl pod by label
-	list, err := clientset.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "k8s-app=kc-kubectl",
-	})
+	list, err := clientset.CoreV1().Pods("kube-system").List(
+		request.Request.Context(),
+		metav1.ListOptions{
+			LabelSelector: "k8s-app=kc-kubectl",
+		},
+	)
 	if err != nil {
 		logger.Errorf("kubectl console, find kubectl pod failed: %v", err)
 		restplus.HandleInternalError(response, request, err)
@@ -2521,22 +2512,79 @@ func (h *handler) SSHToPod(request *restful.Request, response *restful.Response)
 		logger.Errorf("kubectl console, kubectl pod not exists: %v", err)
 		return
 	}
-	podName := list.Items[0].GetName()
+	podName := list.Items[rand.Intn(len(list.Items))].GetName()
 
-	wsConn, err := upGrader.Upgrade(response.ResponseWriter, request.Request, nil)
+	h.execPod(request, response, clientcfg,
+		"kube-system", podName, "kc-kubectl", []string{"sh", "-c", sshutils.MagicExecShell})
+}
+
+func parseCommand(c string) []string {
+	if c == "" {
+		return []string{"sh", "-c", sshutils.MagicExecShell}
+	}
+	parts := strings.Split(c, " ")
+	cmd := parts[0:0]
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			cmd = append(cmd, p)
+		}
+	}
+	return cmd
+}
+
+func (h *handler) ExecPod(request *restful.Request, response *restful.Response) {
+	clusterName := request.PathParameter(query.ParameterName)
+	namespace := request.PathParameter("namespace")
+	pod := request.PathParameter("pod")
+	container := request.QueryParameter("container")
+	command := parseCommand(request.QueryParameter("command"))
+
+	clientcfg, clientset, err := h.getCluster(clusterName)
 	if err != nil {
-		logger.Errorf("upgrade err: %v", err)
+		restplus.HandleError(response, request, err)
 		return
 	}
-	session := &sshutils.TerminalSession{Conn: wsConn, SizeChan: make(chan remotecommand.TerminalSize)}
-	t := sshutils.NewTerminaler(clientset, clientcfg)
-	err = t.StartProcess("kube-system", podName, "kc-kubectl", []string{"sh"}, session)
+
+	// find kubectl pod by label
+	po, err := clientset.CoreV1().Pods(namespace).Get(
+		request.Request.Context(),
+		pod,
+		metav1.GetOptions{},
+	)
 	if err != nil {
-		logger.Errorf("start process err: %v", err)
-		session.Close(2, err.Error())
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		logger.Errorf("kubectl console, find kubectl pod failed: %v", err)
+		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	session.Close(1, "Process exited")
+	if po.Status.Phase != corev1.PodRunning {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("pod %s is not running", pod))
+		return
+	}
+
+	if container != "" {
+		found := false
+		for _, c := range po.Spec.Containers {
+			if c.Name == container {
+				found = true
+				break
+			}
+		}
+		if !found {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("container %s not found", container))
+			return
+		}
+	} else {
+		if len(po.Spec.Containers) != 1 {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("pod %s has more than one container", pod))
+			return
+		}
+	}
+	h.execPod(request, response, clientcfg, namespace, pod, container, command)
 }
 
 func (h *handler) SSHToNode(request *restful.Request, response *restful.Response) {
@@ -3722,4 +3770,55 @@ func (h *handler) registryValidate(_ context.Context, cp *v1.Registry) error {
 		}
 	}
 	return nil
+}
+
+func (h *handler) getCluster(clusterName string) (*rest.Config, *kubernetes.Clientset, error) {
+	clu, err := h.clusterOperator.GetCluster(context.TODO(), clusterName)
+	if err != nil {
+		if apimachineryErrors.IsNotFound(err) {
+			return nil, nil, restful.ServiceError{
+				Code:    http.StatusBadRequest,
+				Message: fmt.Sprintf("cluster %s not exists", clusterName),
+				Header:  nil,
+			}
+		}
+		logger.Errorf("get cluster %s failed: %v", clusterName, err)
+		return nil, nil, err
+	}
+	if clu.KubeConfig == nil {
+		return nil, nil, restful.ServiceError{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf("cluster %s clientset not init", clusterName),
+			Header:  nil,
+		}
+	}
+
+	return client.FromKubeConfig(clu.KubeConfig)
+}
+
+func (h *handler) execPod(
+	request *restful.Request,
+	response *restful.Response,
+	rc *rest.Config,
+	namespace,
+	pod,
+	container string,
+	cmd []string) {
+	wsConn, err := upGrader.Upgrade(response.ResponseWriter, request.Request, nil)
+	if err != nil {
+		logger.Errorf("upgrade err: %v", err)
+		return
+	}
+	session := &sshutils.TerminalSession{
+		Conn:     wsConn,
+		SizeChan: make(chan remotecommand.TerminalSize),
+	}
+	t := sshutils.NewTerminaler(rc)
+	err = t.StartProcess(namespace, pod, container, cmd, session)
+	if err != nil {
+		logger.Errorf("start process err: %v", err)
+		session.Close(2, err.Error())
+		return
+	}
+	session.Close(1, "Process exited")
 }

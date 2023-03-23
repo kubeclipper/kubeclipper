@@ -100,6 +100,30 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
 
+	webservice.Route(webservice.GET("/clusters/{name}/namespace/{namespace}/pods/{pod}/exec").
+		To(h.ExecPod).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
+		Doc("exec pod container command").
+		Param(webservice.PathParameter(query.ParameterName, "cluster name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.PathParameter("namespace", "cluster namespace").
+			Required(true).
+			DataType("string")).
+		Param(webservice.PathParameter("pod", "pod name").
+			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter("container", "container name,can be ignored when there is only one container").
+			Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter("command", "by default, a terminal is opened using shell command").
+			Required(false).
+			DataType("boolean")).
+		Param(webservice.QueryParameter(ParameterToken, "auth token").
+			Required(true).
+			DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
+
 	webservice.Route(webservice.POST("/clusters").
 		To(h.CreateClusters).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
