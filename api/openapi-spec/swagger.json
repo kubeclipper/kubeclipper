@@ -1464,6 +1464,65 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/clusters/{name}/namespace/{namespace}/pods/{pod}/exec": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Cluster"
+        ],
+        "summary": "exec pod container command",
+        "operationId": "ExecPod",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "cluster name",
+            "name": "name",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "cluster namespace",
+            "name": "namespace",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "pod name",
+            "name": "pod",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "description": "container name,can be ignored when there is only one container",
+            "name": "container",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "by default, a terminal is opened using shell command",
+            "name": "command",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "auth token",
+            "name": "token",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/clusters/{name}/nodes": {
       "put": {
         "produces": [
@@ -6386,9 +6445,17 @@
     "v1.KubeProxy": {},
     "v1.Kubelet": {
       "required": [
-        "rootDir"
+        "rootDir",
+        "nodeIP",
+        "ipAsName"
       ],
       "properties": {
+        "ipAsName": {
+          "type": "boolean"
+        },
+        "nodeIP": {
+          "type": "string"
+        },
         "rootDir": {
           "type": "string"
         }

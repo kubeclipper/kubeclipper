@@ -29,6 +29,8 @@ import (
 const (
 	wsMsgCmd    = "cmd"
 	wsMsgResize = "resize"
+
+	MagicExecShell = "(clear && bash) || (clear && ash) || (clear && sh) || bash || ash || sh"
 )
 
 type wsMsg struct {
@@ -63,7 +65,7 @@ func NewSSHConn(cols, rows int, sshClient *ssh.Client) (*SSHConn, error) {
 		return nil, err
 	}
 	comboWriter := new(wsBufferWriter)
-	//ssh.stdout and stderr will write output into comboWriter
+	// ssh.stdout and stderr will write output into comboWriter
 	sshSession.Stdout = comboWriter
 	sshSession.Stderr = comboWriter
 	modes := ssh.TerminalModes{
@@ -103,8 +105,8 @@ func (w *wsBufferWriter) Write(p []byte) (int, error) {
 	return w.buffer.Write(p)
 }
 
-//flushComboOutput flush ssh.session combine output into websocket response
-//func flushComboOutput(w *wsBufferWriter, wsConn *websocket.Conn) error {
+// flushComboOutput flush ssh.session combine output into websocket response
+// func flushComboOutput(w *wsBufferWriter, wsConn *websocket.Conn) error {
 //	if w.buffer.Len() != 0 {
 //		err := wsConn.WriteMessage(websocket.TextMessage, w.buffer.Bytes())
 //		if err != nil {
@@ -113,4 +115,4 @@ func (w *wsBufferWriter) Write(p []byte) (int, error) {
 //		w.buffer.Reset()
 //	}
 //	return nil
-//}
+// }

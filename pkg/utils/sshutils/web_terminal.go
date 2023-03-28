@@ -28,7 +28,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
@@ -44,28 +43,34 @@ const (
 )
 
 type Terminaler struct {
-	client kubernetes.Interface
 	config *rest.Config
 }
 
-func NewTerminaler(client kubernetes.Interface, config *rest.Config) *Terminaler {
-	return &Terminaler{client: client, config: config}
+func NewTerminaler(config *rest.Config) *Terminaler {
+	return &Terminaler{config: config}
 }
 
 func (t *Terminaler) StartProcess(namespace, podName, containerName string, cmd []string, ptyHandler PtyHandler) error {
-	req := t.client.CoreV1().RESTClient().Post().
+	rc, err := t.coreV1RestClient()
+	if err != nil {
+		return err
+	}
+	req := rc.Post().
 		Resource("pods").
 		Name(podName).
 		Namespace(namespace).
-		SubResource("exec")
-	req.VersionedParams(&corev1.PodExecOptions{
-		Container: containerName,
-		Command:   cmd,
-		Stdin:     true,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       true,
-	}, scheme.ParameterCodec)
+		SubResource("exec").
+		VersionedParams(
+			&corev1.PodExecOptions{
+				Container: containerName,
+				Command:   cmd,
+				Stdin:     true,
+				Stdout:    true,
+				Stderr:    true,
+				TTY:       true,
+			},
+			scheme.ParameterCodec,
+		)
 
 	exec, err := remotecommand.NewSPDYExecutor(t.config, "POST", req.URL())
 	if err != nil {
@@ -79,6 +84,14 @@ func (t *Terminaler) StartProcess(namespace, podName, containerName string, cmd 
 		Tty:               true,
 	})
 	return errors.WithMessage(err, "Stream")
+}
+
+func (t *Terminaler) coreV1RestClient() (*rest.RESTClient, error) {
+	cfg := *t.config
+	cfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	cfg.APIPath = "/api"
+	cfg.GroupVersion = &corev1.SchemeGroupVersion
+	return rest.RESTClientFor(&cfg)
 }
 
 // PtyHandler is what remotecommand expects from a pty
