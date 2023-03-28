@@ -109,7 +109,7 @@ const (
   # Lists docker repositories
   kcctl registry list --node 10.0.0.111  --type repository
   # Lists docker images
-  kcctl registry list --node 10.0.0.111  --type image --name etcd 
+  kcctl registry list --node 10.0.0.111  --type image --name etcd
 
   Please read 'kcctl registry list -h' get more registry list flags.`
 	deleteLongDescription = `
@@ -883,7 +883,7 @@ func (o *RegistryOptions) push() error {
 }
 
 func (o *RegistryOptions) removeImage() error {
-	rmi := `docker images | awk '{print $1":"$2}' | grep -v registry | grep -v REPOSITORY`
+	rmi := `docker images | awk '{print $1":"$2}'  | grep -v registry | grep -v REPOSITORY`
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, rmi)
 	if err != nil {
 		logger.Warnf("docker remove image error: %s", err.Error())
@@ -911,7 +911,7 @@ func (o *RegistryOptions) removeImage() error {
 }
 
 func (o *RegistryOptions) pushImage() error {
-	push := fmt.Sprintf(`docker images | grep %s:%d | awk '{print "docker push "$1":"$2}'`, o.Node, o.RegistryPort)
+	push := fmt.Sprintf(`docker images | grep -v none | grep %s:%d | awk '{print "docker push "$1":"$2}'`, o.Node, o.RegistryPort)
 	logger.V(3).Info("docker push hook:", push)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, push)
 	if err != nil {
@@ -940,7 +940,7 @@ func (o *RegistryOptions) pushImage() error {
 }
 
 func (o *RegistryOptions) normalTag() error {
-	retag := fmt.Sprintf(`docker images | grep / | grep -v k8s.gcr.io | grep -v registry.k8s.io | grep -v %s:%d | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort, o.Node, o.RegistryPort)
+	retag := fmt.Sprintf(`docker images | grep / | grep -v none | grep -v k8s.gcr.io | grep -v registry.k8s.io | grep -v %s:%d | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort, o.Node, o.RegistryPort)
 	logger.V(3).Info("normalTag hook:", retag)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, retag)
 	if err != nil {
@@ -970,7 +970,7 @@ func (o *RegistryOptions) normalTag() error {
 
 func (o *RegistryOptions) specialTag() error {
 	// add 'ip:port/library'
-	dockerTag := fmt.Sprintf(`docker images | grep -v registry | grep -v / | grep -v k8s.gcr.io | grep -v registry.k8s.io | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/library/"$1":"$2}'`, o.Node, o.RegistryPort)
+	dockerTag := fmt.Sprintf(`docker images | grep -v registry | grep -v none | grep -v / | grep -v k8s.gcr.io | grep -v registry.k8s.io | grep -v REPOSITORY | awk '{print "docker tag "$3" %s:%d/library/"$1":"$2}'`, o.Node, o.RegistryPort)
 	logger.V(3).Info("specialTag hook:", dockerTag)
 	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, dockerTag)
 	if err != nil {
@@ -998,8 +998,8 @@ func (o *RegistryOptions) specialTag() error {
 
 	// remove tag 'k8s.gcr.io' and 'registry.k8s.io'
 	dockerTagCmds := []string{
-		fmt.Sprintf(`docker images | grep k8s.gcr.io | sed 's/k8s.gcr.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort),
-		fmt.Sprintf(`docker images | grep registry.k8s.io | sed 's/registry.k8s.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort),
+		fmt.Sprintf(`docker images | grep -v none | grep k8s.gcr.io | sed 's/k8s.gcr.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort),
+		fmt.Sprintf(`docker images | grep -v none | grep registry.k8s.io | sed 's/registry.k8s.io\///' | awk '{print "docker tag "$3" %s:%d/"$1":"$2}'`, o.Node, o.RegistryPort),
 	}
 	for _, tagCmd := range dockerTagCmds {
 		logger.V(3).Info("dockerTag2 hook:", tagCmd)
