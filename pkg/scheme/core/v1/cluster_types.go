@@ -38,23 +38,24 @@ type Cluster struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
-	LocalRegistry     string           `json:"localRegistry,omitempty" optional:"true"`
-	Masters           WorkerNodeList   `json:"masters"`
-	Workers           WorkerNodeList   `json:"workers" optional:"true"`
-	KubernetesVersion string           `json:"kubernetesVersion" enum:"v1.20.13"`
-	CertSANs          []string         `json:"certSANs,omitempty" optional:"true"`
-	ExternalCaCert    string           `json:"externalCaCert,omitempty" optional:"true"`
-	ExternalCaKey     string           `json:"externalCaKey,omitempty" optional:"true"`
-	KubeProxy         KubeProxy        `json:"kubeProxy,omitempty" optional:"true"`
-	Etcd              Etcd             `json:"etcd,omitempty" optional:"true"`
-	Kubelet           Kubelet          `json:"kubelet,omitempty" optional:"true"`
-	Networking        Networking       `json:"networking"`
-	ContainerRuntime  ContainerRuntime `json:"containerRuntime"`
-	CNI               CNI              `json:"cni"`
-	KubeConfig        []byte           `json:"kubeConfig,omitempty"`
-	Addons            []Addon          `json:"addons" optional:"true"`
-	Description       string           `json:"description,omitempty" optional:"true"`
-	Status            ClusterStatus    `json:"status,omitempty" optional:"true"`
+	LocalRegistry     string         `json:"localRegistry,omitempty" optional:"true"`
+	Masters           WorkerNodeList `json:"masters"`
+	Workers           WorkerNodeList `json:"workers" optional:"true"`
+	KubernetesVersion string         `json:"kubernetesVersion" enum:"v1.20.13"`
+	// when generate cert,use GetAllCertSANs
+	CertSANs         []string         `json:"certSANs,omitempty" optional:"true"`
+	ExternalCaCert   string           `json:"externalCaCert,omitempty" optional:"true"`
+	ExternalCaKey    string           `json:"externalCaKey,omitempty" optional:"true"`
+	KubeProxy        KubeProxy        `json:"kubeProxy,omitempty" optional:"true"`
+	Etcd             Etcd             `json:"etcd,omitempty" optional:"true"`
+	Kubelet          Kubelet          `json:"kubelet,omitempty" optional:"true"`
+	Networking       Networking       `json:"networking"`
+	ContainerRuntime ContainerRuntime `json:"containerRuntime"`
+	CNI              CNI              `json:"cni"`
+	KubeConfig       []byte           `json:"kubeConfig,omitempty"`
+	Addons           []Addon          `json:"addons" optional:"true"`
+	Description      string           `json:"description,omitempty" optional:"true"`
+	Status           ClusterStatus    `json:"status,omitempty" optional:"true"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -145,6 +146,20 @@ func (c *Cluster) Offline() bool {
 		return true
 	}
 	return false
+}
+
+// GetAllCertSANs if api server set externalIP,use it as certSans
+func (c *Cluster) GetAllCertSANs() []string {
+	list := c.CertSANs
+	ip, ok := c.Labels[common.LabelExternalIP]
+	if ok {
+		list = append(list, ip)
+	}
+	domain, ok := c.Labels[common.LabelExternalDomain]
+	if ok {
+		list = append(list, domain)
+	}
+	return list
 }
 
 func (c *Cluster) Complete() {
@@ -361,7 +376,7 @@ func (l WorkerNodeList) Complement(nodes ...WorkerNode) WorkerNodeList {
 	return out
 }
 
-func (c Cluster) GetAllNodes() sets.String {
+func (c *Cluster) GetAllNodes() sets.String {
 	s := sets.NewString(c.Masters.GetNodeIDs()...)
 	s.Insert(c.Workers.GetNodeIDs()...)
 	return s

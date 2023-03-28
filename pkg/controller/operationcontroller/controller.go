@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/kubeclipper/kubeclipper/pkg/service"
+
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
@@ -40,9 +42,11 @@ import (
 )
 
 type OperationReconciler struct {
-	ClusterLister   listerv1.ClusterLister
-	OperationLister listerv1.OperationLister
-	OperationWriter operation.Writer
+	CmdDelivery       service.CmdDelivery
+	ClusterLister     listerv1.ClusterLister
+	OperationLister   listerv1.OperationLister
+	OperationWriter   operation.Writer
+	OperationOperator operation.Operator
 }
 
 func (r *OperationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -101,6 +105,12 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error("Failed to get cluster with name", zap.String("cluster", cluName), zap.Error(err))
 		return ctrl.Result{}, err
 	}
+
+	if err = r.distributeOperation(ctx, log, op); err != nil {
+		log.Error("Failed to distribute operation", zap.String("cluster", cluName), zap.String("operation", op.Name), zap.Error(err))
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -119,5 +129,21 @@ func (r *OperationReconciler) SetupWithManager(mgr manager.Manager, cache inform
 	}
 
 	mgr.AddRunnable(c)
+	return nil
+}
+
+func (r *OperationReconciler) distributeOperation(ctx context.Context, log logger.Logging, op *v1.Operation) error {
+	if op.Status.Status == v1.OperationStatusPending {
+		op.Status.Status = v1.OperationStatusRunning
+		if _, err := r.OperationWriter.UpdateOperation(ctx, op); err != nil {
+			return err
+		}
+
+		go func() {
+			if err := r.CmdDelivery.DeliverTaskOperation(context.TODO(), op, nil); err != nil {
+				log.Error("distribute task error", zap.Error(err))
+			}
+		}()
+	}
 	return nil
 }

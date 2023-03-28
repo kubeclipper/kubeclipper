@@ -129,6 +129,8 @@ type CreateClusterOptions struct {
 	Name               string
 	createdByIP        bool
 	CertSans           []string
+	ExternalIP         string
+	ExternalPort       string
 	CaCertFile         string
 	CaKeyFile          string
 	DNSDomain          string
@@ -184,6 +186,8 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.K8sVersion, "k8s-version", o.K8sVersion, "k8s version")
 	cmd.Flags().StringVar(&o.CNI, "cni", o.CNI, "k8s cni type, calico or others")
 	cmd.Flags().StringVar(&o.CNIVersion, "cni-version", o.CNIVersion, "k8s cni version")
+	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, "k8s apiserver external ip")
+	cmd.Flags().StringVar(&o.ExternalPort, "external-port", o.ExternalPort, "k8s apiserver external port")
 	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
@@ -423,6 +427,13 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		},
 
 		Status: v1.ClusterStatus{},
+	}
+
+	if l.ExternalIP != "" {
+		c.Labels[common.LabelExternalIP] = l.ExternalIP
+	}
+	if l.ExternalPort != "" {
+		c.Labels[common.LabelExternalPort] = l.ExternalPort
 	}
 
 	masters := make([]v1.WorkerNode, 0)
