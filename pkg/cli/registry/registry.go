@@ -883,14 +883,37 @@ func (o *RegistryOptions) push() error {
 }
 
 func (o *RegistryOptions) removeImage() error {
+	// remove <none>:<none> images
+	noneRmi := `docker images|awk '{print $2$3}' | grep none | grep -v REPOSITORY`
+	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, noneRmi)
+	if err != nil {
+		logger.Warnf("docker remove <none> image error: %s", err.Error())
+	}
+	if err = ret.Error(); err != nil {
+		logger.Warnf("docker remove <none> image error: %s", err.Error())
+	}
+	err = o.rmi(ret)
+	if err != nil {
+		return err
+	}
+
 	rmi := `docker images | awk '{print $1":"$2}'  | grep -v registry | grep -v REPOSITORY`
-	ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, rmi)
+	ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, rmi)
 	if err != nil {
 		logger.Warnf("docker remove image error: %s", err.Error())
 	}
 	if err = ret.Error(); err != nil {
 		logger.Warnf("docker remove image error: %s", err.Error())
 	}
+	err = o.rmi(ret)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *RegistryOptions) rmi(ret sshutils.Result) error {
 	logger.V(4).Info("docker rmi out", ret.Stdout)
 	split := strings.Split(ret.Stdout, "\n")
 	logger.V(4).Info("docker rmi cmd count:", len(split))
@@ -899,7 +922,8 @@ func (o *RegistryOptions) removeImage() error {
 		if cmd == "" {
 			continue
 		}
-		ret, err = sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, "docker rmi "+cmd)
+		cmd = strings.ReplaceAll(cmd, "<none>", "")
+		ret, err := sshutils.SSHCmdWithSudo(o.SSHConfig, o.Node, "docker rmi "+cmd)
 		if err != nil {
 			return err
 		}
