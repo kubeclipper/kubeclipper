@@ -36,6 +36,14 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 )
 
+type Action string
+
+const (
+	ActionApply  Action = "kubectl-apply"
+	ActionDelete Action = "kubectl-delete"
+	ActionProxy  Action = "proxy"
+)
+
 const (
 	ProxyHandlerPrefix = "/cluster/"
 )
@@ -45,8 +53,8 @@ type handler struct {
 }
 
 func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	clusterName, k8sResource := parseClusterFromPath(request.URL.Path)
-	if clusterName == "" {
+	clusterName, action, k8sResource := parseClusterFromPath(request.URL.Path)
+	if clusterName == "" || (action == ActionProxy && k8sResource == "") {
 		http.Error(writer, "cluster name cannot be empty", http.StatusBadRequest)
 		return
 	}
@@ -70,6 +78,12 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if action != ActionProxy {
+		emulateKubectlHandler(writer, request, action, restConfig)
+		return
+	}
+
 	request.URL.Path = k8sResource
 	request.Header.Del("Authorization")
 
@@ -158,14 +172,18 @@ func makeUpgradeTransport(config *rest.Config, keepalive time.Duration) (proxy.U
 	return proxy.NewUpgradeRequestRoundTripper(rt, upgrader), nil
 }
 
-func parseClusterFromPath(p string) (clusterName, res string) {
+func parseClusterFromPath(p string) (clusterName string, action Action, proxyURL string) {
+	// /cluster/{clusterName}/{resource}
+	// /cluster/{clusterName}/kubectl-apply
+	// /cluster/{clusterName}/kubectl-delete
 	p = strings.TrimPrefix(p, ProxyHandlerPrefix)
-	items := strings.SplitN(p, "/", 2)
-	switch len(items) {
-	case 2:
-		return items[0], items[1]
-	case 1:
-		return items[0], ""
+	parts := strings.SplitN(p, "/", 2)
+
+	if len(parts) == 2 {
+		if strings.HasPrefix(parts[1], "kubectl-") {
+			return parts[0], Action(parts[1]), ""
+		}
+		return parts[0], ActionProxy, parts[1]
 	}
-	return "", ""
+	return parts[0], "", ""
 }
