@@ -88,6 +88,8 @@ type JoinOptions struct {
 	parseAgent   options.Agents
 
 	sshConfig *sshutils.SSH
+
+	Pkg string `json:"pkg" yaml:"pkg,omitempty"`
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -123,6 +125,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.nodeIPDetect, "node-ip-detect", o.nodeIPDetect, fmt.Sprintf("Kc agent node ip detect method. Used for routing between nodes in the kubernetes cluster. If not specified, ip-detect is inherited. \n%s", options.IPDetectDescription))
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
+	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "Package resource url (path or http url). Default is inherited from the deploy config.")
 	options.AddFlagsToSSH(o.sshConfig, cmd.Flags())
 	utils.CheckErr(cmd.MarkFlagRequired("agent"))
 	return cmd
@@ -267,13 +270,17 @@ func (c *JoinOptions) preCheckKcAgent(ip string) bool {
 
 func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) error {
 	// send agent binary
+	pkg := c.deployConfig.Pkg
+	if c.Pkg != "" {
+		pkg = c.Pkg
+	}
 	hook := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s && cp -rf %s /usr/local/bin/",
 		filepath.Join(config.DefaultPkgPath, "kc"),
-		filepath.Join(config.DefaultPkgPath, path.Base(c.deployConfig.Pkg)),
+		filepath.Join(config.DefaultPkgPath, path.Base(pkg)),
 		config.DefaultPkgPath,
 		filepath.Join(config.DefaultPkgPath, "kc/bin/kubeclipper-agent"))
 	logger.V(3).Info("join agent node hook:", hook)
-	err := utils.SendPackageV2(c.sshConfig, c.deployConfig.Pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackageV2(c.sshConfig, pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
 	if err != nil {
 		return errors.Wrap(err, "SendPackageV2")
 	}

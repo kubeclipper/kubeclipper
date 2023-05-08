@@ -51,10 +51,10 @@ const (
   The command currently stores the results to the /root/.kc/config file by default.`
 	loginExample = `
   # Login to the kubeclipper server
-  kcctl login --host http://127.0.0.1 --username admin
+  kcctl login --host https://127.0.0.1 --username admin
 
   # Login to the kubeclipper server via passwd by cli
-  kcctl login --host http://127.0.0.1 --username admin --password xxx
+  kcctl login --host https://127.0.0.1 --username admin --password xxx
 
   Please read 'kcctl login -h' get more login flags.`
 )
@@ -94,7 +94,7 @@ func NewCmdLogin(streams options.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringVarP(&o.Username, "username", "u", o.Username, "kubeclipper username")
 	cmd.Flags().StringVarP(&o.Password, "password", "p", o.Password, "kubeclipper user password")
-	cmd.Flags().StringVarP(&o.Host, "host", "H", o.Host, "kubeclipper server address, format as scheme://host")
+	cmd.Flags().StringVarP(&o.Host, "host", "H", o.Host, "kubeclipper server address, format as https://host")
 	_ = cmd.MarkFlagRequired("host")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd
