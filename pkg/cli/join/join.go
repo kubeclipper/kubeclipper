@@ -85,6 +85,8 @@ type JoinOptions struct {
 	floatIPs   []string // format: ip:floatIP,e.g. 192.168.10.11:172.20.149.199
 	ipDetect   string
 	parseAgent options.Agents
+
+	Pkg string `json:"pkg" yaml:"pkg,omitempty"`
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -239,14 +241,18 @@ func (c *JoinOptions) preCheckKcAgent(ip string) bool {
 }
 
 func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) error {
+	pkg := c.deployConfig.Pkg
+	if c.Pkg != "" {
+		pkg = c.Pkg
+	}
 	// send agent binary
 	hook := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s && cp -rf %s /usr/local/bin/",
 		filepath.Join(config.DefaultPkgPath, "kc"),
-		filepath.Join(config.DefaultPkgPath, path.Base(c.deployConfig.Pkg)),
+		filepath.Join(config.DefaultPkgPath, path.Base(pkg)),
 		config.DefaultPkgPath,
 		filepath.Join(config.DefaultPkgPath, "kc/bin/kubeclipper-agent"))
 	logger.V(3).Info("join agent node hook:", hook)
-	err := utils.SendPackageV2(c.deployConfig.SSHConfig, c.deployConfig.Pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackageV2(c.deployConfig.SSHConfig, pkg, []string{node}, config.DefaultPkgPath, nil, &hook)
 	if err != nil {
 		return errors.Wrap(err, "SendPackageV2")
 	}
