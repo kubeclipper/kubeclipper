@@ -47,11 +47,12 @@ import (
 
 type ContainerdRunnable struct {
 	Base
-	RegistryConfigDir string `json:"registryConfigDir"`
-	LocalRegistry     string `json:"localRegistry"`
-	KubeVersion       string `json:"kubeVersion"`
-	PauseVersion      string `json:"pauseVersion"`
-	PauseRegistry     string `json:"pauseRegistry"`
+	RegistryConfigDir   string `json:"registryConfigDir"`
+	LocalRegistry       string `json:"localRegistry"`
+	KubeVersion         string `json:"kubeVersion"`
+	PauseVersion        string `json:"pauseVersion"`
+	PauseRegistry       string `json:"pauseRegistry"`
+	EnableSystemdCgroup string `json:"enableSystemdCgroup"`
 
 	installSteps   []v1.Step
 	uninstallSteps []v1.Step
@@ -141,6 +142,15 @@ func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.O
 	}
 	if _, err = instance.DownloadAndUnpackConfigs(); err != nil {
 		return nil, err
+	}
+	runnable.EnableSystemdCgroup = "false"
+	// check whether cgroup2 is used as the cgroup driver, if is it, enable containerd systemd cgroup
+	res, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "cat /proc/self/mountinfo")
+	if err != nil {
+		return nil, err
+	}
+	if strings.Contains(res.StdOut(), "cgroup2") {
+		runnable.EnableSystemdCgroup = "true"
 	}
 	// generate containerd daemon config file
 	if err = runnable.setupContainerdConfig(ctx, opts.DryRun); err != nil {
