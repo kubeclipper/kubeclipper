@@ -58,6 +58,7 @@ const KcCaddyTmpl = `{
 			path /api/*
 			path /oauth/*
 			path /version
+			path /cluster/*
 		}
 		reverse_proxy @kc {
 			to {{.ServerUpstream}}
