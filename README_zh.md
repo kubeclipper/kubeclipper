@@ -30,78 +30,81 @@
 
 ---
 
-## KubeClipper
+## 什么是 KubeClipper
 
 > 中文 | [English](README.md)
 
-<!-- TODO: 介绍 -->
+[KubeClipper](https://kubeclipper.io/) 是一个轻量级的 Web 服务，为 **Kubernetes 集群生命周期管理** 提供友好的 Web 控制台 GUI、API 和 CLI 工具。  
+KubeClipper 提供灵活的 Kubernetes 即服务（KaaS），允许用户在任何地方（云、虚拟机、裸机）快速部署 K8S 集群，并提供持续的生命周期管理功能（安装、删除、升级、备份和恢复、集群扩展、远程访问、插件管理、应用商店）。详细信息见[功能列表](https://github.com/kubeclipper/kubeclipper/blob/master/README_zh.md#features)
+
+**🎯 项目目标**：以最轻松便捷的方式管理 Kubernetes。
 
 ## Features
 
 <details>
-  <summary><b>✨ 创建集群</b></summary>
+  <summary><b>☸️ 集群生命周期管理</b></summary>
+  支持在任何基础设施上部署 Kubernetes，并提供完整的集群生命周期管理。
+
   <ul>
-  <li>支持在线部署、代理部署、离线部署</li>
-  <li>管理常用镜像仓库</li>
-  <li>从模版创建集群/安装插件</li>
-  <li>支持多版本 K8S、CRI 部署</li>
-  <li>NFS 存储支持</li>
+  <li>生命周期管理：支持集群创建、删除、备份、恢复、升级、增删节点</li>
+  <li>多部署方式：在线/离线部署支持</li>
+  <li>多架构：x86/64&arm64 支持</li>
+  <li>集群导入：支持外部集群（非Kubeclipper创建）注册&管理</li>
+  <li>...</li>
   </ul>
 </details>
 
 <details>
-  <summary><b>🎈 集群托管</b></summary>
+  <summary><b>🌐 节点管理</b></summary>
   <ul>
-  <li>kubeadm 集群托管</li>
-  <li>集群插件安装/卸载</li>
-  <li>查看集群实时操作日志</li>
-  <li>添加/移除节点</li>
-  <li>访问集群 kubectl web console</li>
-  <li>编辑集群（元数据等）</li>
-  <li>集群备份/还原、定时备份</li>
-  <li>集群备份存储空间管理</li>
-  <li>从 kubeclipper 移除集群</li>
+  <li>节点自动注册</li>
+  <li>节点信息收集</li>
+  <li>节点终端</li>
+  <li>...</li>
   </ul>
 </details>
 
 <details>
-  <summary><b>☸️ 集群管理</b></summary>
-  <ul>
-  <li>多区域、多集群管理</li>
-  <li>集群插件安装/卸载</li>
-  <li>访问集群 kubectl web console</li>
-  <li>查看集群操作过程中的实时日志</li>
-  <li>编辑集群（元数据等）</li>
-  <li>删除集群</li>
-  <li>添加/移除节点</li>
-  <li>创建失败后从断点重试</li>
-  <li>集群备份/还原、定时备份</li>
-  <li>集群版本升级</li>
-  <li>整个集群 / 单个插件保存为模版</li>
-  <li>集群备份存储空间管理</li>
-  </ul>
-</details>
+  <summary><b>🚪 身份和访问管理（IAM）</b></summary>
+  提供统一的认证鉴权与细粒度的基于角色的授权系统。
 
-<details>
-  <summary><b>🌐 区域 / 节点管理</b></summary>
   <ul>
-  <li>添加 agent 节点并指定区域（kcctl）</li>
-  <li>节点状态管理</li>
-  <li>连接节点终端</li>
-  <li>节点启用/禁用</li>
-  <li>查看区域下节点和集群列表</li>
-  </ul>
-</details>
-
-<details>
-  <summary><b>🚪 访问控制</b></summary>
-  <ul>
-  <li>用户和角色管理</li>
-  <li>自定义角色管理</li>
+  <li>基于 RBAC 的用户权限系统</li>
   <li>OIDC 集成</li>
+  <li>...</li>
   </ul>
 </details>
 
+
+## Roadmap & Todo list
+* 🚀 集群安装优化
+  * 使用 OCI 镜像封装离线安装包，降低复杂度
+* 💻 Kubernetes web console
+  * 工作负载 & 监控显示
+  * 基于租户的集群访问控制
+* 📦 应用商店
+  * 应用生命周期管理
+  * 支持 Web UI 和 CLI 工具
+* 🧩 常见应用程序和插件集成
+  * LB & Ingress
+  * Monitor
+  * Kubernetes Dashboard
+  * KubeEdge
+  * ...
+* 🕸 托管集群
+  * 支持 KoK 集群
+
+## Architecture
+### Core
+![kc-arch1](docs/img/kc-arch.png)
+
+### Node
+![kc-arch2](docs/img/kc-arch2.png)
+
+### Network
+![kc-network](docs/img/kc-network.png)
+
+更多 Kubeclipper 架构信息见 [kubeclipper.io](https://kubeclipper.io/docs/overview/)。
 ## Quick Start
 
 对于初次接触 KubeClipper 并想快速上手的用户，建议使用 All-in-One 安装模式，它能够帮助您零配置快速部署 KubeClipper。
@@ -240,12 +243,6 @@ kcctl get cluster -o yaml|grep status -A5
 3. 更新 `kubeclipper-server.yaml` 中 etcd 的配置
 4. `make build`
 5. `./dist/kubeclipper-server serve`
-
-## Architecture
-
-![kc-arch1](docs/img/kc-arch.png)
-
-![kc-arch2](docs/img/kc-arch2.png)
 
 ## Contributing
 

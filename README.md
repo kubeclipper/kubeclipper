@@ -30,77 +30,80 @@
 
 ---
 
-## KubeClipper
+## What is KubeClipper
 
 > English | [中文](README_zh.md)
 
-<!-- TODO: 介绍 -->
+[KubeClipper](https://kubeclipper.io/) is a lightweight web service that provides a friendly web console GUI, APIs, and a CLI tool for **Kubernetes cluster lifecycle management**.  
+KubeClipper provides flexible Kubernetes as a Service (KaaS), which allows users to rapidly deploy K8S clusters 
+anywhere(cloud, hypervisor, bare metal) and provides continuous lifecycle management capabilities 
+(installation, deleting, upgrading, backup and restoration, cluster scaling, remote access, plug-in management, 
+application store).see [Feature List](https://github.com/kubeclipper/kubeclipper#features) for details.
+
+**🎯 Project Goal**：Manage Kubernetes in the most light and convenient way.
 
 ## Features
 
 <details>
-  <summary><b>✨ Create Cluster</b></summary>
+  <summary><b>☸️ Cluster Lifecycle Management</b></summary>
+  Supports deployment of Kubernetes on any infrastructure and provides comprehensive cluster lifecycle management.
+
   <ul>
-    <li>Supports online deployment, proxy deployment, offline deployment</li>
-    <li>Frequently-used mirror repository management</li>
-    <li>Create clusters / install plugins from templates</li>
-    <li>Supports multi-version K8S and CRI deployments</li>
-    <li>NFS storage support</li>
+  <li>Lifecycle Management: cluster creation, deletion, backup, restoration, upgrade, and node manipulation</li>
+  <li>Multiple Deployment Modes: online/offline deployment support</li>
+  <li>Multi-Architecture: x86/64 &amp; arm64 support</li>
+  <li>Cluster Import: registration and management of external clusters (non-Kubeclipper created)</li>
+  <li>...</li>
   </ul>
 </details>
 
 <details>
-  <summary><b>🎈 Cluster hosting</b></summary>
+  <summary><b>🌐 Node Management</b></summary>
   <ul>
-  <li>kubeadm Cluster hosting</li>
-  <li>Cluster plug-in installation/uninstallation</li>
-  <li>Real-time logs during cluster operations</li>
-  <li>Access to cluster kubectl web console</li>
-  <li>Edit clusters (metadata, etc.)</li>
-  <li>Adding / removing cluster nodes</li>
-  <li>Cluster backup and restore, scheduled backups</li>
-  <li>Cluster backup space management</li>
-  <li>Remove cluster from kubeclipper</li>
+  <li>Automatic node registration</li>
+  <li>Node information collection</li>
+  <li>Node terminal</li>
+  <li>...</li>
   </ul>
 </details>
 
 <details>
-  <summary><b>☸️ Cluster Management</b></summary>
+  <summary><b>🚪 Identity and Access Management (IAM)</b></summary>
+  Provides a unified authentication and authorization system with fine-grained role-based access control.
+
   <ul>
-    <li>Multi-region, multi-cluster management</li>
-    <li>Cluster plug-in installation/uninstallation</li>
-    <li>Access to cluster kubectl web console</li>
-    <li>Real-time logs during cluster operations</li>
-    <li>Edit clusters (metadata, etc.)</li>
-    <li>Deleting clusters</li>
-    <li>Adding / removing cluster nodes</li>
-    <li>Retry from breakpoint after creation failure</li>
-    <li>Cluster backup and restore, scheduled backups</li>
-    <li>Cluster version upgrade</li>
-    <li>Save entire cluster / individual plugins as templates</li>
-    <li>Cluster backup space management</li>
+  <li>RBAC-based user permission system</li>
+  <li>OIDC integration</li>
+  <li>...</li>
   </ul>
 </details>
 
-<details>
-  <summary><b>🌐 Region & Node Management</b></summary>
-  <ul>
-    <li>Adding agent nodes and specifying regions (kcctl)</li>
-    <li>Node status management</li>
-    <li>Connect node terminal</li>
-    <li>Node enable/disable</li>
-    <li>View the list of nodes and clusters under a region</li>
-  </ul>
-</details>
+## Roadmap & Todo list
+* 🚀 Cluster Installation Optimization 
+  * Use images to encapsulate installation package resources to reduce complexity. Reuse mature image technology
+* 💻 Kubernetes Web Console 
+  * Workload resources & monitoring presentation
+  * Tenant based cluster access control
+* 📦 Application Store 
+  * Application lifecycle management 
+  * Support web UI & CLI interface
+* 🧩 Common Application and Plugin Integrations 
+  * LB & Ingress 
+  * Monitoring 
+  * Kubernetes Dashboard 
+  * KubeEdge
+* 🕸 Managed Clusters
+  * Support KoK clusters.
 
-<details>
-  <summary><b>🚪 Access control</b></summary>
-  <ul>
-    <li>User and role management</li>
-    <li>Custom Role Management</li>
-    <li>OIDC integrate</li>
-  </ul>
-</details>
+## Architecture
+### Core
+![kc-arch1](docs/img/kc-arch.png)
+### Node
+![kc-arch2](docs/img/kc-arch2.png)
+### Network
+![kc-network](docs/img/kc-network.png)
+
+Explore the architecture of Kubeclipper on [kubeclipper.io](https://kubeclipper.io/docs/overview/).
 
 ## Quick Start
 
@@ -245,12 +248,6 @@ Once the cluster enter  the `Running` state , it means that the creation is comp
 3. change `kubeclipper-server.yaml` etcd.serverList to your locally etcd cluster
 4. `make build`
 5. `./dist/kubeclipper-server serve`
-
-## Architecture
-
-![kc-arch1](docs/img/kc-arch.png)
-
-![kc-arch2](docs/img/kc-arch2.png)
 
 ## Contributing
 
