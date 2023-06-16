@@ -27,9 +27,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
-
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -135,6 +134,8 @@ type CreateClusterOptions struct {
 	CaKeyFile          string
 	DNSDomain          string
 	IPv4AutoDetection  string
+	ServiceSubnet      string
+	PodSubnet          string
 }
 
 var (
@@ -193,6 +194,8 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
 	cmd.Flags().StringVar(&o.DNSDomain, "cluster-dns-domain", o.DNSDomain, "k8s cluster domain")
 	cmd.Flags().StringVar(&o.IPv4AutoDetection, "calico.ipv4-auto-detection", o.IPv4AutoDetection, fmt.Sprintf("node ipv4 auto detection. \n%s", IPDetectDescription))
+	cmd.Flags().StringVar(&o.ServiceSubnet, "service-subnet", o.ServiceSubnet, "serviceSubnet is the subnet used by Kubernetes Services. Defaults to '10.96.0.0/12'")
+	cmd.Flags().StringVar(&o.PodSubnet, "pod-subnet", o.PodSubnet, "podSubnet is the subnet used by Pods. Defaults to '172.25.0.0/16'")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -404,8 +407,8 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		ContainerRuntime:  v1.ContainerRuntime{},
 		Networking: v1.Networking{
 			IPFamily:      v1.IPFamilyIPv4,
-			Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
-			Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
+			Services:      v1.NetworkRanges{CIDRBlocks: []string{l.ServiceSubnet}},
+			Pods:          v1.NetworkRanges{CIDRBlocks: []string{l.PodSubnet}},
 			DNSDomain:     l.DNSDomain,
 			ProxyMode:     "ipvs",
 			WorkerNodeVip: "169.254.169.100",
@@ -428,7 +431,12 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 
 		Status: v1.ClusterStatus{},
 	}
-
+	if l.ServiceSubnet == "" {
+		l.ServiceSubnet = constatns.ClusterServiceSubnet
+	}
+	if l.PodSubnet == "" {
+		l.PodSubnet = constatns.ClusterPodSubnet
+	}
 	if l.ExternalIP != "" {
 		c.Labels[common.LabelExternalIP] = l.ExternalIP
 	}
