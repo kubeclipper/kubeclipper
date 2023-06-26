@@ -182,7 +182,7 @@ func (d *DeployOptions) Complete() error {
 	if d.deployConfig.Pkg == "" {
 		v := os.Getenv("KC_VERSION")
 		if v == "" {
-			//v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
+			// v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
 			// TODO: inject branch when run go build
 			// hard code master
 			v = "master"
@@ -461,8 +461,9 @@ func (d *DeployOptions) sendPackage() {
 	tar := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s", filepath.Join(config.DefaultPkgPath, "kc"),
 		filepath.Join(config.DefaultPkgPath, path.Base(d.deployConfig.Pkg)), config.DefaultPkgPath)
 	cp := sshutils.WrapSh(fmt.Sprintf("cp -rf %s /usr/local/bin/", filepath.Join(config.DefaultPkgPath, "kc/bin/*")))
-	// rm -rf /root/kc && tar -xvf /root/kc/pkg/kc.tar -C ~/kc/pkg && /bin/bash -c 'cp -rf /root/kc/pkg/kc/bin/* /usr/local/bin/'
-	hook := sshutils.Combine([]string{tar, cp})
+	mkdir := "mkdir -p /usr/lib/systemd/system"
+	// rm -rf /root/kc && tar -xvf /root/kc/pkg/kc.tar -C ~/kc/pkg && /bin/bash -c 'cp -rf /root/kc/pkg/kc/bin/* /usr/local/bin/' && mkdir -p /usr/lib/systemd/system
+	hook := sshutils.Combine([]string{tar, cp, mkdir})
 	err := utils.SendPackage(d.deployConfig.SSHConfig, d.deployConfig.Pkg, d.allNodes, config.DefaultPkgPath, nil, &hook)
 	if err != nil {
 		logger.Fatalf("sendPackage err:%s", err.Error())
