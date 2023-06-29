@@ -195,21 +195,16 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 	if stepper.LocalRegistry != "" && stepper.Kubeadm.LocalRegistry != stepper.LocalRegistry {
 		stepper.Kubeadm.LocalRegistry = stepper.LocalRegistry
 	}
-	masterDownload, err := json.Marshal(packageDownload)
+	download, err := json.Marshal(packageDownload)
 	if err != nil {
 		return err
 	}
-	// worker node in all cases, you do not need to pull the image
-	packageDownload.DownloadImage = false
-	workerDownload, err := json.Marshal(packageDownload)
-	if err != nil {
-		return err
-	}
+
 	stepper.installSteps = []v1.Step{
 		{
 			ID:        strutil.GetUUID(),
-			Name:      "DownloadMasterUpgradePackage",
-			Nodes:     utils.UnwrapNodeList(masters),
+			Name:      "DownloadUpgradePackage",
+			Nodes:     utils.UnwrapNodeList(extraMetadata.GetAllNodes()),
 			Action:    v1.ActionInstall,
 			Timeout:   metav1.Duration{Duration: 10 * time.Minute},
 			ErrIgnore: false,
@@ -223,7 +218,7 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 				{
 					Type:          v1.CommandCustom,
 					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, upgradePackage, version, component.TypeStep),
-					CustomCommand: masterDownload,
+					CustomCommand: download,
 				},
 				{
 					Type:         v1.CommandShell,
@@ -231,34 +226,7 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 				},
 			},
 			RetryTimes: 1,
-		}}
-	if len(workers) > 0 {
-		stepper.installSteps = append(stepper.installSteps, v1.Step{
-			ID:        strutil.GetUUID(),
-			Name:      "DownloadWorkerUpgradePackage",
-			Nodes:     utils.UnwrapNodeList(workers),
-			Action:    v1.ActionInstall,
-			Timeout:   metav1.Duration{Duration: 10 * time.Minute},
-			ErrIgnore: false,
-			BeforeRunCommands: []v1.Command{
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"rm", "-rf", ManifestDir},
-				},
-			},
-			Commands: []v1.Command{
-				{
-					Type:          v1.CommandCustom,
-					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, upgradePackage, version, component.TypeStep),
-					CustomCommand: workerDownload,
-				},
-				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"chmod", "+x", "/usr/bin/kubelet-pre-start.sh", "/usr/bin/kubelet", "/usr/bin/kubeadm", "/usr/bin/kubectl", "/usr/bin/conntrack"},
-				},
-			},
-			RetryTimes: 1,
-		})
+		},
 	}
 
 	kubeadmBytes, err := json.Marshal(stepper.Kubeadm)
