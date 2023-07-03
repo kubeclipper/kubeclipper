@@ -308,7 +308,7 @@ var (
 	precheckKcServerFunc              = generateCommonPreCheckFunc("kc-server")
 	precheckKcAgentFunc               = generateCommonPreCheckFunc("kc-agent")
 	precheckNtpFunc      precheckFunc = func(sshConfig *sshutils.SSH, host string) error {
-		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "systemctl --all --type service --state running | grep -e chrony -e ntpd -e ntp|wc -l")
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "systemctl --all --type service --state running | grep -e chrony -e ntp|wc -l")
 		if err != nil {
 			return err
 		}
