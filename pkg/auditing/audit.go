@@ -161,7 +161,7 @@ func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audi
 	e := &audit.Event{
 		RequestURI: info.Path,
 		Verb:       info.Verb,
-		//Level:                    a.level,
+		// Level:                    a.level,
 		Level:                    a.auditOptions.AuditLevel,
 		AuditID:                  types.UID(uuid.New().String()),
 		Stage:                    audit.StageResponseComplete,
@@ -173,9 +173,9 @@ func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audi
 			Resource: info.Resource,
 			Name:     info.Name,
 			UID:      "",
-			//APIGroup:    info.APIGroup,
-			//APIVersion:  info.APIVersion,
-			//Subresource: info.Subresource,
+			// APIGroup:    info.APIGroup,
+			// APIVersion:  info.APIVersion,
+			// Subresource: info.Subresource,
 		},
 	}
 
@@ -278,7 +278,7 @@ type DatabaseBackend struct {
 	eventOp     platform.EventWriter
 	eventCh     chan *audit.Event
 	stopCh      <-chan struct{}
-	ignoreVerbs sets.String
+	ignoreVerbs sets.Set[string]
 }
 
 func NewDatabaseBackend(operator platform.EventWriter, stopCh <-chan struct{}) Backend {
@@ -286,7 +286,7 @@ func NewDatabaseBackend(operator platform.EventWriter, stopCh <-chan struct{}) B
 		eventOp:     operator,
 		eventCh:     make(chan *audit.Event, 1000),
 		stopCh:      stopCh,
-		ignoreVerbs: sets.NewString("get", "list", "watch"),
+		ignoreVerbs: sets.New("get", "list", "watch"),
 	}
 	go b.worker()
 	return b

@@ -191,7 +191,7 @@ func (r *Kubeadm) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	err = r.clusterAddon(ctx, v1.ActionUninstall)
+	err = r.clusterAddon(ctx, v1.ActionUninstall, clu)
 	if err != nil {
 		logger.Warnf("cluster addons %s failed: %v", v1.ActionInstall, err)
 	}
@@ -241,7 +241,7 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 
 	log.Debugf("create import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
 
-	err = r.clusterAddon(ctx, v1.ActionInstall)
+	err = r.clusterAddon(ctx, v1.ActionInstall, clu)
 	if err != nil {
 		logger.Debugf("cluster addon service create failed: %v", err)
 	}
@@ -685,23 +685,23 @@ func (r *Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
 	}
 }
 
-func (r *Kubeadm) clusterAddon(ctx context.Context, action v1.StepAction) error {
+func (r *Kubeadm) clusterAddon(ctx context.Context, action v1.StepAction, clu *v1.Cluster) error {
 	err := r.clusterServiceAccount(ctx, action)
 	if err != nil {
 		// the failure to delete the service account due to an exception is tolerated, so ignore this error
-		logger.Debugf("%s the cluster %s's service accounts failed: %v", action, r.Provider.ClusterName, err)
-		return nil
+		logger.Debugf("%s the cluster %s's service accounts failed: %v", action, clu.Name, err)
+		return err
 	}
 
 	masters, err := listMaster(ctx, &r.Clientset)
 	if err != nil {
-		return fmt.Errorf("list cluster(%s) master node failed: %v", r.Provider.ClusterName, err)
+		return fmt.Errorf("list cluster(%s) master node failed: %v", clu.Name, err)
 	}
 	for _, master := range masters {
 		err = r.kubectlTerminal(ctx, master, action)
 		if err != nil {
 			// the failure to delete the service account due to an exception is tolerated, so ignore this error
-			logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, r.Provider.ClusterName, err)
+			logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, clu.Name, err)
 		}
 	}
 
@@ -798,7 +798,7 @@ func (r *Kubeadm) kubectlTerminal(ctx context.Context, node KubeNode, action v1.
 
 		// TODO： since there is only one version of the kubectl terminal image at this stage,
 		// it is difficult to match multiple versions of the k8s cluster.
-		//for now, we are using kubectl v1.23.6 as the latest version
+		// for now, we are using kubectl v1.23.6 as the latest version
 		url := fmt.Sprintf("http://%s:%v/kc-extension/latest/%s", deployConfig.ServerIPs[0], deployConfig.StaticServerPort, node.arch)
 
 		loadImage := ""

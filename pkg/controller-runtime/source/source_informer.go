@@ -44,8 +44,11 @@ func (is *Informer) Start(ctx context.Context, handler handler.EventHandler, que
 	if is.Informer == nil {
 		return fmt.Errorf("must specify Informer.Informer")
 	}
-	//cache.WaitForCacheSync(ctx.Done(), is.Informer.HasSynced)
-	is.Informer.AddEventHandler(internal.EventHandler{Queue: queue, EventHandler: handler, Predicates: prct})
+	// cache.WaitForCacheSync(ctx.Done(), is.Informer.HasSynced)
+	_, err := is.Informer.AddEventHandler(internal.EventHandler{Queue: queue, EventHandler: handler, Predicates: prct})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
