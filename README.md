@@ -252,3 +252,7 @@ Once the cluster enter  the `Running` state , it means that the creation is comp
 ## Contributing
 
 Please follow [Community](https://github.com/kubeclipper/community) to join us.
+
+## Star History
+
+![Star History Chart](https://api.star-history.com/svg?repos=kubeclipper/kubeclipper&type=Date)
