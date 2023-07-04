@@ -26,7 +26,7 @@ import (
 
 //nolint:unused
 type PathExclude struct {
-	excludePaths sets.String
+	excludePaths sets.Set[string]
 	prefixes     []string
 }
 

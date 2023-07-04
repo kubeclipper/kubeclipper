@@ -58,7 +58,7 @@ type Info struct {
 }
 
 type InfoFactory struct {
-	APIPrefixes sets.String
+	APIPrefixes sets.Set[string]
 }
 
 /*

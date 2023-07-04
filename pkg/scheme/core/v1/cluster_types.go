@@ -377,8 +377,8 @@ func (l WorkerNodeList) Complement(nodes ...WorkerNode) WorkerNodeList {
 	return out
 }
 
-func (c *Cluster) GetAllNodes() sets.String {
-	s := sets.NewString(c.Masters.GetNodeIDs()...)
+func (c *Cluster) GetAllNodes() sets.Set[string] {
+	s := sets.New(c.Masters.GetNodeIDs()...)
 	s.Insert(c.Workers.GetNodeIDs()...)
 	return s
 }

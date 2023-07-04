@@ -19,6 +19,7 @@
 package sshutils
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -76,7 +77,7 @@ func (t *Terminaler) StartProcess(namespace, podName, containerName string, cmd 
 	if err != nil {
 		return errors.WithMessage(err, "NewSPDYExecutor")
 	}
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 		Stdin:             ptyHandler,
 		Stdout:            ptyHandler,
 		Stderr:            ptyHandler,

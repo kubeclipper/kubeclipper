@@ -96,7 +96,7 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 	return apiServer, nil
 }
 
-func (s *ServerOptions) CompleteEtcdOptions() *etcdRESTOptions.SimpleRestOptionsFactory {
+func (s *ServerOptions) CompleteEtcdOptions() *etcdRESTOptions.StorageFactoryRestOptionsFactory {
 	// grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
 	gvks := []schema.GroupVersion{corev1.SchemeGroupVersion, iamv1.SchemeGroupVersion}
 	c := storagebackend.NewDefaultConfig(s.EtcdOptions.Prefix, scheme.Codecs.CodecForVersions(scheme.Encoder, scheme.Codecs.UniversalDeserializer(), schema.GroupVersions(gvks), schema.GroupVersions(gvks)))
@@ -116,7 +116,8 @@ func (s *ServerOptions) CompleteEtcdOptions() *etcdRESTOptions.SimpleRestOptions
 		DefaultWatchCacheSize:   s.EtcdOptions.DefaultWatchCacheSize,
 		WatchCacheSizes:         s.EtcdOptions.WatchCacheSizes,
 	}
-	return &etcdRESTOptions.SimpleRestOptionsFactory{
-		Options: *completeEtcdOptions,
+	return &etcdRESTOptions.StorageFactoryRestOptionsFactory{
+		Options:        *completeEtcdOptions,
+		StorageFactory: &etcdRESTOptions.SimpleStorageFactory{StorageConfig: *c},
 	}
 }

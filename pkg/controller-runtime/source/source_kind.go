@@ -103,7 +103,10 @@ func (ks *Kind) Start(ctx context.Context, handler handler.EventHandler, queue w
 			return
 		}
 
-		i.AddEventHandler(internal.EventHandler{Queue: queue, EventHandler: handler, Predicates: prct})
+		_, err := i.AddEventHandler(internal.EventHandler{Queue: queue, EventHandler: handler, Predicates: prct})
+		if err != nil {
+			return
+		}
 		if !ks.cache.WaitForCacheSync(ctx) {
 			// Would be great to return something more informative here
 			ks.started <- errors.New("cache did not sync")
