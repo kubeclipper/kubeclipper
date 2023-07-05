@@ -604,8 +604,12 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
+		var externalAddress string
+		if clu.Labels != nil {
+			externalAddress = clu.Labels[common.LabelExternalIP]
+		}
 
-		kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, masters[0], h.delivery)
+		kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, masters[0], externalAddress, h.delivery)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
