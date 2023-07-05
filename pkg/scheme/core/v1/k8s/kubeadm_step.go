@@ -155,6 +155,13 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	}
 	installSteps = append(installSteps, steps...)
 
+	ext := Extension{}
+	steps, err = ext.InitStepper(&c).InstallSteps(nodes)
+	if err != nil {
+		return nil, err
+	}
+	installSteps = append(installSteps, steps...)
+
 	kubeConf := KubeadmConfig{}
 	// TODO: No vip is currently introduced as controlPlaneEndpoint
 	steps, err = kubeConf.InitStepper(&c, metadata).InstallSteps([]v1.StepNode{masters[0]})
@@ -287,6 +294,13 @@ func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) 
 	// remove configuration files and rpm packages already installed
 	pack := Package{}
 	steps, err = pack.InitStepper(&c).UninstallSteps(nodes)
+	if err != nil {
+		return nil, err
+	}
+	uninstallSteps = append(uninstallSteps, steps...)
+	// remove extension binary and images
+	ext := Extension{}
+	steps, err = ext.InitStepper(&c).UninstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
