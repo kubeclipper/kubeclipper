@@ -165,6 +165,23 @@ KillMode=process
 [Install]
 WantedBy=multi-user.target`
 
+const KcRegistryService = `# /usr/lib/systemd/system/kc-registry.service
+[Unit]
+Description=kc-registry
+
+[Service]
+Environment="HOME=/root"
+Type=simple
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/registry serve /etc/kubeclipper-registry/kubeclipper-registry.yaml
+ExecReload=/bin/kill -HUP
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target`
+
 const KcServerConfigTmpl = `generic:
   bindAddress: {{.ServerAddress}}
   insecurePort: {{.ServerPort}}
@@ -323,4 +340,27 @@ const DockerDaemonTmpl = `
     "data-root": "{{.DataRoot}}",
     "exec-opts": ["native.cgroupdriver=systemd"]
 }
+`
+
+const KcRegistryConfigTmpl = `
+# https://github.com/distribution/distribution/blob/main/docs/configuration.md
+version: 0.1
+log:
+  level: info # error, warn, info, and debug
+  formatter: text
+  fields:
+    service: registry
+    environment: staging
+storage:
+  filesystem:
+    rootdirectory: {{ .DataRoot }}
+    maxthreads: 100
+  delete:
+    enabled: true
+  cache:
+    blobdescriptor: inmemory
+http:
+  addr: :{{ .RegistryPort }}
+  headers:
+    X-Content-Type-Options: [nosniff]
 `
