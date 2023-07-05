@@ -551,7 +551,7 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	return stepper
 }
 
-func GetKubeConfig(ctx context.Context, name string, node component.Node, deliveryCmd service.CmdDelivery) (string, error) {
+func GetKubeConfig(ctx context.Context, name string, node component.Node, externalAddress string, deliveryCmd service.CmdDelivery) (string, error) {
 	content, err := deliveryCmd.DeliverCmd(ctx, node.ID, []string{"cat", "/etc/kubernetes/admin.conf"}, 3*time.Minute)
 	if err != nil {
 		logger.Errorf(" cat kubeConfig error: %s", err.Error())
@@ -567,7 +567,11 @@ func GetKubeConfig(ctx context.Context, name string, node component.Node, delive
 		return "", err
 	}
 
-	kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.NodeIPv4)
+	if externalAddress != "" {
+		kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", externalAddress)
+	} else {
+		kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.NodeIPv4)
+	}
 	config, err := clientcmd.Write(kubeConfig)
 	if err != nil {
 		return "", err
