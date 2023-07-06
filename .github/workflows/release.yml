@@ -48,7 +48,7 @@ jobs:
           tar -zcvf kc-darwin-arm64.tar.gz darwin_arm64/
           popd
       - name: Setup ossutil
-        uses: manyuanrong/setup-ossutil@v2.0
+        uses: manyuanrong/setup-ossutil@v3.0
         with:
           endpoint: ${{ secrets.OSS_ENDPOINT }}
           access-key-id: ${{ secrets.OSS_ACCESS_KEY }}
