@@ -1,5 +1,7 @@
 # Kubeclipper 接口自动化测试
 
+test
+
 ## 1. 准备
 
 ```bash
