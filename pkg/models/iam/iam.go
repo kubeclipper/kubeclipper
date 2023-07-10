@@ -20,6 +20,7 @@ package iam
 
 import (
 	"context"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"sort"
 
 	"github.com/pkg/errors"
@@ -92,6 +93,7 @@ func (i *iamOperator) GetUser(ctx context.Context, name string) (*iamv1.User, er
 }
 
 func (i *iamOperator) CreateUser(ctx context.Context, user *iamv1.User) (*iamv1.User, error) {
+	ctx = genericapirequest.WithNamespace(ctx, user.Namespace)
 	obj, err := i.userStorage.Create(ctx, user, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -100,6 +102,7 @@ func (i *iamOperator) CreateUser(ctx context.Context, user *iamv1.User) (*iamv1.
 }
 
 func (i *iamOperator) UpdateUser(ctx context.Context, user *iamv1.User) (*iamv1.User, error) {
+	ctx = genericapirequest.WithNamespace(ctx, user.Namespace)
 	obj, wasCreated, err := i.userStorage.Update(ctx, user.Name, rest.DefaultUpdatedObjectInfo(user),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -314,6 +317,7 @@ func (i *iamOperator) GetRole(ctx context.Context, name string) (*iamv1.GlobalRo
 }
 
 func (i *iamOperator) CreateRole(ctx context.Context, role *iamv1.GlobalRole) (*iamv1.GlobalRole, error) {
+	ctx = genericapirequest.WithNamespace(ctx, role.Namespace)
 	obj, err := i.roleStorage.Create(ctx, role, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -322,6 +326,7 @@ func (i *iamOperator) CreateRole(ctx context.Context, role *iamv1.GlobalRole) (*
 }
 
 func (i *iamOperator) UpdateRole(ctx context.Context, role *iamv1.GlobalRole) (*iamv1.GlobalRole, error) {
+	ctx = genericapirequest.WithNamespace(ctx, role.Namespace)
 	obj, wasCreated, err := i.roleStorage.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -370,6 +375,7 @@ func (i *iamOperator) GetRoleBinding(ctx context.Context, name string) (*iamv1.G
 }
 
 func (i *iamOperator) CreateRoleBinding(ctx context.Context, role *iamv1.GlobalRoleBinding) (*iamv1.GlobalRoleBinding, error) {
+	ctx = genericapirequest.WithNamespace(ctx, role.Namespace)
 	obj, err := i.roleBindingStorage.Create(ctx, role, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -378,6 +384,7 @@ func (i *iamOperator) CreateRoleBinding(ctx context.Context, role *iamv1.GlobalR
 }
 
 func (i *iamOperator) UpdateRoleBinding(ctx context.Context, role *iamv1.GlobalRoleBinding) (*iamv1.GlobalRoleBinding, error) {
+	ctx = genericapirequest.WithNamespace(ctx, role.Namespace)
 	obj, wasCreated, err := i.roleBindingStorage.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -427,6 +434,7 @@ func (i *iamOperator) GetToken(ctx context.Context, name string) (*iamv1.Token, 
 }
 
 func (i *iamOperator) CreateToken(ctx context.Context, token *iamv1.Token) (*iamv1.Token, error) {
+	ctx = genericapirequest.WithNamespace(ctx, token.Namespace)
 	obj, err := i.tokenStorage.Create(ctx, token, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -435,6 +443,7 @@ func (i *iamOperator) CreateToken(ctx context.Context, token *iamv1.Token) (*iam
 }
 
 func (i *iamOperator) UpdateToken(ctx context.Context, token *iamv1.Token) (*iamv1.Token, error) {
+	ctx = genericapirequest.WithNamespace(ctx, token.Namespace)
 	obj, wasCreated, err := i.tokenStorage.Update(ctx, token.Name, rest.DefaultUpdatedObjectInfo(token),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {

@@ -20,6 +20,7 @@ package core
 
 import (
 	"context"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,6 +82,7 @@ func (o operator) ListConfigMapsEx(ctx context.Context, query *query.Query) (*mo
 }
 
 func (o operator) CreateConfigMap(ctx context.Context, configmap *v1.ConfigMap) (*v1.ConfigMap, error) {
+	ctx = genericapirequest.WithNamespace(ctx, configmap.Namespace)
 	obj, err := o.cmStorage.Create(ctx, configmap, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -89,6 +91,7 @@ func (o operator) CreateConfigMap(ctx context.Context, configmap *v1.ConfigMap) 
 }
 
 func (o operator) UpdateConfigMap(ctx context.Context, configmap *v1.ConfigMap) (*v1.ConfigMap, error) {
+	ctx = genericapirequest.WithNamespace(ctx, configmap.Namespace)
 	obj, wasCreated, err := o.cmStorage.Update(ctx, configmap.Name, rest.DefaultUpdatedObjectInfo(configmap),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
