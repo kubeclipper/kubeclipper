@@ -20,6 +20,7 @@ package operation
 
 import (
 	"context"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models"
 
@@ -74,6 +75,7 @@ func (l *operationOperator) GetOperation(ctx context.Context, name string) (*v1.
 }
 
 func (l *operationOperator) CreateOperation(ctx context.Context, operation *v1.Operation) (*v1.Operation, error) {
+	ctx = genericapirequest.WithNamespace(ctx, operation.Namespace)
 	obj, err := l.storage.Create(ctx, operation, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -82,6 +84,7 @@ func (l *operationOperator) CreateOperation(ctx context.Context, operation *v1.O
 }
 
 func (l *operationOperator) UpdateOperation(ctx context.Context, operation *v1.Operation) (*v1.Operation, error) {
+	ctx = genericapirequest.WithNamespace(ctx, operation.Namespace)
 	obj, wasCreated, err := l.storage.Update(ctx, operation.Name, rest.DefaultUpdatedObjectInfo(operation), nil, nil, false, &metav1.UpdateOptions{})
 	if wasCreated {
 		logger.Debug("operation not exist, use create instead of update", zap.String("name", operation.Name))

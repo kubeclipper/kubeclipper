@@ -21,6 +21,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"sort"
 	"strings"
 
@@ -76,6 +77,7 @@ func NewClusterOperator(clusterStorage, nodeStorage, regionStorage, backupStorag
 }
 
 func (c *clusterOperator) UpdateCluster(ctx context.Context, cluster *v1.Cluster) (*v1.Cluster, error) {
+	ctx = genericapirequest.WithNamespace(ctx, cluster.Namespace)
 	obj, wasCreated, err := c.clusterStorage.Update(ctx, cluster.Name, rest.DefaultUpdatedObjectInfo(cluster),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -88,6 +90,7 @@ func (c *clusterOperator) UpdateCluster(ctx context.Context, cluster *v1.Cluster
 }
 
 func (c *clusterOperator) UpdateNode(ctx context.Context, node *v1.Node) (*v1.Node, error) {
+	ctx = genericapirequest.WithNamespace(ctx, node.Namespace)
 	obj, wasCreated, err := c.nodeStorage.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -113,6 +116,7 @@ func (c *clusterOperator) ListClusterEx(ctx context.Context, query *query.Query)
 }
 
 func (c *clusterOperator) CreateCluster(ctx context.Context, cluster *v1.Cluster) (*v1.Cluster, error) {
+	ctx = genericapirequest.WithNamespace(ctx, cluster.Namespace)
 	obj, err := c.clusterStorage.Create(ctx, cluster, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -181,6 +185,7 @@ func (c *clusterOperator) DeleteNode(ctx context.Context, name string) error {
 }
 
 func (c *clusterOperator) CreateNode(ctx context.Context, node *v1.Node) (*v1.Node, error) {
+	ctx = genericapirequest.WithNamespace(ctx, node.Namespace)
 	obj, err := c.nodeStorage.Create(ctx, node, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -218,6 +223,7 @@ func (c *clusterOperator) WatchRegions(ctx context.Context, query *query.Query) 
 }
 
 func (c *clusterOperator) CreateRegion(ctx context.Context, region *v1.Region) (*v1.Region, error) {
+	ctx = genericapirequest.WithNamespace(ctx, region.Namespace)
 	obj, err := c.regionStorage.Create(ctx, region, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -233,6 +239,7 @@ func (c *clusterOperator) DeleteRegion(ctx context.Context, name string) error {
 }
 
 func (c *clusterOperator) CreateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	ctx = genericapirequest.WithNamespace(ctx, backup.Namespace)
 	obj, err := c.backupStorage.Create(ctx, backup, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -280,6 +287,7 @@ func (c *clusterOperator) ListBackupEx(ctx context.Context, query *query.Query) 
 }
 
 func (c *clusterOperator) UpdateBackup(ctx context.Context, backup *v1.Backup) (*v1.Backup, error) {
+	ctx = genericapirequest.WithNamespace(ctx, backup.Namespace)
 	obj, existed, err := c.backupStorage.Update(ctx, backup.Name, rest.DefaultUpdatedObjectInfo(backup),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -324,6 +332,7 @@ func (c *clusterOperator) ListBackupPointEx(ctx context.Context, query *query.Qu
 }
 
 func (c *clusterOperator) CreateBackupPoint(ctx context.Context, backupPoint *v1.BackupPoint) (*v1.BackupPoint, error) {
+	ctx = genericapirequest.WithNamespace(ctx, backupPoint.Namespace)
 	obj, err := c.backupPointStorage.Create(ctx, backupPoint, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -332,6 +341,7 @@ func (c *clusterOperator) CreateBackupPoint(ctx context.Context, backupPoint *v1
 }
 
 func (c *clusterOperator) UpdateBackupPoint(ctx context.Context, backupPoint *v1.BackupPoint) (*v1.BackupPoint, error) {
+	ctx = genericapirequest.WithNamespace(ctx, backupPoint.Namespace)
 	obj, existed, err := c.backupPointStorage.Update(ctx, backupPoint.Name, rest.DefaultUpdatedObjectInfo(backupPoint),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -384,6 +394,7 @@ func (c *clusterOperator) ListCronBackupEx(ctx context.Context, query *query.Que
 }
 
 func (c *clusterOperator) CreateCronBackup(ctx context.Context, cronBackup *v1.CronBackup) (*v1.CronBackup, error) {
+	ctx = genericapirequest.WithNamespace(ctx, cronBackup.Namespace)
 	obj, err := c.cronBackupStorage.Create(ctx, cronBackup, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -392,6 +403,7 @@ func (c *clusterOperator) CreateCronBackup(ctx context.Context, cronBackup *v1.C
 }
 
 func (c *clusterOperator) UpdateCronBackup(ctx context.Context, cronBackup *v1.CronBackup) (*v1.CronBackup, error) {
+	ctx = genericapirequest.WithNamespace(ctx, cronBackup.Namespace)
 	obj, existed, err := c.cronBackupStorage.Update(ctx, cronBackup.Name, rest.DefaultUpdatedObjectInfo(cronBackup),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -454,6 +466,7 @@ func (c *clusterOperator) GetDomainEx(ctx context.Context, name string, resource
 }
 
 func (c *clusterOperator) CreateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error) {
+	ctx = genericapirequest.WithNamespace(ctx, domain.Namespace)
 	obj, err := c.dnsStorage.Create(ctx, domain, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -462,6 +475,7 @@ func (c *clusterOperator) CreateDomain(ctx context.Context, domain *v1.Domain) (
 }
 
 func (c *clusterOperator) UpdateDomain(ctx context.Context, domain *v1.Domain) (*v1.Domain, error) {
+	ctx = genericapirequest.WithNamespace(ctx, domain.Namespace)
 	obj, creating, err := c.dnsStorage.Update(ctx, domain.Name, rest.DefaultUpdatedObjectInfo(domain),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -714,6 +728,7 @@ func (c *clusterOperator) GetTemplateEx(ctx context.Context, name string, resour
 }
 
 func (c *clusterOperator) CreateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error) {
+	ctx = genericapirequest.WithNamespace(ctx, template.Namespace)
 	obj, err := c.templateStorage.Create(ctx, template, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -722,6 +737,7 @@ func (c *clusterOperator) CreateTemplate(ctx context.Context, template *v1.Templ
 }
 
 func (c *clusterOperator) UpdateTemplate(ctx context.Context, template *v1.Template) (*v1.Template, error) {
+	ctx = genericapirequest.WithNamespace(ctx, template.Namespace)
 	obj, creating, err := c.templateStorage.Update(ctx, template.Name, rest.DefaultUpdatedObjectInfo(template),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -802,6 +818,7 @@ func (c *clusterOperator) ListCloudProvidersEx(ctx context.Context, query *query
 }
 
 func (c *clusterOperator) CreateCloudProvider(ctx context.Context, CloudProvider *v1.CloudProvider) (*v1.CloudProvider, error) {
+	ctx = genericapirequest.WithNamespace(ctx, CloudProvider.Namespace)
 	obj, err := c.cloudProviderStorage.Create(ctx, CloudProvider, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -810,6 +827,7 @@ func (c *clusterOperator) CreateCloudProvider(ctx context.Context, CloudProvider
 }
 
 func (c *clusterOperator) UpdateCloudProvider(ctx context.Context, CloudProvider *v1.CloudProvider) (*v1.CloudProvider, error) {
+	ctx = genericapirequest.WithNamespace(ctx, CloudProvider.Namespace)
 	obj, wasCreated, err := c.cloudProviderStorage.Update(ctx, CloudProvider.Name, rest.DefaultUpdatedObjectInfo(CloudProvider),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {
@@ -879,6 +897,7 @@ func (c *clusterOperator) ListRegistriesEx(ctx context.Context, query *query.Que
 }
 
 func (c *clusterOperator) CreateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	ctx = genericapirequest.WithNamespace(ctx, r.Namespace)
 	obj, err := c.registryStorage.Create(ctx, r, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -887,6 +906,7 @@ func (c *clusterOperator) CreateRegistry(ctx context.Context, r *v1.Registry) (*
 }
 
 func (c *clusterOperator) UpdateRegistry(ctx context.Context, r *v1.Registry) (*v1.Registry, error) {
+	ctx = genericapirequest.WithNamespace(ctx, r.Namespace)
 	obj, wasCreated, err := c.registryStorage.Update(ctx, r.Name, rest.DefaultUpdatedObjectInfo(r),
 		nil, nil, false, &metav1.UpdateOptions{})
 	if err != nil {

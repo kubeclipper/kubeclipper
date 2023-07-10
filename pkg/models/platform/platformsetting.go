@@ -20,6 +20,7 @@ package platform
 
 import (
 	"context"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,6 +70,7 @@ func (p *platformOperator) GetPlatformSetting(ctx context.Context) (*v1.Platform
 }
 
 func (p *platformOperator) CreatePlatformSetting(ctx context.Context, platformSetting *v1.PlatformSetting) (*v1.PlatformSetting, error) {
+	ctx = genericapirequest.WithNamespace(ctx, platformSetting.Namespace)
 	obj, err := p.storage.Create(ctx, platformSetting, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
@@ -77,6 +79,7 @@ func (p *platformOperator) CreatePlatformSetting(ctx context.Context, platformSe
 }
 
 func (p *platformOperator) UpdatePlatformSetting(ctx context.Context, platformSetting *v1.PlatformSetting) (*v1.PlatformSetting, error) {
+	ctx = genericapirequest.WithNamespace(ctx, platformSetting.Namespace)
 	obj, wasCreated, err := p.storage.Update(ctx, platformSetting.Name, rest.DefaultUpdatedObjectInfo(platformSetting), nil, nil, false, &metav1.UpdateOptions{})
 	if wasCreated {
 		logger.Debug("platform not exist, use create instead of update", zap.String("name", platformSetting.Name))
@@ -100,6 +103,7 @@ func (p *platformOperator) GetEvent(ctx context.Context, name string) (*v1.Event
 }
 
 func (p *platformOperator) CreateEvent(ctx context.Context, Event *v1.Event) (*v1.Event, error) {
+	ctx = genericapirequest.WithNamespace(ctx, Event.Namespace)
 	obj, err := p.eventStorage.Create(ctx, Event, nil, &metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
