@@ -7,8 +7,8 @@ require (
 	github.com/containerd/containerd v1.6.19
 	github.com/coreos/go-oidc/v3 v3.2.0
 	github.com/dlclark/regexp2 v1.7.0
-	github.com/emicklei/go-restful v2.9.6+incompatible
-	github.com/emicklei/go-restful-openapi v0.0.0-00010101000000-000000000000
+	github.com/emicklei/go-restful v2.16.0+incompatible
+	github.com/emicklei/go-restful-openapi v1.4.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fatih/color v1.7.0
 	github.com/go-logr/zapr v1.2.3
@@ -25,8 +25,8 @@ require (
 	github.com/minio/minio-go/v7 v7.0.21
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.0.1
-	github.com/nats-io/nats-server/v2 v2.4.0
-	github.com/nats-io/nats.go v1.12.0
+	github.com/nats-io/nats-server/v2 v2.7.4
+	github.com/nats-io/nats.go v1.13.1-0.20220308171302-2f2f6968e98d
 	github.com/nicksnyder/go-i18n/v2 v2.2.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/ginkgo v1.16.5
@@ -94,8 +94,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/cli v20.10.20+incompatible // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.20+incompatible // indirect
+	github.com/docker/distribution v2.8.2+incompatible // indirect
+	github.com/docker/docker v20.10.24+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
@@ -143,7 +143,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/minio/highwayhash v1.0.1 // indirect
+	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/minio/md5-simd v1.1.0 // indirect
 	github.com/minio/sha256-simd v0.1.1 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
@@ -157,14 +157,14 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/nats-io/jwt/v2 v2.0.3 // indirect
+	github.com/nats-io/jwt/v2 v2.2.1-0.20220113022732-58e87895b296 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onsi/ginkgo/v2 v2.6.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc2 // indirect
-	github.com/opencontainers/runc v1.1.4 // indirect
+	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/selinux v1.10.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -191,7 +191,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.5 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.5 // indirect
-	go.mongodb.org/mongo-driver v1.3.0 // indirect
+	go.mongodb.org/mongo-driver v1.5.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.35.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.37.0 // indirect
@@ -235,8 +235,6 @@ replace (
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
-	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.14.3+incompatible
-	github.com/emicklei/go-restful-openapi => github.com/emicklei/go-restful-openapi v1.4.1
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/fatih/color => github.com/fatih/color v1.13.0
 	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.10
@@ -253,7 +251,6 @@ replace (
 	github.com/golang/mock => github.com/golang/mock v1.5.0
 	github.com/google/uuid => github.com/google/uuid v1.1.2
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.1.12
-	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.4.0
 	github.com/nats-io/nats.go => github.com/nats-io/nats.go v1.12.0
 	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.4
