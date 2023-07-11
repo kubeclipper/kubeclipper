@@ -22,7 +22,7 @@ require (
 	github.com/google/go-containerregistry v0.12.1
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
-	github.com/minio/minio-go/v7 v7.0.21
+	github.com/minio/minio-go/v7 v7.0.59
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.0.1
 	github.com/nats-io/nats-server/v2 v2.4.0
@@ -98,7 +98,7 @@ require (
 	github.com/docker/docker v20.10.20+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
-	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -133,8 +133,8 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.15.11 // indirect
-	github.com/klauspost/cpuid v1.3.1 // indirect
+	github.com/klauspost/compress v1.16.5 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
@@ -144,8 +144,8 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/highwayhash v1.0.1 // indirect
-	github.com/minio/md5-simd v1.1.0 // indirect
-	github.com/minio/sha256-simd v0.1.1 // indirect
+	github.com/minio/md5-simd v1.1.2 // indirect
+	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.0 // indirect
@@ -173,7 +173,7 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/rs/xid v1.2.1 // indirect
+	github.com/rs/xid v1.5.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/smartystreets/assertions v1.0.1 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
@@ -217,7 +217,7 @@ require (
 	google.golang.org/grpc v1.56.1 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.62.0 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
