@@ -49,10 +49,10 @@ require (
 	github.com/vbauerster/mpb/v8 v8.0.2
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.uber.org/zap v1.24.0
-	golang.org/x/crypto v0.10.0
+	golang.org/x/crypto v0.11.0
 	golang.org/x/oauth2 v0.5.0
-	golang.org/x/term v0.9.0
-	golang.org/x/text v0.10.0
+	golang.org/x/term v0.10.0
+	golang.org/x/text v0.11.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.26.4
 	k8s.io/apimachinery v0.26.4
@@ -206,9 +206,9 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
-	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
@@ -268,7 +268,6 @@ replace (
 	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 	go.uber.org/zap => go.uber.org/zap v1.17.0
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	google.golang.org/grpc => google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf => google.golang.org/protobuf v1.26.0
 	gopkg.in/ini.v1 => gopkg.in/ini.v1 v1.62.0
