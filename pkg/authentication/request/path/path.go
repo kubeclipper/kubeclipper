@@ -29,13 +29,13 @@ import (
 )
 
 type Authenticator struct {
-	excludePaths sets.String
+	excludePaths sets.Set[string]
 	prefixes     []string
 }
 
 func NewAuthenticator(excludePaths []string) (authenticator.Request, error) {
 	var prefixes []string
-	paths := sets.NewString()
+	paths := sets.Set[string]{}
 	for _, p := range excludePaths {
 		p = strings.TrimPrefix(p, "/")
 		if len(p) == 0 {

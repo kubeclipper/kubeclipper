@@ -90,7 +90,7 @@ type APIServer struct {
 	Config                *config.Config
 	Services              []service.Interface
 	cache                 cache.Interface
-	RESTOptionsGetter     *etcdRESTOptions.SimpleRestOptionsFactory
+	RESTOptionsGetter     *etcdRESTOptions.StorageFactoryRestOptionsFactory
 	storageFactory        registry.SharedStorageFactory
 	rbacAuthorizer        authorizer.Authorizer
 	databaseAuditBackend  auditing.Backend
@@ -183,7 +183,7 @@ func (s *APIServer) Run(stopCh <-chan struct{}) (err error) {
 
 func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 	infoFactory := &request.InfoFactory{
-		APIPrefixes: sets.NewString("api", "cluster"),
+		APIPrefixes: sets.New("api", "cluster"),
 	}
 	s.container.Filter(filters.WithRequestInfo(infoFactory))
 

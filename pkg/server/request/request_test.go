@@ -154,7 +154,7 @@ func TestInfoFactory_NewRequestInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &InfoFactory{
-				APIPrefixes: sets.NewString("api"),
+				APIPrefixes: sets.New("api"),
 			}
 			got, err := i.NewRequestInfo(tt.args.req)
 			if (err != nil) != tt.wantErr {

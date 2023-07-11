@@ -414,9 +414,9 @@ func TestAuthorizer_Authorize(t *testing.T) {
 
 	setupIAMMock(iamMockOp)
 
-	reqInfoFactory := &request.InfoFactory{APIPrefixes: sets.NewString("api")}
+	reqInfoFactory := &request.InfoFactory{APIPrefixes: sets.New("api")}
 
-	authz := &Authorizer{am: iamMockOp}
+	auth := &Authorizer{am: iamMockOp}
 
 	type args struct {
 		user user.Info
@@ -1516,7 +1516,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 				return
 			}
 
-			got, got1, err := authz.Authorize(context.TODO(), getAuthorizerAttributes(tt.args.user, info))
+			got, got1, err := auth.Authorize(context.TODO(), getAuthorizerAttributes(tt.args.user, info))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return

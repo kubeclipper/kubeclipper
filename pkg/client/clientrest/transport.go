@@ -74,16 +74,17 @@ func initTransport(config *transport.Config) (http.RoundTripper, error) {
 		return nil, err
 	}
 	// The options didn't require a custom TLS config
-	if tlsConfig == nil && config.Dial == nil && config.Proxy == nil {
+	if tlsConfig == nil && config.DialHolder == nil && config.Proxy == nil {
 		return http.DefaultTransport, nil
 	}
 
-	dial := config.Dial
-	if dial == nil {
-		dial = (&net.Dialer{
+	dialHolder := config.DialHolder
+	if dialHolder == nil {
+		dial := (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext
+		dialHolder = &transport.DialHolder{Dial: dial}
 	}
 
 	proxy := http.ProxyFromEnvironment
@@ -96,7 +97,7 @@ func initTransport(config *transport.Config) (http.RoundTripper, error) {
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: 25,
-		DialContext:         dial,
+		DialContext:         dialHolder.Dial,
 		DisableCompression:  config.DisableCompression,
 	})
 

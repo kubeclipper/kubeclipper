@@ -115,13 +115,13 @@ func (r *NodeReconciler) syncNodeRole(ctx context.Context, node *v1.Node) error 
 func (r *NodeReconciler) updateNodeRoleIfNotEqual(ctx context.Context, clu *v1.Cluster, node *v1.Node, nodeRole common.NodeRole) error {
 	var (
 		err   error
-		nodes sets.String
+		nodes sets.Set[string]
 	)
 	switch nodeRole {
 	case common.NodeRoleMaster:
-		nodes = sets.NewString(clu.Masters.GetNodeIDs()...)
+		nodes = sets.New(clu.Masters.GetNodeIDs()...)
 	case common.NodeRoleWorker:
-		nodes = sets.NewString(clu.Workers.GetNodeIDs()...)
+		nodes = sets.New(clu.Workers.GetNodeIDs()...)
 	default:
 		return fmt.Errorf("unsupported ")
 	}

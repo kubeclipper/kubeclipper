@@ -31,7 +31,7 @@ import (
 
 func TestAuthenticator_AuthenticateRequest(t *testing.T) {
 	type fields struct {
-		excludePaths sets.String
+		excludePaths sets.Set[string]
 		prefixes     []string
 	}
 	type args struct {
@@ -48,7 +48,7 @@ func TestAuthenticator_AuthenticateRequest(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				excludePaths: sets.NewString("testPath", "testPath2", "testPath3"),
+				excludePaths: sets.New("testPath", "testPath2", "testPath3"),
 				prefixes:     []string{"testPath"},
 			},
 			args: args{
@@ -74,7 +74,7 @@ func TestAuthenticator_AuthenticateRequest(t *testing.T) {
 		{
 			name: "",
 			fields: fields{
-				excludePaths: sets.NewString("test Path", "testPath2", "testPath3"),
+				excludePaths: sets.New("test Path", "testPath2", "testPath3"),
 				prefixes:     []string{"testPath"},
 			},
 			args: args{
