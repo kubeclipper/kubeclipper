@@ -15,7 +15,7 @@ vars:
   - &cluster_name "test"
   - &backupspace_des "有效备份空间"
   - &fs_backupRootDir "/tmp/nfs/data/e2e-test"
-  - &s3_endpoint "172.20.163.233:9000"
+  - &s3_endpoint "172.20.150.138:9000"
   - &s3_username "admin"
   - &s3_password "Aa123456"
 
