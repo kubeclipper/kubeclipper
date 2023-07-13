@@ -160,7 +160,7 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	o := NewCreateClusterOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "cluster (--name) <name> (-m|--master) <id or ip> [(--offline <online> | <offline>)] [(--cri <docker> | <containerd>)] [(--cni <calico> | <others> )] [flags]",
+		Use:                   "cluster (--name) <name> (-m|--master) <id or ip> [(--offline <false> | <true>)] [(--cri <docker> | <containerd>)] [(--cni <calico> | <others> )] [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "create kubeclipper cluster resource",
 		Long:                  clusterLongDescription,
@@ -177,7 +177,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVarP(&o.Masters, "master", "m", o.Masters, "k8s master node id or ip")
 	cmd.Flags().StringSliceVar(&o.Workers, "worker", o.Workers, "k8s worker node id or ip")
 	cmd.Flags().BoolVar(&o.UntaintMaster, "untaint-master", o.UntaintMaster, "untaint master node after cluster create")
-	cmd.Flags().BoolVar(&o.Offline, "offline", o.Offline, "create cluster online or offline")
+	cmd.Flags().BoolVar(&o.Offline, "offline", o.Offline, "create cluster online(false) or offline(true)")
 	cmd.Flags().StringVar(&o.LocalRegistry, "local-registry", o.LocalRegistry, "use local registry address to pull image")
 	cmd.Flags().StringSliceVar(&o.InsecureRegistries, "insecure-registry", o.InsecureRegistries, "use remote registry address to pull image")
 	cmd.Flags().StringVar(&o.CRI, "cri", o.CRI, "k8s cri type, docker or containerd")
