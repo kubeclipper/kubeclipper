@@ -191,7 +191,7 @@ func (r *Kubeadm) Cleanup(ctx context.Context) error {
 		}
 	}
 
-	err = r.clusterAddon(ctx, v1.ActionUninstall, clu)
+	err = r.clusterAddon(ctx, v1.ActionUninstall)
 	if err != nil {
 		logger.Warnf("cluster addons %s failed: %v", v1.ActionInstall, err)
 	}
@@ -228,7 +228,7 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 	// then,import cluster
 	oldClu, err := r.Operator.ClusterLister.Get(clu.Name)
 	if err != nil {
-		// create,if not exists
+		// create, if not exists
 		if apimachineryErrors.IsNotFound(err) {
 			if _, err = r.Operator.ClusterWriter.CreateCluster(context.TODO(), clu); err != nil {
 				return errors.WithMessagef(err, "create cluster %s", clu.Name)
@@ -241,7 +241,7 @@ func (r *Kubeadm) importClusterToKC(ctx context.Context, clu *v1.Cluster) error 
 
 	log.Debugf("create import provider %s's cluster [%v] successfully", r.Provider.Name, clu.Name)
 
-	err = r.clusterAddon(ctx, v1.ActionInstall, clu)
+	err = r.clusterAddon(ctx, v1.ActionInstall)
 	if err != nil {
 		logger.Debugf("cluster addon service create failed: %v", err)
 	}
@@ -685,23 +685,23 @@ func (r *Kubeadm) replaceIDToIP(no *v1.WorkerNode) {
 	}
 }
 
-func (r *Kubeadm) clusterAddon(ctx context.Context, action v1.StepAction, clu *v1.Cluster) error {
+func (r *Kubeadm) clusterAddon(ctx context.Context, action v1.StepAction) error {
 	err := r.clusterServiceAccount(ctx, action)
 	if err != nil {
 		// the failure to delete the service account due to an exception is tolerated, so ignore this error
-		logger.Debugf("%s the cluster %s's service accounts failed: %v", action, clu.Name, err)
+		logger.Debugf("%s the cluster %s's service accounts failed: %v", action, r.Config.ClusterName, err)
 		return err
 	}
 
 	masters, err := listMaster(ctx, &r.Clientset)
 	if err != nil {
-		return fmt.Errorf("list cluster(%s) master node failed: %v", clu.Name, err)
+		return fmt.Errorf("list cluster(%s) master node failed: %v", r.Config.ClusterName, err)
 	}
 	for _, master := range masters {
 		err = r.kubectlTerminal(ctx, master, action)
 		if err != nil {
 			// the failure to delete the service account due to an exception is tolerated, so ignore this error
-			logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, clu.Name, err)
+			logger.Debugf("%s the cluster %s's kubectl terminal service failed: %v", action, r.Config.ClusterName, err)
 		}
 	}
 
