@@ -38,4 +38,7 @@ const (
 	Kubelet10KubeadmDir      = "/etc/systemd/system/kubelet.service.d"
 	KubeBinaryDir            = "/usr/bin"
 	KubeManifestsDir         = "/etc/kubernetes/manifests"
+	// KubeletSystemdResolverConfig specifies the default resolver config when systemd service is active
+	KubeletSystemdResolverConfig = "/run/systemd/resolve/resolv.conf"
+	KubeletDefaultResolvConf     = "/etc/resolv.conf"
 )

@@ -24,6 +24,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/initsystem"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
@@ -137,4 +139,13 @@ func deleteContainer(namespace string) error {
 	}
 
 	return nil
+}
+
+// isServiceActive checks whether the given service exists and is running
+func isServiceActive(name string) (bool, error) {
+	initSystem, err := initsystem.GetInitSystem()
+	if err != nil {
+		return false, err
+	}
+	return initSystem.ServiceIsActive(name), nil
 }

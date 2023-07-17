@@ -20,8 +20,9 @@ package platform
 
 import (
 	"context"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"strings"
+
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
