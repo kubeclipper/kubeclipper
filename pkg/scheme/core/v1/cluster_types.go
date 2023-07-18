@@ -272,9 +272,10 @@ type Etcd struct {
 }
 
 type Kubelet struct {
-	RootDir  string `json:"rootDir" yaml:"rootDir"`
-	NodeIP   string `json:"nodeIP" yaml:"nodeIP"`
-	IPAsName bool   `json:"ipAsName" yaml:"ipAsName"`
+	RootDir    string `json:"rootDir" yaml:"rootDir"`
+	NodeIP     string `json:"nodeIP" yaml:"nodeIP"`
+	IPAsName   bool   `json:"ipAsName" yaml:"ipAsName"`
+	ResolvConf string `json:"resolvConf" yaml:"resolvConf"`
 }
 
 type KubeProxy struct {

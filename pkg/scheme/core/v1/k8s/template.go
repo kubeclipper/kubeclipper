@@ -129,7 +129,9 @@ nodeRegistration:
 {{end}}
   kubeletExtraArgs:
     root-dir: {{.Kubelet.RootDir}}
-    node-ip: {{.Kubelet.NodeIP}}`
+    node-ip: {{.Kubelet.NodeIP}}
+    resolv-conf: {{.Kubelet.ResolvConf}}
+`
 
 const lvscareV111 = `
 apiVersion: v1

@@ -308,6 +308,17 @@ func (stepper KubeadmConfig) Install(ctx context.Context, opts component.Options
 		stepper.BootstrapToken = workerJoinCmd[4]
 		stepper.CACertHashes = workerJoinCmd[6]
 	}
+	// check resolv-conf
+	ok, err := isServiceActive("systemd-resolved")
+	if err != nil {
+		logger.Warnf("cannot determine if systemd-resolved is active: %v", err)
+	}
+	if ok {
+		stepper.Kubelet.ResolvConf = KubeletSystemdResolverConfig
+	} else {
+		stepper.Kubelet.ResolvConf = KubeletDefaultResolvConf
+	}
+
 	if err := os.MkdirAll(ManifestDir, 0755); err != nil {
 		return nil, err
 	}
