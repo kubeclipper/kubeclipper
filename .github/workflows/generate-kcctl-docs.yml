@@ -57,7 +57,7 @@ jobs:
           docker buildx build --platform linux/amd64,linux/arm64 --push --file ./tools/kcctldocs-gen/generators/Dockerfile -t kubeclipper/kcctl-docs ./tools/kcctldocs-gen/generators
 
       - name: Resrart Pod
-        uses: steebchen/kubectl@v2.0.0
+        uses: steebchen/kubectl@v2.1.1
         with:
           config: ${{ secrets.PROD_KUBECONFIG }}
           version: v1.23.0 # specify kubectl binary version explicitly
