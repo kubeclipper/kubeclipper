@@ -44,7 +44,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.8.2
-	github.com/subosito/gotenv v1.2.0
+	github.com/subosito/gotenv v1.4.2
 	github.com/txn2/txeh v1.4.0
 	github.com/vbauerster/mpb/v8 v8.0.2
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
