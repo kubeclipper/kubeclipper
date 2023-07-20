@@ -1,0 +1,48 @@
+# 获取集群备份列表
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: check_backup_list_fs
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/backups?limit=10
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.items[?(@.backupPointName=='test-fs')].backupPointName: test-fs
+
+  - name: check_backup_list_s3
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/backups?limit=10
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.items[?(@.backupPointName=='apitest-s3')].backupPointName: apitest-s3
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

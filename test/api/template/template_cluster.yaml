@@ -1,0 +1,162 @@
+# 创建集群模版-查看集群模版-修改集群模版-删除集群模版
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: create_cluster_template
+    url: /apis/api/core.kubeclipper.io/v1/templates
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      apiVersion: "core.kubeclipper.io/v1"
+      config: 
+        addons: []
+        certSANs: []
+        cni:
+          calico:
+            IPManger: true
+            IPv4AutoDetection: "first-found"
+            IPv6AutoDetection: ""
+            mode: "Overlay-Vxlan-All"
+            mtu: 1440
+          type: "calico"
+          version: "v3.22.4"
+        containerRuntime:
+        insecureRegistry: []
+        rootDir: "/var/lib/containerd"
+        type: "containerd"
+        version: "1.6.4"
+        etcd:
+          dataDir: "/var/lib/etcd"
+        kind: "Cluster"
+        kubeProxy: {}
+        kubelet: 
+          rootDir: "/var/lib/kubelet"
+        kubernetesVersion: "v1.23.6"
+        localRegistry: ""
+        metadata:
+          annotations:
+            kubeclipper.io/offline: ""
+          labels: {}
+        networking:
+          dnsDomain: "cluster.local"
+          ipFamily: "IPv4"
+          pods:
+            cidrBlocks: 
+              - "10.96.0.0/16"
+          proxyMode: "ipvs"
+          services:
+            cidrBlocks:
+              - "172.25.0.0/24"
+          workerNodeVip: "169.254.169.100"
+        workerNodeVip: "169.254.169.100"  
+      kind: "Template"
+      metadata:
+        annotations:
+          kubeclipper.io/display-name: "cluster-module"
+        labels:
+          kubeclipper.io/category: "kubernetes"
+          kubeclipper.io/componentName: "kubernetes"
+          kubeclipper.io/componentVersion: "v1"
+    status: 201
+  
+  - name: list_cluster_template
+    url: /apis/api/core.kubeclipper.io/v1/templates
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: update_cluster_template
+    url: /apis/api/core.kubeclipper.io/v1/templates/$HISTORY['list_cluster_template'].$RESPONSE['$.items[0].metadata.name']
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Template
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: $HISTORY['list_cluster_template'].$RESPONSE['$.items[0].metadata.name']
+        resourceVersion: $HISTORY['list_cluster_template'].$RESPONSE['$.items[0].metadata.resourceVersion']
+        labels:
+          kubeclipper.io/category: kubernetes
+          kubeclipper.io/componentName: kubernetes
+          kubeclipper.io/componentVersion: v1
+        annotations:
+          kubeclipper.io/display-name: cluster-module3
+      config:
+        metadata:
+          labels: {}
+          annotations:
+            kubeclipper.io/offline: ''
+        certSANs: []
+        localRegistry: ''
+        workerNodeVip: 169.254.169.100
+        kubernetesVersion: v1.23.6
+        containerRuntime:
+          type: containerd
+          version: 1.6.4
+          insecureRegistry: []
+        networking:
+          ipFamily: IPv4
+          services:
+            cidrBlocks:
+              - 10.96.0.0/16
+          dnsDomain: cluster.local
+          pods:
+            cidrBlocks:
+              - 172.25.0.0/24
+          workerNodeVip: 169.254.169.100
+          proxyMode: ipvs
+        kubeProxy: {}
+        etcd:
+          dataDir: /var/lib/etcd
+        kubelet:
+          rootDir: /var/lib/kubelet
+        cni:
+          type: calico
+          version: v3.22.4
+          calico:
+            IPv4AutoDetection: first-found
+            IPv6AutoDetection: ''
+            mode: Overlay-Vxlan-All
+            IPManger: true
+            mtu: 1440
+        addons: []
+    status: 200
+
+  - name: delete_cluster_template
+    url: /apis/api/core.kubeclipper.io/v1/templates/$HISTORY['list_cluster_template'].$RESPONSE['$.items[0].metadata.name']
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

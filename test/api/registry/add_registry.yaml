@@ -1,0 +1,67 @@
+# 添加镜像仓库
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: create_http_registry
+    url: /apis/api/core.kubeclipper.io/v1/registries
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Registry
+      apiVersion: core.kubeclipper.io/v1
+      host: 10.1.0.234:5000
+      metadata: {
+        annotations: {},
+        name: test-http
+      }
+      scheme: http
+      skipVerify: true
+    status: 201
+
+  - name: create_https_registry
+    url: /apis/api/core.kubeclipper.io/v1/registries
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Registry
+      apiVersion: core.kubeclipper.io/v1
+      ca: "-----BEGIN CERTIFICATE-----\n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\n+7nAyJG1v8j5/SGujPkye43/wBmr4COmWlyw\n-----END CERTIFICATE-----"
+      host: 172.16.29.140
+      metadata: {
+        annotations: {},
+        name: test-https
+      }
+      scheme: https
+      skipVerify: true
+    status: 201
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

@@ -1,0 +1,48 @@
+# 禁用和启用定时备份任务
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: disable_repeat_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups/repeatCronbackups/disable
+    method: PATCH
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.metadata.labels["kubeclipper.io/cronBackupDisable"]: ""
+
+  - name: enable_repeat_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups/repeatCronbackups/enable
+    method: PATCH
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.metadata.labels["kubeclipper.io/cronBackupEnable"]: ""
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

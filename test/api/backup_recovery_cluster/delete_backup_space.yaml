@@ -1,0 +1,75 @@
+# 删除fs备份空间-删除s3备份空间
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: delete_backup_space_fs
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints/test-fs
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: check_delete_fs_sucessfully
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: name~test-fs
+      labelSelector: "!kubeclipper.io/role-template"
+      limit: -1
+      fieldSelector:
+      page: 1
+    response_json_paths:
+      $.totalCount: 0
+
+  - name: delete_backup_space_s3
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints/apitest-s3
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: check_delete_s3_sucessfully
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: name~apitest-s3
+      labelSelector: "!kubeclipper.io/role-template"
+      limit: -1
+      fieldSelector:
+      page: 1
+    response_json_paths:
+      $.totalCount: 0
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+

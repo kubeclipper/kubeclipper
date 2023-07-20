@@ -1,0 +1,100 @@
+# 创建插件模版-查看插件模版-修改插件模版-删除插件模版
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+  - &nfs_serverAddr '172.20.151.105'
+  - &nfs_sharedPath '/tmp/nfs/data/e2e-test'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: create_nfs_template
+    url: /apis/api/core.kubeclipper.io/v1/templates
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      apiVersion: "core.kubeclipper.io/v1"
+      config:
+        archiveOnDelete: false
+        mountOptions: []
+        reclaimPolicy: "Delete"
+        replicas: 1
+        scName: "nfs-sc"
+        serverAddr: *nfs_serverAddr
+        sharedPath: *nfs_sharedPath
+      kind: "Template"
+      metadata:
+        annotations:
+          kubeclipper.io/display-name: "nfs"
+        labels:
+          kubeclipper.io/category: "storage"
+          kubeclipper.io/componentName: "nfs-provisioner"
+          kubeclipper.io/componentVersion: "v1"
+    status: 201
+  
+  - name: list_nfs_template
+    url: /apis/api/core.kubeclipper.io/v1/templates
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: update_cluster_template
+    url: /apis/api/core.kubeclipper.io/v1/templates/$HISTORY['list_nfs_template'].$RESPONSE['$.items[0].metadata.name']
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      apiVersion: "core.kubeclipper.io/v1"
+      config:
+        archiveOnDelete: false
+        mountOptions: []
+        reclaimPolicy: "Delete"
+        replicas: 1
+        scName: "nfs-sc"
+        serverAddr: *nfs_serverAddr
+        sharedPath: *nfs_sharedPath
+      kind: "Template"
+      metadata:
+        name: $HISTORY['list_nfs_template'].$RESPONSE['$.items[0].metadata.name']
+        resourceVersion: $HISTORY['list_nfs_template'].$RESPONSE['$.items[0].metadata.resourceVersion']
+        annotations:
+          kubeclipper.io/display-name: "nfs1"
+        labels:
+          kubeclipper.io/category: "storage"
+          kubeclipper.io/componentName: "nfs-provisioner"
+          kubeclipper.io/componentVersion: "v1"
+    status: 200
+
+  - name: delete_nfs_template
+    url: /apis/api/core.kubeclipper.io/v1/templates/$HISTORY['list_nfs_template'].$RESPONSE['$.items[0].metadata.name']
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

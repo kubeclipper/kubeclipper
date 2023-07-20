@@ -1,0 +1,230 @@
+# 创建nfs集群-添加一个节点-移除一个节点-删除nfs集群
+
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+  - &nfs_cluster_name "nfs_cluster_name"
+  - &localRegistry "172.20.139.239:5000"
+  - &nfs_serverAddr "172.20.151.105"
+  - &nfs_sharedPath "/tmp/nfs/data/mcc-host"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_available_node
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: topology.kubeclipper.io/region=default,!kubeclipper.io/nodeRole
+      limit: -1
+      page: 1
+    status: 200
+
+  - name: create_nfs_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters
+    method: POST
+    poll:
+      count: 6
+      delay: 10
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Cluster
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: *nfs_cluster_name
+        labels:
+          topology.kubeclipper.io/region: default
+        annotations:
+          kubeclipper.io/offline: ""
+          kubeclipper.io/description: cluster_description
+      provider:
+        name: kubeadm
+      certSANs: []
+      masters:
+        - id: $HISTORY['get_available_node'].$RESPONSE['$.items[0].metadata.name']
+          taints: []
+          labels: {}
+      workers: []
+      localRegistry: *localRegistry
+      kubernetesVersion: v1.23.6
+      containerRuntime:
+        type: containerd
+        version: 1.6.4
+        insecureRegistry:
+          - *localRegistry
+        rootDir: /var/lib/containerd
+      networking:
+        ipFamily: IPv4
+        services:
+          cidrBlocks:
+            - 172.25.0.0/24
+        dnsDomain: cluster.local
+        pods:
+          cidrBlocks:
+            - 10.96.0.0/16
+        workerNodeVip: 169.254.169.100
+        proxyMode: ipvs
+      kubeProxy: {}
+      etcd:
+        dataDir: /var/lib/etcd
+      kubelet:
+        rootDir: /var/lib/kubelet
+      cni:
+        type: calico
+        version: v3.22.4
+        calico:
+          IPv4AutoDetection: first-found
+          IPv6AutoDetection: ""
+          mode: Overlay-Vxlan-All
+          IPManger: true
+          mtu: 1440
+      addons:
+        - name: nfs-csi
+          config:
+            serverAddr: *nfs_serverAddr
+            sharedPath: *nfs_sharedPath
+            scName: nfs-sc
+            reclaimPolicy: Delete
+            replicas: 1
+            isDefaultSC: false
+          version: v1
+    response_json_paths:
+      $.localRegistry: *localRegistry
+      $.addons[0].config.reclaimPolicy: "Delete"
+      $.addons[0].config.serverAddr: *nfs_serverAddr
+      $.addons[0].config.sharedPath: *nfs_sharedPath
+
+  - name: wait_nfs_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: cluster_list
+    url: /apis/api/core.kubeclipper.io/v1/clusters?fieldSelector=&limit=10
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+    response_json_paths:
+      $.items[?(@.metadata.name=='nfs_cluster_name')].status.phase: Running
+      $.items[?(@.metadata.name=='nfs_cluster_name')].addons[0].config.serverAddr: *nfs_serverAddr
+      $.items[?(@.metadata.name=='nfs_cluster_name')].metadata.labels['topology.kubeclipper.io/region']: default
+      $.items[?(@.metadata.name=='nfs_cluster_name')].metadata.annotations['kubeclipper.io/description']: cluster_description
+
+  - name: add_one_node_in_nfs_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']/nodes
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      nodes:
+        - id: $HISTORY['get_available_node'].$RESPONSE['$.items[1].metadata.name']
+          taints: []
+          labels: {}
+      operation: "add"
+      role: "worker"
+    response_json_paths:
+      $.status.phase: "Updating"
+
+  - name: check_nfs_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: check_add_node_in_nfs_cluster_sucessfully
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: kubeclipper.io/cluster=$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']
+      limit: 10
+      page: 1
+      reverse: false
+      silent: false
+    status: 200
+    response_json_paths:
+      $.totalCount: 2
+
+  - name: remove_one_worker_node_in_nfs_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']/nodes
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      nodes:
+        - id: $HISTORY['get_available_node'].$RESPONSE['$.items[1].metadata.name']
+      operation: "remove"
+      role: "worker"
+    response_json_paths:
+      $.status.phase: "Updating"
+
+  - name: check_nfs_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: check_remove_node_in_nfs_cluster_sucessfully
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: kubeclipper.io/cluster=$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']
+      limit: 10
+    status: 200
+    response_json_paths:
+      $.totalCount: 1
+
+  - name: delete_nfs_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters/$HISTORY['create_nfs_cluster'].$RESPONSE['$.metadata.name']
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
