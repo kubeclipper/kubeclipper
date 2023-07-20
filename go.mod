@@ -11,7 +11,7 @@ require (
 	github.com/emicklei/go-restful-openapi v0.0.0-00010101000000-000000000000
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fatih/color v1.7.0
-	github.com/go-logr/zapr v1.2.3
+	github.com/go-logr/zapr v1.2.4
 	github.com/go-openapi/loads v0.19.5
 	github.com/go-openapi/spec v0.19.7
 	github.com/go-openapi/strfmt v0.19.5
