@@ -268,6 +268,73 @@ tests:
     response_json_paths:
       $.status.phase: "Running"
 
+  - name: edit_cluster_to_select_null_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Cluster
+      apiVersion: core.kubeclipper.io/v1
+      metadata:
+        name: cmytest
+        labels:
+          topology.kubeclipper.io/region: default
+        annotations:
+          kubeclipper.io/offline: ""
+        finalizers:
+          - finalizer.cluster.kubeclipper.io
+        resourceVersion: $HISTORY['get_cluster_detail'].$RESPONSE['$.metadata.resourceVersion']
+      masters:
+        - id: $HISTORY['get_node_list'].$RESPONSE['$.items[0].metadata.name']
+          containerRuntime:
+            type: ""
+      workers: []
+      kubernetesVersion: v1.23.6
+      kubeProxy: {}
+      etcd:
+        dataDir: /var/lib/etcd
+      kubelet:
+        rootDir: /var/lib/kubelet
+      networking:
+        ipFamily: ipvs
+        services:
+          cidrBlocks:
+            - 172.25.0.0/24
+        pods:
+          cidrBlocks:
+            - 10.96.0.0/16
+        dnsDomain: cluster.local
+        proxyMode: ipvs
+        workerNodeVip: 169.254.169.100
+      containerRuntime:
+        type: containerd
+        version: 1.6.4
+        rootDir: /var/lib/containerd
+      cni:
+        localRegistry: ""
+        type: calico
+        version: v3.22.4
+        criType: containerd
+        offline: true
+        namespace: kube-system
+        calico:
+          IPv4AutoDetection: first-found
+          IPv6AutoDetection: ""
+          mode: Overlay-Vxlan-All
+          IPManger: true
+          mtu: 1440
+      kubeConfig: $HISTORY['get_cluster_detail'].$RESPONSE['$.kubeConfig']
+      addons: []
+      status:
+        phase: Running
+        versions:
+          controlPlane: ""
+          apiserver: ""
+          controllerManager: ""
+          scheduler: ""
+    status: 200
+
   - name: user_logout
     url: /apis/oauth/logout
     method: POST

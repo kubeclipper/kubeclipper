@@ -24,15 +24,6 @@ tests:
     response_json_paths:
       $.token_type: Bearer
 
-  - name: list_node
-    url: /apis/api/core.kubeclipper.io/v1/nodes
-    method: GET
-    request_headers:
-      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
-    query_parameters:
-      limit: 10
-    status: 200
-
   - name: connect_terminal
     url: /apis/api/config.kubeclipper.io/v1/terminal.key
     method: GET
@@ -40,22 +31,37 @@ tests:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
     status: 200
 
+  - name: list_nodes_that_can_be_disabled
+    url: apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: topology.kubeclipper.io/region=default,!kubeclipper.io/nodeRole
+      limit: 10
+      page: 1
+    status: 200
+
   - name: disable_node
-    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_node'].$RESPONSE['$.items[0].metadata.name']/disable
+    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_nodes_that_can_be_disabled'].$RESPONSE['$.items[0].metadata.name']/disable
     method: PATCH
+    query_parameters:
+      labelSelector: topology.kubeclipper.io/region=default,!kubeclipper.io/nodeRole
     request_headers:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
     status: 200
 
   - name: enable_node
-    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_node'].$RESPONSE['$.items[0].metadata.name']/enable
+    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_nodes_that_can_be_disabled'].$RESPONSE['$.items[0].metadata.name']/enable
     method: PATCH
+    query_parameters:
+      labelSelector: topology.kubeclipper.io/region=default,!kubeclipper.io/nodeRole
     request_headers:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
     status: 200
 
   - name: list_node_detail
-    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_node'].$RESPONSE['$.items[0].metadata.name']
+    url: /apis/api/core.kubeclipper.io/v1/nodes/$HISTORY['list_nodes_that_can_be_disabled'].$RESPONSE['$.items[0].metadata.name']
     method: GET
     request_headers:
       Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
