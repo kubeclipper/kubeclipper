@@ -9,7 +9,58 @@ import (
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 )
 
-var Roles = []iamv1.GlobalRole{
+type GlobalRoleList []iamv1.GlobalRole
+
+type GlobalRoleBindingList []iamv1.GlobalRoleBinding
+
+type UserList []iamv1.User
+
+func (receiver *GlobalRoleList) Diff(diffList *iamv1.GlobalRoleList) GlobalRoleList {
+	result := make(map[string]iamv1.GlobalRole)
+	for _, v := range diffList.Items {
+		result[v.Name] = v
+	}
+
+	list := GlobalRoleList{}
+	for _, v := range *receiver {
+		if _, ok := result[v.Name]; !ok {
+			list = append(list, v)
+		}
+	}
+	return list
+}
+
+func (receiver *GlobalRoleBindingList) Diff(diffList *iamv1.GlobalRoleBindingList) GlobalRoleBindingList {
+	result := make(map[string]iamv1.GlobalRoleBinding)
+	for _, v := range diffList.Items {
+		result[v.Name] = v
+	}
+
+	list := GlobalRoleBindingList{}
+	for _, v := range *receiver {
+		if _, ok := result[v.Name]; !ok {
+			list = append(list, v)
+		}
+	}
+	return list
+}
+
+func (receiver *UserList) Diff(diffList *iamv1.UserList) UserList {
+	result := make(map[string]iamv1.User)
+	for _, v := range diffList.Items {
+		result[v.Name] = v
+	}
+
+	list := UserList{}
+	for _, v := range *receiver {
+		if _, ok := result[v.Name]; !ok {
+			list = append(list, v)
+		}
+	}
+	return list
+}
+
+var Roles = GlobalRoleList{
 	{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       iamv1.KindGlobalRole,
@@ -897,7 +948,7 @@ var Roles = []iamv1.GlobalRole{
 	},
 }
 
-var RoleBindings = []iamv1.GlobalRoleBinding{
+var RoleBindings = GlobalRoleBindingList{
 	{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GlobalRoleBinding",
@@ -977,7 +1028,7 @@ var RoleBindings = []iamv1.GlobalRoleBinding{
 	},
 }
 
-func GetInternalUser(password string) []iamv1.User {
+func GetInternalUser(password string) UserList {
 	return []iamv1.User{
 		{
 			TypeMeta: metav1.TypeMeta{
