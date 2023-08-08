@@ -50,6 +50,9 @@ const (
 	templatePath      = "/api/core.kubeclipper.io/v1/templates"
 	registryPath      = "/api/core.kubeclipper.io/v1/registries"
 	regionPath        = "/api/core.kubeclipper.io/v1/regions"
+
+	operationPath = "/api/core.kubeclipper.io/v1/operations"
+	logPath       = "/api/core.kubeclipper.io/v1/logs"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -143,6 +146,43 @@ func (cli *Client) DescribeCluster(ctx context.Context, name string) (*ClustersL
 		Items: []v1.Cluster{cluster},
 	}
 	return &clusters, err
+}
+
+func (cli *Client) ListOperation(ctx context.Context, query Queries) (*OperationList, error) {
+	serverResp, err := cli.get(ctx, operationPath, query.ToRawQuery(), nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+
+	opList := OperationList{}
+	err = json.NewDecoder(serverResp.body).Decode(&opList)
+	return &opList, err
+}
+
+func (cli *Client) PrintLogs(ctx context.Context, operation v1.Operation) error {
+	fmt.Println("operation: ", operation.Name)
+	for _, step := range operation.Steps {
+		for _, node := range step.Nodes {
+			v := url.Values{}
+			v.Add("operation", operation.Name)
+			v.Add("node", node.ID)
+			v.Add("step", step.ID)
+			serverResp, err := cli.get(ctx, logPath, v, nil)
+			if err != nil {
+				return err
+			}
+			log := corev1.StepLog{}
+			err = json.NewDecoder(serverResp.body).Decode(&log)
+			ensureReaderClosed(serverResp)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("step: %s-%s\n", step.Name, step.ID)
+			fmt.Printf("logstatus: %s, log: %s\n", log.Status, log.Content)
+		}
+	}
+	return nil
 }
 
 func (cli *Client) ListRoles(ctx context.Context, query Queries) (*RoleList, error) {

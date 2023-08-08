@@ -9,6 +9,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	"github.com/kubeclipper/kubeclipper/pkg/query"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+
 	apierror "github.com/kubeclipper/kubeclipper/pkg/errors"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
@@ -20,7 +23,7 @@ type clusterCondition func(clu *corev1.Cluster) (bool, error)
 type backupCondition func(backup *corev1.Backup) (bool, error)
 
 // WaitForClusterCondition waits a cluster to be matched to the given condition.
-func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, timeout time.Duration, condition clusterCondition) error {
+func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, timeout time.Duration, condition clusterCondition, outLog bool) error {
 	framework.Logf("Waiting up to %v for cluster %q to be %q", timeout, clusterName, conditionDesc)
 	var (
 		lastClusterError error
@@ -36,6 +39,22 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 		lastCluster = clu.Items[0].DeepCopy()
 		framework.Logf("Cluster %q: Phase=%q, Elapsed: %v",
 			clusterName, lastCluster.Status.Phase, time.Since(start))
+		if outLog {
+			q := query.New()
+			q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName)
+			opList, err := c.ListOperation(context.TODO(), kc.Queries(*q))
+			if err != nil {
+				framework.Logf("List Cluster Operation Failed: %v", err)
+			}
+			for _, op := range opList.Items {
+				if op.Labels[common.LabelOperationAction] == "CreateCluster" {
+					err := c.PrintLogs(context.TODO(), op)
+					if err != nil {
+						framework.Logf("Print Step Log Failed: %v", err)
+					}
+				}
+			}
+		}
 
 		if done, err := condition(lastCluster); done {
 			if err == nil {
@@ -95,7 +114,7 @@ func WaitForBackupCondition(c *kc.Client, clusterName, backupName, conditionDesc
 func WaitForClusterRunning(c *kc.Client, clusterName string, timeout time.Duration) error {
 	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s running", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
 		return clu.Status.Phase == corev1.ClusterRunning, nil
-	})
+	}, true)
 }
 
 func WaitForClusterHealthy(c *kc.Client, clusterName string, timeout time.Duration) error {
@@ -106,7 +125,7 @@ func WaitForClusterHealthy(c *kc.Client, clusterName string, timeout time.Durati
 			}
 		}
 		return false, nil
-	})
+	}, true)
 }
 
 // WaitForClusterNotFound returns an error if it takes too long for the pod to fully terminate.
@@ -208,7 +227,7 @@ func WaitForRecovery(c *kc.Client, clusterName string, timeout time.Duration) er
 			return false, fmt.Errorf("recovery cluster %s failed", clusterName)
 		}
 		return false, nil
-	})
+	}, true)
 }
 
 func WaitForUpgrade(c *kc.Client, clusterName string, timeout time.Duration) error {
@@ -219,7 +238,7 @@ func WaitForUpgrade(c *kc.Client, clusterName string, timeout time.Duration) err
 			return false, fmt.Errorf("upgrade cluster %s failed", clusterName)
 		}
 		return false, nil
-	})
+	}, true)
 }
 
 func WaitForCertInit(c *kc.Client, clusterName string, timeout time.Duration) error {
@@ -230,7 +249,7 @@ func WaitForCertInit(c *kc.Client, clusterName string, timeout time.Duration) er
 			}
 		}
 		return false, nil
-	})
+	}, true)
 }
 
 func WaitForCertUpdated(c *kc.Client, clusterName string, latestTime metav1.Time, timeout time.Duration) error {
@@ -243,7 +262,7 @@ func WaitForCertUpdated(c *kc.Client, clusterName string, latestTime metav1.Time
 			}
 		}
 		return false, nil
-	})
+	}, true)
 }
 
 func WaitForCriRegistry(c *kc.Client, clusterName string, timeout time.Duration, registries []string) error {
@@ -266,7 +285,7 @@ func WaitForCriRegistry(c *kc.Client, clusterName string, timeout time.Duration,
 			}
 		}
 		return true, nil
-	})
+	}, true)
 }
 
 func WaitForJoinNode(c *kc.Client, nodeIP string, timeout time.Duration) error {

@@ -4,7 +4,7 @@ import "time"
 
 var (
 	// Default timeouts to be used in TimeoutContext
-	clusterInstall      = 15 * time.Minute
+	clusterInstall      = 20 * time.Minute
 	clusterInstallShort = 5 * time.Minute
 	clusterDelete       = 10 * time.Minute
 	commonTimeout       = 5 * time.Minute
