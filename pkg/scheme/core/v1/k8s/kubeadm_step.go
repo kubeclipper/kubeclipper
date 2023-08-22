@@ -148,15 +148,15 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	}
 	installSteps = append(installSteps, steps...)
 
-	pack := Package{}
-	steps, err = pack.InitStepper(&c).InstallSteps(nodes)
+	ext := Extension{}
+	steps, err = ext.InitStepper(&c).InstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
 	installSteps = append(installSteps, steps...)
 
-	ext := Extension{}
-	steps, err = ext.InitStepper(&c).InstallSteps(nodes)
+	pack := Package{}
+	steps, err = pack.InitStepper(&c).InstallSteps(nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 		}
 		installSteps = append(installSteps, steps...)
 	}
-	steps, err = cniStepper.InstallSteps([]v1.StepNode{masters[0]})
+	steps, err = cniStepper.InstallSteps([]v1.StepNode{masters[0]}, runnable.KubernetesVersion)
 	if err != nil {
 		return nil, err
 	}

@@ -807,7 +807,7 @@ func (r *Kubeadm) kubectlTerminal(ctx context.Context, node KubeNode, action v1.
 			// docker load -i xxx/images.tar
 			loadImage = fmt.Sprintf("docker load -i %s", exImage)
 		case v1.CRIContainerd:
-			loadImage = fmt.Sprintf("ctr --namespace k8s.io image import --all-platforms %s", exImage)
+			loadImage = fmt.Sprintf("nerdctl -n k8s.io load -i %s", exImage)
 		default:
 			logger.Warnf("unsupported cri types: ", node.cri)
 		}

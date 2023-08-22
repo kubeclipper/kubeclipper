@@ -176,7 +176,11 @@ func (c *Cluster) Complete() {
 	c.CNI.LocalRegistry = c.LocalRegistry
 	c.CNI.CriType = c.ContainerRuntime.Type
 	c.CNI.Offline = c.Offline()
-	c.CNI.Namespace = "kube-system"
+	if common.IsKubeVersionGreater(c.KubernetesVersion, 126) {
+		c.CNI.Namespace = "calico-system"
+	} else {
+		c.CNI.Namespace = "kube-system"
+	}
 }
 
 type Certification struct {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"runtime"
 	"time"
 
@@ -51,6 +50,10 @@ func (stepper *Extension) Install(ctx context.Context, opts component.Options) (
 	if err != nil {
 		return nil, err
 	}
+	// install configs.tar.gz
+	if _, err = instance.DownloadAndUnpackConfigs(); err != nil {
+		return nil, err
+	}
 	// local registry not filled and is in offline mode, download images.tar.gz file from tarballs
 	if stepper.Offline && stepper.LocalRegistry == "" {
 		imageSrc, err := instance.DownloadImages()
@@ -62,11 +65,6 @@ func (stepper *Extension) Install(ctx context.Context, opts component.Options) (
 		}
 		logger.Info("image tarball decompress successfully")
 	}
-	// install configs.tar.gz
-	if _, err = instance.DownloadAndUnpackConfigs(); err != nil {
-		return nil, err
-	}
-
 	logger.Debug("k8s packages offline install successfully")
 	return nil, nil
 }

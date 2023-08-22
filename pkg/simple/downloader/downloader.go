@@ -44,6 +44,7 @@ const (
 	ConfigFilename   = "configs.tar.gz"
 	BaseDstDir       = "/tmp/kc-downloader"
 	baseManifestDir  = "/opt/kc/manifest"
+	ChartFilename    = "charts.tgz"
 )
 
 var options *Options
@@ -80,7 +81,7 @@ func NewInstance(ctx context.Context, name, version, arch string, online, dryRun
 		baseURI = options.Address
 	}
 	if !dryRun {
-		dstDir = filepath.Join(BaseDstDir, "."+name, version, arch)
+		dstDir = filepath.Join(BaseDstDir, "."+name, version)
 		manifestDir = filepath.Join(baseManifestDir, name, version, arch)
 		cManifestDir = filepath.Join(baseManifestDir, name, version, arch, "config")
 		// create required directories
@@ -132,6 +133,20 @@ func (dl *Downloader) DownloadImages() (string, error) {
 // RemoveImages remove image file
 func (dl *Downloader) RemoveImages() error {
 	return os.RemoveAll(filepath.Join(dl.dstDir, ImageFilename))
+}
+
+// DownloadCharts download chart file
+func (dl *Downloader) DownloadCharts() (string, error) {
+	return filepath.Join(dl.dstDir, ChartFilename), dl.Download(ChartFilename)
+}
+
+// RemoveCharts remove chart file
+func (dl *Downloader) RemoveCharts() error {
+	return os.RemoveAll(filepath.Join(dl.dstDir, ChartFilename))
+}
+
+func (dl *Downloader) GetChartDownloadPath() string {
+	return filepath.Join(dl.dstDir, ChartFilename)
 }
 
 // DownloadCustomImages download custom image file

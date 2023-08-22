@@ -20,7 +20,6 @@ package utils
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -30,33 +29,33 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 )
 
-// decompress and load image
+// LoadImage decompress and load image
 func LoadImage(ctx context.Context, dryRun bool, file, criType string) error {
-	_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "gzip", "-df", file)
-	if err != nil {
-		return err
-	}
-
-	file = strings.ReplaceAll(file, ".gz", "")
+	//_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "gzip", "-df", file)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//file = strings.ReplaceAll(file, ".gz", "")
 
 	switch criType {
 	case "containerd":
 		// ctr --namespace k8s.io image import --all-platforms xxx/images.tar
 		// Why need set `--all-platforms` flag?
 		// This prevents unexpected errors due to the incorrect schema type declaration of the mirroring system that cannot be imported normally.
-		_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "ctr", "--namespace", "k8s.io", "image", "import", "--all-platforms", file)
+		_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "nerdctl", "-n", "k8s.io", "load", "-i", file)
 		if err != nil {
 			return err
 		}
 	case "docker":
 		// docker load -i xxx/images.tar
-		_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "docker", "load", "-i", file)
+		_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "docker", "load", "-i", file)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "rm", "-rf", file)
+	_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "rm", "-rf", file)
 
 	return err
 }

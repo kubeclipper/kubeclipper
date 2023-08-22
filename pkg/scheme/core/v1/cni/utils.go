@@ -2,6 +2,8 @@ package cni
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
@@ -83,5 +85,66 @@ func RemoveImage(name string, custom []byte, nodes []v1.StepNode) v1.Step {
 				CustomCommand: custom,
 			},
 		},
+	}
+}
+
+func InstallCalicoRelease(chartPath string, yamlName string, nodes []v1.StepNode) v1.Step {
+	return v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       "installCalicoRelease",
+		Timeout:    metav1.Duration{Duration: 1 * time.Minute},
+		ErrIgnore:  false,
+		RetryTimes: 1,
+		Nodes:      nodes,
+		Commands: []v1.Command{
+			{
+				Type:         v1.CommandShell,
+				ShellCommand: []string{"helm", "upgrade", "--install", "--create-namespace", "calico", "-n", "calico-system", chartPath, "-f", yamlName},
+			},
+		},
+	}
+}
+
+func IsHighKubeVersion(kubeVersion string) bool {
+	if kubeVersion == "" {
+		return false
+	}
+	kubeVersion = strings.ReplaceAll(kubeVersion, "v", "")
+	kubeVersion = strings.ReplaceAll(kubeVersion, ".", "")
+
+	kubeVersion = strings.Join(strings.Split(kubeVersion, "")[0:3], "")
+
+	if v, _ := strconv.Atoi(kubeVersion); v >= 126 {
+		return true
+	}
+	return false
+}
+
+func ParseNodeAddressDetection(nodeAddressDetection string) NodeAddressDetection {
+	// nodeAddressDetection first-found|can-reach=DESTINATION|interface=INTERFACE-REGEX|skip-interface=INTERFACE-REGEX
+	switch nodeAddressDetection {
+	case "first-found":
+		return NodeAddressDetection{
+			Type: "first-found",
+		}
+	case "can-reach":
+		return NodeAddressDetection{
+			Type:  "can-reach",
+			Value: strings.TrimPrefix(nodeAddressDetection, "can-reach="),
+		}
+	case "interface":
+		return NodeAddressDetection{
+			Type:  "interface",
+			Value: strings.TrimPrefix(nodeAddressDetection, "interface="),
+		}
+	case "skip-interface":
+		return NodeAddressDetection{
+			Type:  "skip-interface",
+			Value: strings.TrimPrefix(nodeAddressDetection, "skip-interface="),
+		}
+	default:
+		return NodeAddressDetection{
+			Type: "first-found",
+		}
 	}
 }
