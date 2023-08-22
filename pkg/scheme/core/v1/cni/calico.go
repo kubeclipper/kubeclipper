@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/component/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
@@ -42,8 +44,15 @@ func init() {
 	}
 }
 
+type NodeAddressDetection struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
 type CalicoRunnable struct {
 	BaseCni
+	NodeAddressDetectionV4 NodeAddressDetection
+	NodeAddressDetectionV6 NodeAddressDetection
 }
 
 func (runnable *CalicoRunnable) Type() string {
@@ -73,7 +82,9 @@ func (runnable *CalicoRunnable) InitStep(metadata *component.ExtraMetadata, cni 
 	stepper.Namespace = cni.Namespace
 	stepper.DualStack = networking.IPFamily == v1.IPFamilyDualStack
 	stepper.PodIPv4CIDR = networking.Pods.CIDRBlocks[0]
-	stepper.PodIPv4CIDR = ipv6
+	stepper.PodIPv6CIDR = ipv6
+	stepper.NodeAddressDetectionV4 = ParseNodeAddressDetection(cni.Calico.IPv4AutoDetection)
+	stepper.NodeAddressDetectionV6 = ParseNodeAddressDetection(cni.Calico.IPv6AutoDetection)
 
 	return stepper
 }
@@ -92,15 +103,30 @@ func (runnable *CalicoRunnable) LoadImage(nodes []v1.StepNode) ([]v1.Step, error
 	return steps, nil
 }
 
-func (runnable *CalicoRunnable) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+func (runnable *CalicoRunnable) InstallSteps(nodes []v1.StepNode, kubernetesVersion string) ([]v1.Step, error) {
 	var steps []v1.Step
 	bytes, err := json.Marshal(runnable)
 	if err != nil {
 		return nil, err
 	}
+	if IsHighKubeVersion(kubernetesVersion) {
+		chart := &common.Chart{
+			PkgName: "calico",
+			Version: runnable.Version,
+			Offline: runnable.Offline,
+		}
 
-	steps = append(steps, RenderYaml("calico", bytes, nodes))
-	steps = append(steps, ApplyYaml(filepath.Join(manifestDir, "calico.yaml"), nodes))
+		cLoadSteps, err := chart.InstallStepsV2(nodes)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, cLoadSteps...)
+		steps = append(steps, RenderYaml("calico", bytes, nodes))
+		steps = append(steps, InstallCalicoRelease(filepath.Join(downloader.BaseDstDir, "."+chart.PkgName, chart.Version, downloader.ChartFilename), filepath.Join(manifestDir, "calico.yaml"), nodes))
+	} else {
+		steps = append(steps, RenderYaml("calico", bytes, nodes))
+		steps = append(steps, ApplyYaml(filepath.Join(manifestDir, "calico.yaml"), nodes))
+	}
 
 	return steps, nil
 }
@@ -162,6 +188,23 @@ func (runnable *CalicoRunnable) clear(calico *v1.Calico, nodes []v1.StepNode) []
 			},
 		})
 	}
+	// clean all cali* interface
+	steps = append(steps, v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       "removeCali",
+		Timeout:    metav1.Duration{Duration: 30 * time.Second},
+		ErrIgnore:  true,
+		Nodes:      nodes,
+		Action:     v1.ActionUninstall,
+		RetryTimes: 1,
+		Commands: []v1.Command{
+			{
+				Type: v1.CommandShell,
+				// ip addr | grep cali | awk '{cmd="ip link delete "$2;system(cmd)}'
+				ShellCommand: []string{"ip", "addr", "|", "grep", "cali", "|", "awk", "'{cmd=\"ip link delete \"$2;system(cmd)}'"},
+			},
+		},
+	})
 
 	return steps
 }
@@ -208,6 +251,8 @@ func (runnable *CalicoRunnable) CalicoTemplate() (string, error) {
 		return calicoV3224, nil
 	case "v3.24.5":
 		return calicoV3245, nil
+	case "v3.26.1":
+		return calicoV3261, nil
 	}
 	return "", fmt.Errorf("calico dose not support version: %s", runnable.Version)
 }

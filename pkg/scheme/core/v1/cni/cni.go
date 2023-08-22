@@ -47,7 +47,7 @@ type BaseCni struct {
 type Stepper interface {
 	InitStep(metadata *component.ExtraMetadata, cni *v1.CNI, networking *v1.Networking) Stepper
 	LoadImage(nodes []v1.StepNode) ([]v1.Step, error)
-	InstallSteps(nodes []v1.StepNode) ([]v1.Step, error)
+	InstallSteps(nodes []v1.StepNode, kubeVersion string) ([]v1.Step, error)
 	UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error)
 	CmdList(namespace string) map[string]string
 }
@@ -61,16 +61,20 @@ func (runnable *BaseCni) Install(ctx context.Context, opts component.Options) ([
 	if err != nil {
 		return nil, err
 	}
-	dstFile, err := instance.DownloadImages()
-	if err != nil {
-		return nil, err
-	}
-	// load image package
-	if err = utils.LoadImage(ctx, opts.DryRun, dstFile, runnable.CriType); err == nil {
+
+	if runnable.Offline && runnable.LocalRegistry == "" {
+		dstFile, err := instance.DownloadImages()
+		if err != nil {
+			return nil, err
+		}
+		// load image package
+		if err = utils.LoadImage(ctx, opts.DryRun, dstFile, runnable.CriType); err != nil {
+			return nil, err
+		}
 		logger.Info("calico packages offline install successfully")
 	}
 
-	return nil, err
+	return nil, nil
 }
 
 func (runnable *BaseCni) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {

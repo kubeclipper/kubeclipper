@@ -18,14 +18,14 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 		{
 			name: "base",
 			stepper: CalicoRunnable{
-				BaseCni{
-					DualStack:   false,
+				BaseCni: BaseCni{
+					DualStack:   true,
 					PodIPv4CIDR: constatns.ClusterPodSubnet,
 					PodIPv6CIDR: "aaa:bbb",
 					CNI: v1.CNI{
 						LocalRegistry: "172.0.0.1:5000",
 						Type:          "calico",
-						Version:       "v3.21.2",
+						Version:       "v3.26.1",
 						Calico: &v1.Calico{
 							IPv4AutoDetection: "first-found",
 							IPv6AutoDetection: "first-found",
@@ -39,6 +39,8 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt.stepper.NodeAddressDetectionV4 = ParseNodeAddressDetection(tt.stepper.Calico.IPv4AutoDetection)
+		tt.stepper.NodeAddressDetectionV6 = ParseNodeAddressDetection(tt.stepper.Calico.IPv6AutoDetection)
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
 			err := tt.stepper.renderCalicoTo(w)

@@ -17903,3 +17903,77 @@ spec:
               - /usr/bin/check-status
               - -r
             periodSeconds: 10`
+
+const calicoV3261 = `installation:
+  registry: {{with .CNI.LocalRegistry}}{{.}}{{end}}
+  cni:
+    type: Calico
+    ipam:
+      type: Calico
+  {{if eq .CNI.Calico.Mode "BGP"}}
+  bgp: Enabled
+  {{else}}
+  bgp: Disabled
+  {{end}}
+  calicoNetwork:
+    # Iptables, BPF
+    linuxDataplane: Iptables
+    mtu: {{.CNI.Calico.MTU}}
+    nodeAddressAutodetectionV4:
+      {{if eq .NodeAddressDetectionV4.Type "first-found"}}
+      firstFound: true
+      {{else if eq .NodeAddressDetectionV4.Type "interface"}}
+      interface: {{.NodeAddressDetectionV4.Value}}
+      {{else if eq .NodeAddressDetectionV4.Type "skip-interface"}}
+      skipInterface: {{.NodeAddressDetectionV4.Value}}
+      {{else if eq .NodeAddressDetectionV4.Type "can-reach"}}
+      canReach: {{.NodeAddressDetectionV4.Value}}
+      {{end}}
+      #cidrs: []
+      #kubernetes: xxx
+    {{if .DualStack}}
+    nodeAddressAutodetectionV6:
+      {{if eq .NodeAddressDetectionV6.Type "first-found"}}
+      firstFound: true
+      {{else if eq .NodeAddressDetectionV6.Type "interface"}}
+      interface: {{.NodeAddressDetectionV6.Value}}
+      {{else if eq .NodeAddressDetectionV6.Type "skip-interface"}}
+      skipInterface: {{.NodeAddressDetectionV6.Value}}
+      {{else if eq .NodeAddressDetectionV6.Type "can-reach"}}
+      canReach: {{.NodeAddressDetectionV6.Value}}
+      {{end}}
+    {{end}}
+    ipPools:
+      - blockSize: 26
+        cidr: {{.PodIPv4CIDR}}
+        {{if eq .CNI.Calico.Mode "Overlay-IPIP-All"}}
+        encapsulation: IPIP
+        {{else if eq .CNI.Calico.Mode "Overlay-IPIP-Cross-Subnet"}}
+        encapsulation: IPIPCrossSubnet
+        {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-All"}}
+        encapsulation: VXLAN
+        {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-Cross-Subnet"}}
+        encapsulation: VXLANCrossSubnet
+        {{else}}
+        encapsulation: None
+        {{end}}
+        natOutgoing: Enabled
+        nodeSelector: all()
+      {{if .DualStack}}
+      - blockSize: 122
+        cidr: {{.PodIPv6CIDR}}
+        encapsulation: None
+        natOutgoing: Enabled
+        nodeSelector: all()
+      {{end}}
+
+apiServer:
+  enabled: true
+
+tigeraOperator:
+  image: tigera/operator
+  version: v1.30.4
+  registry: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}
+calicoctl:
+  image: {{with .CNI.LocalRegistry}}{{.}}{{else}}docker.io{{end}}/calico/ctl
+  tag: v3.26.1`
