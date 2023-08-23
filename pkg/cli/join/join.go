@@ -22,9 +22,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"text/template"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -72,6 +75,35 @@ const (
   # Add multiple agent nodes and config float ip.
   kcctl join --agent 192.168.10.123,192.168.10.124 --float-ip 192.168.10.123:172.20.149.199 --float-ip 192.168.10.124:172.20.149.200
 
+  # Add agent nodes use config file. join config example:
+ssh:
+  user: root
+  password: "0000"
+  pkFile: ""
+  privateKey: ""
+  pkPassword: ""
+  port: 22
+  connectionTimeout: 1m0s
+#	MethodFirst     = "first-found"
+#	MethodInterface = "interface="
+#	MethodCidr      = "cidr="
+#	MethodCanReach  = "can-reach="
+ipDetect: first-found
+nodeIPDetect: first-found
+agents:
+  192.168.234.41:
+    #region: default
+    #floatIP:
+    #proxyServer:
+    #proxyAPIServer:
+    #proxySSH:
+  192.168.234.42:
+    #region: default2
+    #floatIP:
+    #proxyServer:
+    #proxyAPIServer:
+    #proxySSH:
+  kcctl join --join-config join-config.yaml
   Please read 'kcctl join -h' get more deploy flags`
 )
 
@@ -89,7 +121,16 @@ type JoinOptions struct {
 
 	sshConfig *sshutils.SSH
 
+	joinConfigPath string
+
 	Pkg string `json:"pkg" yaml:"pkg,omitempty"`
+}
+
+type JoinConfig struct {
+	Agents       options.Agents `json:"agents,omitempty" yaml:"agents,omitempty"`
+	IPDetect     string         `json:"ipDetect,omitempty" yaml:"ipDetect,omitempty"`
+	NodeIPDetect string         `json:"nodeIPDetect,omitempty" yaml:"nodeIPDetect,omitempty"`
+	SSHConfig    *sshutils.SSH  `json:"ssh,omitempty" yaml:"ssh,omitempty"`
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -126,16 +167,50 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "Package resource url (path or http url). Default is inherited from the deploy config.")
+	cmd.Flags().StringVar(&o.joinConfigPath, "join-config", "", "path to the join config file to use for join")
+
 	options.AddFlagsToSSH(o.sshConfig, cmd.Flags())
-	utils.CheckErr(cmd.MarkFlagRequired("agent"))
 	return cmd
+}
+
+func readJoinConfig(path string) (*JoinConfig, error) {
+	joinConfig := &JoinConfig{}
+	fData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	err = yaml.Unmarshal(fData, joinConfig)
+	return joinConfig, err
 }
 
 func (c *JoinOptions) Complete() error {
 	var err error
-	if c.parseAgent, err = deploy.BuildAgent(c.agents, c.floatIPs, c.deployConfig.DefaultRegion); err != nil {
-		return err
+	if c.joinConfigPath != "" {
+		joinConfig, err := readJoinConfig(c.joinConfigPath)
+		if err != nil {
+			return err
+		}
+		if len(joinConfig.Agents) == 0 {
+			return fmt.Errorf("join-config must specify at least one agent node")
+		}
+		if joinConfig.Agents != nil {
+			c.parseAgent = joinConfig.Agents
+		}
+		if joinConfig.IPDetect != "" {
+			c.ipDetect = joinConfig.IPDetect
+		}
+		if joinConfig.NodeIPDetect != "" {
+			c.nodeIPDetect = joinConfig.NodeIPDetect
+		}
+		if joinConfig.SSHConfig != nil {
+			c.sshConfig = joinConfig.SSHConfig
+		}
+	} else {
+		if c.parseAgent, err = deploy.BuildAgent(c.agents, c.floatIPs, c.deployConfig.DefaultRegion); err != nil {
+			return err
+		}
 	}
+
 	// config Complete
 	if err = c.cliOpts.Complete(); err != nil {
 		return err
@@ -197,7 +272,7 @@ func (c *JoinOptions) ValidateArgs() error {
 	if c.nodeIPDetect != "" && !autodetection.CheckMethod(c.nodeIPDetect) {
 		return fmt.Errorf("invalid node ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
 	}
-	if len(c.agents) == 0 {
+	if len(c.parseAgent) == 0 {
 		return fmt.Errorf("must specified at least one agent node")
 	}
 	if len(c.deployConfig.ServerIPs) == 0 {
