@@ -88,17 +88,23 @@ func (l NodeList) AvailableKubeMasters() (NodeList, error) {
 
 func (l NodeList) ReachableNodes(protocol string, port int, timeout time.Duration) NodeList {
 	wg := sync.WaitGroup{}
-	wg.Add(len(l))
-	var list NodeList
+	ch := make(chan Node, len(l))
+	defer close(ch)
 	for _, no := range l {
+		wg.Add(1)
 		go func(no Node) {
-			if netutil.Reachable(protocol, no.NodeIPv4+":"+strconv.Itoa(port), timeout) == nil {
-				list = append(list, no)
+			defer wg.Done()
+			if netutil.Reachable(protocol, no.IPv4+":"+strconv.Itoa(port), timeout) == nil {
+				ch <- no
 			}
-			wg.Done()
 		}(no)
 	}
 	wg.Wait()
+	var list NodeList
+	length := len(ch)
+	for i := 0; i < length; i++ {
+		list = append(list, <-ch)
+	}
 	return list
 }
 
