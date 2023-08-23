@@ -114,26 +114,27 @@ IP6_AUTODETECTION_METHOD=can-reach=www.google.com`
 
 type CreateClusterOptions struct {
 	BaseOptions
-	Masters            []string
-	Workers            []string
-	UntaintMaster      bool
-	Offline            bool
-	LocalRegistry      string
-	InsecureRegistries []string
-	CRI                string
-	CRIVersion         string
-	K8sVersion         string
-	CNI                string
-	CNIVersion         string
-	Name               string
-	createdByIP        bool
-	CertSans           []string
-	CaCertFile         string
-	CaKeyFile          string
-	DNSDomain          string
-	IPv4AutoDetection  string
-	ServiceSubnet      string
-	PodSubnet          string
+	Masters                   []string
+	Workers                   []string
+	UntaintMaster             bool
+	Offline                   bool
+	LocalRegistry             string
+	InsecureRegistries        []string
+	CRI                       string
+	CRIVersion                string
+	K8sVersion                string
+	CNI                       string
+	CNIVersion                string
+	Name                      string
+	createdByIP               bool
+	CertSans                  []string
+	CaCertFile                string
+	CaKeyFile                 string
+	DNSDomain                 string
+	IPv4AutoDetection         string
+	ServiceSubnet             string
+	PodSubnet                 string
+	OnlyInstallKubernetesComp bool
 }
 
 var (
@@ -148,12 +149,15 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 			CliOpts:    options.NewCliOptions(),
 			IOStreams:  streams,
 		},
-		UntaintMaster: false,
-		Offline:       true,
-		CRI:           "containerd",
-		CNI:           "calico",
-		createdByIP:   false,
-		DNSDomain:     "cluster.local",
+		UntaintMaster:     false,
+		Offline:           true,
+		CRI:               "containerd",
+		CNI:               "calico",
+		createdByIP:       false,
+		DNSDomain:         "cluster.local",
+		IPv4AutoDetection: autodetection.MethodFirst,
+		ServiceSubnet:     "10.96.0.0/12",
+		PodSubnet:         "172.25.0.0/16",
 	}
 }
 
@@ -192,6 +196,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.IPv4AutoDetection, "calico.ipv4-auto-detection", o.IPv4AutoDetection, fmt.Sprintf("node ipv4 auto detection. \n%s", IPDetectDescription))
 	cmd.Flags().StringVar(&o.ServiceSubnet, "service-subnet", o.ServiceSubnet, "serviceSubnet is the subnet used by Kubernetes Services. Defaults to '10.96.0.0/12'")
 	cmd.Flags().StringVar(&o.PodSubnet, "pod-subnet", o.PodSubnet, "podSubnet is the subnet used by Pods. Defaults to '172.25.0.0/16'")
+	cmd.Flags().BoolVar(&o.OnlyInstallKubernetesComp, "only-install-kubernetes-component", o.OnlyInstallKubernetesComp, "only install kubernetes component, not install cni")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -381,6 +386,9 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	var annotations = map[string]string{}
 	if l.Offline {
 		annotations[common.AnnotationOffline] = ""
+	}
+	if l.OnlyInstallKubernetesComp {
+		annotations[common.AnnotationOnlyInstallKubernetesComp] = "true"
 	}
 
 	c := &v1.Cluster{

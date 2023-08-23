@@ -68,6 +68,9 @@ const (
 	AnnotationMetadataProxyServer    = "metadata.kubeclipper.io/proxyServer"
 	AnnotationMetadataProxyAPIServer = "metadata.kubeclipper.io/proxyAPIServer"
 	AnnotationMetadataProxySSH       = "metadata.kubeclipper.io/proxySSH"
+
+	// AnnotationOnlyInstallKubernetesComp mean not install cni when create cluster
+	AnnotationOnlyInstallKubernetesComp = "kubeclipper.io/only-install-kubernetes-component"
 )
 
 type NodeRole string // master/worker/ingress(worker)

@@ -211,6 +211,17 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 		installSteps = append(installSteps, steps...)
 	}
 
+	// when disable cni, only install k8s control plane and kubelet
+	// user can install other cni and other plugin manually
+	if metadata.OnlyInstallKubernetesComp {
+		steps, err = PatchTaintAndLabelStep(runnable.Masters, runnable.Workers, metadata)
+		if err != nil {
+			return nil, err
+		}
+		installSteps = append(installSteps, steps...)
+		return installSteps, nil
+	}
+
 	//cn := CNIInfo{}
 	cf, err := cni.Load(c.CNI.Type)
 	if err != nil {
