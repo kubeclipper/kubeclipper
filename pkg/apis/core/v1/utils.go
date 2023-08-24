@@ -131,11 +131,13 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 		steps = append(steps, k8sSteps...)
 	}
 
-	addonSteps, err := h.parseAddonStep(ctx, c, carr, action)
-	if err != nil {
-		return nil, err
+	if !extraMetadata.OnlyInstallKubernetesComp {
+		addonSteps, err := h.parseAddonStep(ctx, c, carr, action)
+		if err != nil {
+			return nil, err
+		}
+		steps = append(steps, addonSteps...)
 	}
-	steps = append(steps, addonSteps...)
 
 	if action == v1.ActionUninstall {
 		steps = append(steps, k8sSteps...)

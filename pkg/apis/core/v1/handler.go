@@ -953,6 +953,13 @@ func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNod
 		CNINamespace:       c.CNI.Namespace,
 	}
 
+	if c.Annotations != nil {
+		_, ok := c.Annotations[common.AnnotationOnlyInstallKubernetesComp]
+		if ok {
+			meta.OnlyInstallKubernetesComp = true
+		}
+	}
+
 	meta.Addons = append(meta.Addons, c.Addons...)
 
 	masters, err := h.getNodeInfo(ctx, c.Masters, skipNodeNotFound)

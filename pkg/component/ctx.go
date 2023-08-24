@@ -41,21 +41,22 @@ type (
 )
 
 type ExtraMetadata struct {
-	Masters            NodeList
-	Workers            NodeList
-	ClusterStatus      v1.ClusterPhase
-	Offline            bool
-	LocalRegistry      string
-	CRI                string
-	ClusterName        string
-	KubeVersion        string
-	OperationID        string
-	OperationType      string
-	KubeletDataDir     string
-	ControlPlaneStatus []v1.ControlPlaneHealth
-	Addons             []v1.Addon
-	CNI                string
-	CNINamespace       string
+	Masters                   NodeList
+	Workers                   NodeList
+	ClusterStatus             v1.ClusterPhase
+	Offline                   bool
+	LocalRegistry             string
+	CRI                       string
+	ClusterName               string
+	KubeVersion               string
+	OperationID               string
+	OperationType             string
+	KubeletDataDir            string
+	ControlPlaneStatus        []v1.ControlPlaneHealth
+	Addons                    []v1.Addon
+	CNI                       string
+	CNINamespace              string
+	OnlyInstallKubernetesComp bool
 }
 
 type Node struct {
