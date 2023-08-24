@@ -61,6 +61,9 @@ scheduler:
     pathType: File
 {{with .LocalRegistry}}imageRepository: {{.}}{{end}}
 {{with .ClusterName}}clusterName: {{.}}{{end}}
+{{if gt (len .FeatureGates) 0}}
+featureGates:{{range $key,$value := .FeatureGates}}
+  {{$key}}: {{$value}}{{end}}{{end}}
 ---
 kind: KubeProxyConfiguration
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
