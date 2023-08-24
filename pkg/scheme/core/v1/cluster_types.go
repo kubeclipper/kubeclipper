@@ -57,6 +57,7 @@ type Cluster struct {
 	Description       string             `json:"description,omitempty" optional:"true"`
 	Status            ClusterStatus      `json:"status,omitempty" optional:"true"`
 	PendingOperations []PendingOperation `json:"pendingOperations,omitempty" optional:"true"`
+	FeatureGates      map[string]bool    `json:"featureGates,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

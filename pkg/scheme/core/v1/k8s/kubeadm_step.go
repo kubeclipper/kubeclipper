@@ -430,6 +430,7 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	stepper.CertSANs = c.GetAllCertSANs()
 	stepper.LocalRegistry = c.LocalRegistry
 	stepper.Offline = metadata.Offline
+	stepper.FeatureGates = c.FeatureGates
 	// TODO: No vip is currently introduced as controlPlaneEndpoint
 	stepper.AdvertiseAddress = metadata.Masters[0].NodeIPv4
 

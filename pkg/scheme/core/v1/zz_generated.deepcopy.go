@@ -439,6 +439,13 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.FeatureGates != nil {
+		in, out := &in.FeatureGates, &out.FeatureGates
+		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

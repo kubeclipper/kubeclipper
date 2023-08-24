@@ -149,6 +149,7 @@ func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, c *v1.Clu
 		ControlPlaneEndpoint:    cpEndpoint,
 		CertSANs:                c.GetAllCertSANs(),
 		LocalRegistry:           c.LocalRegistry,
+		FeatureGates:            c.FeatureGates,
 	}
 	stepper.Offline = metadata.Offline
 	stepper.Version = metadata.KubeVersion

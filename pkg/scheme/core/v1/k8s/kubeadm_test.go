@@ -52,6 +52,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 		ControlPlaneEndpoint    string
 		CertSANs                []string
 		LocalRegistry           string
+		FeatureGates            map[string]bool
 	}
 	tests := []struct {
 		name   string
@@ -104,6 +105,33 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				LocalRegistry:        "127.0.0.1:5000",
 			},
 		},
+		{
+			name: "add featureGates",
+			fields: fields{
+				ClusterConfigAPIVersion: "v1beta3",
+				ContainerRuntime:        "containerd",
+				Etcd:                    v1.Etcd{DataDir: "/var/lib/etcd"},
+				Networking: v1.Networking{
+					IPFamily:      v1.IPFamilyIPv4,
+					Services:      v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterServiceSubnet}},
+					Pods:          v1.NetworkRanges{CIDRBlocks: []string{constatns.ClusterPodSubnet}},
+					DNSDomain:     "cluster.local",
+					ProxyMode:     "ipvs",
+					WorkerNodeVip: "8.8.8.8",
+				},
+				KubeProxy:            v1.KubeProxy{},
+				Kubelet:              v1.Kubelet{RootDir: "/var/lib/kubelet", NodeIP: "127.0.0.1", IPAsName: true},
+				ClusterName:          "test-cluster",
+				KubernetesVersion:    "v1.23.6",
+				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
+				CertSANs:             []string{"127.0.0.1"},
+				LocalRegistry:        "127.0.0.1:5000",
+				FeatureGates: map[string]bool{
+					"AdmissionWebhookMatchConditions": true,
+					"AggregatedDiscoveryEndpoint":     true,
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,6 +147,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				ControlPlaneEndpoint:    tt.fields.ControlPlaneEndpoint,
 				CertSANs:                tt.fields.CertSANs,
 				LocalRegistry:           tt.fields.LocalRegistry,
+				FeatureGates:            tt.fields.FeatureGates,
 			}
 			w := &bytes.Buffer{}
 			err := stepper.renderTo(w)

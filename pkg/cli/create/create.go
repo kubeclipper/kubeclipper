@@ -78,6 +78,8 @@ masters:
 #        effect: NoSchedule
 workers: []
 certSans: []
+#featureGates:
+#  xxx: true
 cni:
   calico:
     IPManger: true

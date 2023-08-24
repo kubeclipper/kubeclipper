@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
@@ -135,6 +136,8 @@ type CreateClusterOptions struct {
 	ServiceSubnet             string
 	PodSubnet                 string
 	OnlyInstallKubernetesComp bool
+	FeatureGatesString        []string
+	FeatureGates              map[string]bool
 }
 
 var (
@@ -158,6 +161,7 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 		IPv4AutoDetection: autodetection.MethodFirst,
 		ServiceSubnet:     "10.96.0.0/12",
 		PodSubnet:         "172.25.0.0/16",
+		FeatureGates:      map[string]bool{},
 	}
 }
 
@@ -197,6 +201,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.ServiceSubnet, "service-subnet", o.ServiceSubnet, "serviceSubnet is the subnet used by Kubernetes Services. Defaults to '10.96.0.0/12'")
 	cmd.Flags().StringVar(&o.PodSubnet, "pod-subnet", o.PodSubnet, "podSubnet is the subnet used by Pods. Defaults to '172.25.0.0/16'")
 	cmd.Flags().BoolVar(&o.OnlyInstallKubernetesComp, "only-install-kubernetes-component", o.OnlyInstallKubernetesComp, "only install kubernetes component, not install cni")
+	cmd.Flags().StringSliceVar(&o.FeatureGatesString, "feature-gates", o.FeatureGatesString, "k8s feature gates, format as: --feature-gates=xxx=true|false")
 	o.CliOpts.AddFlags(cmd.Flags())
 	o.PrintFlags.AddFlags(cmd)
 
@@ -330,6 +335,23 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 		l.CaCertFile = base64.StdEncoding.EncodeToString(caCert)
 		l.CaKeyFile = base64.StdEncoding.EncodeToString(caKey)
 	}
+
+	for _, fg := range l.FeatureGatesString {
+		if strings.Contains(fg, "=") {
+			arr := strings.Split(fg, "=")
+			if len(arr) != 2 {
+				continue
+			}
+			k := strings.TrimSpace(arr[0])
+			v := strings.TrimSpace(arr[1])
+			boolValue, err := strconv.ParseBool(v)
+			if err != nil {
+				return fmt.Errorf("invalid value %v for feature-gate key: %s, use true|false instead", v, k)
+			}
+			l.FeatureGates[k] = boolValue
+		}
+	}
+
 	return nil
 }
 
@@ -432,6 +454,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 				MTU:               1440,
 			},
 		},
+		FeatureGates: l.FeatureGates,
 
 		Status: v1.ClusterStatus{},
 	}
