@@ -342,12 +342,10 @@ func (s *APIServer) migrateRole(operator iam.Operator) error {
 	if err != nil {
 		return err
 	}
-	if len(result.Items) > 0 {
-		return nil
-	}
+	roles := Roles.Diff(result)
 
-	for index := range Roles {
-		if _, err = operator.CreateRole(context.TODO(), &Roles[index]); err != nil {
+	for _, val := range roles {
+		if _, err := operator.CreateRole(context.TODO(), &val); err != nil {
 			return err
 		}
 	}
@@ -359,12 +357,10 @@ func (s *APIServer) migrateRoleBinding(operator iam.Operator) error {
 	if err != nil {
 		return err
 	}
-	if len(result.Items) > 0 {
-		return nil
-	}
+	roleBindings := RoleBindings.Diff(result)
 
-	for index := range RoleBindings {
-		if _, err := operator.CreateRoleBinding(context.TODO(), &RoleBindings[index]); err != nil {
+	for _, val := range roleBindings {
+		if _, err := operator.CreateRoleBinding(context.TODO(), &val); err != nil {
 			return err
 		}
 	}
@@ -376,20 +372,19 @@ func (s *APIServer) migrateUser(operator iam.Operator) error {
 	if err != nil {
 		return err
 	}
-	if len(result.Items) > 0 {
-		return nil
-	}
 
-	users := GetInternalUser(s.Config.AuthenticationOptions.InitialPassword)
-	for index := range users {
-		encPass, err := hashutil.EncryptPassword(users[index].Spec.EncryptedPassword)
+	userList := GetInternalUser(s.Config.AuthenticationOptions.InitialPassword)
+	users := userList.Diff(result)
+
+	for _, val := range users {
+		encPass, err := hashutil.EncryptPassword(val.Spec.EncryptedPassword)
 		if err != nil {
 			return err
 		}
-		users[index].Spec.EncryptedPassword = encPass
+		val.Spec.EncryptedPassword = encPass
 		state := v1.UserActive
-		users[index].Status.State = &state
-		if _, err := operator.CreateUser(context.TODO(), &users[index]); err != nil {
+		val.Status.State = &state
+		if _, err := operator.CreateUser(context.TODO(), &val); err != nil {
 			return err
 		}
 	}

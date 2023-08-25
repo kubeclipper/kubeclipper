@@ -249,7 +249,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		ginkgo.By("check whether the cluster registries is automatically removed after registries are deleted")
 		err = cluster.WaitForClusterCondition(f.Client, clu.Name, "delete cluster registries successful", f.Timeouts.CommonTimeout, func(clu *corev1.Cluster) (bool, error) {
 			return clu.Status.Registries == nil, nil
-		})
+		}, true)
 		framework.ExpectNoError(err)
 	})
 
@@ -306,7 +306,7 @@ var _ = SIGDescribe("[Serial]", func() {
 		ginkgo.By("check whether the cluster registries is automatically removed after registries are deleted")
 		err = cluster.WaitForClusterCondition(f.Client, clu.Name, "delete cluster registries successful", f.Timeouts.CommonTimeout, func(clu *corev1.Cluster) (bool, error) {
 			return clu.Status.Registries == nil, nil
-		})
+		}, true)
 		framework.ExpectNoError(err)
 	})
 

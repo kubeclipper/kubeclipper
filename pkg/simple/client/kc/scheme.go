@@ -289,3 +289,22 @@ func (n *TemplateList) TablePrint() ([]string, [][]string) {
 	}
 	return headers, data
 }
+
+var _ printer.ResourcePrinter = (*OperationList)(nil)
+
+type OperationList struct {
+	Items      []v1.Operation `json:"items" description:"paging data"`
+	TotalCount int            `json:"totalCount,omitempty" description:"total count"`
+}
+
+func (n *OperationList) YAMLPrint() ([]byte, error) {
+	panic("implement me")
+}
+
+func (n *OperationList) TablePrint() ([]string, [][]string) {
+	panic("implement me")
+}
+
+func (n *OperationList) JSONPrint() ([]byte, error) {
+	panic("implement me")
+}
