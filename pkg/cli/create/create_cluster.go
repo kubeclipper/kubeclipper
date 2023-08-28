@@ -412,7 +412,12 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	if l.OnlyInstallKubernetesComp {
 		annotations[common.AnnotationOnlyInstallKubernetesComp] = "true"
 	}
-
+	if l.ServiceSubnet == "" {
+		l.ServiceSubnet = constatns.ClusterServiceSubnet
+	}
+	if l.PodSubnet == "" {
+		l.PodSubnet = constatns.ClusterPodSubnet
+	}
 	c := &v1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
@@ -488,12 +493,6 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Labels: nil,
 			Taints: nil,
 		})
-	}
-	if l.ServiceSubnet == "" {
-		l.ServiceSubnet = constatns.ClusterServiceSubnet
-	}
-	if l.PodSubnet == "" {
-		l.PodSubnet = constatns.ClusterPodSubnet
 	}
 	c.Masters = masters
 	c.Workers = workers
