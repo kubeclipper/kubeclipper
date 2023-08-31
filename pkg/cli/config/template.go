@@ -52,13 +52,14 @@ const KcCaddyTmpl = `{
 	log {
 		output stdout
 	}
+	uri replace /apis/cluster/ /apis/cluster-proxy/
 	uri strip_prefix /apis
 	route {
 		@kc {
 			path /api/*
 			path /oauth/*
 			path /version
-			path /cluster/*
+			path /cluster-proxy/*
 		}
 		reverse_proxy @kc {
 			to {{.ServerUpstream}}

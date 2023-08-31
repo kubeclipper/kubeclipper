@@ -45,7 +45,7 @@ const (
 )
 
 const (
-	ProxyHandlerPrefix = "/cluster/"
+	ProxyHandlerPrefix = "/cluster-proxy/"
 )
 
 type handler struct {
