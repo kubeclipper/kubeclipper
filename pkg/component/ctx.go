@@ -97,6 +97,7 @@ func (l NodeList) ReachableNodes(protocol string, port int, timeout time.Duratio
 			defer wg.Done()
 			if netutil.Reachable(protocol, no.IPv4+":"+strconv.Itoa(port), timeout) == nil {
 				ch <- no
+				return
 			}
 		}(no)
 	}
