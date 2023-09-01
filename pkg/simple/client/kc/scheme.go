@@ -20,6 +20,7 @@ package kc
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
@@ -132,10 +133,21 @@ func (n *ClustersList) JSONPrint() ([]byte, error) {
 }
 
 func (n *ClustersList) TablePrint() ([]string, [][]string) {
-	headers := []string{"name", "create_timestamp"}
+	headers := []string{"name", "region", "master_count", "worker_count", "status", "apiserver_certs_expiration", "create_timestamp"}
 	var data [][]string
 	for _, cluster := range n.Items {
+		var ace string
+		for _, cert := range cluster.Status.Certifications {
+			if cert.Name == "apiserver" {
+				ace = cert.ExpirationTime.String()
+			}
+		}
 		data = append(data, []string{cluster.Name,
+			cluster.Labels[common.LabelTopologyRegion],
+			strconv.FormatInt(int64(len(cluster.Masters)), 10),
+			strconv.FormatInt(int64(len(cluster.Workers)), 10),
+			string(cluster.Status.Phase),
+			ace,
 			cluster.CreationTimestamp.String()})
 	}
 	return headers, data
