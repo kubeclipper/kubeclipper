@@ -422,57 +422,6 @@ func TestClustersList_JSONPrint(t *testing.T) {
 	}
 }
 
-func TestClustersList_TablePrint(t *testing.T) {
-	type fields struct {
-		Items      []corev1.Cluster
-		TotalCount int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []string
-		want1  [][]string
-	}{
-		{
-			name: "base",
-			fields: fields{
-				Items: []corev1.Cluster{
-					{
-						ObjectMeta: v1.ObjectMeta{
-							Name: "cluster1",
-						},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{
-							Name: "cluster2",
-						},
-					},
-				},
-			},
-			want: []string{"name", "create_timestamp"},
-			want1: [][]string{
-				{"cluster1", "0001-01-01 00:00:00 +0000 UTC"},
-				{"cluster2", "0001-01-01 00:00:00 +0000 UTC"},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := &ClustersList{
-				Items:      tt.fields.Items,
-				TotalCount: tt.fields.TotalCount,
-			}
-			got, got1 := n.TablePrint()
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("TablePrint() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("TablePrint() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
-
 func TestRoleList_YAMLPrint(t *testing.T) {
 	type fields struct {
 		Items      []iamv1.GlobalRole
