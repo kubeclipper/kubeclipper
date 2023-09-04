@@ -20,8 +20,12 @@ package options
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
+	"os"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -78,6 +82,14 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 		Addr: fmt.Sprintf("%s:%d", s.GenericServerRunOptions.BindAddress, s.GenericServerRunOptions.InsecurePort),
 	}
 	if s.GenericServerRunOptions.SecurePort != 0 {
+		pool := x509.NewCertPool()
+		caCertPath := s.Config.GenericServerRunOptions.CACertFile
+
+		caCrt, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, errors.WithMessagef(err, "read ca file %s failed", caCertPath)
+		}
+		pool.AppendCertsFromPEM(caCrt)
 		certificate, err := tls.LoadX509KeyPair(s.GenericServerRunOptions.TLSCertFile, s.GenericServerRunOptions.TLSPrivateKey)
 		if err != nil {
 			return nil, err
@@ -86,6 +98,8 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 		if httpSrv.TLSConfig == nil {
 			httpSrv.TLSConfig = new(tls.Config)
 		}
+		httpSrv.TLSConfig.ClientCAs = pool
+		httpSrv.TLSConfig.ClientAuth = tls.VerifyClientCertIfGiven
 		httpSrv.TLSConfig.Certificates = []tls.Certificate{certificate}
 		httpSrv.Addr = fmt.Sprintf("%s:%d", s.GenericServerRunOptions.BindAddress, s.GenericServerRunOptions.SecurePort)
 	}

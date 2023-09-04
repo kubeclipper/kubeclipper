@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"time"
 
+	authx509 "github.com/kubeclipper/kubeclipper/pkg/authentication/request/x509"
+
 	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -196,10 +198,23 @@ func (s *APIServer) buildHandlerChain(stopCh <-chan struct{}) error {
 		return err
 	}
 
+	opts, err := authx509.NewStaticVerifierFromFile(s.Config.GenericServerRunOptions.CACertFile)
+	if err != nil {
+		return err
+	}
+	x509auth := authx509.NewDynamic(opts, authx509.CommonNameUserConversion)
+
 	tokenAuthn := auth.NewTokenAuthenticator(iamOperator, tokenOperator)
 
-	s.container.Filter(filters.WithAuthentication(unionauth.New(authnPathAuthenticator, internaltoken.New(s.internalInformerUser, s.InternalInformerToken),
-		anonymous.NewAuthenticator(), bearertoken.New(tokenAuthn), wstoken.New(tokenAuthn))))
+	s.container.Filter(filters.WithAuthentication(
+		unionauth.New(
+			authnPathAuthenticator,
+			internaltoken.New(s.internalInformerUser, s.InternalInformerToken),
+			x509auth,
+			anonymous.NewAuthenticator(),
+			bearertoken.New(tokenAuthn),
+			wstoken.New(tokenAuthn)),
+	))
 
 	s.container.Filter(filters.WithAuthorization(s.rbacAuthorizer))
 

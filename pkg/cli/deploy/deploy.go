@@ -42,6 +42,9 @@ import (
 
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/homedir"
+
+	"github.com/kubeclipper/kubeclipper/pkg/authentication/user"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -478,6 +481,11 @@ func (d *DeployOptions) generateAndSendCerts() error {
 	cas := caList()
 	certs := make([]certutils.Config, 0)
 
+	kcctlCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
+	kcctlCommonNameUsages[options.AdminKcctlCert] = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+	kcctlCert := clientCertList(options.DefaultKcctlPKIPath, options.Ca, append(altNames, d.deployConfig.Agents.ListIP()...), []string{user.KCCTL}, kcctlCommonNameUsages)
+	certs = append(certs, kcctlCert...)
+
 	etcdCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
 	etcdCommonNameUsages[options.EtcdServer] = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
 	etcdCommonNameUsages[options.EtcdPeer] = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
@@ -546,6 +554,12 @@ func (d *DeployOptions) generateAndSendCerts() error {
 	if err := d.sendCertAndKey(cas, options.DefaultCaPath); err != nil {
 		return err
 	}
+	//if err := d.sendClientCertAndKey(cas, true); err != nil {
+	//	return err
+	//}
+	//if err := d.sendClientCertAndKey(kcctlCert, false); err != nil {
+	//	return err
+	//}
 
 	if err := d.sendCertAndKey(etcdCert, options.DefaultEtcdPKIPath); err != nil {
 		return err
@@ -888,45 +902,49 @@ func (d *DeployOptions) uploadConfig() {
 	}
 	host := fmt.Sprintf("%s://%s:%d", scheme, d.deployConfig.ServerIPs[0],
 		d.deployConfig.ServerPort)
-	// TODO use WithCAData insteadof WithInsecureSkipTLSVerify
-	c, err := kc.NewClientWithOpts(kc.WithEndpoint(host), kc.WithInsecureSkipTLSVerify())
-	if err != nil {
-		logger.Fatal(err)
-	}
-	resp, err := c.Login(context.TODO(), kc.LoginRequest{
-		Username: constatns.DefaultAdminUser,
-		Password: d.deployConfig.AuthenticationOpts.InitialPassword,
-	})
-	if err != nil {
-		logger.Fatal(err)
-	}
 	cfg := config.Config{
 		Servers: map[string]*config.Server{
-			"default": {
-				Server: host,
-				// TODO get ca insteadof InsecureSkipTLSVerify
-				InsecureSkipTLSVerify: true,
+			"default-cert": {
+				Server:               host,
+				TLSServerName:        options.KCServerAltName,
+				CertificateAuthority: path.Join(homedir.HomeDir(), options.DefaultPath, options.DefaultCaPath, options.Ca+".crt"),
 			},
 		},
 		AuthInfos: map[string]*config.AuthInfo{
-			constatns.DefaultAdminUser: {
-				Token: resp.AccessToken,
+			"kcctl-admin": {
+				ClientCertificate: path.Join(homedir.HomeDir(), options.DefaultPath, options.DefaultKcctlPKIPath, options.AdminKcctlCert+".crt"),
+				ClientKey:         path.Join(homedir.HomeDir(), options.DefaultPath, options.DefaultKcctlPKIPath, options.AdminKcctlCert+".key"),
 			},
 		},
-		CurrentContext: fmt.Sprintf("%s@default", constatns.DefaultAdminUser),
+		CurrentContext: fmt.Sprintf("%s@default-cert", "kcctl-admin"),
 		Contexts: map[string]*config.Context{
-			fmt.Sprintf("%s@default", constatns.DefaultAdminUser): {
-				AuthInfo: constatns.DefaultAdminUser,
-				Server:   "default",
+			fmt.Sprintf("%s@default-cert", "kcctl-admin"): {
+				AuthInfo: "kcctl-admin",
+				Server:   "default-cert",
 			},
 		},
 	}
-	c, err = kc.FromConfig(cfg)
+	c, err := kc.FromConfig(cfg)
 	if err != nil {
 		logger.Fatal(err)
 	}
 	uploadDeployConfig(c, d.deployConfig)
 	uploadCerts(c)
+	if err = cfg.Dump(); err != nil {
+		logger.Fatal(err)
+	}
+	if err = d.sendDefaultAdminConf(); err != nil {
+		logger.Fatal(err)
+	}
+}
+
+func (d *DeployOptions) sendDefaultAdminConf() error {
+	afterHook := fmt.Sprintf("mv %s %s/admin.conf", path.Join(options.DefaultKcServerConfigPath, options.DefaultConfig), options.DefaultKcServerConfigPath)
+	err := utils.SendPackage(d.deployConfig.SSHConfig,
+		options.DefaultConfigPath,
+		d.deployConfig.ServerIPs,
+		options.DefaultKcServerConfigPath, nil, &afterHook)
+	return err
 }
 
 func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
@@ -1117,6 +1135,42 @@ func certList(pki, caName string, altNames []string, commonNameUsage map[string]
 			CAName:       caName,
 			CommonName:   commonName,
 			Organization: []string{"kubeclipper.io"},
+			Year:         100,
+			AltNames:     alt,
+			Usages:       usages,
+		}
+		certConfig = append(certConfig, conf)
+	}
+	return certConfig
+}
+
+func clientCertList(pki, caName string, altNames, organization []string, commonNameUsage map[string][]x509.ExtKeyUsage) []certutils.Config {
+	certPath := filepath.Join(options.HomeDIR, options.DefaultPath, pki)
+	alt := certutils.AltNames{
+		DNSNames: map[string]string{
+			"localhost": "localhost",
+		},
+		IPs: map[string]net.IP{
+			"127.0.0.1":               net.IPv4(127, 0, 0, 1),
+			net.IPv6loopback.String(): net.IPv6loopback,
+		},
+	}
+	for _, altName := range altNames {
+		if ip := net.ParseIP(altName); ip != nil {
+			alt.IPs[ip.String()] = ip
+			continue
+		}
+		alt.DNSNames[altName] = altName
+	}
+	logger.V(2).Infof("client cert alt DNS : [%v], client cert alt IPs: [%v]", alt.DNSNames, alt.IPs)
+	certConfig := make([]certutils.Config, 0)
+	for commonName, usages := range commonNameUsage {
+		conf := certutils.Config{
+			Path:         certPath,
+			BaseName:     commonName,
+			CAName:       caName,
+			CommonName:   commonName,   // e.g. kcctl,parse as username
+			Organization: organization, // e.g. system:kcctl,parse as userGroup
 			Year:         100,
 			AltNames:     alt,
 			Usages:       usages,
