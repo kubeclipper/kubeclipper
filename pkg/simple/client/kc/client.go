@@ -47,12 +47,13 @@ type Client struct {
 	insecureSkipTLSVerify bool
 	tlsServerName         string
 	caPool                *x509.CertPool
+	cliCert               *tls.Certificate
 }
 
 func FromConfig(c config.Config) (*Client, error) {
 	ctx := c.Contexts[c.CurrentContext]
 	currentServer := c.Servers[ctx.Server]
-
+	currentAuthInfo := c.AuthInfos[ctx.AuthInfo]
 	var opts []Opt
 	opts = append(opts,
 		WithEndpoint(c.Servers[ctx.Server].Server),
@@ -72,6 +73,21 @@ func FromConfig(c config.Config) (*Client, error) {
 			return nil, err
 		}
 		opts = append(opts, WithCAData(caData))
+	}
+
+	switch {
+	case len(currentAuthInfo.ClientCertificateData) != 0 && len(currentAuthInfo.ClientKeyData) != 0:
+		opts = append(opts, WithCertData(currentAuthInfo.ClientCertificateData, currentAuthInfo.ClientKeyData))
+	case currentAuthInfo.ClientCertificate != "" && currentAuthInfo.ClientKey != "":
+		certData, err := os.ReadFile(currentAuthInfo.ClientCertificate)
+		if err != nil {
+			return nil, err
+		}
+		keyData, err := os.ReadFile(currentAuthInfo.ClientKey)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, WithCertData(certData, keyData))
 	}
 
 	cli, err := NewClientWithOpts(opts...)
@@ -101,7 +117,7 @@ func NewClientWithOpts(opts ...Opt) (*Client, error) {
 		}
 	}
 	// init tlsConfig
-	if c.insecureSkipTLSVerify || c.tlsServerName != "" || c.caPool != nil {
+	if c.insecureSkipTLSVerify || c.tlsServerName != "" || c.caPool != nil || c.cliCert != nil {
 		tr, err := c.httpTransport()
 		if err != nil {
 			return nil, err
@@ -118,7 +134,12 @@ func NewClientWithOpts(opts ...Opt) (*Client, error) {
 		if c.caPool != nil {
 			tr.TLSClientConfig.RootCAs = c.caPool
 		}
+
+		if c.cliCert != nil {
+			tr.TLSClientConfig.Certificates = []tls.Certificate{*c.cliCert}
+		}
 	}
+
 	if c.client == nil {
 		c.client = http.DefaultClient
 	}

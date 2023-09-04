@@ -20,16 +20,10 @@ package login
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
-
-	"sigs.k8s.io/yaml"
-
-	"k8s.io/client-go/util/homedir"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 
@@ -138,8 +132,14 @@ func (l *LoginOptions) RunLogin() error {
 	if err != nil {
 		return err
 	}
-
-	cfg := &config.Config{
+	cfg, err := config.TryLoadFromFile(options.DefaultConfigPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		cfg = config.New()
+	}
+	newCfg := &config.Config{
 		Servers: map[string]*config.Server{
 			"default": {
 				Server: l.Host,
@@ -161,26 +161,7 @@ func (l *LoginOptions) RunLogin() error {
 		},
 	}
 
-	cfgBytes, err := json.MarshalIndent(cfg, "", "\t")
-	if err != nil {
-		return err
-	}
-	cfgBytes, err = yaml.JSONToYAML(cfgBytes)
-	if err != nil {
-		return err
-	}
-	fpath := filepath.Join(homedir.HomeDir(), config.DefaultConfigPath)
+	cfg.Merge(newCfg)
 
-	if _, err := os.Stat(fpath); os.IsNotExist(err) {
-		if err := os.MkdirAll(fpath, os.ModeDir|0755); err != nil {
-			return err
-		}
-	}
-	f, err := os.Create(filepath.Join(fpath, "config"))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.Write(cfgBytes)
-	return err
+	return cfg.Dump()
 }

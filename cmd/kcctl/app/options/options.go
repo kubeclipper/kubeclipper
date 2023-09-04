@@ -68,6 +68,7 @@ const (
 	DefaultDeployConfig        = "deploy-config.yaml"
 	DefaultConfig              = "config"
 	DefaultCaPath              = "pki"
+	DefaultKcctlPKIPath        = "pki/kcctl"
 	DefaultEtcdPKIPath         = "pki/etcd"
 	DefaultNatsPKIPath         = "pki/nats"
 	DefaultKCPKIPath           = "pki/kc"
@@ -88,6 +89,8 @@ const (
 	KCServer         = "kc-server"
 	NatsAltNameProxy = "proxy.kubeclipper.io" // add nats server SAN for agent proxy
 	KCServerAltName  = "server.kubeclipper.io"
+
+	AdminKcctlCert = "admin"
 )
 
 const IPDetectDescription = `

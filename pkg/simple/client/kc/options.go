@@ -19,6 +19,7 @@
 package kc
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"net/http"
 	"net/url"
@@ -82,6 +83,17 @@ func WithCAData(ca []byte) Opt {
 		caPool := x509.NewCertPool()
 		caPool.AppendCertsFromPEM(ca)
 		client.caPool = caPool
+		return nil
+	}
+}
+
+func WithCertData(cert, key []byte) Opt {
+	return func(client *Client) error {
+		pair, err := tls.X509KeyPair(cert, key)
+		if err != nil {
+			return err
+		}
+		client.cliCert = &pair
 		return nil
 	}
 }

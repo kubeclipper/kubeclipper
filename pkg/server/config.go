@@ -1032,6 +1032,11 @@ var RoleBindings = GlobalRoleBindingList{
 			{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "User",
+				Name:     "system:kcctl",
+			},
+			{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "User",
 				Name:     "admin",
 			},
 		},
