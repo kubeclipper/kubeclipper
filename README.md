@@ -200,14 +200,6 @@ When deployed successfully, you can open a browser and visit `http://$IP ` to en
 
 When `kubeclipper` is deployed successfully, you can use the **kcctl** **tool** or **console** to create a  k8s cluster. In the quick start tutorial, we use the kcctl tool to create.
 
-First, log in with the default account and password to obtain the token, which is convenient for subsequent interaction between kcctl and kc-server.
-
-```bash
-# if your kc-server node ip is 192.168.234.3
-# you should replace 192.168.234.3 to your kc-server node ip
-kcctl login -H http://192.168.234.3:8080  -u admin -p Thinkbig1
-```
-
 Then create a k8s cluster with the following command:
 
 ```bash

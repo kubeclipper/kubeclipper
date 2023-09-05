@@ -5,7 +5,7 @@ name: sync-script
 on:
   push:
     branches:
-      - 'release*'
+      - 'master'
 
 # This ensures that previous jobs for the branch are canceled when the branch is updated.
 concurrency:
