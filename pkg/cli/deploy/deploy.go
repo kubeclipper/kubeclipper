@@ -97,23 +97,23 @@ const (
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg kc-minimal.tar.gz
 
   # Deploy env use remove http/https resource server
-  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.4.0/kc-amd64.tar.gz
 
   # Deploy env with many agent node in same region.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124  --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124  --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.4.0/kc-amd64.tar.gz
 
   # Deploy env with many agent node in different region.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/master/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.4.0/kc-amd64.tar.gz
 
   # Deploy env with many agent node which has orderly ip.
   # this will add 10 agent,1.1.1.1, 1.1.1.2, ... 1.1.1.10.
-  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.4.0/kc-amd64.tar.gz
   
   # Deploy env with many agent nodes and specify ip detect method for these nodes
-  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 --ip-detect=interface=eth0 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 --ip-detect=interface=eth0 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.4.0/kc-amd64.tar.gz
 
   # Deploy env with many agent nodes and specify node ip detect method for these nodes, used for routing between nodes in the kubernetes cluster
-  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 --node-ip-detect=interface=eth1 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.3.1/kc-amd64.tar.gz
+  kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 --node-ip-detect=interface=eth1 --pk-file ~/.ssh/id_rsa --pkg https://oss.kubeclipper.io/release/v1.4.0/kc-amd64.tar.gz
 
   # Deploy from config.
   kcctl deploy --deploy-config deploy-config.yaml
@@ -188,7 +188,7 @@ func (d *DeployOptions) Complete() error {
 			// v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
 			// TODO: inject branch when run go build
 			// hard code master
-			v = "master"
+			v = "v1.4.0"
 		}
 		d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, v, runtime.GOARCH)
 	}
