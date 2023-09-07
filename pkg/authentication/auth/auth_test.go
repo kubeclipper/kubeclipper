@@ -27,7 +27,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	authuser "k8s.io/apiserver/pkg/authentication/user"
 
 	iammock "github.com/kubeclipper/kubeclipper/pkg/models/iam/mock"
@@ -91,7 +90,7 @@ func Test_passwordAuthenticator_Authenticate(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    user.Info
+		want    authuser.Info
 		want1   string
 		wantErr bool
 	}{
