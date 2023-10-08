@@ -25,6 +25,8 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
 func IsFileExist(filepath string) (bool, error) {
@@ -57,7 +59,9 @@ func CmdToString(name string, arg ...string) (Result, error) {
 	}
 	ret.Stdout = bout.String()
 	ret.Stderr = berr.String()
-	return ret, nil
+
+	logger.V(5).Info(ret.Table())
+	return ret, ret.error()
 }
 
 func RunCmdAsSSH(cmdStr string) (Result, error) {
@@ -86,7 +90,8 @@ func RunCmdAsSSH(cmdStr string) (Result, error) {
 		ret.ExitCode = exitCode
 		return ret, nil
 	}
-	return ret, nil
+	logger.V(5).Info(ret.Table())
+	return ret, ret.error()
 }
 
 func Whoami() string {
