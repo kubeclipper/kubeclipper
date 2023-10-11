@@ -55,3 +55,11 @@ func TestSSHCmd(t *testing.T) {
 	}
 	assert.Equal(t, "54321", ret.StdoutToString(""))
 }
+
+func TestSSHTable(t *testing.T) {
+	ret, err := SSHCmdWithSudo(nil, "", "ls .")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(ret.Table())
+}
