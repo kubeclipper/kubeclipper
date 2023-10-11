@@ -71,6 +71,28 @@ const (
   Please read 'kcctl create cluster -h' get more create cluster flags.`
 )
 
+const CalicoNetModeDescription = `
+The following sections describe the available calico network modes.
+
+1. BGP
+Using the pod network in BGP mode, the pod network can be easily connected to the physical network with the best 
+performance. It is suitable for bare metal environments and network environments that support the BGP protocol.
+
+2. Overlay-IPIP-All
+A pod network in overlay mode using IP-in-IP technology, suitable for environments where all underlying platforms support IPIP.
+
+3. Overlay-IPIP-Cross-Subnet
+Use the overlay mode pod network of IP-in-IP technology when communicating on different network segments, host routing 
+when communicating on the same network segment, suitable for bare metal environments with complex network environments.
+
+4. Overlay-Vxlan-All
+The overlay mode pod network using vxlan technology is suitable for almost all platforms but the performance is reduced.
+
+5. Overlay-Vxlan-Cross-Subnet
+Use the overlay mode pod network of vxlan technology when communicating on different network segments, and host routing 
+when communicating on the same network segment, suitable for bare metal environments with complex network environments.
+`
+
 const IPDetectDescription = `
 When Calico is used for routing, each node must be configured with an IPv4 address and/or an IPv6 address that 
 will beused to route between nodes. To eliminate node specific IP address configuration, the calico/node container
@@ -132,6 +154,7 @@ type CreateClusterOptions struct {
 	CaCertFile                string
 	CaKeyFile                 string
 	DNSDomain                 string
+	CalicoNetMode             string
 	IPv4AutoDetection         string
 	ServiceSubnet             string
 	PodSubnet                 string
@@ -158,6 +181,7 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 		CNI:               "calico",
 		createdByIP:       false,
 		DNSDomain:         "cluster.local",
+		CalicoNetMode:     "Overlay-Vxlan-All",
 		IPv4AutoDetection: autodetection.MethodFirst,
 		ServiceSubnet:     "10.96.0.0/12",
 		PodSubnet:         "172.25.0.0/16",
@@ -198,6 +222,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
 	cmd.Flags().StringVar(&o.DNSDomain, "cluster-dns-domain", o.DNSDomain, "k8s cluster domain")
 	cmd.Flags().StringVar(&o.IPv4AutoDetection, "calico.ipv4-auto-detection", o.IPv4AutoDetection, fmt.Sprintf("node ipv4 auto detection. \n%s", IPDetectDescription))
+	cmd.Flags().StringVar(&o.CalicoNetMode, "calico.net-mode", o.CalicoNetMode, "calico network mode, support [BGP|Overlay-IPIP-All|Overlay-IPIP-Cross-Subnet|Overlay-Vxlan-All|Overlay-Vxlan-Cross-Subnet] now. \n"+CalicoNetModeDescription)
 	cmd.Flags().StringVar(&o.ServiceSubnet, "service-subnet", o.ServiceSubnet, "serviceSubnet is the subnet used by Kubernetes Services. Defaults to '10.96.0.0/12'")
 	cmd.Flags().StringVar(&o.PodSubnet, "pod-subnet", o.PodSubnet, "podSubnet is the subnet used by Pods. Defaults to '172.25.0.0/16'")
 	cmd.Flags().BoolVar(&o.OnlyInstallKubernetesComp, "only-install-kubernetes-component", o.OnlyInstallKubernetesComp, "only install kubernetes component, not install cni")
@@ -287,6 +312,11 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	}
 	if len(l.Masters)%2 == 0 {
 		return utils.UsageErrorf(cmd, "master node must be odd")
+	}
+	if l.CalicoNetMode != "" && !sliceutil.HasString([]string{
+		"BGP", "Overlay-IPIP-All", "Overlay-IPIP-Cross-Subnet", "Overlay-Vxlan-All", "Overlay-Vxlan-Cross-Subnet",
+	}, l.CalicoNetMode) {
+		return utils.UsageErrorf(cmd, "unsupported calico net mode, support [BGP|Overlay-IPIP-All|Overlay-IPIP-Cross-Subnet|Overlay-Vxlan-All|Overlay-Vxlan-Cross-Subnet] now")
 	}
 	if l.IPv4AutoDetection != "" && !autodetection.CheckCalicoMethod(l.IPv4AutoDetection) {
 		return utils.UsageErrorf(cmd, "unsupported ip detect method, support [first-found,interface=xxx,can-reach=xxx] now")
@@ -454,7 +484,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Calico: &v1.Calico{
 				IPv4AutoDetection: l.IPv4AutoDetection,
 				IPv6AutoDetection: "first-found",
-				Mode:              "Overlay-Vxlan-All",
+				Mode:              l.CalicoNetMode,
 				IPManger:          true,
 				MTU:               1440,
 			},
