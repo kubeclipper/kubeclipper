@@ -122,7 +122,13 @@ func IsHighKubeVersion(kubeVersion string) bool {
 
 func ParseNodeAddressDetection(nodeAddressDetection string) NodeAddressDetection {
 	// nodeAddressDetection first-found|can-reach=DESTINATION|interface=INTERFACE-REGEX|skip-interface=INTERFACE-REGEX
-	switch nodeAddressDetection {
+	detections := strings.Split(nodeAddressDetection, "=")
+	if len(detections) == 0 {
+		return NodeAddressDetection{
+			Type: "first-found",
+		}
+	}
+	switch detections[0] {
 	case "first-found":
 		return NodeAddressDetection{
 			Type: "first-found",
