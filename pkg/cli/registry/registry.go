@@ -60,6 +60,8 @@ const (
 	registryExample = `
   # Deploy docker registry
   kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz
+  # Deploy docker registry without image load
+  kcctl registry deploy --pk-file key --node 10.0.0.111 --pkg kc.tar.gz --skip-image-load
   # Clean docker registry
   kcctl registry clean --pk-file key --node 10.0.0.111
   # Push docker image to registry
@@ -134,10 +136,11 @@ type RegistryOptions struct {
 	DataRoot     string
 	RegistryPort int
 
-	Type   string
-	Name   string
-	Tag    string
-	Number int
+	Type          string
+	Name          string
+	Tag           string
+	Number        int
+	SkipImageLoad bool
 }
 
 var (
@@ -197,6 +200,7 @@ func NewCmdRegistryDeploy(o *RegistryOptions) *cobra.Command {
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "registry service and images pkg.")
 	cmd.Flags().StringVar(&o.DataRoot, "data-root", o.DataRoot, "set registry data root directory.")
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "set registry port")
+	cmd.Flags().BoolVar(&o.SkipImageLoad, "skip-image-load", o.SkipImageLoad, "set to skip image load,if set true will skip image load when deploy registry")
 
 	utils.CheckErr(cmd.MarkFlagRequired("node"))
 	utils.CheckErr(cmd.MarkFlagRequired("pkg"))
@@ -453,6 +457,7 @@ func (o *RegistryOptions) Install() error {
 	if err := o.deployRegistry(); err != nil {
 		return fmt.Errorf("deploy registry error: %s", err.Error())
 	}
+
 	// load images
 	if err := o.loadImages(); err != nil {
 		return fmt.Errorf("load images error: %s", err.Error())
@@ -676,6 +681,10 @@ func (o *RegistryOptions) processPackage() error {
 }
 
 func (o *RegistryOptions) loadImages() error {
+	if o.SkipImageLoad {
+		logger.Info("skip image load")
+		return nil
+	}
 	// TODO: for historical reasons and version stability, kcctl temporarily skips the load of the kc-extension image when deploying a private repository
 	// e.g. find /tmp/kc/resource -name images*.tar.gz ｜ grep -v kc-extension  | awk '{print}'
 

@@ -21,8 +21,13 @@ package sshutils
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/olekukonko/tablewriter"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -41,16 +46,43 @@ func (r Result) Short() string {
 	return fmt.Sprintf("(run `%s` on %s@%s)", r.PrintCmd, r.User, r.Host)
 }
 
+// Deprecated
+// need not use this method to check error,will automic check when command run.
 func (r Result) Error() error {
+	return r.error()
+}
+
+func (r Result) error() error {
 	if r.ExitCode == 0 {
 		return nil
 	}
-	return fmt.Errorf("%s err: %s", r.Short(), r.Stderr)
+	if r.Stderr != "" {
+		return fmt.Errorf("%s exitcode %v msg: %s", r.Short(), r.ExitCode, r.Stderr)
+	}
+	return fmt.Errorf("%s exitcode %v msg: %s", r.Short(), r.ExitCode, r.Stdout)
 }
 
+// Deprecated
+// use Table to replace
 func (r Result) String() string {
-	return fmt.Sprintf("(run `%s` on %s@%s) \nstdout: \n%s\nstderr: %s\nexitcode: %v\n", r.PrintCmd, r.User, r.Host,
-		r.Stdout, r.Stderr, r.ExitCode)
+	return r.Table()
+}
+
+// Table format as table
+func (r Result) Table() string {
+	buff := new(bytes.Buffer)
+
+	table := tablewriter.NewWriter(buff)
+	table.SetHeader([]string{"USER", "HOST", "COMMAND", "STDOUT", "STDERR", "EXIT CODE"})
+	data := [][]string{
+		{r.User, r.Host, r.PrintCmd, r.Stdout, r.Stderr, strconv.Itoa(r.ExitCode)},
+	}
+
+	for _, v := range data {
+		table.Append(v)
+	}
+	table.Render()
+	return "\n" + buff.String() + "\n"
 }
 
 func (r Result) StdoutToString(place string) string {
@@ -99,7 +131,13 @@ func SSHCmd(sshConfig *SSH, host, cmd string) (Result, error) {
 		Stderr:   stderr,
 		ExitCode: code,
 	}
-	return result, err
+	logger.V(5).Infof(result.Table())
+
+	if err != nil {
+		return result, err
+	}
+	// check exit code again when run cmd success
+	return result, result.error()
 }
 
 // runSSHCommand returns the stdout, stderr, and exit code from running cmd on
