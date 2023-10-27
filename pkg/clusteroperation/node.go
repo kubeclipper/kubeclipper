@@ -170,6 +170,14 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		}
 		op.Steps = append(op.Steps, steps...)
 
+		// k8s-extension
+		ext := k8s.Extension{}
+		steps, err = ext.InitStepper(cluster).InstallSteps(stepNodes)
+		if err != nil {
+			return nil, err
+		}
+		op.Steps = append(op.Steps, steps...)
+
 		// kubernetes
 		steps, err = p.getPackageSteps(cluster, action, stepNodes)
 		if err != nil {
@@ -198,6 +206,14 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 
 		// kubernetes
 		steps, err := p.getPackageSteps(cluster, action, stepNodes)
+		if err != nil {
+			return nil, err
+		}
+		op.Steps = append(op.Steps, steps...)
+
+		// k8s-extension
+		ext := k8s.Extension{}
+		steps, err = ext.InitStepper(cluster).UninstallSteps(stepNodes)
 		if err != nil {
 			return nil, err
 		}
