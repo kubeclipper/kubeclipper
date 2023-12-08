@@ -135,8 +135,12 @@ func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 
 	if err != nil {
 		logger.Error(err)
+		if options.AssumeYes {
+			logger.Infof("skip this error,continue exec cmd")
+			return true
+		}
 		logger.Errorf("===========>%s PRECHECK FAILED!", name)
-		if err == errorMultiNIC {
+		if errors.Is(err, errorMultiNIC) {
 			_, _ = streams.Out.Write([]byte("node has multi nic,and --ip-detect flag not specified,default ip " +
 				"detect method is 'first-found',which maybe chose a wrong one,you can add --ip-detect flag to specify it." + "\n"))
 		}
