@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/subosito/gotenv"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -270,28 +271,29 @@ type Metadata struct {
 }
 
 type DeployConfig struct {
-	Config             string                         `json:"-" yaml:"-"`
-	SSHConfig          *sshutils.SSH                  `json:"ssh" yaml:"ssh,omitempty"`
-	EtcdConfig         *Etcd                          `json:"etcd" yaml:"etcd,omitempty"`
-	ServerIPs          []string                       `json:"serverIPs" yaml:"serverIPs,omitempty"`
-	Agents             Agents                         `json:"agents" yaml:"agents,omitempty"`
-	Proxys             []string                       `json:"proxys" yaml:"proxys,omitempty"`
-	IPDetect           string                         `json:"ipDetect" yaml:"ipDetect,omitempty"`
-	NodeIPDetect       string                         `json:"nodeIPDetect" yaml:"nodeIPDetect,omitempty"`
-	Debug              bool                           `json:"debug" yaml:"debug,omitempty"`
-	DefaultRegion      string                         `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
-	ServerPort         int                            `json:"serverPort" yaml:"serverPort,omitempty"`
-	TLS                bool                           `json:"tls" yaml:"tls,omitempty"`
-	StaticServerPort   int                            `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
-	StaticServerPath   string                         `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
-	Pkg                string                         `json:"pkg" yaml:"pkg,omitempty"`
-	ConsolePort        int                            `json:"consolePort" yaml:"consolePort,omitempty"`
-	JWTSecret          string                         `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
-	AuditOpts          *option.AuditOptions           `json:"audit" yaml:"audit,omitempty"`
-	MQ                 *MQ                            `json:"mq" yaml:"mq,omitempty"`
-	OpLog              *OpLog                         `json:"opLog" yaml:"opLog,omitempty"`
-	ImageProxy         *ImageProxy                    `json:"imageProxy" yaml:"imageProxy,omitempty"`
-	AuthenticationOpts *options.AuthenticationOptions `json:"authentication" yaml:"authentication,omitempty"`
+	Config                     string                         `json:"-" yaml:"-"`
+	SSHConfig                  *sshutils.SSH                  `json:"ssh" yaml:"ssh,omitempty"`
+	EtcdConfig                 *Etcd                          `json:"etcd" yaml:"etcd,omitempty"`
+	ServerIPs                  []string                       `json:"serverIPs" yaml:"serverIPs,omitempty"`
+	Agents                     Agents                         `json:"agents" yaml:"agents,omitempty"`
+	Proxys                     []string                       `json:"proxys" yaml:"proxys,omitempty"`
+	IPDetect                   string                         `json:"ipDetect" yaml:"ipDetect,omitempty"`
+	NodeIPDetect               string                         `json:"nodeIPDetect" yaml:"nodeIPDetect,omitempty"`
+	Debug                      bool                           `json:"debug" yaml:"debug,omitempty"`
+	DefaultRegion              string                         `json:"defaultRegion" yaml:"defaultRegion,omitempty"`
+	ServerPort                 int                            `json:"serverPort" yaml:"serverPort,omitempty"`
+	TLS                        bool                           `json:"tls" yaml:"tls,omitempty"`
+	StaticServerPort           int                            `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
+	StaticServerPath           string                         `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
+	Pkg                        string                         `json:"pkg" yaml:"pkg,omitempty"`
+	ConsolePort                int                            `json:"consolePort" yaml:"consolePort,omitempty"`
+	JWTSecret                  string                         `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
+	AuditOpts                  *option.AuditOptions           `json:"audit" yaml:"audit,omitempty"`
+	MQ                         *MQ                            `json:"mq" yaml:"mq,omitempty"`
+	OpLog                      *OpLog                         `json:"opLog" yaml:"opLog,omitempty"`
+	ImageProxy                 *ImageProxy                    `json:"imageProxy" yaml:"imageProxy,omitempty"`
+	AuthenticationOpts         *options.AuthenticationOptions `json:"authentication" yaml:"authentication,omitempty"`
+	KCServerHealthCheckTimeout time.Duration                  `json:"kcServerHealthCheckTimeout" yaml:"kcServerHealthCheckTimeout,omitempty"`
 }
 
 type AgentRegions map[string][]string // key: region, value: ips
@@ -363,8 +365,9 @@ func NewDeployOptions() *DeployConfig {
 		ImageProxy: &ImageProxy{
 			KcImageRepoMirror: getRepoMirror(),
 		},
-		AuthenticationOpts: options.NewAuthenticateOptions(),
-		Agents:             make(Agents),
+		AuthenticationOpts:         options.NewAuthenticateOptions(),
+		Agents:                     make(Agents),
+		KCServerHealthCheckTimeout: time.Second * 30,
 	}
 }
 
@@ -486,6 +489,7 @@ func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.OpLog.Dir, "oplog-dir", c.OpLog.Dir, "kc agent operation log dir")
 	flags.IntVar(&c.OpLog.Threshold, "oplog-threshold", c.OpLog.Threshold, "kc agent operation log single threshold")
 	flags.StringVar(&c.ImageProxy.KcImageRepoMirror, "kc-image-repo-mirror", c.ImageProxy.KcImageRepoMirror, "K8s image repository mirror")
+	flags.DurationVar(&c.KCServerHealthCheckTimeout, "kc-server-health-check-timeout", c.KCServerHealthCheckTimeout, "kc server health check timeout, default is 30s")
 
 	AddFlagsToSSH(c.SSHConfig, flags)
 }
