@@ -1,0 +1,80 @@
+# 创建定时备份任务
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: add_repeat_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: CronBackup
+      metadata:
+        name: repeatCronbackups
+        labels: {}
+      spec:
+        clusterName: test
+        schedule: "26 10 * * *"
+        maxBackupNum: 1
+    response_json_paths:
+      $.spec.maxBackupNum: 1
+
+  - name: add_once_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: CronBackup
+      metadata:
+        name: onceCronbackups
+        labels: {}
+      spec:
+        clusterName: test
+        runAt: "2025-01-27T00:03:00+08:00"
+    response_json_paths:
+      $.kind: CronBackup
+
+  - name: add_timeout_once_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: CronBackup
+      metadata:
+        name: apitest-设置过时的一次定时备份
+        labels: {}
+      spec:
+        clusterName: test
+        runAt: "2023-01-02T00:03:00+08:00"
+    status: 400
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

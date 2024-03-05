@@ -1,0 +1,61 @@
+# 集群升级
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: cluster_upgrade
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/upgrade
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      offline: false
+      version: "v1.23.9"
+    status: 200
+
+  - name: check_cluster_status_is_Upgrading
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.status.phase: "Upgrading"
+
+  - name: check_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

@@ -1,0 +1,124 @@
+# 添加一个节点-移除一个节点-添加2个节点-移除2个节点-查看节点列表
+
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+  - &cluster_name "test"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_available_node
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: topology.kubeclipper.io/region=default,!kubeclipper.io/nodeRole
+      limit: -1
+      page: 1
+    status: 200
+
+  - name: add_one_node
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/nodes
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      nodes:
+        - id: $HISTORY['get_available_node'].$RESPONSE['$.items[0].metadata.name']
+          taints: []
+          labels: {}
+      operation: "add"
+      role: "worker"
+    response_json_paths:
+      $.status.phase: "Updating"
+
+  - name: check_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: check_add_node_sucessfully
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: kubeclipper.io/cluster=test
+      limit: 10
+      page: 1
+      reverse: false
+      silent: false
+    status: 200
+    response_json_paths:
+      $.totalCount: 2
+
+  - name: remove_one_worker_node
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/nodes
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      nodes:
+        - id: $HISTORY['get_available_node'].$RESPONSE['$.items[0].metadata.name']
+      operation: "remove"
+      role: "worker"
+    response_json_paths:
+      $.status.phase: "Updating"
+
+  - name: check_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: check_remove_node_sucessfully
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: kubeclipper.io/cluster=test
+      limit: 10
+    status: 200
+    response_json_paths:
+      $.totalCount: 1
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+ 

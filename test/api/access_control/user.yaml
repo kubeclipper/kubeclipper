@@ -1,0 +1,154 @@
+# 用户模块
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: add_user
+    url: /apis/api/iam.kubeclipper.io/v1/users
+    method: POST
+    data:
+      kind: User
+      apiVersion: iam.kubeclipper.io/v1
+      metadata: {
+        annotations: {iam.kubeclipper.io/role: "platform-view"},
+        name: "test"
+      }
+      spec: {
+        displayName: "test",
+        email: "test@99cloud.net",
+        password: "Thinkbig1",
+        phone: "18051226789"
+      }
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: list_user
+    url: /apis/api/iam.kubeclipper.io/v1/users
+    method: GET
+    query_parameters:
+      fuzzy: name~test
+      limit: 10
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: edit_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test
+    method: PUT
+    data:
+      kind: User
+      apiVersion: iam.kubeclipper.io/v1
+      metadata: {
+        annotations: {iam.kubeclipper.io/role: "platform-admin"},
+        name: "test",
+        resourceVersion: "$HISTORY['list_user'].$RESPONSE['$.items[0].metadata.resourceVersion']"
+      }
+      spec: {
+        displayName: "test",
+        email: "test@99cloud.net",
+        password: "Thinkbig1",
+        phone: "18051226789"
+      }
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: reset_password
+    url: /apis/api/iam.kubeclipper.io/v1/users/test/password
+    method: PUT
+    data:
+      newPassword: Thinkbig1!
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: describe_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test
+    method: GET
+    query_parameters:
+      name: test
+      resourceVersion: $HISTORY['list_user'].$RESPONSE['$.items[0].metadata.resourceVersion']
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: check_user
+    url: /apis/api/iam.kubeclipper.io/v1/users
+    method: HEAD
+    query_parameters:
+      fieldSelector: metadata.name=test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: disable_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test/disable
+    method: PUT
+    query_parameters:
+      name: test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: enable_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test/enable
+    method: PUT
+    query_parameters:
+      name: test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: record_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test/loginrecords
+    method: GET
+    query_parameters:
+      name: test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: role_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test/roles
+    method: GET
+    query_parameters:
+      name: test
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: delete_user
+    url: /apis/api/iam.kubeclipper.io/v1/users/test
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

@@ -1,0 +1,110 @@
+# 新建测试集群
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_test_node
+    url: apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: default-ip~172.20.139.223
+      limit: 10
+      page: 1
+    status: 200
+
+  - name: create_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      addons: []
+      apiVersion: "core.kubeclipper.io/v1"
+      certSANs: []
+      cni: 
+        calico: 
+          IPManger: true
+          IPv4AutoDetection: "first-found"
+          IPv6AutoDetection: ""
+          mode: "Overlay-Vxlan-All"
+          mtu: 1440
+        type: "calico"
+        version: "v3.22.4"
+      containerRuntime:
+        insecureRegistry: []
+        rootDir: "/var/lib/containerd"
+        type: "containerd"
+        version: "1.6.4"
+      etcd:
+        dataDir: "/var/lib/etcd"
+      kind: "Cluster"
+      kubeProxy: {}
+      kubelet: 
+        rootDir: "/var/lib/kubelet"
+      kubernetesVersion: "v1.23.6"
+      localRegistry: ""
+      masters: 
+        - id: $HISTORY['get_test_node'].$RESPONSE['$.items[0].metadata.name']
+          label: {}
+          taints: []
+      metadata:
+        annotations:
+          kubeclipper.io/offline: ""
+        labels:
+          topology.kubeclipper.io/region: "default"
+        name: test
+      networking:
+        dnsDomain: "cluster.local"
+        ipFamily: "ipvs"
+        pods: 
+          cidrBlocks: 
+            - "10.96.0.0/16"
+        proxyMode: "ipvs"
+        services: 
+          cidrBlocks:
+            - "172.25.0.0/24"
+        workerNodeVip: "169.254.169.100"
+      provider: 
+        name: "kubeadm"
+      workers: []
+
+  - name: check_cluster_status
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

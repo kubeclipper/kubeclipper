@@ -1,0 +1,86 @@
+# 编辑定时备份任务和查看定时备份任务列表
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: check_repeat_scheduled_backups_in_list
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      limit: -1
+      page: 1
+    response_json_paths:
+      $.items[?(@.metadata.name=='repeatCronbackups')].spec.maxBackupNum: 1
+
+  - name: check_cronbackups_according_to_name
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups/repeatCronbackups
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.metadata.name: repeatCronbackups
+
+  - name: edit_repeat_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups/repeatCronbackups
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: CronBackup
+      metadata:
+        name: repeatCronbackups
+        labels: {}
+      spec:
+        clusterName: test
+        schedule: "30 10 * * *"
+        maxBackupNum: 2
+    response_json_paths:
+      $.spec.maxBackupNum: 2
+      $.spec.schedule: "30 10 * * *"
+
+  - name: edit_once_scheduled_backups
+    url: /apis/api/core.kubeclipper.io/v1/cronbackups/onceCronbackups
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: CronBackup
+      metadata:
+        name: onceCronbackups
+        labels: {}
+      spec:
+        clusterName: test
+        runAt: "2026-01-27T00:03:00+08:00"
+    response_json_paths:
+      $.kind: CronBackup
+      $.spec.runAt: "2026-01-26T16:03:00Z"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

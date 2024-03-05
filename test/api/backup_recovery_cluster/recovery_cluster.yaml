@@ -1,0 +1,95 @@
+# 恢复集群
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_useBackupName
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/backups?limit=10
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: recovery_cluster_fs
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/recovery
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      useBackupName: $HISTORY['get_useBackupName'].$RESPONSE['$.items[?(@.backupPointName=='test-fs')].metadata.name']
+    status: 200
+
+  - name: check_cluster_status_is_Restoring
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.status.phase: "Restoring"
+
+  - name: check_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: recovery_cluster_s3
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test/recovery
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      useBackupName: $HISTORY['get_useBackupName'].$RESPONSE['$.items[?(@.backupPointName=='apitest-s3')].metadata.name']
+    status: 200
+
+  - name: check_cluster_status_is_Restoring
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    response_json_paths:
+      $.status.phase: "Restoring"
+
+  - name: check_cluster_status_is_running
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    poll:
+      count: 60
+      delay: 15
+    response_json_paths:
+      $.status.phase: "Running"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

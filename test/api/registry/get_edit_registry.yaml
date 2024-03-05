@@ -1,0 +1,61 @@
+# 修改镜像仓库
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_https_registry
+    url: /apis/api/core.kubeclipper.io/v1/registries
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: name~test-https
+    status: 200
+
+  - name: edit_https_registry
+    url: /apis/api/core.kubeclipper.io/v1/registries/test-https
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      kind: Registry
+      apiVersion: core.kubeclipper.io/v1
+      host: 172.16.29.140
+      metadata: {
+        annotations: {
+          kubeclipper.io/description: edit
+          },
+        name: test-https,
+        resourceVersion: "$HISTORY['get_https_registry'].$RESPONSE['$.items[0].metadata.resourceVersion']"
+      }
+      scheme: https
+      skipVerify: true
+    status: 200
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

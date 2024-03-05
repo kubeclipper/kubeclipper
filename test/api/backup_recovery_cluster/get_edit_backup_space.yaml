@@ -1,0 +1,94 @@
+# 编辑fs备份空间-在列表中搜索fs备份空间-编辑s3备份空间-在列表中搜索s3备份空间
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+  - &cluster_name "apitest_cluster_name"
+  - &backupspace_des "有效备份空间"
+  - &fs_backupRootDir "/tmp/nfs/data/e2e-test"
+  - &s3_endpoint "172.20.163.233:9000"
+  - &s3_username "admin"
+  - &s3_password "Aa123456"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: edit_fs_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints/test-fs
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      description: *backupspace_des
+      fsConfig:
+      storageType: "fs"
+    response_json_paths:
+      $.description: *backupspace_des
+
+  - name: search_fs_backup_space_in_list
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: name~test-fs
+      labelSelector: "!kubeclipper.io/role-template"
+      limit: -1
+      fieldSelector:
+      page: 1
+    response_json_paths:
+      $.items[0].description: *backupspace_des
+      $.totalCount: 1
+
+  - name: edit_s3_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints/apitest-s3
+    method: PUT
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      description: *backupspace_des
+      s3Config:
+        accessKeyID: *s3_username
+        accessKeySecret: *s3_password
+      storageType: "s3"
+    response_json_paths:
+      $.description: *backupspace_des
+
+  - name: search_s3_backup_space_in_list
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: name~apitest-s3
+      labelSelector: "!kubeclipper.io/role-template"
+      limit: -1
+      fieldSelector:
+      page: 1
+    response_json_paths:
+      $.items[0].description: *backupspace_des
+      $.totalCount: 1
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

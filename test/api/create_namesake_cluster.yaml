@@ -1,0 +1,95 @@
+# 创建同名集群，预期创建不成功
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: get_available_node
+    url: /apis/api/core.kubeclipper.io/v1/nodes
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      labelSelector: topology.kubeclipper.io/region=default,!kubeclipper.io/nodeRole
+      limit: -1
+      page: 1
+    status: 200
+
+  - name: creat_namesake_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      addons: []
+      apiVersion: "core.kubeclipper.io/v1"
+      certSANs: []
+      cni:
+        calico:
+          IPManger: true
+          IPv4AutoDetection: "first-found"
+          IPv6AutoDetection: ""
+          mode: "Overlay-Vxlan-All"
+          mtu: 1440
+        type: "calico"
+        version: "v3.22.4"
+      containerRuntime:
+        insecureRegistry: []
+        rootDir: "/var/lib/containerd"
+        type: "containerd"
+        version: "1.6.4"
+      etcd:
+        dataDir: "/var/lib/etcd"
+      kind: "Cluster"
+      kubeProxy: {}
+      kubelet:
+        rootDir: "/var/lib/kubelet"
+      kubernetesVersion: "v1.23.6"
+      localRegistry: ""
+      masters:
+        - id: $HISTORY['get_available_node'].$RESPONSE['$.items[0].metadata.name']
+          label: {}
+          taints: []
+      metadata:
+        annotations:
+          kubeclipper.io/offline: ""
+        labels:
+          topology.kubeclipper.io/region: "default"
+        name: test
+      networking:
+        dnsDomain: "cluster.local"
+        ipFamily: "ipvs"
+        pods:
+          cidrBlocks:
+            - "10.96.0.0/16"
+        proxyMode: "ipvs"
+        services:
+          cidrBlocks:
+            - "172.25.0.0/24"
+        workerNodeVip: "169.254.169.100"
+      provider:
+        name: "kubeadm"
+      workers: []
+    status: 400
+    response_strings:
+      - "already exists"

@@ -1,0 +1,55 @@
+# 删除测试集群
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username 'admin'
+  - &password 'Thinkbig1'
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+  
+  - name: delete_cluster
+    url: /apis/api/core.kubeclipper.io/v1/clusters/test
+    method: DELETE
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  - name: check_cluster_status
+    url: apis/api/core.kubeclipper.io/v1/nodes?kubeclipper.io/nodeRole!=master
+    method: GET
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    query_parameters:
+      fuzzy: default-ip~172.20.139.223
+      labelselector: kubeclipper.io/nodeRole!=master
+      limit: 10
+      page: 1
+    poll:
+      count: 60
+      delay: 10
+    response_json_paths:
+      $.items[0].status.addresses[0].address: "172.20.139.223"
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200

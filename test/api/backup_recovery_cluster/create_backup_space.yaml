@@ -1,0 +1,72 @@
+# 添加fs备份空间-添加s3备份空间
+fixtures:
+  - ConfigFixture
+  - SampleDataFixture
+
+defaults:
+  ssl: False
+  request_headers:
+    content-type: application/json
+    accept: application/json
+
+vars:
+  - &username "admin"
+  - &password "Thinkbig1"
+  - &cluster_name "apitest_cluster_name"
+  - &backupspace_des "有效备份空间"
+  - &fs_backupRootDir "/tmp/nfs/data/e2e-test"
+  - &s3_endpoint "172.20.150.138:9000"
+  - &s3_username "admin"
+  - &s3_password "Aa123456"
+
+tests:
+  - name: user_login
+    url: /apis/oauth/login
+    method: POST
+    data:
+      username: *username
+      password: *password
+    status: 200
+    response_json_paths:
+      $.token_type: Bearer
+
+  - name: add_fs_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      metadata:
+        name: test-fs
+      storageType: FS
+      fsConfig:
+        backupRootDir: *fs_backupRootDir
+    response_json_paths:
+      $.kind: BackupPoint
+
+  - name: add_s3_backup_space
+    url: /apis/api/core.kubeclipper.io/v1/backuppoints
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    data:
+      metadata:
+        name: apitest-s3
+      storageType: S3
+      s3Config:
+        bucket: kubeclipper
+        endpoint: *s3_endpoint
+        accessKeyID: *s3_username
+        accessKeySecret: *s3_password
+    response_json_paths:
+      $.kind: BackupPoint
+
+  - name: user_logout
+    url: /apis/oauth/logout
+    method: POST
+    request_headers:
+      Authorization: Bearer $HISTORY['user_login'].$RESPONSE['$.access_token']
+    status: 200
+
+  
+
