@@ -729,7 +729,7 @@ func (d *DeployOptions) deployKcServer() {
 		}
 
 		// wait kc-server start
-		ctx, cancel := context.WithTimeout(context.Background(), 21*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), d.deployConfig.KCServerHealthCheckTimeout)
 		defer cancel()
 		err = retryFunc(ctx, 3*time.Second, "waitServiceRunning", host, d.waitServerRunning)
 		if err != nil {
