@@ -15,7 +15,7 @@ jobs:
       GO111MODULE: on
     steps:
       - name: Set up Go 1.19
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: 1.19
         id: go
