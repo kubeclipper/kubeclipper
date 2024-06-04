@@ -27,7 +27,7 @@ require (
 	github.com/moby/ipvs v1.0.1
 	github.com/nats-io/nats-server/v2 v2.4.0
 	github.com/nats-io/nats.go v1.12.0
-	github.com/nicksnyder/go-i18n/v2 v2.2.0
+	github.com/nicksnyder/go-i18n/v2 v2.4.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.24.1
@@ -53,7 +53,7 @@ require (
 	golang.org/x/oauth2 v0.10.0
 	golang.org/x/sys v0.20.0
 	golang.org/x/term v0.20.0
-	golang.org/x/text v0.11.0
+	golang.org/x/text v0.14.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.26.4
