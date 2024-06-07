@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -433,8 +434,16 @@ func (stepper *KubeadmConfig) InitStepper(c *v1.Cluster, metadata *component.Ext
 	stepper.FeatureGates = c.FeatureGates
 	// TODO: No vip is currently introduced as controlPlaneEndpoint
 	stepper.AdvertiseAddress = metadata.Masters[0].NodeIPv4
+	stepper.IgnorePreflightErrors = parseIgnorePreflightErrors(c.Annotations[common.AnnotationOnlyIgnorePreflightErrors])
 
 	return stepper
+}
+
+func parseIgnorePreflightErrors(errStr string) []string {
+	if errStr == "" {
+		return nil
+	}
+	return strings.Split(errStr, ",")
 }
 
 func (stepper *KubeadmConfig) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
@@ -506,6 +515,7 @@ func (stepper *ControlPlane) InitStepper(c *v1.Cluster) *ControlPlane {
 	stepper.ContainerRuntime = c.ContainerRuntime.Type
 	stepper.ExternalCaCert = c.ExternalCaCert
 	stepper.ExternalCaKey = c.ExternalCaKey
+	stepper.IgnorePreflightErrors = c.Annotations[common.AnnotationOnlyIgnorePreflightErrors]
 
 	return stepper
 }

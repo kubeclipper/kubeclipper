@@ -137,30 +137,31 @@ IP6_AUTODETECTION_METHOD=can-reach=www.google.com`
 
 type CreateClusterOptions struct {
 	BaseOptions
-	Masters                   []string
-	Workers                   []string
-	UntaintMaster             bool
-	Offline                   bool
-	LocalRegistry             string
-	InsecureRegistries        []string
-	CRI                       string
-	CRIVersion                string
-	K8sVersion                string
-	CNI                       string
-	CNIVersion                string
-	Name                      string
-	createdByIP               bool
-	CertSans                  []string
-	CaCertFile                string
-	CaKeyFile                 string
-	DNSDomain                 string
-	CalicoNetMode             string
-	IPv4AutoDetection         string
-	ServiceSubnet             string
-	PodSubnet                 string
-	OnlyInstallKubernetesComp bool
-	FeatureGatesString        []string
-	FeatureGates              map[string]bool
+	Masters                          []string
+	Workers                          []string
+	UntaintMaster                    bool
+	Offline                          bool
+	LocalRegistry                    string
+	InsecureRegistries               []string
+	CRI                              string
+	CRIVersion                       string
+	K8sVersion                       string
+	CNI                              string
+	CNIVersion                       string
+	Name                             string
+	createdByIP                      bool
+	CertSans                         []string
+	CaCertFile                       string
+	CaKeyFile                        string
+	DNSDomain                        string
+	CalicoNetMode                    string
+	IPv4AutoDetection                string
+	ServiceSubnet                    string
+	PodSubnet                        string
+	KubeadmInitIgnorePreflightErrors string // kubeadm init --ignore-preflight-errors
+	OnlyInstallKubernetesComp        bool
+	FeatureGatesString               []string
+	FeatureGates                     map[string]bool
 }
 
 var (
@@ -225,6 +226,7 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.CalicoNetMode, "calico.net-mode", o.CalicoNetMode, "calico network mode, support [BGP|Overlay-IPIP-All|Overlay-IPIP-Cross-Subnet|Overlay-Vxlan-All|Overlay-Vxlan-Cross-Subnet] now. \n"+CalicoNetModeDescription)
 	cmd.Flags().StringVar(&o.ServiceSubnet, "service-subnet", o.ServiceSubnet, "serviceSubnet is the subnet used by Kubernetes Services. Defaults to '10.96.0.0/12'")
 	cmd.Flags().StringVar(&o.PodSubnet, "pod-subnet", o.PodSubnet, "podSubnet is the subnet used by Pods. Defaults to '172.25.0.0/16'")
+	cmd.Flags().StringVar(&o.KubeadmInitIgnorePreflightErrors, "kubeadm-init-ignore-preflight-errors", o.KubeadmInitIgnorePreflightErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.,kubeadm init --ignore-preflight-errors=xxx")
 	cmd.Flags().BoolVar(&o.OnlyInstallKubernetesComp, "only-install-kubernetes-component", o.OnlyInstallKubernetesComp, "only install kubernetes component, not install cni")
 	cmd.Flags().StringSliceVar(&o.FeatureGatesString, "feature-gates", o.FeatureGatesString, "k8s feature gates, format as: --feature-gates=xxx=true|false")
 	o.CliOpts.AddFlags(cmd.Flags())
@@ -442,6 +444,11 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	if l.OnlyInstallKubernetesComp {
 		annotations[common.AnnotationOnlyInstallKubernetesComp] = "true"
 	}
+
+	if l.KubeadmInitIgnorePreflightErrors != "" {
+		annotations[common.AnnotationOnlyIgnorePreflightErrors] = l.KubeadmInitIgnorePreflightErrors
+	}
+
 	if l.ServiceSubnet == "" {
 		l.ServiceSubnet = constatns.ClusterServiceSubnet
 	}

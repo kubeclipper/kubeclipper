@@ -53,6 +53,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 		CertSANs                []string
 		LocalRegistry           string
 		FeatureGates            map[string]bool
+		IgnorePreflightErrors   string
 	}
 	tests := []struct {
 		name   string
@@ -73,13 +74,14 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 					ProxyMode:     "ipvs",
 					WorkerNodeVip: "8.8.8.8",
 				},
-				KubeProxy:            v1.KubeProxy{},
-				Kubelet:              v1.Kubelet{RootDir: "/var/lib/kubelet"},
-				ClusterName:          "test-cluster",
-				KubernetesVersion:    "v1.23.6",
-				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
-				CertSANs:             []string{"127.0.0.1"},
-				LocalRegistry:        "127.0.0.1:5000",
+				KubeProxy:             v1.KubeProxy{},
+				Kubelet:               v1.Kubelet{RootDir: "/var/lib/kubelet"},
+				ClusterName:           "test-cluster",
+				KubernetesVersion:     "v1.23.6",
+				ControlPlaneEndpoint:  "apiserver.cluster.local:6443",
+				CertSANs:              []string{"127.0.0.1"},
+				LocalRegistry:         "127.0.0.1:5000",
+				IgnorePreflightErrors: "",
 			},
 		},
 		{
@@ -96,13 +98,14 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 					ProxyMode:     "ipvs",
 					WorkerNodeVip: "8.8.8.8",
 				},
-				KubeProxy:            v1.KubeProxy{},
-				Kubelet:              v1.Kubelet{RootDir: "/var/lib/kubelet", NodeIP: "127.0.0.1", IPAsName: true},
-				ClusterName:          "test-cluster",
-				KubernetesVersion:    "v1.23.6",
-				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
-				CertSANs:             []string{"127.0.0.1"},
-				LocalRegistry:        "127.0.0.1:5000",
+				KubeProxy:             v1.KubeProxy{},
+				Kubelet:               v1.Kubelet{RootDir: "/var/lib/kubelet", NodeIP: "127.0.0.1", IPAsName: true},
+				ClusterName:           "test-cluster",
+				KubernetesVersion:     "v1.23.6",
+				ControlPlaneEndpoint:  "apiserver.cluster.local:6443",
+				CertSANs:              []string{"127.0.0.1"},
+				LocalRegistry:         "127.0.0.1:5000",
+				IgnorePreflightErrors: "NumCPU",
 			},
 		},
 		{
@@ -130,6 +133,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 					"AdmissionWebhookMatchConditions": true,
 					"AggregatedDiscoveryEndpoint":     true,
 				},
+				IgnorePreflightErrors: "NumCPU,Swap",
 			},
 		},
 	}
@@ -148,7 +152,9 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				CertSANs:                tt.fields.CertSANs,
 				LocalRegistry:           tt.fields.LocalRegistry,
 				FeatureGates:            tt.fields.FeatureGates,
+				IgnorePreflightErrors:   parseIgnorePreflightErrors(tt.fields.IgnorePreflightErrors),
 			}
+			t.Logf("IgnorePreflightErrors %v,len %v", stepper.IgnorePreflightErrors, len(stepper.IgnorePreflightErrors))
 			w := &bytes.Buffer{}
 			err := stepper.renderTo(w)
 			if err != nil {

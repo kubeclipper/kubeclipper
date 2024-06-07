@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+
 	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
@@ -150,6 +152,7 @@ func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, c *v1.Clu
 		CertSANs:                c.GetAllCertSANs(),
 		LocalRegistry:           c.LocalRegistry,
 		FeatureGates:            c.FeatureGates,
+		IgnorePreflightErrors:   parseIgnorePreflightErrors(c.Annotations[common.AnnotationOnlyIgnorePreflightErrors]),
 	}
 	stepper.Offline = metadata.Offline
 	stepper.Version = metadata.KubeVersion

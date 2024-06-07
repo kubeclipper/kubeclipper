@@ -100,6 +100,10 @@ nodeRegistration:
 {{- if .Kubelet.IPAsName }}
   name: "{{.Kubelet.NodeIP}}"
 {{- end}}
+{{if gt (len .IgnorePreflightErrors) 0}}
+  ignorePreflightErrors:{{range .IgnorePreflightErrors}}
+    - {{.}}{{end}}
+{{- end}}
 {{- if eq .ContainerRuntime  "containerd"}}
   criSocket: /run/containerd/containerd.sock
 {{end}}
