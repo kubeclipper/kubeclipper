@@ -105,32 +105,34 @@ type KubeadmConfig struct {
 	ClusterConfigAPIVersion string `json:"clusterConfigAPIVersion"`
 	// If both Docker and containerd are detected, Docker takes precedence,so we must specify cri.
 	// https://v1-20.docs.kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#installing-runtime
-	ContainerRuntime     string          `json:"containerRuntime"`
-	Etcd                 v1.Etcd         `json:"etcd"`
-	Networking           v1.Networking   `json:"networking"`
-	KubeProxy            v1.KubeProxy    `json:"kubeProxy"`
-	Kubelet              v1.Kubelet      `json:"kubelet"`
-	ClusterName          string          `json:"clusterName"`
-	KubernetesVersion    string          `json:"kubernetesVersion"`
-	ControlPlaneEndpoint string          `json:"controlPlaneEndpoint"`
-	CertSANs             []string        `json:"certSANs"`
-	LocalRegistry        string          `json:"localRegistry"`
-	Offline              bool            `json:"offline"`
-	IsControlPlane       bool            `json:"isControlPlane,omitempty"`
-	CACertHashes         string          `json:"caCertHashes,omitempty"`
-	BootstrapToken       string          `json:"bootstrapToken,omitempty"`
-	CertificateKey       string          `json:"certificateKey,omitempty"`
-	AdvertiseAddress     string          `json:"advertiseAddress,omitempty"`
-	FeatureGates         map[string]bool `json:"featureGates,omitempty"`
+	ContainerRuntime      string          `json:"containerRuntime"`
+	Etcd                  v1.Etcd         `json:"etcd"`
+	Networking            v1.Networking   `json:"networking"`
+	KubeProxy             v1.KubeProxy    `json:"kubeProxy"`
+	Kubelet               v1.Kubelet      `json:"kubelet"`
+	ClusterName           string          `json:"clusterName"`
+	KubernetesVersion     string          `json:"kubernetesVersion"`
+	ControlPlaneEndpoint  string          `json:"controlPlaneEndpoint"`
+	CertSANs              []string        `json:"certSANs"`
+	LocalRegistry         string          `json:"localRegistry"`
+	Offline               bool            `json:"offline"`
+	IsControlPlane        bool            `json:"isControlPlane,omitempty"`
+	CACertHashes          string          `json:"caCertHashes,omitempty"`
+	BootstrapToken        string          `json:"bootstrapToken,omitempty"`
+	CertificateKey        string          `json:"certificateKey,omitempty"`
+	AdvertiseAddress      string          `json:"advertiseAddress,omitempty"`
+	FeatureGates          map[string]bool `json:"featureGates,omitempty"`
+	IgnorePreflightErrors []string        `json:"ignorePreflightErrors,omitempty"`
 }
 
 type ControlPlane struct {
 	// KubeConfig file
-	APIServerDomainName string
-	EtcdDataPath        string
-	ContainerRuntime    string
-	ExternalCaCert      string
-	ExternalCaKey       string
+	APIServerDomainName   string
+	EtcdDataPath          string
+	ContainerRuntime      string
+	ExternalCaCert        string
+	ExternalCaKey         string
+	IgnorePreflightErrors string
 }
 
 type ClusterNode struct {

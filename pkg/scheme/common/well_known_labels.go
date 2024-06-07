@@ -71,6 +71,8 @@ const (
 
 	// AnnotationOnlyInstallKubernetesComp mean not install cni when create cluster
 	AnnotationOnlyInstallKubernetesComp = "kubeclipper.io/only-install-kubernetes-component"
+	// AnnotationOnlyIgnorePreflightErrors specify kubeadm init --ignore-preflight-errors
+	AnnotationOnlyIgnorePreflightErrors = "kubeclipper.io/ignore-preflight-errors"
 )
 
 type NodeRole string // master/worker/ingress(worker)
