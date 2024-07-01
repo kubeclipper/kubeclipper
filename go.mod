@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/containerd/containerd v1.6.19
 	github.com/coreos/go-oidc/v3 v3.6.0
-	github.com/dlclark/regexp2 v1.10.0
+	github.com/dlclark/regexp2 v1.11.0
 	github.com/emicklei/go-restful v2.9.6+incompatible
 	github.com/emicklei/go-restful-openapi v0.0.0-00010101000000-000000000000
 	github.com/evanphx/json-patch v4.12.0+incompatible
