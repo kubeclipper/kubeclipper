@@ -24,7 +24,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/minio/minio-go/v7 v7.0.61
 	github.com/mitchellh/mapstructure v1.4.1
-	github.com/moby/ipvs v1.0.1
+	github.com/moby/ipvs v1.1.0
 	github.com/nats-io/nats-server/v2 v2.4.0
 	github.com/nats-io/nats.go v1.12.0
 	github.com/nicksnyder/go-i18n/v2 v2.2.0
@@ -187,7 +187,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
 	github.com/vbatts/tar-split v0.11.3 // indirect
-	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
+	github.com/vishvananda/netns v0.0.2 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/yashtewari/glob-intersection v0.2.0 // indirect
