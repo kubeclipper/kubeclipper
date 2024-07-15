@@ -3,7 +3,7 @@ module github.com/kubeclipper/kubeclipper
 go 1.20
 
 require (
-	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/containerd/containerd v1.6.19
 	github.com/coreos/go-oidc/v3 v3.6.0
 	github.com/dlclark/regexp2 v1.11.2
@@ -68,7 +68,7 @@ require (
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/Microsoft/hcsshim v0.9.7 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
@@ -131,7 +131,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/huandu/xstrings v1.3.1 // indirect
+	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
