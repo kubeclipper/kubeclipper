@@ -26,7 +26,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	"io"
+	"k8s.io/component-base/version"
 	"math"
 	"net"
 	"net/http"
@@ -184,11 +186,12 @@ func (d *DeployOptions) Complete() error {
 	}
 	if d.deployConfig.Pkg == "" {
 		v := os.Getenv("KC_VERSION")
+		var ok bool
 		if v == "" {
-			// v, _ = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
-			// TODO: inject branch when run go build
-			// hard code master
-			v = "v1.4.0"
+			v, ok = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
+			if !ok {
+				v = "v1.4.1"
+			}
 		}
 		d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, v, runtime.GOARCH)
 	}
