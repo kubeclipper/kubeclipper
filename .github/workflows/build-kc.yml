@@ -32,10 +32,21 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Get branch name
+      - name: Get tag or branch
         id: extract_branch
         shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+          branch=${GITHUB_REF#refs/heads/}
+          if [[ "$branch" == "master" || "$branch" == "main" ]]; then
+            ref_name=$branch
+          elif [[ -n "$latest_tag" ]]; then
+            ref_name=$latest_tag
+          else
+            ref_name=$branch
+          fi
+          echo "The ref name is $ref_name"
+          echo "##[set-output name=branch;]${ref_name}"
 
       - name: Build
         if: github.event_name == 'push'
