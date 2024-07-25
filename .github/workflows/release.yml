@@ -30,9 +30,21 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Extract Tag
-        id: extract_tag
-        run:  echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+      - name: Get tag or branch
+        id: extract_branch
+        shell: bash
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+          branch=${GITHUB_REF#refs/heads/}
+          if [[ "$branch" == "master" || "$branch" == "main" ]]; then
+            ref_name=$branch
+          elif [[ -n "$latest_tag" ]]; then
+            ref_name=$latest_tag
+          else
+            ref_name=$branch
+          fi
+          echo "The ref name is $ref_name"
+          echo "##[set-output name=branch;]${ref_name}"
 
       - name: Build
         if: github.event_name == 'push'
@@ -56,10 +68,10 @@ jobs:
           #sts-token: "sts_token"
       - name: Upload to oss
         run: |
-          ossutil cp -rf dist/kc-linux-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
-          ossutil cp -rf dist/kc-linux-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
-          ossutil cp -rf dist/kc-darwin-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
-          ossutil cp -rf dist/kc-darwin-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_tag.outputs.version }}/
+          ossutil cp -rf dist/kc-linux-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.version }}/
+          ossutil cp -rf dist/kc-linux-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.version }}/
+          ossutil cp -rf dist/kc-darwin-amd64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.version }}/
+          ossutil cp -rf dist/kc-darwin-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.version }}/
 
       - name: Release
         uses: softprops/action-gh-release@v2
