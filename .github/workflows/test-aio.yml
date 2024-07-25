@@ -24,10 +24,18 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Get branch name
+      - name: Get tag or branch
         id: extract_branch
         shell: bash
-        run: echo "##[set-output name=branch;]$(echo ${GITHUB_BASE_REF})"
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null)
+          if [[ -n "$latest_tag" ]]; then
+           branch=$latest_tag
+          else
+            branch=${GITHUB_REF#refs/heads/}
+          fi
+          echo "tag or branch is $branch"
+          echo "##[set-output name=branch;]${branch}"
       - name: Build
         if: github.event_name == 'pull_request'
         run:
