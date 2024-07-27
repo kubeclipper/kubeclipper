@@ -296,9 +296,9 @@ func (dl *Downloader) getManifestElements(prefix string) (manifest []ManifestEle
 		return
 	}
 	if err = json.Unmarshal(data, &manifest); err != nil {
+		logger.Debugf("unmarshal [%s] file contents failed: %v", filePath, err)
 		return
 	}
-	logger.Debugf("unmarshal [%s] file contents failed: %v", filePath, err)
 	return
 }
 
