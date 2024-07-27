@@ -91,7 +91,8 @@ func RunCmdWithContext(ctx context.Context, dryRun bool, command string, args ..
 	//	}
 	//}()
 	if err = ec.Run(); err != nil {
-		logger.Error("run command failed: "+err.Error(), zap.String("cmd", ec.String()))
+		// e.g. run command failed(exit status 1): ${raw_std_error}
+		logger.Errorf("run command failed(%v): %s", err, ec.StdErr(), zap.String("cmd", ec.String()))
 		return ec, err
 	}
 	return ec, nil
