@@ -70,14 +70,7 @@ func (ec *ExecCmd) Run() error {
 		return errors.New("exec: already started")
 	}
 	ec.Cmd.Env = os.Environ()
-	if err := ec.Cmd.Run(); err != nil {
-		// errs = append(errs, err)
-		// command runs and exits with a non-zero exit status
-		// put it into stderr
-		_, _ = ec.stdErrBuf.WriteString(err.Error())
-		return err
-	}
-	return nil
+	return ec.Cmd.Run()
 }
 
 // Marshal merges stdout & stderr and returns bytes slice
