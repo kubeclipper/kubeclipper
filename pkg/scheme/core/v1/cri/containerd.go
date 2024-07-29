@@ -39,6 +39,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/cgroups"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
@@ -143,15 +144,10 @@ func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.O
 	if _, err = instance.DownloadAndUnpackConfigs(); err != nil {
 		return nil, err
 	}
-	runnable.EnableSystemdCgroup = "false"
-	// check whether cgroup2 is used as the cgroup driver, if is it, enable containerd systemd cgroup
-	res, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "cat /proc/self/mountinfo")
-	if err != nil {
-		return nil, err
-	}
-	if strings.Contains(res.StdOut(), "cgroup2") {
-		runnable.EnableSystemdCgroup = "true"
-	}
+	// When systemd is the init system of Linux,
+	// it generates and consumes a root cgroup and acts as a cgroup manager.
+	runnable.EnableSystemdCgroup = strconv.FormatBool(cgroups.IsRunningSystemd())
+
 	// generate containerd daemon config file
 	if err = runnable.setupContainerdConfig(ctx, opts.DryRun); err != nil {
 		return nil, err
