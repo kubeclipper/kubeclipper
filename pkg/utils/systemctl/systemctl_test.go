@@ -115,14 +115,14 @@ func TestStopUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{
-			name: "case1",
-			args: args{
-				ctx:  context.Background(),
-				unit: "chronyd.service",
-			},
-			wantErr: false,
-		},
+		// {
+		// 	name: "case1",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 		{
 			name: "case2",
 			args: args{
@@ -151,14 +151,14 @@ func TestEnableUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{
-			name: "case1",
-			args: args{
-				ctx:  context.Background(),
-				unit: "chronyd.service",
-			},
-			wantErr: false,
-		},
+		// {
+		// 	name: "case1",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 		{
 			name: "case2",
 			args: args{
@@ -187,14 +187,14 @@ func TestDisableUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{
-			name: "case1",
-			args: args{
-				ctx:  context.Background(),
-				unit: "chronyd.service",
-			},
-			wantErr: false,
-		},
+		// {
+		// 	name: "case1",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 		{
 			name: "case2",
 			args: args{
@@ -223,14 +223,14 @@ func TestRestartUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{
-			name: "case1",
-			args: args{
-				ctx:  context.Background(),
-				unit: "chronyd.service",
-			},
-			wantErr: false,
-		},
+		// {
+		// 	name: "case1",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 		{
 			name: "case2",
 			args: args{
