@@ -174,7 +174,27 @@ func StopUnit(ctx context.Context, name string) error {
 		return fmt.Errorf("failed to stop unit %s: %w", name, err)
 	}
 	if result := <-res; result != "done" {
-		return fmt.Errorf("failed to start unit %s: %s", name, result)
+		return fmt.Errorf("failed to stop unit %s: %s", name, result)
+	}
+
+	return nil
+}
+
+// ReloadUnit reloads a unit.
+// equivalent to `systemctl reload <unit-name>`
+func ReloadUnit(ctx context.Context, name string) error {
+	conn, err := dbus.NewWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to connect dbus: %w", err)
+	}
+	defer conn.Close()
+
+	res := make(chan string)
+	if _, err := conn.ReloadUnitContext(ctx, name, defaultJobMode, res); err != nil {
+		return fmt.Errorf("failed to reload unit %s: %w", name, err)
+	}
+	if result := <-res; result != "done" {
+		return fmt.Errorf("failed to reload unit %s: %s", name, result)
 	}
 
 	return nil

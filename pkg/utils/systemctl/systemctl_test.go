@@ -115,22 +115,22 @@ func TestStopUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// {
-		// 	name: "case1",
-		// 	args: args{
-		// 		ctx:  context.Background(),
-		// 		unit: "sshd.service",
-		// 	},
-		// 	wantErr: false,
-		// },
 		{
-			name: "case2",
+			name: "case1",
 			args: args{
 				ctx:  context.Background(),
 				unit: "systemd-journald",
 			},
 			wantErr: false,
 		},
+		// {
+		// 	name: "case2",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -151,22 +151,22 @@ func TestEnableUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// {
-		// 	name: "case1",
-		// 	args: args{
-		// 		ctx:  context.Background(),
-		// 		unit: "sshd.service",
-		// 	},
-		// 	wantErr: false,
-		// },
 		{
-			name: "case2",
+			name: "case1",
 			args: args{
 				ctx:  context.Background(),
 				unit: "foo",
 			},
 			wantErr: true,
 		},
+		// {
+		// 	name: "case2",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -187,22 +187,22 @@ func TestDisableUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// {
-		// 	name: "case1",
-		// 	args: args{
-		// 		ctx:  context.Background(),
-		// 		unit: "sshd.service",
-		// 	},
-		// 	wantErr: false,
-		// },
 		{
-			name: "case2",
+			name: "case1",
 			args: args{
 				ctx:  context.Background(),
 				unit: "foo",
 			},
 			wantErr: false,
 		},
+		// {
+		// 	name: "case2",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -223,27 +223,71 @@ func TestRestartUnit(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// {
-		// 	name: "case1",
-		// 	args: args{
-		// 		ctx:  context.Background(),
-		// 		unit: "sshd.service",
-		// 	},
-		// 	wantErr: false,
-		// },
 		{
-			name: "case2",
+			name: "case1",
 			args: args{
 				ctx:  context.Background(),
 				unit: "foo",
 			},
 			wantErr: true,
 		},
+		// {
+		// 	name: "case2",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := RestartUnit(tt.args.ctx, tt.args.unit); (err != nil) != tt.wantErr {
 				t.Errorf("RestartUnit() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestReloadUnit(t *testing.T) {
+	type args struct {
+		ctx  context.Context
+		unit string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "case1",
+			args: args{
+				ctx:  context.Background(),
+				unit: "foo",
+			},
+			wantErr: true,
+		},
+		{
+			name: "case2",
+			args: args{
+				ctx:  context.Background(),
+				unit: "chronyd.service",
+			},
+			wantErr: true,
+		},
+		// {
+		// 	name: "case3",
+		// 	args: args{
+		// 		ctx:  context.Background(),
+		// 		unit: "sshd.service",
+		// 	},
+		// 	wantErr: false,
+		// },
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ReloadUnit(tt.args.ctx, tt.args.unit); (err != nil) != tt.wantErr {
+				t.Errorf("ReloadUnit() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
