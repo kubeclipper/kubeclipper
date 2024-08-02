@@ -45,6 +45,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/ipvsutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/systemctl"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
 )
 
@@ -80,6 +81,10 @@ func init() {
 		panic(err)
 	}
 }
+
+const (
+	kubeletSystemdUnitName = "kubelet.service"
+)
 
 var (
 	_ component.StepRunnable   = (*Package)(nil)
@@ -199,9 +204,8 @@ func (stepper *Package) Install(ctx context.Context, opts component.Options) ([]
 }
 
 func (stepper *Package) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	if err := stepper.disableKubeletService(ctx, opts.DryRun); err != nil {
-		return nil, err
-	}
+	stepper.disableKubeletService(ctx, opts.DryRun)
+
 	// remove related binary configuration files
 	instance, err := downloader.NewInstance(ctx, K8s, stepper.Version, runtime.GOARCH, !stepper.Offline, opts.DryRun)
 	if err != nil {
@@ -223,6 +227,10 @@ func (stepper *Package) Uninstall(ctx context.Context, opts component.Options) (
 	if _, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "rm", "-rf", stepper.KubeletDir); err != nil {
 		logger.Warn("clean kubelet dir failed", zap.Error(err))
 	}
+	// reload systemd daemon
+	if err = systemctl.ReloadDeamon(ctx); err != nil {
+		logger.Warn("failed to reload systemd daemon", zap.Error(err))
+	}
 
 	return nil, nil
 }
@@ -236,28 +244,42 @@ func (stepper *Package) enableKubeletService(ctx context.Context, dryRun bool) e
 		}
 	}
 
-	// enable systemd containerd service
-	_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "daemon-reload")
-	if err != nil {
+	if dryRun {
+		logger.Debugf("dry run enable and restart systemd unit %s", kubeletSystemdUnitName)
+		return nil
+	}
+
+	if err := systemctl.ReloadDeamon(ctx); err != nil {
 		return err
 	}
-	_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "enable", "kubelet", "--now")
-	if err != nil {
+	logger.Debug("reload systemd daemon successfully")
+	if err := systemctl.EnableUnit(ctx, kubeletSystemdUnitName); err != nil {
 		return err
 	}
-	logger.Debug("enable kubelet systemd service successfully")
+	logger.Debugf("enable systemd unit %s successfully", kubeletSystemdUnitName)
+	if err := systemctl.RestartUnit(ctx, kubeletSystemdUnitName); err != nil {
+		return err
+	}
+	logger.Debugf("restart systemd unit %s successfully", kubeletSystemdUnitName)
 	return nil
 }
 
-func (stepper *Package) disableKubeletService(ctx context.Context, dryRun bool) error {
-	// The following command execution error is ignored
-	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "kubelet"); err != nil {
-		logger.Warn("stop systemd kubelet service failed", zap.Error(err))
+func (stepper *Package) disableKubeletService(ctx context.Context, dryRun bool) {
+	if dryRun {
+		logger.Debugf("dry run stop and disable systemd unit %s", kubeletSystemdUnitName)
+		return
 	}
-	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "kubelet"); err != nil {
-		logger.Warn("disable systemd kubelet service failed", zap.Error(err))
+
+	if err := systemctl.StopUnit(ctx, kubeletSystemdUnitName); err != nil {
+		logger.Warnf("failed to stop systemd unit %s", kubeletSystemdUnitName, zap.Error(err))
+	} else {
+		logger.Debugf("stop systemd unit %s successfully", kubeletSystemdUnitName)
 	}
-	return nil
+	if err := systemctl.DisableUnit(ctx, kubeletSystemdUnitName); err != nil {
+		logger.Warnf("failed to disable systemd unit %s", kubeletSystemdUnitName, zap.Error(err))
+	} else {
+		logger.Debugf("disable systemd unit %s successfully", kubeletSystemdUnitName)
+	}
 }
 
 func (stepper KubeadmConfig) NewInstance() component.ObjectMeta {
