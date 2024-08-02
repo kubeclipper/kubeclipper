@@ -6,6 +6,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/containerd/containerd v1.6.19
 	github.com/coreos/go-oidc/v3 v3.6.0
+	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/dlclark/regexp2 v1.11.2
 	github.com/emicklei/go-restful v2.9.6+incompatible
 	github.com/emicklei/go-restful-openapi v0.0.0-00010101000000-000000000000
@@ -92,7 +93,6 @@ require (
 	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
-	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/cli v24.0.0+incompatible // indirect
@@ -118,6 +118,7 @@ require (
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
+	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

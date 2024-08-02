@@ -38,10 +38,14 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/systemctl"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+)
+
+const (
+	dockerSystemdUnitName = "docker.service"
 )
 
 type DockerRunnable struct {
@@ -147,9 +151,8 @@ func (runnable DockerRunnable) Install(ctx context.Context, opts component.Optio
 }
 
 func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	if err := runnable.disableDockerService(ctx, opts.DryRun); err != nil {
-		return nil, err
-	}
+	runnable.disableDockerService(ctx, opts.DryRun)
+
 	// remove related binary configuration files
 	instance, err := downloader.NewInstance(ctx, criDocker, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
@@ -176,6 +179,11 @@ func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Opt
 	if err = os.RemoveAll(dockerDefaultConfigDir); err == nil {
 		logger.Debug("remove docker config dir successfully")
 	}
+	// reload systemd daemon
+	if err = systemctl.ReloadDeamon(ctx); err != nil {
+		logger.Warn("failed to reload systemd daemon", zap.Error(err))
+	}
+	logger.Debug("uninstall docker successfully")
 	return nil, nil
 }
 
@@ -202,26 +210,42 @@ func (runnable *DockerRunnable) renderTo(w io.Writer) error {
 }
 
 func (runnable *DockerRunnable) enableDockerService(ctx context.Context, dryRun bool) error {
-	_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "daemon-reload")
-	if err != nil {
+	if dryRun {
+		logger.Debugf("dry run enable systemd unit %s", dockerSystemdUnitName)
+		return nil
+	}
+
+	if err := systemctl.ReloadDeamon(ctx); err != nil {
 		return err
 	}
-	_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "enable", "docker", "--now")
-	if err != nil {
+	logger.Debugf("reload systemd daemon successfully")
+	if err := systemctl.EnableUnit(ctx, dockerSystemdUnitName); err != nil {
 		return err
 	}
+	logger.Debugf("enable systemd unit %s successfully", dockerSystemdUnitName)
+	if err := systemctl.RestartUnit(ctx, dockerSystemdUnitName); err != nil {
+		return err
+	}
+	logger.Debugf("restart systemd unit %s successfully", dockerSystemdUnitName)
 	return nil
 }
 
-func (runnable *DockerRunnable) disableDockerService(ctx context.Context, dryRun bool) error {
-	// the following command execution error is ignored
-	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "docker"); err != nil {
-		logger.Warn("stop systemd docker service failed", zap.Error(err))
+func (runnable *DockerRunnable) disableDockerService(ctx context.Context, dryRun bool) {
+	if dryRun {
+		logger.Debugf("dry run stop and disable systemd unit %s", dockerSystemdUnitName)
+		return
 	}
-	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "docker"); err != nil {
-		logger.Warn("disable systemd docker service failed", zap.Error(err))
+
+	if err := systemctl.StopUnit(ctx, dockerSystemdUnitName); err != nil {
+		logger.Warnf("failed to stop systemd unit %s", dockerSystemdUnitName, zap.Error(err))
+	} else {
+		logger.Debugf("stop systemd unit %s successfully", dockerSystemdUnitName)
 	}
-	return nil
+	if err := systemctl.DisableUnit(ctx, dockerSystemdUnitName); err != nil {
+		logger.Warnf("failed to disable systemd unit %s", dockerSystemdUnitName, zap.Error(err))
+	} else {
+		logger.Debugf("disable systemd unit %s successfully", dockerSystemdUnitName)
+	}
 }
 
 type DockerInsecureRegistryConfigure struct {
@@ -268,9 +292,8 @@ func (d *DockerInsecureRegistryConfigure) Install(ctx context.Context, opts comp
 		if err != nil {
 			return nil, fmt.Errorf("write config file to: %s :%w", configFile, err)
 		}
-		_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", "systemctl reload docker")
-		if err != nil {
-			return nil, fmt.Errorf("reload docker:%w", err)
+		if err := systemctl.ReloadUnit(ctx, dockerSystemdUnitName); err != nil {
+			return nil, err
 		}
 	}
 	return nil, nil

@@ -43,7 +43,12 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/systemctl"
 	tmplutil "github.com/kubeclipper/kubeclipper/pkg/utils/template"
+)
+
+const (
+	containerdSystemdUnitName = "containerd.service"
 )
 
 type ContainerdRunnable struct {
@@ -166,9 +171,8 @@ func (runnable ContainerdRunnable) Install(ctx context.Context, opts component.O
 }
 
 func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	if err := runnable.disableContainerdService(ctx, opts.DryRun); err != nil {
-		return nil, err
-	}
+	runnable.disableContainerdService(ctx, opts.DryRun)
+
 	// remove related binary configuration files
 	instance, err := downloader.NewInstance(ctx, criContainerd, runnable.Version, runtime.GOARCH, !runnable.Offline, opts.DryRun)
 	if err != nil {
@@ -192,6 +196,10 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 	// remove containerd data
 	if err = os.RemoveAll(containerdDefaultDataDir); err == nil {
 		logger.Debug("remove containerd systemd config successfully")
+	}
+	// reload systemd daemon
+	if err = systemctl.ReloadDeamon(ctx); err != nil {
+		logger.Warn("failed to reload systemd daemon", zap.Error(err))
 	}
 	logger.Debug("uninstall containerd successfully")
 	return nil, nil
@@ -241,32 +249,42 @@ func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, d
 }
 
 func (runnable *ContainerdRunnable) enableContainerdService(ctx context.Context, dryRun bool) error {
-	_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "daemon-reload")
-	if err != nil {
+	if dryRun {
+		logger.Debugf("dry run enable and restart systemd unit %s", containerdSystemdUnitName)
+		return nil
+	}
+
+	if err := systemctl.ReloadDeamon(ctx); err != nil {
 		return err
 	}
-	_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "enable", "containerd")
-	if err != nil {
+	logger.Debug("reload systemd daemon successfully")
+	if err := systemctl.EnableUnit(ctx, containerdSystemdUnitName); err != nil {
 		return err
 	}
-	// restart containerd to active config, if it is already running
-	_, err = cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "restart", "containerd")
-	if err != nil {
+	logger.Debugf("enable systemd unit %s successfully", containerdSystemdUnitName)
+	if err := systemctl.RestartUnit(ctx, containerdSystemdUnitName); err != nil {
 		return err
 	}
-	logger.Debug("enable containerd systemd service successfully")
+	logger.Debugf("restart systemd unit %s successfully", containerdSystemdUnitName)
 	return nil
 }
 
-func (runnable *ContainerdRunnable) disableContainerdService(ctx context.Context, dryRun bool) error {
-	// the following command execution error is ignored
-	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "stop", "containerd"); err != nil {
-		logger.Warn("stop systemd containerd service failed", zap.Error(err))
+func (runnable *ContainerdRunnable) disableContainerdService(ctx context.Context, dryRun bool) {
+	if dryRun {
+		logger.Debugf("dry run stop and disable systemd unit %s", containerdSystemdUnitName)
+		return
 	}
-	if _, err := cmdutil.RunCmdWithContext(ctx, dryRun, "systemctl", "disable", "containerd"); err != nil {
-		logger.Warn("disable systemd containerd service failed", zap.Error(err))
+
+	if err := systemctl.StopUnit(ctx, containerdSystemdUnitName); err != nil {
+		logger.Warnf("failed to stop systemd unit %s", containerdSystemdUnitName, zap.Error(err))
+	} else {
+		logger.Debugf("stop systemd unit %s successfully", containerdSystemdUnitName)
 	}
-	return nil
+	if err := systemctl.DisableUnit(ctx, containerdSystemdUnitName); err != nil {
+		logger.Warnf("failed to disable systemd unit %s", containerdSystemdUnitName, zap.Error(err))
+	} else {
+		logger.Debugf("disable systemd unit %s successfully", containerdSystemdUnitName)
+	}
 }
 
 func (runnable *ContainerdRunnable) renderTo(w io.Writer) error {
