@@ -178,7 +178,8 @@ func addLicenseHeader(path, license string, fmode os.FileMode) (bool, error) {
 		return false, nil
 	}
 
-	// create a temporary go file for injecting license headers
+	// Create a temporary go file for injecting license headers.
+	// The prefix `addlicense-` is used for batch deleting the temporary files if problems occur.
 	tmp, err := os.CreateTemp(filepath.Dir(path), "addlicense-")
 	if err != nil {
 		return false, err
@@ -189,7 +190,7 @@ func addLicenseHeader(path, license string, fmode os.FileMode) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
+	// Copy the file mode.
 	if err := tmp.Chmod(stat.Mode()); err != nil {
 		return false, err
 	}
@@ -198,27 +199,30 @@ func addLicenseHeader(path, license string, fmode os.FileMode) (bool, error) {
 	// 	return false, err
 	// }
 
+	// This go file has build constraints.
 	if buf2.Len() > 0 {
 		if _, err := tmp.WriteString(buf2.String() + "\n"); err != nil {
 			return false, err
 		}
 	}
 
-	// write license header to the beginning
+	// Write license header firstly.
 	if _, err := tmp.WriteString(license + "\n"); err != nil {
 		return false, err
 	}
 
+	// Caculate position of the line contains `package `.
 	offset := int64(buf1.Len())
 	if dropped > 1 {
-		offset += dropped - 1 // line contains `package `
+		// CR characters are dropped, they should be added back.
+		offset += dropped - 1
 	}
-	// move the cursor of original file to the beginning
+	// Move the cursor of original go file to the position.
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
 		return false, err
 	}
 
-	// pour all of the original one into the tmp file
+	// Pour rest of the original go file into the temporary one.
 	if _, err := io.Copy(tmp, f); err != nil {
 		return false, err
 	}
@@ -232,10 +236,10 @@ func addLicenseHeader(path, license string, fmode os.FileMode) (bool, error) {
 	return err == nil, err
 }
 
-// scanLines scans the file line by line to buffers
+// scanLines handles the file line by line
 // buffer1: the lines before the package declaration
 // buffer2: the lines of go build constraints
-// dropped: CR characters dropped
+// dropped: the number of CR (`\r`) characters dropped
 func scanLines(file *os.File) (buf1, buf2 bytes.Buffer, dropped int64) {
 	scanner := bufio.NewScanner(file)
 	dropCR := func(data []byte) []byte {
@@ -264,7 +268,7 @@ func scanLines(file *os.File) (buf1, buf2 bytes.Buffer, dropped int64) {
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if bytes.HasPrefix(line, []byte("package ")) {
-			// reading until the line contains `package p`
+			// Reading until the line contains `package p`.
 			break
 		} else if bytes.HasPrefix(line, []byte("//go:build ")) || bytes.HasPrefix(line, []byte("// +build ")) {
 			buf2.Write(line)
