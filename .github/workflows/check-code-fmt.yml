@@ -1,0 +1,53 @@
+# 1.setup go env
+# 2.make checkfmt
+# 3.make test
+
+name: check-code-fmt
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+      - 'release*'
+
+# This ensures that previous jobs for the PR are canceled when the PR is updated.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmtcheck:
+    name: Check Code Format
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.19
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Checkfmt
+        shell: bash
+        # maybe timeout, use --timeout optional
+        run: make checkfmt
+
+      - name: Check pr is properly formatted
+        id: check-formatted
+        run: |
+          # Get the list of changed files and write to a file
+          git diff --name-only > changed_files.txt
+
+          # Check if the file has content
+          if [ -s changed_files.txt ]; then
+            echo "Code is not formatted correctly. Please run 'make checkfmt' before submitting your code."
+            echo "Files with formatting issues:"
+            cat changed_files.txt
+            exit 1
+          else
+            echo "Code is properly formatted."
+          fi
