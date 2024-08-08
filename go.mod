@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/containerd/containerd v1.6.19
 	github.com/coreos/go-oidc/v3 v3.6.0
 	github.com/coreos/go-systemd/v22 v22.3.2
@@ -52,6 +53,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.23.0
 	golang.org/x/oauth2 v0.21.0
+	golang.org/x/sync v0.7.0
 	golang.org/x/sys v0.22.0
 	golang.org/x/term v0.20.0
 	golang.org/x/text v0.16.0
@@ -211,7 +213,6 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
