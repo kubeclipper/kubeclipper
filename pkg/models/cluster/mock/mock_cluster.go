@@ -16,7 +16,7 @@
  *
  */
 
-package mock_cluster
+package mockcluster
 
 import (
 	context "context"

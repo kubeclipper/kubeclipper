@@ -16,7 +16,7 @@
  *
  */
 
-package mock_operation
+package mockoperation
 
 import (
 	context "context"

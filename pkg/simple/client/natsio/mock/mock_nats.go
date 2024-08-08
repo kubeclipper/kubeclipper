@@ -16,7 +16,7 @@
  *
  */
 
-package mock_natsio
+package mocknatsio
 
 import (
 	context "context"

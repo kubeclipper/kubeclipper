@@ -16,7 +16,7 @@
  *
  */
 
-package mock_platform
+package mockplatform
 
 import (
 	context "context"

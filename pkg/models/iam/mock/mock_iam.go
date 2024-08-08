@@ -16,7 +16,7 @@
  *
  */
 
-package mock_iam
+package mockiam
 
 import (
 	context "context"

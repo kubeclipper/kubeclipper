@@ -16,7 +16,7 @@
  *
  */
 
-package mock_lease
+package mocklease
 
 import (
 	context "context"
