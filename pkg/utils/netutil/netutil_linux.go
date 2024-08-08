@@ -58,3 +58,19 @@ func GetDefaultGateway(ipv4 bool) (ip net.IP, err error) {
 	}
 	return nil, errors.New("no default gateway")
 }
+
+func DeleteLink(name string) error {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			// the network interface doesn't exist
+			return nil
+		}
+		return err
+	}
+	return netlink.LinkDel(link)
+}
+
+func IsLinkVeth(link netlink.Link) bool {
+	return link.Type() == "veth"
+}
