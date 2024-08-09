@@ -17,7 +17,7 @@ deps:
 		CLIENT_GEN=$(shell which client-gen)
     endif
 
-.PHONY: build build-server build-agent build-proxy build-cli openapi
+.PHONY: build build-server build-agent build-proxy build-cli openapi licfmt
 build: build-server build-agent build-proxy build-cli
 
 build-server:
@@ -65,6 +65,8 @@ vet:
 lint:
 	golangci-lint run --timeout 10m
 
+licfmt:
+	go run tools/licfmt/licfmt.go -v ./*
 
 .PHONY: cli cleancli cli-serve
 cli: cleancli
