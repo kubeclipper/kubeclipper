@@ -39,7 +39,7 @@ require (
 	github.com/pkg/sftp v1.10.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sethvargo/go-password v0.2.0
+	github.com/sethvargo/go-password v0.3.1
 	github.com/shirou/gopsutil/v3 v3.21.10
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.7.0
