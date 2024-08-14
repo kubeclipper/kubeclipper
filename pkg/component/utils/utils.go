@@ -20,12 +20,15 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/component"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 )
 
@@ -86,4 +89,17 @@ func UnwrapNodeList(nl component.NodeList) (nodes []v1.StepNode) {
 		})
 	}
 	return nodes
+}
+
+// NamespacedKey returns ${namespace}/${name} string(namespaced key) of a Kubernetes object.
+func NamespacedKey(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func BuildKubeClientset(kubeconfigPath string) (*kubernetes.Clientset, error) {
+	kubeCfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build kubeconfig: %v", err)
+	}
+	return kubernetes.NewForConfig(kubeCfg)
 }
