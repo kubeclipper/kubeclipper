@@ -898,22 +898,20 @@ func (stepper *Health) allNodesReady(ctx context.Context, opts component.Options
 }
 
 func (stepper *Health) kubeSystemPodsReady(ctx context.Context, opts component.Options) (err error) {
-	logger.Info("check status of all nodes in the cluster")
-	nodes, err := stepper.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	logger.Info("check status of all Pods in kube-system namespace")
+	pods, err := stepper.Clientset.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get nodes: %v", err)
+		return fmt.Errorf("failed to get pods: %v", err)
 	}
-	for _, node := range nodes.Items {
-		for _, condition := range node.Status.Conditions {
-			if condition.Type == corev1.NodeReady && condition.Status != corev1.ConditionTrue {
-				err = fmt.Errorf("node %s is not ready", node.Name)
-				logger.Warn(err.Error())
-				return
-			}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning {
+			err = fmt.Errorf("pod %s is not running", utils.NamespacedKey(pod.Namespace, pod.Name))
+			logger.Warn(err.Error())
+			return
 		}
 	}
 
-	logger.Info("all nodes in the cluster are ready")
+	logger.Info("all Pods in kube-system namespace are ready")
 	return
 }
 
