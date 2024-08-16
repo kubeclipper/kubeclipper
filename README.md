@@ -24,7 +24,7 @@
 
 <p align="center">
   <img alt="github actions" src="https://img.shields.io/badge/-Github_Actions_>-000000?style=flat-square&logo=github-actions&logoColor=white" />
-  <img alt="code-check-test" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/code-check-test.yml/badge.svg" />
+  <img alt="check-test-coverage" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/check-test-coverage.yml/badge.svg" />
   <img alt="build-kc" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/build-kc.yml/badge.svg" />
 </p>
 
@@ -34,10 +34,10 @@
 
 > English | [中文](README_zh.md)
 
-[KubeClipper](https://kubeclipper.io/) is a lightweight web service that provides a friendly web console GUI, APIs, and a CLI tool for **Kubernetes cluster lifecycle management**.  
-KubeClipper provides flexible Kubernetes as a Service (KaaS), which allows users to rapidly deploy K8S clusters 
-anywhere(cloud, hypervisor, bare metal) and provides continuous lifecycle management capabilities 
-(installation, deleting, upgrading, backup and restoration, cluster scaling, remote access, plug-in management, 
+[KubeClipper](https://kubeclipper.io/) is a lightweight web service that provides a friendly web console GUI, APIs, and a CLI tool for **Kubernetes cluster lifecycle management**.
+KubeClipper provides flexible Kubernetes as a Service (KaaS), which allows users to rapidly deploy K8S clusters
+anywhere(cloud, hypervisor, bare metal) and provides continuous lifecycle management capabilities
+(installation, deleting, upgrading, backup and restoration, cluster scaling, remote access, plug-in management,
 application store).see [Feature List](https://github.com/kubeclipper/kubeclipper#features) for details.
 
 **🎯 Project Goal**：Manage Kubernetes in the most light and convenient way.
@@ -79,28 +79,35 @@ application store).see [Feature List](https://github.com/kubeclipper/kubeclipper
 </details>
 
 ## Roadmap & Todo list
-* 🚀 Cluster Installation Optimization 
-  * Use images to encapsulate installation package resources to reduce complexity. Reuse mature image technology
-* 💻 Kubernetes Web Console 
-  * Workload resources & monitoring presentation
-  * Tenant based cluster access control
-* 📦 Application Store 
-  * Application lifecycle management 
-  * Support web UI & CLI interface
-* 🧩 Common Application and Plugin Integrations 
-  * LB & Ingress 
-  * Monitoring 
-  * Kubernetes Dashboard 
-  * KubeEdge
+
+* 🚀 Cluster Installation Optimization
+    * Use images to encapsulate installation package resources to reduce complexity. Reuse mature image technology
+* 💻 Kubernetes Web Console
+    * Workload resources & monitoring presentation
+    * Tenant based cluster access control
+* 📦 Application Store
+    * Application lifecycle management
+    * Support web UI & CLI interface
+* 🧩 Common Application and Plugin Integrations
+    * LB & Ingress
+    * Monitoring
+    * Kubernetes Dashboard
+    * KubeEdge
 * 🕸 Managed Clusters
-  * Support KoK clusters.
+    * Support KoK clusters.
 
 ## Architecture
+
 ### Core
+
 ![kc-arch1](docs/img/kc-arch.png)
+
 ### Node
+
 ![kc-arch2](docs/img/kc-arch2.png)
+
 ### Network
+
 ![kc-network](docs/img/kc-network.png)
 
 Explore the architecture of Kubeclipper on [kubeclipper.io](https://kubeclipper.io/docs/overview/).
@@ -117,18 +124,16 @@ You only need to prepare a host with reference to the following requirements for
 
 #### Hardware recommended configuration
 
-- Make sure your machine meets the minimum hardware requirements: CPU >= 2 cores, RAM >= 2GB.
-- Operating System: CentOS 7.x / Ubuntu 18.04 / Ubuntu 20.04.
+* Make sure your machine meets the minimum hardware requirements: CPU >= 2 cores, RAM >= 2GB.
+* Operating System: CentOS 7.x / Ubuntu 18.04 / Ubuntu 20.04.
 
 #### Node requirements
 
-- Nodes must be able to connect via `SSH`.
+* Nodes must be able to connect via `SSH`.
 
-- You can use the `sudo` / `curl` / `wget` / `tar` command on this node.
+* You can use the `sudo` / `curl` / `wget` / `tar` command on this node.
 
 > It is recommended that your operating system is in a clean state (no additional software is installed), otherwise, conflicts may occur.
-
-
 
 ### Deploy KubeClipper
 
@@ -147,7 +152,7 @@ curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=master bash -
 ```
 
-> It is highly recommended that you install the latest release to experience more features.  
+> It is highly recommended that you install the latest release to experience more features.
 > You can also download the specified version on the **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)**.
 
 Check if the installation is successful with the following command:
@@ -188,11 +193,11 @@ After printing the KubeClipper banner, the installation is complete.
 
 ### Login Console
 
-When deployed successfully, you can open a browser and visit `http://$IP ` to enter the KubeClipper console.
+When deployed successfully, you can open a browser and visit `http://$IP` to enter the KubeClipper console.
 
 ![](docs/img/console-login.png)
 
- You can log in with the default account and password `admin / Thinkbig1 `.
+ You can log in with the default account and password `admin / Thinkbig1`.
 
 > You may need to configure port forwarding rules and open ports in security groups for external users to access the console.
 
@@ -222,6 +227,7 @@ Once the cluster enter  the `Running` state , it means that the creation is comp
 
 1. fork repo and clone
 2. run etcd locally, usually use docker / podman to run etcd container
+
    ```bash
    export HostIP="Your-IP"
    docker run -d \
@@ -237,6 +243,7 @@ Once the cluster enter  the `Running` state , it means that the creation is comp
    --snapshot-count=10000 \
    --data-dir=/var/lib/etcd
    ```
+
 3. change `kubeclipper-server.yaml` etcd.serverList to your locally etcd cluster
 4. `make build`
 5. `./dist/kubeclipper-server serve`
