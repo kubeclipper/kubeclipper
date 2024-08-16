@@ -186,12 +186,8 @@ func addLicenseHeader(path, license string, fmode os.FileMode) (bool, error) {
 	}
 	defer os.Remove(tmp.Name())
 
-	stat, err := f.Stat()
-	if err != nil {
-		return false, err
-	}
 	// Copy the file mode.
-	if err := tmp.Chmod(stat.Mode()); err != nil {
+	if err := tmp.Chmod(fmode); err != nil {
 		return false, err
 	}
 

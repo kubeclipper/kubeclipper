@@ -30,11 +30,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/pkg/errors"
 	"github.com/txn2/txeh"
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/homedir"
 
+	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -85,6 +89,8 @@ func init() {
 const (
 	kubeletSystemdUnitName = "kubelet.service"
 )
+
+var DefaultKubeConfigPath = filepath.Join(homedir.HomeDir(), ".kube/config")
 
 var (
 	_ component.StepRunnable   = (*Package)(nil)
@@ -154,6 +160,7 @@ type ClusterNode struct {
 
 type Health struct {
 	KubernetesVersion string
+	*kubernetes.Clientset
 }
 
 type Certification struct{}
@@ -846,15 +853,20 @@ func (stepper *Health) NewInstance() component.ObjectMeta {
 	return &Health{}
 }
 
-func (stepper *Health) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	if err := utils.RetryFunc(ctx, opts, 10*time.Second, "allNodeReady", stepper.allNodeReady); err != nil {
-		return nil, err
-	}
-	if err := utils.RetryFunc(ctx, opts, 10*time.Second, "checkPodStatus", stepper.checkPodStatus); err != nil {
-		return nil, err
+func (stepper *Health) Install(ctx context.Context, opts component.Options) (b []byte, err error) {
+	if stepper.Clientset == nil {
+		if stepper.Clientset, err = utils.BuildKubeClientset(DefaultKubeConfigPath); err != nil {
+			return nil, fmt.Errorf("failed to create clientset: %v", err)
+		}
 	}
 
-	return nil, nil
+	for _, fn := range []func(ctx context.Context, opts component.Options) error{stepper.allNodesReady, stepper.kubeSystemPodsReady} {
+		if err = utils.RetryFunc(ctx, opts, 10*time.Second, "allNodeReady", fn); err != nil {
+			return
+		}
+	}
+
+	return
 }
 
 func (stepper *Health) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
@@ -865,31 +877,42 @@ func (stepper *Health) Uninstall(ctx context.Context, opts component.Options) ([
 	return nil, nil
 }
 
-// the status of all nodes in the cluster is ready
-func (stepper *Health) allNodeReady(ctx context.Context, opts component.Options) error {
-	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", `kubectl get node | grep NotReady`)
+func (stepper *Health) allNodesReady(ctx context.Context, opts component.Options) (err error) {
+	logger.Info("check status of all nodes in the cluster")
+	nodes, err := stepper.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		logger.Warn("run kubectl get node error", zap.Error(err))
+		return fmt.Errorf("failed to get nodes: %v", err)
 	}
-	if ec.StdOut() == "" {
-		logger.Info("all nodes are ready")
-		return nil
+	for _, node := range nodes.Items {
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status != corev1.ConditionTrue {
+				err = fmt.Errorf("node %s is not ready", node.Name)
+				logger.Warn(err.Error())
+				return
+			}
+		}
 	}
-	logger.Warn("some nodes are not ready", zap.String("node", ec.StdOut()))
-	return fmt.Errorf("some nodes are not ready")
+
+	logger.Info("all nodes in the cluster are ready")
+	return
 }
 
-// k8s own component(kube-systemd) pod status is running
-func (stepper *Health) checkPodStatus(ctx context.Context, opts component.Options) error {
-	ec, err := cmdutil.RunCmdWithContext(ctx, opts.DryRun, "bash", "-c", `kubectl get po -n kube-system | grep -v Running`)
+func (stepper *Health) kubeSystemPodsReady(ctx context.Context, opts component.Options) (err error) {
+	logger.Info("check status of all Pods in kube-system namespace")
+	pods, err := stepper.Clientset.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		logger.Warn("run 'kubectl get po -n kube-system | grep -v Running' error", zap.Error(err))
+		return fmt.Errorf("failed to get pods: %v", err)
+	}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning {
+			err = fmt.Errorf("pod %s is not running", utils.NamespacedKey(pod.Namespace, pod.Name))
+			logger.Warn(err.Error())
+			return
+		}
 	}
 
-	if len(strings.Split(ec.StdOut(), "\n")) > 2 {
-		return fmt.Errorf("there are no running pods: %s", strings.Join(ec.Args[1:], ","))
-	}
-	return err
+	logger.Info("all Pods in kube-system namespace are ready")
+	return
 }
 
 func (stepper *Health) getRegisterServiceAccountCommands() ([]v1.Command, error) {

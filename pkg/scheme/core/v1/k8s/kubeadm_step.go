@@ -248,8 +248,11 @@ func (runnable *Runnable) makeInstallSteps(metadata *component.ExtraMetadata) ([
 	}
 	installSteps = append(installSteps, steps...)
 
-	heal := Health{}
-	steps, err = heal.InitStepper(c.KubernetesVersion).InstallSteps([]v1.StepNode{masters[0]})
+	heal := &Health{}
+	if err := heal.InitStepper(c.KubernetesVersion, DefaultKubeConfigPath); err != nil {
+		return nil, err
+	}
+	steps, err = heal.InstallSteps([]v1.StepNode{masters[0]})
 	if err != nil {
 		return nil, err
 	}
@@ -333,8 +336,11 @@ func (runnable *Runnable) makeUninstallSteps(metadata *component.ExtraMetadata) 
 	}
 	uninstallSteps = append(uninstallSteps, steps...)
 
-	heal := Health{}
-	steps, err = heal.InitStepper(c.KubernetesVersion).UninstallSteps(&runnable.Networking, nodes...)
+	heal := &Health{}
+	if err := heal.InitStepper(c.KubernetesVersion, DefaultKubeConfigPath); err != nil {
+		return nil, err
+	}
+	steps, err = heal.UninstallSteps(&runnable.Networking, nodes...)
 	if err != nil {
 		return nil, err
 	}
@@ -647,9 +653,12 @@ func (stepper *ClusterNode) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 	return nil, nil
 }
 
-func (stepper *Health) InitStepper(version string) *Health {
+func (stepper *Health) InitStepper(version, kubeConfigPath string) (err error) {
 	stepper.KubernetesVersion = version
-	return stepper
+	if stepper.Clientset, err = utils.BuildKubeClientset(kubeConfigPath); err != nil {
+		return fmt.Errorf("failed to create clientset: %v", err)
+	}
+	return
 }
 
 func (stepper *Health) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {

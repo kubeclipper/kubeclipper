@@ -25,6 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -32,8 +35,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -216,8 +217,12 @@ func (stepper *GenNode) MakeUninstallSteps(metadata *component.ExtraMetadata, pa
 			doCommandRemoveStep("removeKubeletDataDir", patchNodes, KubeletDefaultDataDir),
 			doCommandRemoveStep("removeDockershimDataDir", patchNodes, DockershimDefaultDataDir),
 		)
-		heal := Health{}
-		steps, err = heal.InitStepper(metadata.KubeVersion).UninstallSteps(&stepper.Cluster.Networking, patchNodes...)
+
+		heal := &Health{}
+		if err := heal.InitStepper(metadata.KubeVersion, DefaultKubeConfigPath); err != nil {
+			return err
+		}
+		steps, err = heal.UninstallSteps(&stepper.Cluster.Networking, patchNodes...)
 		if err != nil {
 			return err
 		}
