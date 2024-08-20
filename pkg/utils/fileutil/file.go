@@ -25,6 +25,7 @@ import (
 	"hash"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -119,8 +120,11 @@ func IsDir(name string) bool {
 }
 
 func CreateDirIfNotExists(path string, perm os.FileMode) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return os.MkdirAll(path, os.ModeDir|perm)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return os.MkdirAll(path, perm)
+		}
+		return err
 	}
 	return nil
 }
@@ -156,4 +160,27 @@ func Backup(filePath, dir string) (bakFile string, err error) {
 	defer dst.Close()
 	_, err = io.Copy(dst, src)
 	return
+}
+
+// CopyFile copies the source file to destnation one.
+func CopyFile(src, dst string, mode os.FileMode) error {
+	// parent directory of destination file
+	if err := CreateDirIfNotExists(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+
+	fsrc, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer fsrc.Close()
+
+	fdst, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer fdst.Close()
+
+	_, err = io.Copy(fdst, fsrc)
+	return err
 }

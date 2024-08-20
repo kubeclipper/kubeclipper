@@ -770,10 +770,8 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 			return nil, err
 		}
 
-		// cp admin.conf
-		_, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun,
-			"bash", "-c", "mkdir -p $HOME/.kube && cp -if /etc/kubernetes/admin.conf $HOME/.kube/config && chown $(id -u):$(id -g) $HOME/.kube/config")
-		if err != nil {
+		// copy kubeconfig file
+		if err := generateKubeConfig(ctx); err != nil {
 			return nil, err
 		}
 	}
