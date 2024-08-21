@@ -20,21 +20,22 @@ package k8s
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/kubeclipper/kubeclipper/pkg/utils/initsystem"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/homedir"
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/cmdutil"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/fileutil"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/initsystem"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 )
 
@@ -51,14 +52,11 @@ func getJoinCmdFromStdOut(output string, cutBegin string) string {
 }
 
 func generateKubeConfig(ctx context.Context) error {
-	if err := fileutil.CreateDirIfNotExists("/root/.kube", 0755); err != nil {
+	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube/config")
+	if err := fileutil.CopyFile("/etc/kubernetes/admin.conf", kubeconfigPath, 0644); err != nil {
 		return err
 	}
-	_, err := cmdutil.RunCmdWithContext(ctx, false, "cp", "-rf", "/etc/kubernetes/admin.conf", "/root/.kube/config")
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.Chown(kubeconfigPath, os.Getuid(), os.Getgid())
 }
 
 func doCommandRemoveStep(name string, nodes []v1.StepNode, dirs ...string) v1.Step {
