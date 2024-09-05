@@ -852,10 +852,8 @@ func (stepper *Health) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *Health) Install(ctx context.Context, opts component.Options) (b []byte, err error) {
-	if stepper.Clientset == nil {
-		if stepper.Clientset, err = utils.BuildKubeClientset(DefaultKubeConfigPath); err != nil {
-			return nil, fmt.Errorf("failed to create clientset: %v", err)
-		}
+	if stepper.Clientset, err = utils.BuildKubeClientset(DefaultKubeConfigPath); err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %v", err)
 	}
 
 	for _, fn := range []func(ctx context.Context, opts component.Options) error{stepper.allNodesReady, stepper.kubeSystemPodsReady} {
