@@ -66,9 +66,8 @@ func MaybeTimeoutError(err error, taskFormat string, taskArgs ...interface{}) er
 		return TimeoutError(fmt.Sprintf("timed out while "+taskFormat, taskArgs...))
 	} else if err != nil {
 		return fmt.Errorf("error while %s: %w", fmt.Sprintf(taskFormat, taskArgs...), err)
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // HandleWaitingAPIError handles an error from an API request in the context of a Wait function.
