@@ -1,6 +1,8 @@
 module github.com/kubeclipper/kubeclipper
 
-go 1.20
+go 1.21
+
+toolchain go1.22.5
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
