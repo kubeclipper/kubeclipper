@@ -889,7 +889,7 @@ func (stepper *Recovery) BeforeRecovery(ctx context.Context, opts component.Opti
 			if strings.Contains(ec.StdErr(), "6443 was refused") {
 				return nil
 			}
-			err = fmt.Errorf(ec.StdErr())
+			err = errors.New(ec.StdErr())
 		}
 		return err
 	})

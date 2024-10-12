@@ -45,13 +45,13 @@ test:
 .PHONY: format-deps checkfmt fmt goimports vet lint
 format-deps:
     ifeq (, $(shell which golangci-lint))
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.60.0
     endif
     ifeq (, $(shell which goimports))
 		go install golang.org/x/tools/cmd/goimports@latest
     endif
 
-checkfmt: format-deps fmt goimports lint
+checkfmt: fmt goimports format-deps lint
 
 fmt:
 	gofmt -s -w ./pkg ./cmd ./tools ./test
@@ -63,7 +63,7 @@ vet:
 	go vet ./pkg/... ./cmd/...
 
 lint:
-	golangci-lint run --timeout 10m
+	GOGC=1 golangci-lint run --timeout 10m
 
 licfmt:
 	go run tools/licfmt/licfmt.go -v ./*

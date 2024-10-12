@@ -21,6 +21,7 @@ package k8s
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -405,7 +406,7 @@ func (stepper *Drain) Uninstall(ctx context.Context, opts component.Options) (by
 				err = nil
 				return
 			}
-			err = fmt.Errorf(ec.StdErr())
+			err = errors.New(ec.StdErr())
 			logger.Error(logErrMsg, zap.Error(err))
 		}
 	}()

@@ -31,9 +31,8 @@ func (l userList) Less(i, j int) bool {
 		return true
 	} else if t1.Before(t2) {
 		return false
-	} else {
-		return l[i].Name > l[j].Name
 	}
+	return l[i].Name > l[j].Name
 }
 
 // DesensitizationUserPassword mark user's passwd empty.

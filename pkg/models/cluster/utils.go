@@ -34,7 +34,6 @@ func (l recordList) Less(i, j int) bool {
 		return true
 	} else if ti.Before(tj) {
 		return false
-	} else {
-		return l[i].RR > l[j].RR
 	}
+	return l[i].RR > l[j].RR
 }

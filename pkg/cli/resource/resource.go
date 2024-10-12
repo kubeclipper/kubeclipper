@@ -356,7 +356,7 @@ func (o *ResourceOptions) ResourceList() error {
 	}
 
 	for _, val := range errMap {
-		logger.Warnf(val)
+		logger.Warn(val)
 	}
 
 	return nil

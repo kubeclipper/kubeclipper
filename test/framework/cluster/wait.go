@@ -209,9 +209,8 @@ func WaitForBackupAvailable(c *kc.Client, clusterName, backupName string, timeou
 			return true, nil
 		} else if backup.Status.ClusterBackupStatus == corev1.ClusterBackupError {
 			return false, fmt.Errorf("backup %s create failed", backup.Name)
-		} else {
-			return false, nil
 		}
+		return false, nil
 	})
 }
 
