@@ -655,9 +655,9 @@ func (stepper *ClusterNode) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, erro
 
 func (stepper *Health) InitStepper(version, kubeConfigPath string) (err error) {
 	stepper.KubernetesVersion = version
-	if stepper.Clientset, err = utils.BuildKubeClientset(kubeConfigPath); err != nil {
-		return fmt.Errorf("failed to create clientset: %v", err)
-	}
+	//if stepper.Clientset, err = utils.BuildKubeClientset(kubeConfigPath); err != nil {
+	//	return fmt.Errorf("failed to create clientset: %v", err)
+	//}
 	return
 }
 
