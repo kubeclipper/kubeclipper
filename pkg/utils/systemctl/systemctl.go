@@ -38,7 +38,7 @@ const (
 // lookupUnitStatus returns the status of the unit if it exists.
 // equivalent to `systemctl show <unit-name> --property=ActiveState`
 func lookupUnitStatus(ctx context.Context, conn *dbus.Conn, name string) (*dbus.UnitStatus, error) {
-	units, err := conn.ListUnitsByNamesContext(ctx, []string{name})
+	units, err := ListUnitsByNamesContextFallback(ctx, conn, name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup unit %s: %w", name, err)
 	}
