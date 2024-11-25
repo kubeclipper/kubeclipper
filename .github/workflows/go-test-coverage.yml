@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 # This ensures that previous jobs for the PR are canceled when the PR is updated.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
