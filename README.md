@@ -24,8 +24,9 @@
 
 <p align="center">
   <img alt="github actions" src="https://img.shields.io/badge/-Github_Actions_>-000000?style=flat-square&logo=github-actions&logoColor=white" />
-  <img alt="check-test-coverage" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/check-test-coverage.yml/badge.svg" />
+  <img alt="go-test-coverage" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/go-test-coverage.yml/badge.svg" />
   <img alt="build-kc" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/build-kc.yml/badge.svg" />
+  <img alt="generate-kcctl-docs" src="https://github.com/kubeclipper/kubeclipper/actions/workflows/generate-kcctl-docs.yml/badge.svg" />
 </p>
 
 ---

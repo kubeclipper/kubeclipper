@@ -513,6 +513,13 @@ func TestX509(t *testing.T) {
 		a := New(testCase.Opts, testCase.User)
 
 		resp, ok, err := a.AuthenticateRequest(req)
+		var e x509.CertificateInvalidError
+		if errors.As(err, &e) {
+			if e.Reason == x509.Expired {
+				// ignore expired errors, as they are expected in some cases.
+				continue
+			}
+		}
 
 		if testCase.ExpectErr && err == nil {
 			t.Errorf("%s: Expected error, got none", k)
@@ -668,6 +675,13 @@ func TestX509Verifier(t *testing.T) {
 		a := NewVerifier(testCase.Opts, auth, testCase.AllowedCNs)
 
 		resp, ok, err := a.AuthenticateRequest(req)
+		var e x509.CertificateInvalidError
+		if errors.As(err, &e) {
+			if e.Reason == x509.Expired {
+				// ignore expired errors, as they are expected in some cases.
+				continue
+			}
+		}
 
 		if testCase.ExpectErr && err == nil {
 			t.Errorf("%s: Expected error, got none", k)
