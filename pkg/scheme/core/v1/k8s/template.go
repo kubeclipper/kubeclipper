@@ -29,7 +29,7 @@ etcd:
       election-timeout: '1500'
       heartbeat-interval: '300'
       quota-backend-bytes: '8589934592'
-      snapshot-count: '5000'
+      snapshot-count: '100000'
 networking:
   serviceSubnet: {{ range .Networking.Services.CIDRBlocks }}{{ . }}{{- end }}
   podSubnet: {{ range .Networking.Pods.CIDRBlocks }}{{ . }}{{- end }}
