@@ -471,7 +471,7 @@ func ToContainerdRegistryConfig(registries []v1.RegistrySpec) map[string]*Contai
 		cfg.Hosts = append(cfg.Hosts, ContainerdHost{
 			Scheme:       r.Scheme,
 			Host:         r.Host,
-			Capabilities: []string{CapabilityPull, CapabilityResolve},
+			Capabilities: []string{CapabilityPull, CapabilityPush, CapabilityResolve},
 			SkipVerify:   r.SkipVerify,
 			CA:           []byte(r.CA),
 		})
