@@ -354,6 +354,11 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 		l.createdByIP = true
 	}
 
+	// check is masters and workers conflict
+	if hasConflict(l.Masters, l.Workers) {
+		return errors.New("master and worker conflict")
+	}
+
 	if l.CaCertFile != "" || l.CaKeyFile != "" {
 		caCert, err := os.ReadFile(l.CaCertFile)
 		if err != nil {
