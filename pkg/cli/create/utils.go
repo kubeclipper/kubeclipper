@@ -47,3 +47,10 @@ func getComponentAvailableVersions(client *kc.Client, offline bool, component st
 	}
 	return set
 }
+
+// hasConflict 判断是否有重复的节点
+func hasConflict(masters, workers []string) bool {
+	set := sets.NewString(masters...)
+	set.Insert(workers...)
+	return set.Len() != len(masters)+len(workers)
+}
