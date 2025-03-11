@@ -76,7 +76,6 @@ sudo systemctl restart docker
 
 sudo docker info
 
-
 sudo usermod -aG docker ${USER}
 
 # 卸载 Docker
@@ -89,7 +88,6 @@ sudo usermod -aG docker ${USER}
 ```
 
 ## install make & ntp
-
 
 ```bash
 # build-essential/noble,now 12.10ubuntu1 amd64 [installed]
@@ -119,7 +117,6 @@ vim /etc/ssh/sshd_config
 PermitRootLogin yes
 systemctl restart ssh
 passwd xxx
-
 
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
 
