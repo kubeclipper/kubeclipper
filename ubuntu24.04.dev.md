@@ -1,8 +1,11 @@
 # dev 
+
 ## ubuntu 24.04
 
 ## install golang 
+
 ### go1.24.0.linux-amd64.tar.gz
+
 ```
 
 https://golang.google.cn/dl/
@@ -11,9 +14,11 @@ wget https://golang.google.cn/dl/go1.24.0.linux-amd64.tar.gz
 tar zxf go1.24.0.linux-amd64.tar.gz
 sudo mv go /usr/local/
 
-export GOROOT=/usr/local/go
 sudo chmod 777 /opt
-mkdir /opt/go
+mkdir -p /opt/go
+
+vim /etc/profile
+export GOROOT=/usr/local/go
 export GOPATH=/opt/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 export GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
@@ -21,7 +26,9 @@ export GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 ```
 
 ## install docker 
+
 ### docker-ce/noble,now 5:28.0.1-1\~ubuntu.24.04~noble amd64 [installed]
+
 ```
 https://www.cnblogs.com/ylz8401/p/18251415
 
@@ -74,34 +81,82 @@ sudo usermod -aG docker ${USER}
 # sudo rm -rf /var/lib/docker
 # sudo rm -rf /var/lib/containerd
 
-
-
 ```
 
 ## install make & ntp 
+
 ### build-essential/noble,now 12.10ubuntu1 amd64 [installed]
+
 #### GNU Make 4.3
+
 ### ntp/noble,now 1:4.2.8p15+dfsg-2~1.2.2+dfsg1-4build2 all [installed]
 
 ```
-sudo apt install -y build-essential git curl wget net-tools
-apt install ntp
+sudo apt install -y build-essential git curl wget net-tools -y
+apt install ntp -y
 
 ```
 
 ## clone & comple
+
 ```
-git clone
-git checkout 
+git clone https://github.com/kubeclipper/kubeclipper.git
+or
+git clone git@github.com:drcwr/kubeclipper.git
+git checkout release-1.4
 make build
 ```
 
 ## deploy
+
 ```
+
 sudo su
+vim /etc/ssh/sshd_config
+PermitRootLogin yes	
+systemctl restart ssh
+passwd xxx
+
 
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
 
-kcctl deploy --user root
+kcctl deploy --help
+kcctl deploy --user root --passwd {local-host-user-pwd} --pkg kc-minimal.tar.gz
+
+```
+
+## clean
+
+```
+kcctl clean --help
+
+# Uninstall the entire kubeclipper platform.
+kcctl clean --all
+kcctl clean -A
+
+```
+
+## debug kcctl using gdb
+
+```
+apt install gdb -y
+
+export GOLDFLAGS=""
+make build
+or
+make build-cli
+
+gdb dist/kcctl
+b resource.go:278
+r login --host http://127.0.0.1 --username admin --password Thinkbig1
+r resource list
+
+```
+
+## ssh-keygen
+
+```
+ssh-keygen -t rsa -b 4096
+ssh-keygen -f ~/.ssh/id_rsa.pub -e -m pem > id_rsa.pem
 
 ```
