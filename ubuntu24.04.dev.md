@@ -23,7 +23,6 @@ export GOROOT=/usr/local/go
 export GOPATH=/opt/go
 export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 export GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
-
 ```
 
 ### install docker
@@ -86,7 +85,6 @@ sudo usermod -aG docker ${USER}
 # docker-compose-plugin docker-ce-rootless-extras
 # sudo rm -rf /var/lib/docker
 # sudo rm -rf /var/lib/containerd
-
 ```
 
 ### install make & ntp
@@ -98,7 +96,6 @@ sudo usermod -aG docker ${USER}
 
 sudo apt install -y build-essential git curl wget net-tools -y
 apt install ntp -y
-
 ```
 
 ### clone & comple
@@ -124,7 +121,6 @@ curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
 
 kcctl deploy --help
 kcctl deploy --user root --passwd {local-host-user-pwd} --pkg kc-minimal.tar.gz
-
 ```
 
 ### clean
@@ -135,7 +131,6 @@ kcctl clean --help
 # Uninstall the entire kubeclipper platform.
 kcctl clean --all
 kcctl clean -A
-
 ```
 
 ### debug kcctl using gdb
@@ -152,7 +147,6 @@ gdb dist/kcctl
 b resource.go:278
 r login --host http://127.0.0.1 --username admin --password Thinkbig1
 r resource list
-
 ```
 
 ### ssh-keygen
@@ -160,13 +154,12 @@ r resource list
 ```bash
 ssh-keygen -t rsa -b 4096
 ssh-keygen -f ~/.ssh/id_rsa.pub -e -m pem > id_rsa.pem
-
 ```
-
 
 ## tarball k8s v1.32.2
 
 ### add root passwd
+
 ```bash
 vim /etc/ssh/sshd_config
 PermitRootLogin yes
@@ -176,11 +169,13 @@ passwd
 ```
 
 ### deploy MUST with passwd or pk-file FOR 'kcctl resource' cmd
+
 ```bash
 kcctl deploy --server $IPADDR_SERVER --agent $IPADDR_AGENT --passwd xxx 或者 --pk-file
 ```
 
 ### tarball
+
 ```bash
 ./tarball-kubernetes.sh -a amd64 -v 1.32.2 -o /tmp
 
@@ -195,12 +190,13 @@ kcctl resource push --pkg k8s-${k8s_ver}-amd64.tar.gz --type k8s
 ```
 
 ### add k8s v1.32.2 info
+
 ```bash
 vim /opt/kubeclipper-server/resource/metadata.json
-
 ```
 
 ### deploy k8s using kcctl,add pause tag
+
 ```bash
 vim /etc/containerd/config.toml
 # from
@@ -210,6 +206,7 @@ vim /etc/containerd/config.toml
 ```
 
 ### bakup /tmp/.k8s and reboot host server
+
 ```bash
 mkdir ~/bak -p
 cp /tmp/.k8s ~/bak -a
@@ -217,4 +214,3 @@ cp /tmp/.k8s ~/bak -a
 cp ~/bak/.k8s /tmp -a
 # continue deploy k8s with web GUI
 ```
-
