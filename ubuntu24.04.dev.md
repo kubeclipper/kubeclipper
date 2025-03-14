@@ -1,6 +1,6 @@
 # KubeClipper dev
-
-## install golang
+## ubuntu 24.04 dev
+### install golang
 
 ```bash
 # ubuntu 24.04
@@ -24,7 +24,7 @@ export GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 
 ```
 
-## install docker
+### install docker
 
 ```bash
 # docker-ce/noble,now 5:28.0.1-1\~ubuntu.24.04~noble amd64 [installed]
@@ -87,7 +87,7 @@ sudo usermod -aG docker ${USER}
 
 ```
 
-## install make & ntp
+### install make & ntp
 
 ```bash
 # build-essential/noble,now 12.10ubuntu1 amd64 [installed]
@@ -99,7 +99,7 @@ apt install ntp -y
 
 ```
 
-## clone & comple
+### clone & comple
 
 ```bash
 git clone https://github.com/kubeclipper/kubeclipper.git
@@ -109,7 +109,7 @@ git checkout release-1.4
 make build
 ```
 
-## deploy
+### deploy
 
 ```bash
 sudo su
@@ -125,7 +125,7 @@ kcctl deploy --user root --passwd {local-host-user-pwd} --pkg kc-minimal.tar.gz
 
 ```
 
-## clean
+### clean
 
 ```bash
 kcctl clean --help
@@ -136,7 +136,7 @@ kcctl clean -A
 
 ```
 
-## debug kcctl using gdb
+### debug kcctl using gdb
 
 ```bash
 apt install gdb -y
@@ -153,10 +153,66 @@ r resource list
 
 ```
 
-## ssh-keygen
+### ssh-keygen
 
 ```bash
 ssh-keygen -t rsa -b 4096
 ssh-keygen -f ~/.ssh/id_rsa.pub -e -m pem > id_rsa.pem
 
 ```
+
+
+## tarball k8s v1.32.2
+
+### add root passwd
+```bash
+vim /etc/ssh/sshd_config
+PermitRootLogin yes
+systemctl restart ssh
+
+passwd
+```
+
+### deploy MUST with passwd or pk-file FOR 'kcctl resource' cmd
+```bash
+kcctl deploy --server $IPADDR_SERVER --agent $IPADDR_AGENT --passwd xxx 或者 --pk-file
+```
+
+### tarball
+```bash
+./tarball-kubernetes.sh -a amd64 -v 1.32.2 -o /tmp
+
+k8s_ver='v1.32.2'
+mkdir -p k8s/${k8s_ver}/amd64
+pushd k8s/${k8s_ver}/amd64
+cp cp /tmp/k8s/${k8s_ver}/amd64/* . -a
+popd
+tar -zcvf k8s-${k8s_ver}-amd64.tar.gz  k8s
+kcctl login --host http://127.0.0.1 --username admin --password Thinkbig1
+kcctl resource push --pkg k8s-${k8s_ver}-amd64.tar.gz --type k8s
+```
+
+### add k8s v1.32.2 info
+```bash
+vim /opt/kubeclipper-server/resource/metadata.json
+
+```
+
+### deploy k8s using kcctl,add pause tag
+```bash
+vim /etc/containerd/config.toml
+# from
+# sandbox_image = "registry.k8s.io/pause:"
+# to
+# sandbox_image = "registry.k8s.io/pause:3.10"
+```
+
+### bakup /tmp/.k8s and reboot host server
+```bash
+mkdir ~/bak -p
+cp /tmp/.k8s ~/bak -a
+# after reboot
+cp ~/bak/.k8s /tmp -a
+# continue deploy k8s with web GUI
+```
+
