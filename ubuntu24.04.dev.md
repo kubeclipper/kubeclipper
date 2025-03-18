@@ -1,6 +1,6 @@
-# KubeClipper dev
+# ubuntu24.04.dev.md
 
-## ubuntu 24.04 dev
+## KubeClipper dev
 
 ### install golang
 
