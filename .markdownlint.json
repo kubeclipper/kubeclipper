@@ -1,0 +1,16 @@
+{
+    "MD041": false,
+    "MD043": {
+        // List of headings
+        "headings": [
+            "# Head",
+            "## Item",
+            "*",
+            "## Foot",
+            "*"
+        ],
+        // Match case of headings
+        "match_case": false
+      }
+    
+}
