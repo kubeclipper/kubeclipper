@@ -1,4 +1,4 @@
-- ubuntu24.04.dev.md
+ubuntu24.04.dev.md
 
 - KubeClipper dev
 
