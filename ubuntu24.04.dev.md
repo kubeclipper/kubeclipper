@@ -1,8 +1,8 @@
 # ubuntu24.04.dev.md
 
-- KubeClipper dev
+## KubeClipper dev
 
-1. install golang
+### install golang
 
 ```bash
 # ubuntu 24.04
@@ -25,7 +25,7 @@ export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 export GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 ```
 
-1. install docker
+### install docker
 
 ```bash
 # docker-ce/noble,now 5:28.0.1-1\~ubuntu.24.04~noble amd64 [installed]
@@ -87,7 +87,7 @@ sudo usermod -aG docker ${USER}
 # sudo rm -rf /var/lib/containerd
 ```
 
-1. install make & ntp
+### install make & ntp
 
 ```bash
 # build-essential/noble,now 12.10ubuntu1 amd64 [installed]
@@ -98,7 +98,7 @@ sudo apt install -y build-essential git curl wget net-tools -y
 apt install ntp -y
 ```
 
-1. clone & comple
+### clone & comple
 
 ```bash
 git clone https://github.com/kubeclipper/kubeclipper.git
@@ -108,7 +108,7 @@ git checkout release-1.4
 make build
 ```
 
-1. deploy
+### deploy
 
 ```bash
 sudo su
@@ -123,7 +123,7 @@ kcctl deploy --help
 kcctl deploy --user root --passwd {local-host-user-pwd} --pkg kc-minimal.tar.gz
 ```
 
-1. clean
+### clean
 
 ```bash
 kcctl clean --help
@@ -133,7 +133,7 @@ kcctl clean --all
 kcctl clean -A
 ```
 
-1. debug kcctl using gdb
+### debug kcctl using gdb
 
 ```bash
 apt install gdb -y
@@ -149,16 +149,16 @@ r login --host http://127.0.0.1 --username admin --password Thinkbig1
 r resource list
 ```
 
-1. ssh-keygen
+### ssh-keygen
 
 ```bash
 ssh-keygen -t rsa -b 4096
 ssh-keygen -f ~/.ssh/id_rsa.pub -e -m pem > id_rsa.pem
 ```
 
-- tarball k8s v1.32.2
+## tarball k8s v1.32.2
 
-1. add root passwd
+### add root passwd
 
 ```bash
 vim /etc/ssh/sshd_config
@@ -168,13 +168,13 @@ systemctl restart ssh
 passwd
 ```
 
-1. deploy MUST with passwd or pk-file FOR 'kcctl resource' cmd
+### deploy MUST with passwd or pk-file FOR 'kcctl resource' cmd
 
 ```bash
 kcctl deploy --server $IPADDR_SERVER --agent $IPADDR_AGENT --passwd xxx 或者 --pk-file
 ```
 
-1. tarball
+### tarball
 
 ```bash
 ./tarball-kubernetes.sh -a amd64 -v 1.32.2 -o /tmp
@@ -189,13 +189,13 @@ kcctl login --host http://127.0.0.1 --username admin --password Thinkbig1
 kcctl resource push --pkg k8s-${k8s_ver}-amd64.tar.gz --type k8s
 ```
 
-1. add k8s v1.32.2 info
+### add k8s v1.32.2 info
 
 ```bash
 vim /opt/kubeclipper-server/resource/metadata.json
 ```
 
-1. deploy k8s using kcctl,add pause tag
+### deploy k8s using kcctl,add pause tag
 
 ```bash
 vim /etc/containerd/config.toml
@@ -205,7 +205,7 @@ vim /etc/containerd/config.toml
 # sandbox_image = "registry.k8s.io/pause:3.10"
 ```
 
-1. bakup /tmp/.k8s and reboot host server
+### bakup /tmp/.k8s and reboot host server
 
 ```bash
 mkdir ~/bak -p
