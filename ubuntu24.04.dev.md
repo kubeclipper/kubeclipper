@@ -217,8 +217,8 @@ cp ~/bak/.k8s /tmp -a
 
 ## deploy kubeedge
 
-
 ### kind deploy k8s
+
 ```bash
 # go 1.16+ and docker, podman or nerdctl installed 
 
@@ -256,6 +256,7 @@ mv usr/bin/kubectl /usr/bin/
 ```
 
 ### keadm
+
 ```bash
 # cloudnode
 wget https://github.com/kubeedge/kubeedge/releases/download/v1.20.0/keadm-v1.20.0-linux-amd64.tar.gz
@@ -374,11 +375,12 @@ ctr -n  kube-system t ls
 ctr -n  kube-system i ls
 
 
-keadm join  --cloudcore-ipport=172.18.0.2:10000 --token=keadm-gettoken-cloudnode --kubeedge-version=v1.20.0 -p=unix:///var/run/docker.sock
+keadm join  --cloudcore-ipport=172.18.0.2:10000 \
+--token=keadm-gettoken-cloudnode --kubeedge-version=v1.20.0 \
+-p=unix:///var/run/docker.sock
 
 systemctl status  edgecore.service
 # systemctl restart  edgecore.service
 journalctl -u edgecore.service -xe
-
 
 ```
