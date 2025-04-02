@@ -214,3 +214,173 @@ cp /tmp/.k8s ~/bak -a
 cp ~/bak/.k8s /tmp -a
 # continue deploy k8s with web GUI
 ```
+
+## deploy kubeedge
+
+### kind deploy k8s
+
+```bash
+# go 1.16+ and docker, podman or nerdctl installed 
+
+# cat portmapping.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 10000
+    hostPort: 10000
+  - containerPort: 10001
+    hostPort: 10001
+  - containerPort: 10002
+    hostPort: 10002
+  - containerPort: 10003
+    hostPort: 10003
+  - containerPort: 10004
+    hostPort: 10004
+    # optional: set the bind address on the host
+    # 0.0.0.0 is the current default
+    # listenAddress: "127.0.0.1"
+    # optional: set the protocol to one of TCP, UDP, SCTP.
+    # TCP is the default
+    protocol: TCP
+
+kind create cluster --config portmapping.yaml
+
+# kind delete cluster
+
+# cp to host computer
+docker exec  kind-control-plane tar -c -f -  /usr/bin/kubectl > kubectl.tar
+tar xf kubectl.tar
+mv usr/bin/kubectl /usr/bin/
+```
+
+### keadm
+
+```bash
+# cloudnode
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.20.0/keadm-v1.20.0-linux-amd64.tar.gz
+# scp keadm-v1.20.0-linux-amd64.tar.gz edgenode
+tar -zxvf keadm-v1.20.0-linux-amd64.tar.gz
+cp keadm-v1.20.0-linux-amd64/keadm/keadm /usr/local/bin/keadm
+keadm version
+
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.20.0/kubeedge-v1.20.0-linux-amd64.tar.gz
+wget https://github.com/kubeedge/kubeedge/releases/download/v1.20.0/edgesite-v1.20.0-linux-amd64.tar.gz
+
+mkdir /etc/kubeedge
+cp kubeedge-v1.20.0-linux-amd64.tar.gz  edgesite-v1.20.0-linux-amd64.tar.gz /etc/kubeedge
+
+docker pull kubeedge/installation-package:v1.20.0
+docker pull kubeedge/iptables-manager:v1.20.0
+docker pull kubeedge/cloudcore:v1.20.0
+kind load docker-image kubeedge/installation-package:v1.20.0 --name kind
+kind load docker-image kubeedge/iptables-manager:v1.20.0 --name kind
+kind load docker-image kubeedge/cloudcore:v1.20.0  --name kind
+
+# keadm init --advertise-address="THE-EXPOSED-IP" --kubeedge-version=v1.20.0
+keadm init  --advertise-address=192.168.1.208 -v 7
+
+docker exec  kind-control-plane ss -tuln
+
+kubectl get all -n kubeedge 
+kubectl get nodes
+# kubectl  delete nodes k8s-node1
+
+keadm gettoken
+
+
+# edgenode
+
+vim /etc/containerd/config.toml
+
+runtime_type = "io.containerd.runc.v2"
+# disabled_plugins = ["cri"]
+disabled_plugins = []
+SystemdCgroup = true
+
+
+# edge node install cni for cri
+wget https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
+mkdir -p /opt/cni/bin
+tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.6.2.tgz
+
+mkdir -p /etc/cni/net.d/
+$ cat >/etc/cni/net.d/10-containerd-net.conflist <<EOF
+{
+  "cniVersion": "1.0.0",
+  "name": "containerd-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "ipMasq": true,
+      "promiscMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [{
+            "subnet": "10.88.0.0/16"
+          }],
+          [{
+            "subnet": "2001:db8:4860::/64"
+          }]
+        ],
+        "routes": [
+          { "dst": "0.0.0.0/0" },
+          { "dst": "::/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+EOF
+
+systemctl restart containerd.service
+
+ctr -n k8s.io image ls
+
+docker pull kubeedge/installation-package:v1.20.0
+docker save kubeedge/installation-package:v1.20.0 -o keip.tar
+ctr -n k8s.io image import keip.tar
+
+docker pull pause:3.8
+docker save pause:3.8 -o pause.3.8.tar
+ctr -n k8s.io image import pause.3.8.tar
+
+
+ctr -n k8s.io image pull docker.io/library/eclipse-mosquitto:1.6.15
+# or
+docker pull eclipse-mosquitto:1.6.15
+docker save eclipse-mosquitto:1.6.15 -o tt.tar
+ctr -n k8s.io image import tt.tar
+
+docker pull docker.io/kindest/kindnetd:v20250214-acbabc1a
+docker save docker.io/kindest/kindnetd:v20250214-acbabc1a -o kek.tar
+ctr -n k8s.io image import kek.tar
+
+docker pull registry.k8s.io/kube-proxy:v1.32.2
+docker save registry.k8s.io/kube-proxy:v1.32.2 -o kep.tar
+ctr -n k8s.io image import kep.tar
+
+ctr -n k8s.io image  ls
+
+ctr -n  kube-system c ls
+ctr -n  kube-system t ls
+ctr -n  kube-system i ls
+
+
+keadm join  --cloudcore-ipport=172.18.0.2:10000 \
+--token=keadm-gettoken-cloudnode --kubeedge-version=v1.20.0 \
+-p=unix:///var/run/docker.sock
+
+systemctl status  edgecore.service
+# systemctl restart  edgecore.service
+journalctl -u edgecore.service -xe
+
+```
