@@ -398,7 +398,7 @@ kubectl edit cm cloudcore -n kubeedge
 docker exec -it kind-control-plane bash
 crictl pods
 # restart cloudcore pod
-crictl stopp  cloudcore-5d9ccb9dc8-lv2qb
+crictl stopp cloudcore-5d9ccb9dc8-lv2qb
 
 ```
 
