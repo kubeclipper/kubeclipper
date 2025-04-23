@@ -384,3 +384,73 @@ systemctl status  edgecore.service
 journalctl -u edgecore.service -xe
 
 ```
+
+## kube api config
+
+### cloud
+
+```bash
+kubectl edit cm cloudcore -n kubeedge
+
+      dynamicController:
+        enable: true
+
+docker exec -it kind-control-plane bash
+crictl pods
+# restart cloudcore pod
+crictl stopp cloudcore-5d9ccb9dc8-lv2qb
+
+```
+
+### edge
+
+```bash
+vim /etc/kubeedge/config/edgecore.yaml
+modules:
+  ...
+  edgeMesh:
+    enable: false
+  ...
+  metaManager:
+    metaServer:
+      enable: true
+
+vim /etc/kubeedge/config/edgecore.yaml
+modules:
+  ...
+  edged:
+    ...
+    tailoredKubeletConfig:
+      ...
+      clusterDNS:
+      - 169.254.96.16
+      clusterDomain: cluster.local
+
+systemctl restart  edgecore.service
+
+# metaServer port 10550
+netstat -natp|grep 10550
+curl 127.0.0.1:10550/api/v1/services
+curl http://127.0.0.1:10550/api/v1/namespaces/kube-system/pods|jq '.items.[].metadata.name'
+
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  161k    0  161k    0     0   588k      0 --:--:-- --:--:-- --:--:--  586k
+"coredns-668d6bf9bc-j8cq4"
+"coredns-668d6bf9bc-kf4cl"
+"etcd-kind-control-plane"
+"kindnet-5bgh7"
+"kindnet-qsllc"
+"kube-apiserver-kind-control-plane"
+"kube-controller-manager-kind-control-plane"
+"kube-proxy-92w6x"
+"kube-proxy-rcjfq"
+"kube-scheduler-kind-control-plane"
+
+
+# cloud
+kubectl get pods -n kube-system -o wide
+
+# edge memroy
+ps -p <PID> -o rss
+```
