@@ -34,10 +34,16 @@ type Registry struct {
 }
 
 type RegistrySpec struct {
-	Scheme     string `json:"scheme,omitempty"`
-	Host       string `json:"host,omitempty"`
-	SkipVerify bool   `json:"skipVerify,omitempty"`
-	CA         string `json:"ca,omitempty"`
+	Scheme       string        `json:"scheme,omitempty"`
+	Host         string        `json:"host,omitempty"`
+	SkipVerify   bool          `json:"skipVerify,omitempty"`
+	CA           string        `json:"ca,omitempty"`
+	RegistryAuth *RegistryAuth `json:"auth,omitempty"`
+}
+
+type RegistryAuth struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 // RegistryList is a resource containing a list of RegistryList objects.

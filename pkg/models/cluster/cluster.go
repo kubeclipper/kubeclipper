@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
+
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -934,6 +936,7 @@ func RegistryFuzzyFilter(obj runtime.Object, q *query.Query) []runtime.Object {
 	}
 	objs := make([]runtime.Object, 0, len(registries.Items))
 	for index, template := range registries.Items {
+		template = strutil.HiddenPassword(template)
 		selected := true
 		for k, v := range q.FuzzySearch {
 			if !models.ObjectMetaFilter(template.ObjectMeta, k, v) {
