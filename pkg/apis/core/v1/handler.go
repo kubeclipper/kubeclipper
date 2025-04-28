@@ -3665,7 +3665,7 @@ func (h *handler) UpdateRegistry(req *restful.Request, resp *restful.Response) {
 		return
 	}
 
-	_, err := h.clusterOperator.GetRegistryEx(req.Request.Context(), name, "0")
+	oldReg, err := h.clusterOperator.GetRegistryEx(req.Request.Context(), name, "0")
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleBadRequest(resp, req, err)
@@ -3673,6 +3673,14 @@ func (h *handler) UpdateRegistry(req *restful.Request, resp *restful.Response) {
 		}
 		restplus.HandleInternalError(resp, req, err)
 		return
+	}
+	// check is need update password
+	if reg.RegistryAuth != nil { // if auth is nil,mean use disable auth
+		// if password is default value(****) means not update password
+		if reg.RegistryAuth.Password == strutil.SensitiveData {
+			reg.RegistryAuth.Password = oldReg.RegistryAuth.Password
+		}
+		// if not,use new password in request
 	}
 
 	if !dryRun {
@@ -3697,7 +3705,8 @@ func (h *handler) DescribeRegistry(req *restful.Request, resp *restful.Response)
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, reg)
+	regClean := strutil.HiddenPassword(*reg)
+	_ = resp.WriteHeaderAndEntity(http.StatusOK, &regClean)
 }
 
 func (h *handler) ListRegistry(req *restful.Request, resp *restful.Response) {
@@ -3780,6 +3789,15 @@ func (h *handler) registryValidate(_ context.Context, cp *v1.Registry) error {
 			return fmt.Errorf("invalidate certificate")
 		}
 	}
+	if cp.RegistryAuth != nil {
+		userEmpty := cp.RegistryAuth.Username == ""
+		passEmpty := cp.RegistryAuth.Password == ""
+
+		if userEmpty != passEmpty {
+			return fmt.Errorf("username and password must both be empty or both be non-empty")
+		}
+	}
+
 	return nil
 }
 

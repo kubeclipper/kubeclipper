@@ -22,6 +22,8 @@ import (
 	"encoding/base64"
 	"strconv"
 	"strings"
+
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 func Base64Encode(src string) string {
@@ -72,4 +74,16 @@ func StealKubernetesMajorVersionNumber(version string) (int, error) {
 
 	version = strings.Join(strings.Split(version, "")[0:3], "")
 	return strconv.Atoi(version)
+}
+
+const SensitiveData = "******"
+
+func HiddenPassword(registry v1.Registry) v1.Registry {
+	// hidden sensitive data
+	if registry.RegistryAuth != nil {
+		if registry.RegistryAuth.Password != "" {
+			registry.RegistryAuth.Password = SensitiveData
+		}
+	}
+	return registry
 }
