@@ -454,3 +454,57 @@ kubectl get pods -n kube-system -o wide
 # edge memroy
 ps -p <PID> -o rss
 ```
+
+## deploy hostnetwork application
+
+### edge node
+
+```bash
+docker pull nginx
+docker save nginx:latest -o nginx.tar
+ctr -n k8s.io image import nginx.tar
+ctr image import nginx.tar
+ctr -n k8s.io image list
+ctr image list
+netstat -natp|grep nginx
+
+```
+
+### cloud node
+
+```bash
+kubectl apply -f hostnginx.yaml
+kubectl get pods -o wide
+kubectl describe pod  nginx-deployment-799c65967c-q8nvt
+
+```
+
+### yaml file
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      hostNetwork: true
+      containers:
+      - name: nginx
+        image: docker.io/library/nginx:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+          hostPort: 80
+
+```
