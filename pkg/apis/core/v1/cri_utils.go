@@ -24,16 +24,13 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
 )
 
 // TODO: copy from ClusterController, Remove after refactoring
@@ -144,52 +141,9 @@ func (h *handler) getCRIRegistriesStep(ctx context.Context, cluster *v1.Cluster,
 }
 
 func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []v1.Node) (*v1.Step, error) {
-	var (
-		step     component.StepRunnable
-		identity string
-	)
-	switch cluster.ContainerRuntime.Type {
-	case v1.CRIDocker:
-		identity = cri.DockerInsecureRegistryConfigureIdentity
-		step = &cri.DockerInsecureRegistryConfigure{
-			InsecureRegistry: cri.ToDockerInsecureRegistry(registries),
-		}
-	case v1.CRIContainerd:
-		identity = cri.ContainerdRegistryConfigureIdentity
-		step = &cri.ContainerdRegistryConfigure{
-			Registries: cri.ToContainerdRegistryConfig(registries),
-			// TODO: get from config
-			ConfigDir: cri.ContainerdDefaultRegistryConfigDir,
-		}
-	default:
-		return nil, fmt.Errorf("unknown CRI type:%s", cluster.ContainerRuntime.Type)
+	wrapNodes := make([]*v1.Node, 0, len(nodes))
+	for i := range nodes {
+		wrapNodes[i] = &nodes[i]
 	}
-	stepData, err := json.Marshal(step)
-	if err != nil {
-		return nil, fmt.Errorf("step marshal:%w", err)
-	}
-	var allNodes []v1.StepNode
-	for _, node := range nodes {
-		allNodes = append(allNodes, v1.StepNode{
-			ID:       node.Name,
-			IPv4:     node.Status.Ipv4DefaultIP,
-			NodeIPv4: node.Status.NodeIpv4DefaultIP,
-			Hostname: node.Labels[common.LabelHostname],
-		})
-	}
-	return &v1.Step{
-		Name:   "update-cri-registry-config",
-		Nodes:  allNodes,
-		Action: v1.ActionInstall,
-		Timeout: metav1.Duration{
-			Duration: time.Second * 30,
-		},
-		Commands: []v1.Command{
-			{
-				Type:          v1.CommandCustom,
-				Identity:      identity,
-				CustomCommand: stepData,
-			},
-		},
-	}, nil
+	return clustercontroller.CRIRegistryUpdateStep(cluster, registries, wrapNodes)
 }

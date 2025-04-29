@@ -199,6 +199,20 @@ version = 2
       [plugins."io.containerd.grpc.v1.cri".registry.auths]
 
       [plugins."io.containerd.grpc.v1.cri".registry.configs]
+        {{- if .RegistryWithAuth }}
+          {{- range $reg := .RegistryWithAuth }}
+            {{- if $reg.Host }}
+        [plugins."io.containerd.grpc.v1.cri".registry.configs."{{ $reg.Host }}"]
+              {{- if $reg.RegistryAuth }}
+          [plugins."io.containerd.grpc.v1.cri".registry.configs."{{ $reg.Host }}".auth]
+            username = "{{ $reg.RegistryAuth.Username }}"
+            password = "{{ $reg.RegistryAuth.Password }}"
+            auth = ""
+            identitytoken = ""
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
 
       [plugins."io.containerd.grpc.v1.cri".registry.headers]
 

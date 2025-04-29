@@ -72,11 +72,21 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cl
 	runnable.DataRootDir = strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, cluster.ContainerRuntime.DataRootDir)
 	runnable.LocalRegistry = metadata.LocalRegistry
 	runnable.Registies = cluster.Status.Registries
+	runnable.RegistryWithAuth = FilterRegistryWithAuth(cluster.Status.Registries)
+	if runnable.RegistryConfigDir == "" {
+		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir
+	}
+	// When systemd is the init system of Linux,
+	// it generates and consumes a root cgroup and acts as a cgroup manager.
+	runnable.EnableSystemdCgroup = strconv.FormatBool(cgroups.IsRunningSystemd())
 
 	runnable.PauseVersion, runnable.PauseRegistry = runnable.matchPauseVersion(metadata.KubeVersion)
 	runtimeBytes, err := json.Marshal(runnable)
 	if err != nil {
-		return err
+		logger.Errorf("Failed to marshal container runtime information: %v", err)
+	}
+	if runnable.PauseVersion == "" {
+		runnable.PauseVersion, runnable.PauseRegistry = runnable.matchPauseVersion(cluster.KubernetesVersion)
 	}
 
 	// nodes := utils.UnwrapNodeList(metadata.GetAllNodes())
@@ -242,9 +252,11 @@ func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, d
 	if err := os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
 		return err
 	}
+	// render config.toml
 	if err := fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, runnable.renderTo, dryRun); err != nil {
 		return err
 	}
+	// render certs.d
 	return runnable.renderRegistryConfig(dryRun)
 }
 
@@ -307,14 +319,16 @@ func (runnable *ContainerdRunnable) renderRegistryConfig(dryRun bool) error {
 }
 
 type ContainerdRegistryConfigure struct {
-	Registries map[string]*ContainerdRegistry `json:"registries,omitempty"`
-	ConfigDir  string                         `json:"configDir"`
+	Registries         map[string]*ContainerdRegistry `json:"registries,omitempty"` // 用于生成hosts.toml
+	ConfigDir          string                         `json:"configDir"`
+	ContainerdRunnable *ContainerdRunnable            `json:"containerdRunnable,omitempty"`
 }
 
 func (c *ContainerdRegistryConfigure) Install(ctx context.Context, opts component.Options) ([]byte, error) {
 	if opts.DryRun {
 		return nil, nil
 	}
+	// 1. render certs.d config
 	entries, err := os.ReadDir(c.ConfigDir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("read registry config dir:%s failed:%w", c.ConfigDir, err)
@@ -338,6 +352,23 @@ func (c *ContainerdRegistryConfigure) Install(ctx context.Context, opts componen
 			logger.Errorf("clear old registry config dir: %s failed:%s", d, err)
 		}
 	}
+
+	// 2. render config.toml
+	cf := filepath.Join(containerdDefaultConfigDir, "config.toml")
+	if err = os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
+		logger.Errorf("mkdir containerd config dir: %s failed:%s", cf, err)
+	}
+	if err = fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, c.ContainerdRunnable.renderTo, false); err != nil {
+		logger.Errorf("render containerd config: %s failed:%s", cf, err)
+	}
+	// restart containerd
+	if err = systemctl.ReloadDeamon(ctx); err != nil {
+		logger.Errorf("systemctl daemon-reload failed:%s", err)
+	}
+	if err = systemctl.RestartUnit(ctx, containerdSystemdUnitName); err != nil {
+		logger.Errorf("systemctl restart containerd failed:%s", err)
+	}
+
 	return nil, nil
 }
 
@@ -477,4 +508,15 @@ func ToContainerdRegistryConfig(registries []v1.RegistrySpec) map[string]*Contai
 		})
 	}
 	return cfgs
+}
+
+// FilterRegistryWithAuth 过滤带认证的 Registry 用于生成 config.toml 文件
+func FilterRegistryWithAuth(registries []v1.RegistrySpec) []v1.RegistrySpec {
+	list := make([]v1.RegistrySpec, 0)
+	for _, r := range registries {
+		if r.RegistryAuth != nil {
+			list = append(list, r)
+		}
+	}
+	return list
 }
