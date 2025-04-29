@@ -3641,8 +3641,8 @@ func (h *handler) CreateRegistry(req *restful.Request, resp *restful.Response) {
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-
-	_ = resp.WriteHeaderAndEntity(http.StatusCreated, reg)
+	regClean := strutil.HiddenPassword(*reg)
+	_ = resp.WriteHeaderAndEntity(http.StatusCreated, &regClean)
 }
 
 func (h *handler) UpdateRegistry(req *restful.Request, resp *restful.Response) {

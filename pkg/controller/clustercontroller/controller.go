@@ -219,6 +219,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err = r.updateClusterNode(ctx, clu, false); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	// update cri will restart cri,may make cluster unhealthy
+	// so we need run this before syncClusterClient.
+	if err = r.updateCRIRegistries(ctx, clu); err != nil {
+		return ctrl.Result{}, nil
+	}
 	if err = r.syncClusterClient(ctx, log, clu); err != nil {
 		return ctrl.Result{}, nil
 	}
@@ -231,7 +237,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	return ctrl.Result{}, r.updateCRIRegistries(ctx, clu)
+	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) updateClusterNode(ctx context.Context, c *v1.Cluster, del bool) error {
@@ -536,10 +542,13 @@ func includeAllSan(c *v1.Cluster, cert *x509.Certificate) bool {
 }
 
 func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {
+	logger.Infof("【cluster-controller】 updateCRIRegistries start")
 	registries, err := r.getClusterCRIRegistries(c)
 	if err != nil {
 		return err
 	}
+
+	logger.Debugf("cluster-controller】 updateCRIRegistries registries:%#v", registries)
 	switch c.Status.Phase {
 	case v1.ClusterInstalling:
 		if !registriesEqual(c.Status.Registries, registries) {
@@ -632,13 +641,16 @@ func (r *ClusterReconciler) getClusterCRIRegistries(c *v1.Cluster) ([]v1.Registr
 			validRegistries = append(validRegistries, reg)
 			continue
 		}
-		registry, err := r.RegistryLister.Get(*reg.RegistryRef)
+		//registry, err := r.RegistryLister.Get(*reg.RegistryRef)
+		// use operator not lister
+		registry, err := r.ClusterOperator.GetRegistry(context.Background(), *reg.RegistryRef)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
 			return nil, fmt.Errorf("get registry %s:%w", *reg.RegistryRef, err)
 		}
+		logger.Debugf("【cluster-controller】 getClusterCRIRegistries registry:%#v  auth:%#v", registry, registry.RegistryAuth)
 		registries = appendUniqueRegistry(registries, registry.RegistrySpec)
 		validRegistries = append(validRegistries, reg)
 	}
@@ -646,11 +658,17 @@ func (r *ClusterReconciler) getClusterCRIRegistries(c *v1.Cluster) ([]v1.Registr
 	return registries, nil
 }
 
+func CRIRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Step, error) {
+	return criRegistryUpdateStep(cluster, registries, nodes)
+}
+
 func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Step, error) {
 	var (
 		step     component.StepRunnable
 		identity string
 	)
+	allNodes := utils.BuildStepNode(nodes)
+
 	switch cluster.ContainerRuntime.Type {
 	case v1.CRIDocker:
 		identity = cri.DockerInsecureRegistryConfigureIdentity
@@ -659,10 +677,16 @@ func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, no
 		}
 	case v1.CRIContainerd:
 		identity = cri.ContainerdRegistryConfigureIdentity
+		containerRunable := &cri.ContainerdRunnable{}
+		err := containerRunable.InitStep(context.Background(), cluster, allNodes)
+		if err != nil {
+			return nil, fmt.Errorf("init container runbale failed:%w", err)
+		}
 		step = &cri.ContainerdRegistryConfigure{
 			Registries: cri.ToContainerdRegistryConfig(registries),
 			// TODO: get from config
-			ConfigDir: cri.ContainerdDefaultRegistryConfigDir,
+			ConfigDir:          cri.ContainerdDefaultRegistryConfigDir,
+			ContainerdRunnable: containerRunable,
 		}
 	default:
 		return nil, fmt.Errorf("unknown CRI type:%s", cluster.ContainerRuntime.Type)
@@ -670,15 +694,6 @@ func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, no
 	stepData, err := json.Marshal(step)
 	if err != nil {
 		return nil, fmt.Errorf("step marshal:%w", err)
-	}
-	var allNodes []v1.StepNode
-	for _, node := range nodes {
-		allNodes = append(allNodes, v1.StepNode{
-			ID:       node.Name,
-			IPv4:     node.Status.Ipv4DefaultIP,
-			NodeIPv4: node.Status.NodeIpv4DefaultIP,
-			Hostname: node.Labels[common.LabelHostname],
-		})
 	}
 	return &v1.Step{
 		Name:   "update-cri-registry-config",

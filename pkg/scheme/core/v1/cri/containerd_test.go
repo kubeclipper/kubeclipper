@@ -63,6 +63,20 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 						{
 							Scheme: "http",
 							Host:   "127.0.0.1:6000",
+							RegistryAuth: &v1.RegistryAuth{
+								Username: "myuser",
+								Password: "mypassword",
+							},
+						},
+					},
+					RegistryWithAuth: []v1.RegistrySpec{
+						{
+							Scheme: "http",
+							Host:   "127.0.0.1:6000",
+							RegistryAuth: &v1.RegistryAuth{
+								Username: "myuser",
+								Password: "mypassword",
+							},
 						},
 					},
 				},

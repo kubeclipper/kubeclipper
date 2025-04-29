@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -89,6 +91,18 @@ func UnwrapNodeList(nl component.NodeList) (nodes []v1.StepNode) {
 		})
 	}
 	return nodes
+}
+
+func BuildStepNode(nodes []*v1.Node) (stepNodes []v1.StepNode) {
+	for _, node := range nodes {
+		stepNodes = append(stepNodes, v1.StepNode{
+			ID:       node.Name,
+			IPv4:     node.Status.Ipv4DefaultIP,
+			NodeIPv4: node.Status.NodeIpv4DefaultIP,
+			Hostname: node.Labels[common.LabelHostname],
+		})
+	}
+	return stepNodes
 }
 
 // NamespacedKey returns ${namespace}/${name} string(namespaced key) of a Kubernetes object.
