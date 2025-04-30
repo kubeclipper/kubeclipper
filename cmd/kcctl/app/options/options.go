@@ -139,6 +139,7 @@ const (
 	ResourceNode      = "node"
 	ResourceCluster   = "cluster"
 	ResourceUser      = "user"
+	ResourceRegistry  = "registry"
 	ResourceRole      = "role"
 	ResourceConfigMap = "configmap"
 	UpgradeKcctl      = "kcctl"

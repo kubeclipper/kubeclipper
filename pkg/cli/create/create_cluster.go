@@ -68,6 +68,9 @@ const (
   # Create cluster with worker.
   kcctl create cluster --name demo --master 192.168.10.123 --worker 192.168.10.124
 
+  # Create cluster with cri registry.
+  kcctl create cluster --name demo --master 192.168.10.123 --worker 192.168.10.124 --cri-registry myregistry
+
   Please read 'kcctl create cluster -h' get more create cluster flags.`
 )
 
@@ -143,6 +146,7 @@ type CreateClusterOptions struct {
 	Offline                          bool
 	LocalRegistry                    string
 	InsecureRegistries               []string
+	CRIRegistries                    []string
 	CRI                              string
 	CRIVersion                       string
 	K8sVersion                       string
@@ -211,8 +215,9 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.Workers, "worker", o.Workers, "k8s worker node id or ip")
 	cmd.Flags().BoolVar(&o.UntaintMaster, "untaint-master", o.UntaintMaster, "untaint master node after cluster create")
 	cmd.Flags().BoolVar(&o.Offline, "offline", o.Offline, "create cluster online(false) or offline(true)")
-	cmd.Flags().StringVar(&o.LocalRegistry, "local-registry", o.LocalRegistry, "use local registry address to pull image")
+	cmd.Flags().StringVar(&o.LocalRegistry, "local-registry", o.LocalRegistry, "use local registry address to pull image for create cluster")
 	cmd.Flags().StringSliceVar(&o.InsecureRegistries, "insecure-registry", o.InsecureRegistries, "use remote registry address to pull image")
+	cmd.Flags().StringSliceVar(&o.CRIRegistries, "cri-registry", o.CRIRegistries, "specify internal cri registry name to add registry config to containerd,run command [kcctl get registry] to show internal cri registry")
 	cmd.Flags().StringVar(&o.CRI, "cri", o.CRI, "k8s cri type, docker or containerd")
 	cmd.Flags().StringVar(&o.CRIVersion, "cri-version", o.CRIVersion, "k8s cri version")
 	cmd.Flags().StringVar(&o.K8sVersion, "k8s-version", o.K8sVersion, "k8s version")
@@ -337,6 +342,13 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 	cniVersions := l.listCNI("")
 	if !sliceutil.HasString(cniVersions, l.CNIVersion) {
 		return utils.UsageErrorf(cmd, "unsupported cni version,support %v now", cniVersions)
+	}
+
+	criRegistries := l.listCRIRegistry()
+	for _, registry := range l.CRIRegistries {
+		if !sliceutil.HasString(criRegistries, registry) {
+			return utils.UsageErrorf(cmd, "cri registry [%s] not found,has %v now,use [kcctl get registry] to show", registry, criRegistries)
+		}
 	}
 
 	nodes := make([]string, 0)
@@ -542,12 +554,21 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	if l.LocalRegistry != "" {
 		insecureRegistry = []string{l.LocalRegistry}
 	}
+	var criRegistry []v1.CRIRegistry
+	for _, registry := range l.CRIRegistries {
+		r := registry
+		criRegistry = append(criRegistry, v1.CRIRegistry{
+			RegistryRef: &r,
+		})
+	}
+
 	switch l.CRI {
 	case "docker":
 		c.ContainerRuntime = v1.ContainerRuntime{
 			Type:             v1.CRIDocker,
 			Version:          l.CRIVersion,
 			InsecureRegistry: append(insecureRegistry, l.InsecureRegistries...),
+			Registries:       criRegistry,
 		}
 	case "containerd":
 		fallthrough
@@ -556,6 +577,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 			Type:             v1.CRIContainerd,
 			Version:          l.CRIVersion,
 			InsecureRegistry: append(insecureRegistry, l.InsecureRegistries...),
+			Registries:       criRegistry,
 		}
 	}
 	return c
@@ -585,6 +607,19 @@ func (l *CreateClusterOptions) listK8s(toComplete string) []string {
 	utils.CheckErr(l.Complete(l.CliOpts))
 
 	return l.componentVersions("k8s", toComplete)
+}
+
+func (l *CreateClusterOptions) listCRIRegistry() []string {
+	registries, err := l.Client.ListRegistries(context.Background(), kc.Queries{})
+	if err != nil {
+		logger.Errorf("list cri registry failed: %s.", err)
+		return nil
+	}
+	names := make([]string, 0)
+	for _, registry := range registries.Items {
+		names = append(names, registry.Name)
+	}
+	return names
 }
 
 func (l *CreateClusterOptions) componentVersions(component, toComplete string) []string {

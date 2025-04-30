@@ -18,7 +18,12 @@
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"strconv"
+
+	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +genclient:nonNamespaced
@@ -55,4 +60,33 @@ type RegistryList struct {
 
 	// Items is the list of registry.
 	Items []Registry
+}
+
+func (n *RegistryList) YAMLPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.YAMLPrinter(n.Items[0])
+	}
+	return printer.YAMLPrinter(n)
+}
+
+func (n *RegistryList) TablePrint() ([]string, [][]string) {
+	headers := []string{"name", "scheme", "host", "skip-tls-verify", "ca", "auth"}
+	var data [][]string
+	for _, registry := range n.Items {
+		data = append(data, []string{registry.Name,
+			registry.Scheme,
+			registry.Host,
+			strconv.FormatBool(registry.SkipVerify),
+			strconv.FormatBool(registry.CA != ""),
+			strconv.FormatBool(registry.RegistryAuth != nil),
+		})
+	}
+	return headers, data
+}
+
+func (n *RegistryList) JSONPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.JSONPrinter(n.Items[0])
+	}
+	return printer.JSONPrinter(n)
 }

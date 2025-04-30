@@ -34,22 +34,23 @@ import (
 )
 
 const (
-	ListNodesPath     = "/api/core.kubeclipper.io/v1/nodes"
-	clustersPath      = "/api/core.kubeclipper.io/v1/clusters"
-	clustersCertPath  = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
-	componentPath     = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
-	backupPath        = "/api/core.kubeclipper.io/v1/backups"
-	backupPonitPath   = "/api/core.kubeclipper.io/v1/backuppoints"
-	usersPath         = "/api/iam.kubeclipper.io/v1/users"
-	rolesPath         = "/api/iam.kubeclipper.io/v1/roles"
-	platformPath      = "/api/config.kubeclipper.io/v1/template"
-	publicKeyPath     = "/api/config.kubeclipper.io/v1/terminal.key"
-	versionPath       = "/version"
-	componentMetaPath = "/api/config.kubeclipper.io/v1/componentmeta"
-	configmapPath     = "/api/core.kubeclipper.io/v1/configmaps"
-	templatePath      = "/api/core.kubeclipper.io/v1/templates"
-	registryPath      = "/api/core.kubeclipper.io/v1/registries"
-	regionPath        = "/api/core.kubeclipper.io/v1/regions"
+	ListNodesPath        = "/api/core.kubeclipper.io/v1/nodes"
+	clustersPath         = "/api/core.kubeclipper.io/v1/clusters"
+	clustersCertPath     = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
+	componentPath        = "/api/core.kubeclipper.io/v1/clusters/%s/plugins"
+	backupPath           = "/api/core.kubeclipper.io/v1/backups"
+	backupPonitPath      = "/api/core.kubeclipper.io/v1/backuppoints"
+	usersPath            = "/api/iam.kubeclipper.io/v1/users"
+	rolesPath            = "/api/iam.kubeclipper.io/v1/roles"
+	platformPath         = "/api/config.kubeclipper.io/v1/template"
+	publicKeyPath        = "/api/config.kubeclipper.io/v1/terminal.key"
+	versionPath          = "/version"
+	componentMetaPath    = "/api/config.kubeclipper.io/v1/componentmeta"
+	configmapPath        = "/api/core.kubeclipper.io/v1/configmaps"
+	templatePath         = "/api/core.kubeclipper.io/v1/templates"
+	registryPath         = "/api/core.kubeclipper.io/v1/registries"
+	describeRegistryPath = "/api/core.kubeclipper.io/v1/registry/%s"
+	regionPath           = "/api/core.kubeclipper.io/v1/regions"
 
 	operationPath = "/api/core.kubeclipper.io/v1/operations"
 	logPath       = "/api/core.kubeclipper.io/v1/logs"
@@ -612,6 +613,19 @@ func (cli *Client) DeleteRegistry(ctx context.Context, name string) error {
 		return err
 	}
 	return nil
+}
+
+func (cli *Client) DescribeRegistries(ctx context.Context, name string) (*v1.RegistryList, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf(describeRegistryPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	registries := v1.RegistryList{}
+	registry := v1.Registry{}
+	err = json.NewDecoder(serverResp.body).Decode(&registry)
+	registries.Items = append(registries.Items, registry)
+	return &registries, err
 }
 
 func (cli *Client) ListRegistries(ctx context.Context, query Queries) (*v1.RegistryList, error) {

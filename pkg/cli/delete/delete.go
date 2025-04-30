@@ -68,7 +68,7 @@ type DeleteOptions struct {
 }
 
 var (
-	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceCluster)
+	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceCluster, options.ResourceRegistry)
 )
 
 func NewCmdDelete(streams options.IOStreams) *cobra.Command {
@@ -153,6 +153,11 @@ func (l *DeleteOptions) RunDelete() error {
 			queryString.Set(query.ParameterForce, "true")
 		}
 		err = l.Client.DeleteClusterWithQuery(context.TODO(), l.name, queryString)
+		if err != nil {
+			return err
+		}
+	case options.ResourceRegistry:
+		err = l.Client.DeleteRegistry(context.TODO(), l.name)
 		if err != nil {
 			return err
 		}

@@ -78,7 +78,7 @@ type GetOptions struct {
 }
 
 var (
-	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap)
+	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap, options.ResourceRegistry)
 )
 
 func NewGetOptions(streams options.IOStreams) *GetOptions {
@@ -165,6 +165,8 @@ func (l *GetOptions) list() error {
 		result, err = l.client.ListClusters(context.TODO(), kc.Queries(*q))
 	case options.ResourceConfigMap:
 		result, err = l.client.ListConfigMaps(context.TODO(), kc.Queries(*q))
+	case options.ResourceRegistry:
+		result, err = l.client.ListRegistries(context.TODO(), kc.Queries(*q))
 	default:
 		return fmt.Errorf("unsupported resource")
 	}
@@ -191,6 +193,8 @@ func (l *GetOptions) describe() error {
 		result, err = l.client.DescribeCluster(context.TODO(), l.name)
 	case options.ResourceConfigMap:
 		result, err = l.client.DescribeConfigMap(context.TODO(), l.name)
+	case options.ResourceRegistry:
+		result, err = l.client.DescribeRegistries(context.TODO(), l.name)
 	default:
 		return fmt.Errorf("unsupported resource")
 	}

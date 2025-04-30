@@ -57,6 +57,9 @@ const (
   # Create cluster use cluster.yaml. 
   kcctl create -f cluster.yaml
 
+  # Create registry 
+  kcctl create registry --name myregistry --host 1.1.1.1:5000
+
 cluster.yaml example:
 
 kind: Cluster
@@ -157,6 +160,7 @@ func NewCmdCreate(streams options.IOStreams) *cobra.Command {
 	cmd.AddCommand(NewCmdCreateCluster(streams))
 	cmd.AddCommand(NewCmdCreateRole(streams))
 	cmd.AddCommand(NewCmdCreateUser(streams))
+	cmd.AddCommand(NewCmdCreateRegistry(streams))
 	return cmd
 }
 
