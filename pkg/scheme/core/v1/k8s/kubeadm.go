@@ -427,8 +427,11 @@ func (stepper *KubeadmConfig) matchClusterConfigAPIVersion() (string, error) {
 	if ver >= 118 && ver <= 121 {
 		return "v1beta2", nil
 	}
-	// +1.22.x version
-	return "v1beta3", nil
+	if ver > 121 && ver <= 131 {
+		return "v1beta3", nil
+	}
+	// +1.31.x version
+	return "v1beta4", nil
 }
 
 func (stepper *KubeadmConfig) getAgentNodeIP() (string, error) {

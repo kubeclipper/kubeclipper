@@ -64,6 +64,10 @@ scheduler:
 {{if gt (len .FeatureGates) 0}}
 featureGates:{{range $key,$value := .FeatureGates}}
   {{$key}}: {{$value}}{{end}}{{end}}
+{{- if eq .ClusterConfigAPIVersion "1beta4"}}
+certificateValidityPeriod: 87600h
+caCertificateValidityPeriod: 867240h
+{{end}}
 ---
 kind: KubeProxyConfiguration
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
