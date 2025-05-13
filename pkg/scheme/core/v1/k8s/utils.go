@@ -22,6 +22,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -39,16 +40,37 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 )
 
-func getJoinCmdFromStdOut(output string, cutBegin string) string {
-	outputSlice := strings.Split(output, "\n")
-	controlPlaneJoinStartIndex := 0
-	for index, val := range outputSlice {
-		if val == cutBegin {
-			controlPlaneJoinStartIndex = index
+// sanitizeCommand clean output
+func sanitizeCommand(input string) string {
+	cleaned := strings.ReplaceAll(input, "\\\n", " ")
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
+// extractJoinCommands extra kubeadm join commands from output
+func extractJoinCommands(output string) (master, worker string) {
+	cleanedOutput := sanitizeCommand(output)
+
+	masterPattern := `kubeadm join.*?--control-plane.*?--certificate-key\s+\S+`
+	workerPattern := `kubeadm join.*?--token\s+\S+.*?--discovery-token-ca-cert-hash\s+\S+`
+
+	// extra join master command by regexp
+	reMaster := regexp.MustCompile(masterPattern)
+	masterMatches := reMaster.FindAllString(cleanedOutput, -1)
+	if len(masterMatches) > 0 {
+		master = masterMatches[0]
+	}
+
+	// extra join worker command by regexp
+	reWorker := regexp.MustCompile(workerPattern)
+	workerMatches := reWorker.FindAllString(cleanedOutput, -1)
+	for _, match := range workerMatches {
+		if !strings.Contains(match, "--control-plane") {
+			worker = match
+			break
 		}
 	}
-	result := strings.Join([]string{strings.TrimSpace(outputSlice[controlPlaneJoinStartIndex+2]), strings.TrimSpace(outputSlice[controlPlaneJoinStartIndex+3]), strings.TrimSpace(outputSlice[controlPlaneJoinStartIndex+4])}, "\n")
-	return strings.Replace(result, "\\\n", "", -1)
+
+	return
 }
 
 func generateKubeConfig(ctx context.Context) error {

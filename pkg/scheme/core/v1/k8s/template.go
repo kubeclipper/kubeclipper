@@ -18,18 +18,34 @@
 
 package k8s
 
+// after v1.33 only support v1beta4
+// docs: https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta4/
 const kubeadmTemplate = `
 kind: ClusterConfiguration
 apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
 etcd:
   local:
 {{with .Etcd.DataDir}}    dataDir: "{{.}}"{{end}}
+{{- if eq .ClusterConfigAPIVersion "v1beta4"}} {{/* v1beta4 format */}}
+    extraArgs:
+      - name: auto-compaction-retention
+        value: '1'
+      - name: election-timeout
+        value: '1500'
+      - name: heartbeat-interval
+        value: '300'
+      - name: quota-backend-bytes
+        value: '8589934592'
+      - name: snapshot-count
+        value: '5000'
+{{- else }} {{/* old version format*/}}
     extraArgs:
       auto-compaction-retention: '1'
       election-timeout: '1500'
       heartbeat-interval: '300'
       quota-backend-bytes: '8589934592'
-      snapshot-count: '100000'
+      snapshot-count: '5000'
+{{- end }}
 networking:
   serviceSubnet: {{ range .Networking.Services.CIDRBlocks }}{{ . }}{{- end }}
   podSubnet: {{ range .Networking.Pods.CIDRBlocks }}{{ . }}{{- end }}
@@ -112,8 +128,15 @@ nodeRegistration:
   criSocket: /run/containerd/containerd.sock
 {{end}}
   kubeletExtraArgs:
+{{- if eq .ClusterConfigAPIVersion "v1beta4"}} {{/* v1beta4 format */}}
+    - name: root-dir
+      value: {{.Kubelet.RootDir}}
+    - name: node-ip
+      value: {{.Kubelet.NodeIP}}
+{{- else }} {{/* old version format*/}}
     root-dir: {{.Kubelet.RootDir}}
     node-ip: {{.Kubelet.NodeIP}}
+{{- end }}
 `
 
 const KubeadmJoinTemplate = `apiVersion: kubeadm.k8s.io/{{.ClusterConfigAPIVersion}}
@@ -139,9 +162,18 @@ nodeRegistration:
   criSocket: /run/containerd/containerd.sock
 {{end}}
   kubeletExtraArgs:
+{{- if eq .ClusterConfigAPIVersion "v1beta4"}} {{/* v1beta4 format */}}
+    - name: root-dir
+      value: {{.Kubelet.RootDir}}
+    - name: node-ip
+      value: {{.Kubelet.NodeIP}}
+    - name: resolv-conf
+      value: {{.Kubelet.ResolvConf}}
+{{- else }} {{/* old version format*/}}
     root-dir: {{.Kubelet.RootDir}}
     node-ip: {{.Kubelet.NodeIP}}
     resolv-conf: {{.Kubelet.ResolvConf}}
+{{- end }}
 `
 
 const lvscareV111 = `

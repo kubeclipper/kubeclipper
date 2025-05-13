@@ -513,8 +513,7 @@ func (stepper *ControlPlane) Install(ctx context.Context, opts component.Options
 	joinControlPlaneCMD := "dry run join control plane"
 	joinWorkerCMD := "dry run join worker"
 	if !opts.DryRun {
-		joinControlPlaneCMD = getJoinCmdFromStdOut(ec.StdOut(), "You can now join any number of the control-plane node running the following command on each as root:")
-		joinWorkerCMD = getJoinCmdFromStdOut(ec.StdOut(), "Then you can join any number of worker nodes by running the following on each as root:")
+		joinControlPlaneCMD, joinWorkerCMD = extractJoinCommands(ec.StdOut())
 		if err := generateKubeConfig(ctx); err != nil {
 			return nil, err
 		}
