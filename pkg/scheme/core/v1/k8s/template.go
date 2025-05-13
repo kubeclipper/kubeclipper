@@ -37,14 +37,14 @@ etcd:
       - name: quota-backend-bytes
         value: '8589934592'
       - name: snapshot-count
-        value: '5000'
+        value: '100000'
 {{- else }} {{/* old version format*/}}
     extraArgs:
       auto-compaction-retention: '1'
       election-timeout: '1500'
       heartbeat-interval: '300'
       quota-backend-bytes: '8589934592'
-      snapshot-count: '5000'
+      snapshot-count: '100000'
 {{- end }}
 networking:
   serviceSubnet: {{ range .Networking.Services.CIDRBlocks }}{{ . }}{{- end }}
