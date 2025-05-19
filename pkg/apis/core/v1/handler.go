@@ -31,6 +31,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
+
 	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
 
 	"k8s.io/client-go/util/retry"
@@ -369,7 +371,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 	}
 
 	extraMeta.OperationType = v1.OperationDeleteCluster
-	op, err := h.parseOperationFromCluster(extraMeta, c, v1.ActionUninstall)
+	op, err := h.parseOperationFromCluster(extraMeta, c, v1.ActionUninstall, h.clusterOperator)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -447,7 +449,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	}
 
 	extraMeta.OperationType = v1.OperationCreateCluster
-	op, err := h.parseOperationFromCluster(extraMeta, &c, v1.ActionInstall)
+	op, err := h.parseOperationFromCluster(extraMeta, &c, v1.ActionInstall, h.clusterOperator)
 	if err != nil {
 		restplus.HandleInternalError(response, request, err)
 		return
@@ -940,18 +942,7 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 
 // TODO: it will be deprecated in the future
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
-	meta := &component.ExtraMetadata{
-		ClusterName:        c.Name,
-		ClusterStatus:      c.Status.Phase,
-		Offline:            c.Offline(),
-		LocalRegistry:      c.LocalRegistry,
-		CRI:                c.ContainerRuntime.Type,
-		KubeVersion:        c.KubernetesVersion,
-		KubeletDataDir:     c.Kubelet.RootDir,
-		ControlPlaneStatus: c.Status.ControlPlaneHealth,
-		CNI:                c.CNI.Type,
-		CNINamespace:       c.CNI.Namespace,
-	}
+	meta := utils.NewMetadata(c)
 
 	if c.Annotations != nil {
 		_, ok := c.Annotations[common.AnnotationOnlyInstallKubernetesComp]
@@ -1841,7 +1832,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 	if !dryRun {
 		// cluster.Status.Registries will be updated
 		var statusRegistry []v1.RegistrySpec
-		statusRegistry, err = h.getClusterCRIRegistries(ctx, clu)
+		statusRegistry, err = utils.GetClusterCRIRegistries(clu, h.clusterOperator)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return

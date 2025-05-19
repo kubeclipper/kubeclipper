@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+
 	"github.com/kubeclipper/kubeclipper/pkg/simple/generic"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
@@ -41,7 +43,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 )
@@ -51,26 +52,6 @@ func reverseComponents(components []v1.Addon) {
 	for i := 0; i < length/2; i++ {
 		components[i], components[length-(i+1)] = components[length-(i+1)], components[i]
 	}
-}
-
-func getCriStep(ctx context.Context, c *v1.Cluster, action v1.StepAction, nodes []v1.StepNode) ([]v1.Step, error) {
-	switch c.ContainerRuntime.Type {
-	case v1.CRIDocker:
-		r := cri.DockerRunnable{}
-		err := r.InitStep(ctx, c, nodes)
-		if err != nil {
-			return nil, err
-		}
-		return r.GetActionSteps(action), nil
-	case v1.CRIContainerd:
-		r := cri.ContainerdRunnable{}
-		err := r.InitStep(ctx, c, nodes)
-		if err != nil {
-			return nil, err
-		}
-		return r.GetActionSteps(action), nil
-	}
-	return nil, fmt.Errorf("%v type CRI is not supported", c.ContainerRuntime.Type)
 }
 
 func getK8sSteps(ctx context.Context, c *v1.Cluster, action v1.StepAction) ([]v1.Step, error) {
@@ -92,7 +73,7 @@ func getSteps(c component.Interface, action v1.StepAction) ([]v1.Step, error) {
 	}
 }
 
-func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetadata, c *v1.Cluster, action v1.StepAction) (*v1.Operation, error) {
+func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetadata, c *v1.Cluster, action v1.StepAction, operator cluster.Operator) (*v1.Operation, error) {
 	var steps []v1.Step
 	region := extraMetadata.Masters[0].Region
 	if c.Labels == nil {
@@ -110,7 +91,7 @@ func (h *handler) parseOperationFromCluster(extraMetadata *component.ExtraMetada
 	// Container runtime should be installed on all nodes.
 	ctx := component.WithExtraMetadata(context.TODO(), *extraMetadata)
 	stepNodes := utils.UnwrapNodeList(extraMetadata.GetAllNodes())
-	cSteps, err := getCriStep(ctx, c, action, stepNodes)
+	cSteps, err := clusteroperation.GetCriStep(ctx, c, operator, action, stepNodes)
 	if err != nil {
 		return nil, err
 	}

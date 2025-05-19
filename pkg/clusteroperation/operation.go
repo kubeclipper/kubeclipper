@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
@@ -39,6 +41,7 @@ type Options struct {
 	pendingOperation  v1.PendingOperation
 	extra             *component.ExtraMetadata
 	additionalOptions *AdditionalOptions // additional information
+	operator          cluster.Operator
 }
 
 // AdditionalOptions some types of operations require additional information, which can be put here
@@ -56,12 +59,14 @@ type OptionInterface interface {
 func BuildOperationAdapter(
 	cluster *v1.Cluster, pendingOp v1.PendingOperation,
 	extra *component.ExtraMetadata, addition *AdditionalOptions,
+	operator cluster.Operator,
 ) (*v1.Operation, error) {
 	options := Options{
 		cluster:           cluster,
 		pendingOperation:  pendingOp,
 		extra:             extra,
 		additionalOptions: addition,
+		operator:          operator,
 	}
 
 	var instance Interface

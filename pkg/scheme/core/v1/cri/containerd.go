@@ -65,17 +65,20 @@ type ContainerdRunnable struct {
 	upgradeSteps   []v1.Step
 }
 
-func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cluster, nodes []v1.StepNode) error {
+func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cluster, nodes []v1.StepNode, registries []v1.RegistrySpec) error {
 	metadata := component.GetExtraMetadata(ctx)
 	runnable.Version = cluster.ContainerRuntime.Version
 	runnable.Offline = metadata.Offline
 	runnable.DataRootDir = strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, cluster.ContainerRuntime.DataRootDir)
 	runnable.LocalRegistry = metadata.LocalRegistry
-	runnable.Registies = cluster.Status.Registries
-	runnable.RegistryWithAuth = FilterRegistryWithAuth(cluster.Status.Registries)
+	runnable.Registies = registries
+	runnable.RegistryWithAuth = FilterRegistryWithAuth(runnable.Registies)
 	if runnable.RegistryConfigDir == "" {
 		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir
 	}
+	logger.Infof("[InitStep] Containerd Registry:%v", runnable.Registies)
+	logger.Infof("[InitStep] Containerd RegistryWithAuth:%v", runnable.RegistryWithAuth)
+
 	// When systemd is the init system of Linux,
 	// it generates and consumes a root cgroup and acts as a cgroup manager.
 	runnable.EnableSystemdCgroup = strconv.FormatBool(cgroups.IsRunningSystemd())
