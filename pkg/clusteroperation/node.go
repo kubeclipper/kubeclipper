@@ -26,6 +26,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
 	"github.com/kubeclipper/kubeclipper/pkg/component"
+	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
@@ -70,7 +71,7 @@ func (n *NodeOperation) Builder() (*corev1.Operation, error) {
 	if pn.Role == common.NodeRoleWorker {
 		n.extra.Workers = append(n.extra.Workers, pn.ConvertNodes...)
 	}
-	op, err := pn.MakeOperation(*n.extra, n.cluster)
+	op, err := pn.MakeOperation(*n.extra, n.cluster, n.operator)
 	if err != nil {
 		return nil, err
 	}
@@ -122,31 +123,31 @@ func (p *PatchNodes) makeWorkerCompare(cluster *corev1.Cluster) error {
 }
 
 // MakeOperation Must be called after MakeCompare.
-func (p *PatchNodes) MakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
+func (p *PatchNodes) MakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster, operator cluster.Operator) (*corev1.Operation, error) {
 	pType, ok := cluster.Labels[common.LabelClusterProviderType]
 	if ok {
 		switch pType {
 		case kubeadm.ProviderKubeadm:
-			return p.doMakeOperation(extra, cluster)
+			return p.doMakeOperation(extra, cluster, operator)
 		default:
 			return nil, errors.New("invalid provider type")
 		}
 	}
-	return p.doMakeOperation(extra, cluster)
+	return p.doMakeOperation(extra, cluster, operator)
 }
 
-func (p *PatchNodes) doMakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
+func (p *PatchNodes) doMakeOperation(extra component.ExtraMetadata, cluster *corev1.Cluster, operator cluster.Operator) (*corev1.Operation, error) {
 	switch p.Role {
 	case common.NodeRoleMaster:
 		return nil, ErrInvalidNodesRole
 	case common.NodeRoleWorker:
-		return p.makeWorkerOperation(extra, cluster)
+		return p.makeWorkerOperation(extra, cluster, operator)
 	default:
 		return nil, ErrInvalidNodesRole
 	}
 }
 
-func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster *corev1.Cluster) (*corev1.Operation, error) {
+func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster *corev1.Cluster, operator cluster.Operator) (*corev1.Operation, error) {
 	// no node need to be operated
 	if len(p.Nodes) == 0 {
 		return nil, ErrZeroNode
@@ -182,7 +183,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Labels[common.LabelOperationAction] = corev1.OperationAddNodes
 
 		// container runtime
-		steps, err := getCriStep(ctx, cluster, action, stepNodes)
+		steps, err := GetCriStep(ctx, cluster, operator, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}
@@ -238,7 +239,7 @@ func (p *PatchNodes) makeWorkerOperation(extra component.ExtraMetadata, cluster 
 		op.Steps = append(op.Steps, steps...)
 
 		// container runtime
-		steps, err = getCriStep(ctx, cluster, action, stepNodes)
+		steps, err = GetCriStep(ctx, cluster, operator, action, stepNodes)
 		if err != nil {
 			return nil, err
 		}

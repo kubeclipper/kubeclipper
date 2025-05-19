@@ -678,7 +678,10 @@ func criRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, no
 	case v1.CRIContainerd:
 		identity = cri.ContainerdRegistryConfigureIdentity
 		containerRunable := &cri.ContainerdRunnable{}
-		err := containerRunable.InitStep(context.Background(), cluster, allNodes)
+		// parse metadata from cluster
+		meta := utils.NewMetadata(cluster)
+		ctx := component.WithExtraMetadata(context.TODO(), *meta)
+		err := containerRunable.InitStep(ctx, cluster, allNodes, registries)
 		if err != nil {
 			return nil, fmt.Errorf("init container runbale failed:%w", err)
 		}
@@ -807,7 +810,7 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			extraMeta.OperationID = pendingOperation.OperationID
 
 			// build the operation structure based on the type of operation
-			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil)
+			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil, r.ClusterOperator)
 			if err != nil {
 				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
 				continue

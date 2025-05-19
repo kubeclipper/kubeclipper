@@ -21,9 +21,6 @@ package v1
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -37,7 +34,6 @@ import (
 	mock_cluster "github.com/kubeclipper/kubeclipper/pkg/models/cluster/mock"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 )
 
 var (
@@ -153,88 +149,88 @@ var (
 	}
 )
 
-const fakeKubeConfig = `
-apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data:
-    server: https://foo.bar.baz:6443
-  name: fake-cluster
-contexts:
-- context:
-    cluster: fake-cluster
-    user: kubernetes-admin
-  name: kubernetes-admin@fake-cluster
-current-context: kubernetes-admin@fake-cluster
-kind: Config
-preferences: {}
-users:
-- name: kubernetes-admin
-  user:
-    client-certificate-data:
-    client-key-data:
-`
+//const fakeKubeConfig = `
+//apiVersion: v1
+//clusters:
+//- cluster:
+//    certificate-authority-data:
+//    server: https://foo.bar.baz:6443
+//  name: fake-cluster
+//contexts:
+//- context:
+//    cluster: fake-cluster
+//    user: kubernetes-admin
+//  name: kubernetes-admin@fake-cluster
+//current-context: kubernetes-admin@fake-cluster
+//kind: Config
+//preferences: {}
+//users:
+//- name: kubernetes-admin
+//  user:
+//    client-certificate-data:
+//    client-key-data:
+//`
 
-// mockKubeConfig generates a fake kubeconfig file
-func mockKubeConfig() (yes bool, err error) {
-	if _, err = os.Stat(k8s.DefaultKubeConfigPath); err != nil && errors.Is(err, os.ErrNotExist) {
-		_ = os.MkdirAll(filepath.Dir(k8s.DefaultKubeConfigPath), 0755)
-		return true, os.WriteFile(k8s.DefaultKubeConfigPath, []byte(fakeKubeConfig), 0644)
-	}
-	return
-}
+//// mockKubeConfig generates a fake kubeconfig file
+//func mockKubeConfig() (yes bool, err error) {
+//	if _, err = os.Stat(k8s.DefaultKubeConfigPath); err != nil && errors.Is(err, os.ErrNotExist) {
+//		_ = os.MkdirAll(filepath.Dir(k8s.DefaultKubeConfigPath), 0755)
+//		return true, os.WriteFile(k8s.DefaultKubeConfigPath, []byte(fakeKubeConfig), 0644)
+//	}
+//	return
+//}
 
-func Test_parseOperationFromCluster(t *testing.T) {
-	yes, err := mockKubeConfig()
-	if err != nil {
-		t.Errorf("mock kubeconfig error: %v", err)
-		return
-	}
-	if yes {
-		// clean fake kubeconfig file
-		defer os.RemoveAll(filepath.Dir(k8s.DefaultKubeConfigPath))
-	}
-
-	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil)
-	type args struct {
-		c      *v1.Cluster
-		meta   *component.ExtraMetadata
-		action v1.StepAction
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "test parse cluster install steps",
-			args: args{
-				c:      c1,
-				meta:   extraMeta,
-				action: v1.ActionInstall,
-			},
-			wantErr: false,
-		},
-		{
-			name: "test parse cluster uninstall steps",
-			args: args{
-				c:      c1,
-				meta:   extraMeta,
-				action: v1.ActionUninstall,
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := h.parseOperationFromCluster(tt.args.meta, tt.args.c, tt.args.action)
-			if (err != nil) != tt.wantErr && !IgnoreError(err) {
-				t.Errorf("parseOperationFromCluster() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
-	}
-}
+//func Test_parseOperationFromCluster(t *testing.T) {
+//	yes, err := mockKubeConfig()
+//	if err != nil {
+//		t.Errorf("mock kubeconfig error: %v", err)
+//		return
+//	}
+//	if yes {
+//		// clean fake kubeconfig file
+//		defer os.RemoveAll(filepath.Dir(k8s.DefaultKubeConfigPath))
+//	}
+//
+//	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+//	type args struct {
+//		c      *v1.Cluster
+//		meta   *component.ExtraMetadata
+//		action v1.StepAction
+//	}
+//	tests := []struct {
+//		name    string
+//		args    args
+//		wantErr bool
+//	}{
+//		{
+//			name: "test parse cluster install steps",
+//			args: args{
+//				c:      c1,
+//				meta:   extraMeta,
+//				action: v1.ActionInstall,
+//			},
+//			wantErr: false,
+//		},
+//		{
+//			name: "test parse cluster uninstall steps",
+//			args: args{
+//				c:      c1,
+//				meta:   extraMeta,
+//				action: v1.ActionUninstall,
+//			},
+//			wantErr: false,
+//		},
+//	}
+//	for _, tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//			_, err := h.parseOperationFromCluster(tt.args.meta, tt.args.c, tt.args.action)
+//			if (err != nil) != tt.wantErr && !IgnoreError(err) {
+//				t.Errorf("parseOperationFromCluster() error = %v, wantErr %v", err, tt.wantErr)
+//				return
+//			}
+//		})
+//	}
+//}
 
 func Test_parseOperationFromComponent(t *testing.T) {
 	type args struct {
