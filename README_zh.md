@@ -214,6 +214,8 @@ kcctl get cluster -o yaml|grep status -A5
 
 ## 开发和调试
 
+参考：[开发笔记](docs/dev-guide.md)
+
 1. fork repo and clone
 2. 本地运行 etcd, 通常使用 docker / podman 启动 etcd 容器，启动命令参考如下
 
