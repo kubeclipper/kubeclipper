@@ -226,6 +226,8 @@ Once the cluster enter  the `Running` state , it means that the creation is comp
 
 ## Development and Debugging
 
+Reference：[development-guide](docs/dev-guide.md)
+
 1. fork repo and clone
 2. run etcd locally, usually use docker / podman to run etcd container
 

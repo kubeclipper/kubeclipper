@@ -208,14 +208,17 @@ Deploy KC with AIO mode
 # ssh-keygen -t rsa
 # cat /root/.ssh/id_rsa.pub >> authorized_keys
 
-KC_VERSION=release-1.4 kcctl deploy
+# KC_VERSION=release-1.4 kcctl deploy
+KC_VERSION=release-1.4 kcctl deploy --server 10.0.4.12 --agent 10.0.4.12 --pk-file ~/.ssh/id_rsa
 # kcctl deploy --help
 # kcctl deploy --user root --passwd {local-host-user-pwd} --pkg kc-minimal.tar.gz
 # kcctl deploy --server $IPADDR_SERVER --agent $IPADDR_AGENT --passwd xxx # or --pk-file
 ```
 
+**DO NOT USE** `KC_VERSION=release-1.4 kcctl deploy` since it will not add `pkFile` & `privateKey` in `.kc/deploy-config.yaml`, which will cause `kcctl resource` cmd to fail with notification: "one of pkfile or password must be specify,please config it in ".
+
 ```console
-# KC_VERSION=release-1.4 kcctl deploy
+# KC_VERSION=release-1.4 kcctl deploy --server 10.0.4.12 --agent 10.0.4.12 --pk-file ~/.ssh/id_rsa
 2025-05-30T10:08:59+08:00	INFO	Using auto detected IPv4 address on interface eth0: 10.0.4.12/22
 [2025-05-30T10:08:59+08:00][INFO] node-ip-detect inherits from ip-detect: first-found
 [2025-05-30T10:08:59+08:00][INFO] run in aio mode.
@@ -312,26 +315,189 @@ OR, debug with VSCode, see `.vscode/launch.json`.
 Take v1.32.2 as example:
 
 ```bash
-cd ~/kubeclipper/scripts
-bash tarball-kubernetes.sh -a amd64 -v 1.32.2 -o /tmp
+# wget caas-cd-node/blob/kc/k8s/tarball-kubernetes.sh
+# bash tarball-kubernetes.sh -a amd64 -v 1.32.5 -o /tmp -s https://github.com/duicikeyihangaolou/kubeclipper-packages/raw/refs/heads/master/packages
+bash tarball-kubernetes.sh -a amd64 -v 1.23.17 -o /tmp -s https://github.com/duicikeyihangaolou/kubeclipper-packages/raw/refs/heads/master/packages
 
-k8s_ver='v1.32.2'
-mkdir -p k8s/${k8s_ver}/amd64
-pushd k8s/${k8s_ver}/amd64
-cp /tmp/k8s/${k8s_ver}/amd64/* . -a
-popd
+cd /tmp
+```
+
+After `tarball-kubernetes.sh`, you will get a k8s folder like this, **Always keep one version per time**
+
+```console
+# find k8s
+k8s
+k8s/v1.23.17
+k8s/v1.23.17/amd64
+k8s/v1.23.17/amd64/manifest.json
+k8s/v1.23.17/amd64/images.tar.gz
+k8s/v1.23.17/amd64/configs.tar.gz
+```
+
+Then, push k8s with kcctl
+
+```bash
+cd /tmp
+k8s_ver='v1.23.17'
 tar -zcvf k8s-${k8s_ver}-amd64.tar.gz k8s
 kcctl login --host http://127.0.0.1 --username admin --password Thinkbig1
 kcctl resource push --pkg k8s-${k8s_ver}-amd64.tar.gz --type k8s
+
+# kcctl resource push --pkg k8s-v1.23.17-amd64.tar.gz --type k8s
+# kcctl resource push --pkg k8s-v1.32.5-amd64.tar.gz --type k8s
 ```
 
-### 3.2 Add k8s v1.32.2 info
+After that, you can check the k8s version with `kcctl resource list`
+
+```console
+# kcctl resource list
++-----------+---------------+---------------+----------+-------+
+| 10.0.4.12 |     TYPE      |     NAME      | VERSION  | ARCH  |
++-----------+---------------+---------------+----------+-------+
+| 1.        | cni           | calico        | v3.26.1  | amd64 |
+| 2.        | cri           | containerd    | 1.6.4    | amd64 |
+| 3.        | k8s           | k8s           | v1.23.17 | amd64 |
+| 4.        | k8s           | k8s           | v1.27.4  | amd64 |
+| 5.        | k8s           | k8s           | v1.32.5  | amd64 |
+| 6.        | k8s-extension | k8s-extension | v1       | amd64 |
+| 7.        | kc-extension  | kc-extension  | latest   | amd64 |
++-----------+---------------+---------------+----------+-------+
+```
+
+Also check directory `/opt/kubeclipper-server/resource/`
+
+```console
+# cat /opt/kubeclipper-server/resource/metadata.json | jq | grep minor_version
+          "minor_version": "v1.18",
+          "minor_version": "v1.19",
+          "minor_version": "v1.20",
+          "minor_version": "v1.21",
+          "minor_version": "v1.22",
+          "minor_version": "v1.23",
+          "minor_version": "v1.24",
+          "minor_version": "v1.25",
+          "minor_version": "v1.26",
+          "minor_version": "v1.27",
+          "minor_version": "v1.28",
+
+# ls /opt/kubeclipper-server/resource/k8s
+v1.23.17  v1.27.4  v1.32.5
+```
+
+### 3.2 Add k8s info
+
+1.23.17 K8S could be created from webpage, however CNI yaml validate error:
+
+![](img/kc-install-cluster-failure-v1.23.17-cni.png)
+
+Normal should be:
+
+![](img/kc-install-cluster-normal-calico.png)
+
+Modify metadata.json,change CNI version as below, also fail with 1.23.17, maybe hardcode logic. **TODO** check later.
+
+And as above, new k8s resources didn't add to metadata.json, may be a bug, we need to add it manually now. Without it, in webpage: <http://kc-console/cluster/create>，we could select containerd version with 1.29+ k8s version.
 
 ```bash
 vi /opt/kubeclipper-server/resource/metadata.json
 ```
 
+Modify metadata.json:
+
+```diff
+@@ -414,14 +414,14 @@
+             {
+               "name": "calico",
+               "type": "cni",
+-              "recommend_version": "v3.22.4",
++              "recommend_version": "v3.26.1",
+               "min_version": "",
+               "max_version": ""
+             },
+             {
+               "name": "nfs",
+               "type": "csi",
+-              "recommend_version": "v4.0.2",
++              "recommend_version": "v4.1.0",
+               "min_version": "",
+               "max_version": ""
+             },
+@@ -771,6 +771,68 @@
+               "max_version": ""
+             }
+           ]
++        },
++        {
++          "name": "k8s",
++          "minor_version": "v1.32",
++          "version_control": [
++            {
++              "name": "containerd",
++              "type": "cri",
++              "recommend_version": "1.6.4",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "calico",
++              "type": "cni",
++              "recommend_version": "v3.26.1",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "nfs",
++              "type": "csi",
++              "recommend_version": "v4.1.0",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "cinder",
++              "type": "csi",
++              "recommend_version": "v1.23",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "ceph",
++              "type": "csi",
++              "recommend_version": "v3.4.0",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "kubesphere",
++              "type": "app",
++              "recommend_version": "v3.2.1",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "metallb",
++              "type": "lb",
++              "recommend_version": "v0.13.7",
++              "min_version": "",
++              "max_version": ""
++            },
++            {
++              "name": "mig",
++              "type": "gpu",
++              "recommend_version": "v0.8.2",
++              "min_version": "",
++              "max_version": ""
++            }
++          ]
+         }
+       ],
+       "addon_manifests": [
+```
+
 ### 3.3 Deploy k8s using kcctl, add pause tag
+
+**TODO** A bug, will check later.
+
+Modify `/etc/containerd/config.toml`
 
 ```bash
 vi /etc/containerd/config.toml
@@ -341,14 +507,31 @@ vi /etc/containerd/config.toml
 # sandbox_image = "registry.k8s.io/pause:3.10"
 ```
 
-### 3.4 Backup /tmp/.k8s and reboot host server
+Then, `systemctl restart containerd`
+
+Pause installation from webpage, then resume from the breakpoint.
+
+You also can backup /tmp/.k8s and reboot host server, however pause & resume from webpage is much eaiser. 
 
 ```bash
+# Just log the steps here FYI.
 mkdir ~/bak -p
 cp /tmp/.k8s ~/bak -a
 # after reboot
 cp ~/bak/.k8s /tmp -a
 # continue deploy k8s with web GUI
+```
+
+Check version:
+
+```console
+# kubectl get po -A
+... # all running
+
+# kubectl version
+Client Version: v1.32.5
+Kustomize Version: v5.5.0
+Server Version: v1.32.5
 ```
 
 ## 4. Demo with kubeedge

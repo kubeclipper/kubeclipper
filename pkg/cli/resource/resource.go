@@ -74,7 +74,7 @@ const (
   kcctl resource list 
 
   # List offline resource use specified output format
-  kcctl resource list  --output 'YAML|TABLE|JSON'
+  kcctl resource list --output 'YAML|TABLE|JSON'
 
   Please read 'kcctl resource list -h' get more resource list flags`
 	pushLongDescription = `
