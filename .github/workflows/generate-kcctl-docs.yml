@@ -21,17 +21,15 @@ jobs:
     env:
       GO111MODULE: on
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.21
-        id: go
-
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Set up Golang with cache
+        uses: magnetikonline/action-golang-cache@v5
+        with:
+          go-version-file: go.mod
       - name: Generate Kcctl Docs
         run:
           make cli
@@ -55,12 +53,5 @@ jobs:
       - name: Run buildx
         run: |
           docker buildx build --platform linux/amd64,linux/arm64 --push --file ./tools/kcctldocs-gen/generators/Dockerfile -t kubeclipper/kcctl-docs ./tools/kcctldocs-gen/generators
-
-      - name: Resrart Pod
-        uses: steebchen/kubectl@v2.1.1
-        with:
-          config: ${{ secrets.PROD_KUBECONFIG }}
-          version: v1.23.0 # specify kubectl binary version explicitly
-          command: rollout restart deploy kcctl-docs-deployment
 
 
