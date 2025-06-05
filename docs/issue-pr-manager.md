@@ -1,4 +1,6 @@
-1. issue 和 pr 使用 label 进行管理
+# Issue & PR 管理
+
+## 1. issue 和 pr 使用 label 进行管理
 
 Issue 和 PR 按照目的可以给出以下这些 label
 
@@ -18,8 +20,8 @@ Issue 和 PR 按照目的可以给出以下这些 label
 * `kind/failing-test`: Issue 或 PR 涉及持续失败的测试用例
 * `kind/need-verify`: Issue 或 PR 需要验证
 
+注意事项：
+
 1. PR 最好至少关联一个 Issue
-
 1. PR 所有的 GitHub Action Workflow 需要都运行成功才能合并
-
 1. merge 代码时，使用 `Squash and merge` 选项
