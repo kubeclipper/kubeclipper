@@ -43,9 +43,20 @@ const (
   You can filter the list using a label selector and the --selector flag.
 
   Notice: You must run 'kcctl login' at first, you can get help to run 'kcctl login -h'`
+	// get 命令示例
 	getExample = `
-  # List all users in ps output format.
-  kcctl get user
+  # List operations for a specific cluster
+  kcctl get operation --selector kubeclipper.io/cluster=<CLUSTER-ID>
+  kcctl get operation --selector kubeclipper.io/cluster=cdf19a327aab247739c3f1a98
+
+  # View operation details
+  kcctl get operation <OPERATION_ID> -o yaml
+
+  # List all cluster
+  kcctl get cluster
+
+  # List all node
+  kcctl get node
 
   # List user in json output format
   kcctl get user -o json
@@ -56,13 +67,9 @@ const (
   # List user with field-selector
   kcctl get user --field-selector .metadata.name=foo
 
-  # Describe user admin
-  kcctl get user admin -o yaml
-
   # List other resource
-  kcctl get [role,cluster,node]
-
-  Please read 'kcctl get -h' get more get flags`
+  kcctl get [role,cluster,node,operation]
+`
 )
 
 type GetOptions struct {
@@ -78,7 +85,7 @@ type GetOptions struct {
 }
 
 var (
-	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap, options.ResourceRegistry)
+	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap, options.ResourceRegistry, options.ResourceOperation)
 )
 
 func NewGetOptions(streams options.IOStreams) *GetOptions {
@@ -167,8 +174,10 @@ func (l *GetOptions) list() error {
 		result, err = l.client.ListConfigMaps(context.TODO(), kc.Queries(*q))
 	case options.ResourceRegistry:
 		result, err = l.client.ListRegistries(context.TODO(), kc.Queries(*q))
+	case options.ResourceOperation:
+		result, err = l.client.ListOperation(context.TODO(), kc.Queries(*q))
 	default:
-		return fmt.Errorf("unsupported resource")
+		return fmt.Errorf("unsupported resource,support %s now", allowedResource.List())
 	}
 
 	if err != nil {

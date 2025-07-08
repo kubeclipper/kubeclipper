@@ -142,6 +142,7 @@ const (
 	ResourceRegistry  = "registry"
 	ResourceRole      = "role"
 	ResourceConfigMap = "configmap"
+	ResourceOperation = "operation"
 	UpgradeKcctl      = "kcctl"
 	UpgradeAgent      = "agent"
 	UpgradeServer     = "server"
