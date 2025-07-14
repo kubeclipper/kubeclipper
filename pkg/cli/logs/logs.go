@@ -9,14 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/spf13/cobra"
 
+	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+
 	"github.com/fatih/color"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -196,20 +198,6 @@ func calculateDuration(startAt, endAt metav1.Time) time.Duration {
 	return duration
 }
 
-// getNodeStatus gets the status of a node within a step
-func getNodeStatus(op *v1.Operation, stepID, nodeID string) string {
-	for _, cond := range op.Status.Conditions {
-		if cond.StepID == stepID {
-			for _, st := range cond.Status {
-				if st.Node == nodeID {
-					return string(st.Status)
-				}
-			}
-		}
-	}
-	return "unknown"
-}
-
 // getNodeStatusWithTime returns status and time information for a node in a step
 func getNodeStatusWithTime(op *v1.Operation, stepID, nodeID string) (status string, startAt metav1.Time, endAt metav1.Time) {
 	for _, cond := range op.Status.Conditions {
@@ -287,6 +275,7 @@ func PrintLogLine(w io.Writer, line string) {
 }
 
 // PrintErrorLine prints error message in red
+// nolint
 func PrintErrorLine(w io.Writer, format string, a ...interface{}) {
 	fmt.Fprintf(w, color.RedString(format, a...))
 }
