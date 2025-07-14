@@ -309,14 +309,32 @@ type OperationList struct {
 	TotalCount int            `json:"totalCount,omitempty" description:"total count"`
 }
 
+func (n *OperationList) JSONPrint() ([]byte, error) {
+	if len(n.Items) == 1 {
+		return printer.JSONPrinter(n.Items[0])
+	}
+	return printer.JSONPrinter(n)
+}
+
 func (n *OperationList) YAMLPrint() ([]byte, error) {
-	panic("implement me")
+	if len(n.Items) == 1 {
+		return printer.YAMLPrinter(n.Items[0])
+	}
+	return printer.YAMLPrinter(n)
 }
 
 func (n *OperationList) TablePrint() ([]string, [][]string) {
-	panic("implement me")
-}
-
-func (n *OperationList) JSONPrint() ([]byte, error) {
-	panic("implement me")
+	// output e.g.: dev InstallComponents  successful 2024-08-12 15:20:00 4
+	headers := []string{"id", "cluster", "name", "status", "created_at", "steps"}
+	var data [][]string
+	for _, op := range n.Items {
+		id := op.ObjectMeta.Name
+		cluster := op.ObjectMeta.Labels[common.LabelClusterName]
+		name := op.ObjectMeta.Labels[common.LabelOperationAction]
+		status := string(op.Status.Status)
+		created := op.ObjectMeta.CreationTimestamp.Time.Format("2006-01-02 15:04:05")
+		steps := fmt.Sprintf("%d", len(op.Steps))
+		data = append(data, []string{id, cluster, name, status, created, steps})
+	}
+	return headers, data
 }

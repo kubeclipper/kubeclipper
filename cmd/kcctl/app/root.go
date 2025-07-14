@@ -49,6 +49,8 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/login"
 
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logs"
+
 	"github.com/spf13/cobra"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
@@ -97,6 +99,7 @@ func NewKubeClipperCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(proxy.NewCmdProxy(ioStreams))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(ioStreams))
 	cmds.AddCommand(cluster.NewCmdCluster(ioStreams))
+	cmds.AddCommand(logs.NewCmdLogs(ioStreams))
 
 	return cmds
 }

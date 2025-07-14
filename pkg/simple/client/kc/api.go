@@ -54,6 +54,7 @@ const (
 
 	operationPath = "/api/core.kubeclipper.io/v1/operations"
 	logPath       = "/api/core.kubeclipper.io/v1/logs"
+	LogStreamPath = "/api/core.kubeclipper.io/v1/logs"
 )
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
@@ -159,6 +160,17 @@ func (cli *Client) ListOperation(ctx context.Context, query Queries) (*Operation
 	opList := OperationList{}
 	err = json.NewDecoder(serverResp.body).Decode(&opList)
 	return &opList, err
+}
+
+func (cli *Client) DescribeOperation(ctx context.Context, name string) (*v1.Operation, error) {
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", operationPath, name), nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	operation := v1.Operation{}
+	err = json.NewDecoder(serverResp.body).Decode(&operation)
+	return &operation, err
 }
 
 func (cli *Client) PrintLogs(ctx context.Context, operation v1.Operation) error {
@@ -648,4 +660,22 @@ func (cli *Client) ListRegion(ctx context.Context, query Queries) (*v1.RegionLis
 	regions := v1.RegionList{}
 	err = json.NewDecoder(serverResp.body).Decode(&regions)
 	return &regions, err
+}
+
+// GetStepNodeLog 拉取某个 operation/step/node 的日志。
+func (cli *Client) GetStepNodeLog(ctx context.Context, operation, step, node string) (string, error) {
+	v := url.Values{}
+	v.Set("operation", operation)
+	v.Set("step", step)
+	v.Set("node", node)
+	serverResp, err := cli.get(ctx, LogStreamPath, v, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return "", err
+	}
+	var stepLog corev1.StepLog
+	if err := json.NewDecoder(serverResp.body).Decode(&stepLog); err != nil {
+		return "", err
+	}
+	return stepLog.Content, nil
 }
