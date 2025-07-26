@@ -255,6 +255,8 @@ Reference：[development-guide](docs/dev-guide.md)
 
 Please follow [Community](https://github.com/kubeclipper/community) to join us.
 
+See [GOVERNANCE.md](./GOVERNANCE.md) for project governance and decision-making process.
+
 ## Star History
 
 ![Star History Chart](https://api.star-history.com/svg?repos=kubeclipper/kubeclipper&type=Date)
