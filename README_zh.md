@@ -18,6 +18,7 @@
   <img alt="Pull Requests" src="https://img.shields.io/github/issues-pr/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
   <img alt="contributors" src="https://img.shields.io/github/contributors/kubeclipper/kubeclipper?style=flat-square"/>
   <img alt="apache2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" />
+  <img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/badge_static/81" />
   <img alt="Stars" src="https://img.shields.io/github/stars/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
   <img alt="Forks" src="https://img.shields.io/github/forks/kubeclipper/kubeclipper?style=flat-square&labelColor=343b41"/>
 </p>
