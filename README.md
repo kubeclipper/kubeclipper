@@ -257,6 +257,11 @@ Please follow [Community](https://github.com/kubeclipper/community) to join us.
 
 See [GOVERNANCE.md](./GOVERNANCE.md) for project governance and decision-making process.
 
+## Code of Conduct
+
+This project follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md).
+Please read our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for details.
+
 ## Star History
 
 ![Star History Chart](https://api.star-history.com/svg?repos=kubeclipper/kubeclipper&type=Date)
