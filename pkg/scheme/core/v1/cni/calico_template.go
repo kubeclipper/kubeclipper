@@ -17924,6 +17924,7 @@ spec:
 
 const calicoV3261 = `installation:
   registry: {{with .CNI.LocalRegistry}}{{.}}{{end}}
+  kubeletVolumePluginPath: {{ if .KubeletDataDir }}{{ .KubeletDataDir }}{{ else }}/var/lib/kubelet{{ end }}
   cni:
     type: Calico
     ipam:

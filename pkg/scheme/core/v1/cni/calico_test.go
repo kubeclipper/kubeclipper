@@ -20,6 +20,7 @@ package cni
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
@@ -36,6 +37,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 		{
 			name: "base",
 			stepper: CalicoRunnable{
+				KubeletDataDir: "/var/lib/kubelet",
 				BaseCni: BaseCni{
 					DualStack:   true,
 					PodIPv4CIDR: constatns.ClusterPodSubnet,
@@ -55,6 +57,48 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "v3.26.1-with-kubeletDataDir",
+			stepper: CalicoRunnable{
+				KubeletDataDir: "/custom/kubelet",
+				BaseCni: BaseCni{
+					DualStack:   false,
+					PodIPv4CIDR: "10.244.0.0/16",
+					CNI: v1.CNI{
+						LocalRegistry: "",
+						Type:          "calico",
+						Version:       "v3.26.1",
+						Calico: &v1.Calico{
+							IPv4AutoDetection: "first-found",
+							Mode:              "Overlay-IPIP-All",
+							IPManger:          true,
+							MTU:               1440,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "v3.26.1-without-kubeletDataDir",
+			stepper: CalicoRunnable{
+				KubeletDataDir: "",
+				BaseCni: BaseCni{
+					DualStack:   false,
+					PodIPv4CIDR: "10.244.0.0/16",
+					CNI: v1.CNI{
+						LocalRegistry: "",
+						Type:          "calico",
+						Version:       "v3.26.1",
+						Calico: &v1.Calico{
+							IPv4AutoDetection: "first-found",
+							Mode:              "Overlay-IPIP-All",
+							IPManger:          true,
+							MTU:               1440,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt.stepper.NodeAddressDetectionV4 = ParseNodeAddressDetection(tt.stepper.Calico.IPv4AutoDetection)
@@ -62,11 +106,22 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
 			err := tt.stepper.renderCalicoTo(w)
-			if err != nil {
-				t.Errorf("renderCalicoTo() error = %v", err)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("renderCalicoTo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			t.Log(w.String())
+			output := w.String()
+			if tt.name == "v3.26.1-with-kubeletDataDir" {
+				if !strings.Contains(output, "/custom/kubelet") {
+					t.Errorf("rendered template should contain custom kubeletDataDir: /custom/kubelet, got: %s", output)
+				}
+			}
+			if tt.name == "v3.26.1-without-kubeletDataDir" {
+				if !strings.Contains(output, "/var/lib/kubelet") {
+					t.Errorf("rendered template should contain default kubeletDataDir: /var/lib/kubelet, got: %s", output)
+				}
+			}
+			t.Log(output)
 		})
 	}
 }
