@@ -189,11 +189,17 @@ func DiskInfo(byteSize ByteSize) (Disk, error) {
 				Used:        usage.Used,
 				UsedPercent: usage.UsedPercent,
 			})
-		d.Total = usage.Total / uint64(byteSize)
-		d.Free = usage.Free / uint64(byteSize)
-		d.Used = usage.Used / uint64(byteSize)
-		d.UsedPercent, _ = strconv.ParseFloat(fmt.Sprintf("%.2f", usage.UsedPercent), 64)
+		// Accumulate totals across all partitions
+		d.Total += usage.Total / uint64(byteSize)
+		d.Free += usage.Free / uint64(byteSize)
+		d.Used += usage.Used / uint64(byteSize)
 	}
+	
+	// Calculate overall used percentage based on accumulated totals
+	if d.Total > 0 {
+		d.UsedPercent, _ = strconv.ParseFloat(fmt.Sprintf("%.2f", float64(d.Used)/float64(d.Total)*100), 64)
+	}
+	
 	return d, nil
 }
 
