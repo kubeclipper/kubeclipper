@@ -68,6 +68,7 @@ type CalicoRunnable struct {
 	BaseCni
 	NodeAddressDetectionV4 NodeAddressDetection
 	NodeAddressDetectionV6 NodeAddressDetection
+	KubeletDataDir         string
 }
 
 func (runnable *CalicoRunnable) Type() string {
@@ -89,6 +90,7 @@ func (runnable *CalicoRunnable) InitStep(metadata *component.ExtraMetadata, cni 
 		ipv6 = networking.Pods.CIDRBlocks[1]
 	}
 	stepper.CNI = *cni
+	stepper.KubeletDataDir = metadata.KubeletDataDir
 	stepper.LocalRegistry = cni.LocalRegistry
 	stepper.BaseCni.Type = "calico"
 	stepper.Version = cni.Version
