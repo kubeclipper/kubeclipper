@@ -136,6 +136,17 @@ func (m *PackageMetadata) AddonsDelete(name, version, arch string) error {
 	if index, ok := indexMap[fmt.Sprintf("%s%s%s", name, version, arch)]; ok {
 		if index < len(m.Addons) {
 			m.Addons = append(m.Addons[:index], m.Addons[index+1:]...)
+
+			// if addon is k8s, delete corresponding chart from KcVersions
+			if name == "k8s" && len(m.KcVersions) > 0 {
+				// find and delete the chart with same version
+				for i, chart := range m.KcVersions[0].Charts {
+					if chart.Name == "k8s" && chart.MinorVersion == version {
+						m.KcVersions[0].Charts = append(m.KcVersions[0].Charts[:i], m.KcVersions[0].Charts[i+1:]...)
+						break
+					}
+				}
+			}
 		}
 	}
 
@@ -171,7 +182,41 @@ func (m PackageMetadata) AddonsExist(name, version, arch string) bool {
 func (m *PackageMetadata) AddonsAppendOnly(typeName, name, version, arch string) {
 	if !m.AddonsExist(name, version, arch) {
 		m.Addons = append(m.Addons, MetaResource{Type: typeName, Name: name, Version: version, Arch: arch})
+
+		// if addon is k8s, copy kcVersions from last kcVersion
+		if typeName == "k8s" && len(m.KcVersions) > 0 {
+			// v1.29.4 -> 1.29
+			minorVersion := extractMinorVersion(version)
+			var bestMatch MetaChart
+			for _, chart := range m.KcVersions[0].Charts {
+				if chart.Name == "k8s" {
+					// select same minor version first
+					if strings.HasPrefix(chart.MinorVersion, minorVersion) {
+						bestMatch = chart
+						break
+					}
+					// if not found, select latest one
+					if bestMatch.Name == "" {
+						bestMatch = chart
+					}
+				}
+			}
+
+			if bestMatch.Name != "" {
+				newChart := bestMatch
+				newChart.MinorVersion = version
+				m.KcVersions[0].Charts = append(m.KcVersions[0].Charts, newChart)
+			}
+		}
 	}
+}
+
+func extractMinorVersion(version string) string {
+	parts := strings.Split(version, ".")
+	if len(parts) >= 2 {
+		return parts[0] + "." + parts[1]
+	}
+	return version
 }
 
 // MatchKcVersion find the best version control for the incoming version
