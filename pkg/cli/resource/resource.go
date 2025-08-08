@@ -136,7 +136,7 @@ func NewResourceOptions(streams options.IOStreams) *ResourceOptions {
 		IOStreams:    streams,
 		PrintFlags:   printer.NewPrintFlags(),
 		deployConfig: options.NewDeployOptions(),
-		Arch:         "amd64",
+		Arch:         "",
 	}
 }
 
