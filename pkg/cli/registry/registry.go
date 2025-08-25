@@ -102,8 +102,10 @@ const (
   Push docker image by flags.`
 	pushExample = `
   # Push docker image to registry
-  # You can use [docker save  $images > images.tar && gzip -f images.tar] to generate image pkg
+  # You can use [docker save  $images > images.tar] or [docker save  $images > images.tar && gzip -f images.tar]  to generate image pkg
+  # example: docker save k8s.gcr.io/pause:3.2 k8s.gcr.io/coredns/coredns:1.6.7 > images.tar
   # example: docker save k8s.gcr.io/pause:3.2 k8s.gcr.io/coredns/coredns:1.6.7 > images.tar && gzip -f images.tar
+  kcctl registry push --pk-file key --node 10.0.0.111  --pkg images.tar
   kcctl registry push --pk-file key --node 10.0.0.111  --pkg images.tar.gz
 
   Please read 'kcctl registry push -h' get more registry push flags.`
@@ -581,11 +583,17 @@ func (o *RegistryOptions) Push() error {
 	}
 	fullPath := path.Join(config.DefaultPkgPath, path.Base(o.Pkg))
 
-	logger.Info("unzip package")
-	if err = sshutils.Cmd("gzip", "-df", fullPath); err != nil {
-		return err
+	if strings.HasSuffix(fullPath, ".tar.gz") {
+		logger.Info("unzip package")
+		if err = sshutils.Cmd("gzip", "-df", fullPath); err != nil {
+			return err
+		}
+		fullPath = strings.ReplaceAll(fullPath, ".tar.gz", ".tar")
+	} else if strings.HasSuffix(fullPath, ".tar") {
+		logger.Info(".tar file,skip unzip package")
+	} else {
+		return fmt.Errorf("unknown package type: %s, only tar, .tar or .tar.gz are supported", fullPath)
 	}
-	fullPath = strings.ReplaceAll(fullPath, ".tar.gz", ".tar")
 
 	logger.V(3).Infof("push %s to %s", fullPath, o.registry())
 	logger.Info("waiting for push image")
