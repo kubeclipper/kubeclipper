@@ -32,7 +32,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
-func Push(file, registryStr string) error {
+func Push(file, registryStr, tagSuffix string) error {
 	manifest, err := tarball.LoadManifest(pathOpener(file))
 	if err != nil {
 		return errors.WithMessage(err, "load manifest")
@@ -49,7 +49,7 @@ func Push(file, registryStr string) error {
 			}
 			// push to specify registry
 			repository := tag.RepositoryStr()
-			target := fmt.Sprintf("%s/%s:%s", registryStr, repository, tag.TagStr())
+			target := fmt.Sprintf("%s/%s:%s%s", registryStr, repository, tag.TagStr(), tagSuffix)
 			logger.V(2).Infof("[%v/%v] push %s -> %s\n", i+1, len(manifest), t, target)
 			if err = crane.Push(img, target, crane.Insecure); err != nil {
 				return errors.WithMessage(err, "push")
@@ -63,7 +63,7 @@ func Push(file, registryStr string) error {
 			split := strings.Split(repository, "/")
 			if len(split) == 2 && split[0] == "library" {
 				repository = split[1]
-				target = fmt.Sprintf("%s/%s:%s", registryStr, repository, tag.TagStr())
+				target = fmt.Sprintf("%s/%s:%s%s", registryStr, repository, tag.TagStr(), tagSuffix)
 				logger.V(2).Infof("[%v/%v] push %s -> %s\n", i+1, len(manifest), t, target)
 				if err = crane.Push(img, target, crane.Insecure); err != nil {
 					return errors.WithMessage(err, "push")
