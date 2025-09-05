@@ -143,6 +143,7 @@ type RegistryOptions struct {
 	Tag           string
 	Number        int
 	SkipImageLoad bool
+	TagSuffix     string
 }
 
 var (
@@ -203,6 +204,7 @@ func NewCmdRegistryDeploy(o *RegistryOptions) *cobra.Command {
 	cmd.Flags().StringVar(&o.DataRoot, "data-root", o.DataRoot, "set registry data root directory.")
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "set registry port")
 	cmd.Flags().BoolVar(&o.SkipImageLoad, "skip-image-load", o.SkipImageLoad, "set to skip image load,if set true will skip image load when deploy registry")
+	cmd.Flags().StringVar(&o.TagSuffix, "tag-suffix", o.TagSuffix, "Append a suffix to the final image tag. For example, if the original image is library/busybox:1.36 and you set --tag-suffix=-amd64, the image will be pushed as library/busybox:1.36-amd64. Useful for creating architecture-specific tags in one shot.")
 
 	utils.CheckErr(cmd.MarkFlagRequired("node"))
 	utils.CheckErr(cmd.MarkFlagRequired("pkg"))
@@ -251,6 +253,7 @@ func NewCmdRegistryPush(o *RegistryOptions) *cobra.Command {
 
 	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node.")
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "docker images pkg,use `docker save $images > images.tar && gzip -f images.tar` to generate images.tar.gz")
+	cmd.Flags().StringVar(&o.TagSuffix, "tag-suffix", o.TagSuffix, "Append a suffix to the final image tag. For example, if the original image is library/busybox:1.36 and you set --tag-suffix=-amd64, the image will be pushed as library/busybox:1.36-amd64. Useful for creating architecture-specific tags in one shot.")
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "registry port.")
 
 	utils.CheckErr(cmd.MarkFlagRequired("node"))
@@ -597,7 +600,7 @@ func (o *RegistryOptions) Push() error {
 
 	logger.V(3).Infof("push %s to %s", fullPath, o.registry())
 	logger.Info("waiting for push image")
-	if err = client.Push(fullPath, o.registry()); err != nil {
+	if err = client.Push(fullPath, o.registry(), o.TagSuffix); err != nil {
 		return err
 	}
 	logger.Info("push image successful")
@@ -725,7 +728,7 @@ func (o *RegistryOptions) loadImages() error {
 		tar := strings.ReplaceAll(pkg, ".tar.gz", ".tar")
 
 		logger.V(3).Infof("push %s to %s", tar, o.registry())
-		if err = client.Push(tar, o.registry()); err != nil {
+		if err = client.Push(tar, o.registry(), o.TagSuffix); err != nil {
 			return err
 		}
 	}
