@@ -243,3 +243,6 @@ kcctl get cluster -o yaml|grep status -A5
 ## Contributing
 
 请参考 [Community](https://github.com/kubeclipper/community) 的相关文档，加入我们
+
+---
+Copyright © contributors to KubeClipper, established as KubeClipper a Series of LF Projects, LLC.

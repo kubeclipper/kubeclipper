@@ -266,3 +266,7 @@ Please read our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for details.
 ## Star History
 
 ![Star History Chart](https://api.star-history.com/svg?repos=kubeclipper/kubeclipper&type=Date)
+
+
+---
+Copyright © contributors to KubeClipper, established as KubeClipper a Series of LF Projects, LLC.
