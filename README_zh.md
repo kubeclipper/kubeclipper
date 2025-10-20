@@ -244,5 +244,14 @@ kcctl get cluster -o yaml|grep status -A5
 
 请参考 [Community](https://github.com/kubeclipper/community) 的相关文档，加入我们
 
+## Landscapes
+
+<p align="center">
+<img src="https://landscape.cncf.io/images/cncf-landscape-horizontal-color.svg" width="300"/>
+<br/><br/>
+KubeClipper is a <a href="https://landscape.cncf.io/?group=certified-partners-and-providers&item=platform--certified-kubernetes-installer--kubeclipper">CNCF sandbox project.</a>
+</p>
+
+
 ---
 Copyright © contributors to KubeClipper, established as KubeClipper a Series of LF Projects, LLC.
