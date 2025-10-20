@@ -267,6 +267,13 @@ Please read our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for details.
 
 ![Star History Chart](https://api.star-history.com/svg?repos=kubeclipper/kubeclipper&type=Date)
 
+## Landscapes
+
+<p align="center">
+<img src="https://landscape.cncf.io/images/cncf-landscape-horizontal-color.svg" width="300"/>
+<br/><br/>
+KubeClipper is a <a href="https://landscape.cncf.io/?group=certified-partners-and-providers&item=platform--certified-kubernetes-installer--kubeclipper">CNCF sandbox project.</a>
+</p>
 
 ---
 Copyright © contributors to KubeClipper, established as KubeClipper a Series of LF Projects, LLC.
