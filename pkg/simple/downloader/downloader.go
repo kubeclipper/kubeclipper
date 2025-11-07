@@ -70,6 +70,11 @@ type Downloader struct {
 	ctx context.Context
 }
 
+// ChartDir returns the path of chart file download to
+func ChartDir(name, version string) string {
+	return filepath.Join(filepath.Join(BaseDstDir, "."+name, version), ChartFilename)
+}
+
 func NewInstance(ctx context.Context, name, version, arch string, online, dryRun bool) (*Downloader, error) {
 	if options == nil {
 		return nil, fmt.Errorf("the required downloader configuration is missing, you need to call SetOptions before calling NewInstance")

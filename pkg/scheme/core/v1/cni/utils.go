@@ -106,7 +106,14 @@ func RemoveImage(name string, custom []byte, nodes []v1.StepNode) v1.Step {
 	}
 }
 
-func InstallCalicoRelease(chartPath string, yamlName string, nodes []v1.StepNode) v1.Step {
+func InstallCalicoRelease(chartPath string, yamlName string, calicoVersion string, nodes []v1.StepNode) v1.Step {
+	// For Calico v3.29.6 and later, tigera-operator must be installed in tigera-operator namespace
+	// For earlier versions, it can be installed in calico-system namespace
+	namespace := "calico-system"
+	if IsHighCalicoVersion(calicoVersion) {
+		namespace = "tigera-operator"
+	}
+
 	return v1.Step{
 		ID:         strutil.GetUUID(),
 		Name:       "installCalicoRelease",
@@ -117,7 +124,7 @@ func InstallCalicoRelease(chartPath string, yamlName string, nodes []v1.StepNode
 		Commands: []v1.Command{
 			{
 				Type:         v1.CommandShell,
-				ShellCommand: []string{"helm", "upgrade", "--install", "--create-namespace", "calico", "-n", "calico-system", chartPath, "-f", yamlName},
+				ShellCommand: []string{"helm", "upgrade", "--install", "--create-namespace", "calico", "-n", namespace, chartPath, "-f", yamlName},
 			},
 		},
 	}
@@ -135,6 +142,77 @@ func IsHighKubeVersion(kubeVersion string) bool {
 	if v, _ := strconv.Atoi(kubeVersion); v >= 126 {
 		return true
 	}
+	return false
+}
+
+// IsHighCalicoVersion checks if the Calico version is v3.29.6 or later
+// For v3.29.6+, tigera-operator must be installed in tigera-operator namespace
+func IsHighCalicoVersion(calicoVersion string) bool {
+	if calicoVersion == "" {
+		return false
+	}
+	// Remove 'v' prefix if present
+	calicoVersion = strings.TrimPrefix(calicoVersion, "v")
+
+	// Split version into parts: major.minor.patch
+	parts := strings.Split(calicoVersion, ".")
+	if len(parts) < 3 {
+		return false
+	}
+
+	major, err1 := strconv.Atoi(parts[0])
+	minor, err2 := strconv.Atoi(parts[1])
+	patch, err3 := strconv.Atoi(parts[2])
+
+	if err1 != nil || err2 != nil || err3 != nil {
+		return false
+	}
+
+	// Check if version >= 3.29.6
+	if major > 3 {
+		return true
+	}
+	if major == 3 && minor > 29 {
+		return true
+	}
+	if major == 3 && minor == 29 && patch >= 6 {
+		return true
+	}
+
+	return false
+}
+
+// UseCalicoOperator checks if the Calico version should use tigera-operator (Helm) for deployment
+// For Calico v3.26 and above, use Helm deployment with tigera-operator
+// For versions below v3.26, use direct YAML deployment
+func UseCalicoOperator(calicoVersion string) bool {
+	if calicoVersion == "" {
+		return false
+	}
+	// Remove 'v' prefix if present
+	calicoVersion = strings.TrimPrefix(calicoVersion, "v")
+
+	// Split version into parts: major.minor.patch
+	parts := strings.Split(calicoVersion, ".")
+	if len(parts) < 2 {
+		return false
+	}
+
+	major, err1 := strconv.Atoi(parts[0])
+	minor, err2 := strconv.Atoi(parts[1])
+
+	if err1 != nil || err2 != nil {
+		return false
+	}
+
+	// Check if version >= 3.26
+	if major > 3 {
+		return true
+	}
+	if major == 3 && minor >= 26 {
+		return true
+	}
+
 	return false
 }
 
