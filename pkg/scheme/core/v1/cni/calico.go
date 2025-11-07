@@ -126,20 +126,22 @@ func (runnable *CalicoRunnable) InstallSteps(nodes []v1.StepNode, kubernetesVers
 	if err != nil {
 		return nil, err
 	}
-	if IsHighKubeVersion(kubernetesVersion) {
+
+	// Calico v3.26 and above use tigera-operator (Helm deployment)
+	// Versions below v3.26 use direct YAML deployment
+	if UseCalicoOperator(runnable.Version) {
 		chart := &common.Chart{
 			PkgName: "calico",
 			Version: runnable.Version,
 			Offline: runnable.Offline,
 		}
-
 		cLoadSteps, err := chart.InstallStepsV2(nodes)
 		if err != nil {
 			return nil, err
 		}
 		steps = append(steps, cLoadSteps...)
 		steps = append(steps, RenderYaml("calico", bytes, nodes))
-		steps = append(steps, InstallCalicoRelease(filepath.Join(downloader.BaseDstDir, "."+chart.PkgName, chart.Version, downloader.ChartFilename), filepath.Join(manifestDir, "calico.yaml"), nodes))
+		steps = append(steps, InstallCalicoRelease(downloader.ChartDir(chart.PkgName, runnable.Version), filepath.Join(manifestDir, "calico.yaml"), runnable.Version, nodes))
 	} else {
 		steps = append(steps, RenderYaml("calico", bytes, nodes))
 		steps = append(steps, ApplyYaml(filepath.Join(manifestDir, "calico.yaml"), nodes))
@@ -210,6 +212,8 @@ func (runnable *CalicoRunnable) CalicoTemplate() (string, error) {
 		return calicoV3245, nil
 	case "v3.26.1":
 		return calicoV3261, nil
+	case "v3.29.6":
+		return calicoV3296, nil
 	}
 	return "", fmt.Errorf("calico dose not support version: %s", runnable.Version)
 }
