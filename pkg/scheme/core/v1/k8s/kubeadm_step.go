@@ -1296,9 +1296,29 @@ func (d *KubeadmConfigUpdater) Install(ctx context.Context, opts component.Optio
 		return nil, fmt.Errorf("read config file: %s failed: %w", d.ConfigFile, err)
 	}
 
+	// try v1.beta4
+	var configV2 ClusterConfigurationV1Beta4
+	if err = yaml.Unmarshal(buf, &configV2); err == nil {
+		configV2.APIServer.CertSANs = sets.NewString(d.SANs...).List()
+		marshal, err := yaml.Marshal(configV2)
+		if err != nil {
+			return nil, err
+		}
+
+		if !opts.DryRun {
+			if err = os.WriteFile(d.ConfigFile, marshal, 0600); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	}
+
+	// try v1 beta1
+	v2Err := err
+	logger.Infof("unmarshal config file: %s with v1.beta4 failed: %v, try to use v1 version", d.ConfigFile, v2Err)
 	var config ClusterConfiguration
 	if err = yaml.Unmarshal(buf, &config); err != nil {
-		return nil, fmt.Errorf("unmarshal config file: %s failed: %w", d.ConfigFile, err)
+		return nil, fmt.Errorf("unmarshal config file: %s failed: v1.beta4 error: %v, v1 error: %w, all version failed", d.ConfigFile, v2Err, err)
 	}
 	config.APIServer.CertSANs = sets.NewString(d.SANs...).List()
 	marshal, err := yaml.Marshal(config)

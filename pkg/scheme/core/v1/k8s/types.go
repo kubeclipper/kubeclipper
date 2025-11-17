@@ -67,15 +67,9 @@ type InitConfiguration struct {
 	Patches *Patches `json:"patches,omitempty"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
-type ClusterConfiguration struct {
+// clusterConfigurationBase contains common fields shared by different versions of ClusterConfiguration
+type clusterConfigurationBase struct {
 	metav1.TypeMeta `json:",inline"`
-
-	// Etcd holds configuration for etcd.
-	// +optional
-	Etcd Etcd `json:"etcd,omitempty"`
 
 	// Networking holds configuration for the networking topology of the cluster.
 	// +optional
@@ -133,6 +127,30 @@ type ClusterConfiguration struct {
 	// The cluster name
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
+type ClusterConfiguration struct {
+	clusterConfigurationBase `json:",inline"`
+
+	// Etcd holds configuration for etcd.
+	// +optional
+	Etcd Etcd `json:"etcd,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterConfigurationV1Beta4 contains cluster-wide configuration for a kubeadm cluster (v1beta4 API version)
+// The main difference from ClusterConfiguration is that Etcd uses LocalEtcdV2 which supports
+// ExtraArgs as an array format instead of a map.
+type ClusterConfigurationV1Beta4 struct {
+	clusterConfigurationBase `json:",inline"`
+
+	// Etcd holds configuration for etcd.
+	// +optional
+	Etcd LocalEtcdV2 `json:"etcd,omitempty"`
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -286,6 +304,36 @@ type LocalEtcd struct {
 	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
 	// +optional
 	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
+}
+
+// LocalEtcdV2 support v1.beta4
+type LocalEtcdV2 struct {
+	// ImageMeta allows to customize the container used for etcd
+	ImageMeta `json:",inline"`
+
+	// DataDir is the directory etcd will place its data.
+	// Defaults to "/var/lib/etcd".
+	DataDir string `json:"dataDir"`
+
+	// ExtraArgs are extra arguments provided to the etcd binary
+	// when run inside a static pod.
+	// A key in this map is the flag name as it appears on the
+	// command line except without leading dash(es).
+	// +optional
+	//ExtraArgs map[string]string `json:"extraArgs,omitempty"`
+	ExtraArgs []ArgumentItem `yaml:"extraArgs,omitempty"`
+
+	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
+	// +optional
+	ServerCertSANs []string `json:"serverCertSANs,omitempty"`
+	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
+	// +optional
+	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
+}
+
+type ArgumentItem struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
 }
 
 // ExternalEtcd describes an external etcd cluster.
