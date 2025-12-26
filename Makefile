@@ -18,7 +18,7 @@ deps:
     endif
 
 .PHONY: build build-server build-agent build-proxy build-cli openapi licfmt
-build: build-server build-agent build-proxy build-cli
+build: build-server build-agent build-cli
 
 build-server:
 	KUBE_VERBOSE=2 bash hack/make-rules/build.sh cmd/kubeclipper-server

@@ -223,6 +223,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// update cri will restart cri,may make cluster unhealthy
 	// so we need run this before syncClusterClient.
 	if err = r.updateCRIRegistries(ctx, clu); err != nil {
+		log.Error("update CRI registry failed", zap.Error(err))
 		return ctrl.Result{}, nil
 	}
 	if err = r.syncClusterClient(ctx, log, clu); err != nil {
