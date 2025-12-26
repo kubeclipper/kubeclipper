@@ -429,7 +429,37 @@ func (r *ClusterReconciler) updateAPIServerCerts(ctx context.Context, c *v1.Clus
 		log.Infof("cluster %s api server cert included all sans %v,skip update", c.Name, c.GetAllCertSANs())
 		return nil
 	}
+
+	// Check if there's already an ongoing UpdateAPIServerCertification operation
+	ongoing, err := r.hasOngoingUpdateAPIServerCertOperation(ctx, c.Name)
+	if err != nil {
+		return err
+	}
+	if ongoing {
+		log.Infof("UpdateAPIServerCertification operation already exists for cluster %s, skip creating new one", c.Name)
+		return nil
+	}
+
 	return r.doUpdateAPIServerCerts(ctx, c, nodeList)
+}
+
+func (r *ClusterReconciler) hasOngoingUpdateAPIServerCertOperation(ctx context.Context, clusterName string) (bool, error) {
+	operations, err := r.OperationOperator.ListOperations(ctx, &query.Query{
+		Pagination:      query.NoPagination(),
+		ResourceVersion: "0",
+		LabelSelector:   fmt.Sprintf("%s=%s,%s=%s", common.LabelClusterName, clusterName, common.LabelOperationAction, v1.OperationUpdateAPIServerCertification),
+	})
+	if err != nil {
+		return false, pkgerr.WithMessage(err, "failed to list operations")
+	}
+
+	// Check if there's any ongoing operation
+	for _, op := range operations.Items {
+		if op.Status.Status == v1.OperationStatusPending || op.Status.Status == v1.OperationStatusRunning {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *ClusterReconciler) doUpdateAPIServerCerts(ctx context.Context, c *v1.Cluster, nl component.NodeList) error {
