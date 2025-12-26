@@ -1212,7 +1212,7 @@ func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step,
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "mv -f /etc/kubernetes/pki/apiserver.{crt,key} /tmp/.k8s/pki/"},
+					ShellCommand: []string{"bash", "-c", "cp -f /etc/kubernetes/pki/apiserver.{crt,key} /tmp/.k8s/pki/"},
 				},
 			},
 		},
