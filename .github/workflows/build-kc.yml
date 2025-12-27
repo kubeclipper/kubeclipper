@@ -55,7 +55,7 @@ jobs:
         run: |
           pushd dist
           tar -zcvf kc-linux-arm64.tar.gz linux_arm64/
-          tar -zcvf kc-linux-amd64.tar.gz kubeclipper-server kubeclipper-agent kubeclipper-proxy kcctl
+          tar -zcvf kc-linux-amd64.tar.gz kubeclipper-server kubeclipper-agent kcctl
           tar -zcvf kc-darwin-amd64.tar.gz darwin_amd64/
           tar -zcvf kc-darwin-arm64.tar.gz darwin_arm64/
           popd
