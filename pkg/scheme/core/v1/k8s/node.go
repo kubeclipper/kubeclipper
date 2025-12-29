@@ -198,7 +198,7 @@ func (stepper *GenNode) MakeUninstallSteps(metadata *component.ExtraMetadata, pa
 	}
 	masters := utils.UnwrapNodeList(avaMasters)
 	if len(stepper.uninstallSteps) == 0 {
-		args := []string{"--ignore-daemonsets", "--delete-local-data"}
+		args := []string{"--ignore-daemonsets", "--delete-emptydir-data", "--force"}
 		for _, node := range patchNodes {
 			d := &Drain{}
 			steps, err := d.InitStepper(node.Hostname, args).UninstallSteps([]v1.StepNode{masters[0]})
@@ -417,7 +417,7 @@ func (stepper *Drain) Uninstall(ctx context.Context, opts component.Options) (by
 		return
 	}
 
-	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "taint", "nodes", stepper.Hostname, "NoExec=true:NoExecute")
+	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "taint", "nodes", stepper.Hostname, "NoExec=true:NoExecute", "--overwrite")
 	if err != nil {
 		logErrMsg = "kubectl taint node error"
 		return
@@ -425,7 +425,7 @@ func (stepper *Drain) Uninstall(ctx context.Context, opts component.Options) (by
 
 	cmds := strings.Split(fmt.Sprintf("kubectl drain %s", stepper.Hostname), " ")
 	cmds = append(cmds, stepper.ExtraArgs...)
-	// kubectl drain ${node_name} --ignore-daemonsets --delete-local-data (v1.20.13)
+	// kubectl drain ${node_name} --ignore-daemonsets --delete-emptydir-data --force
 	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, cmds[0], cmds[1:]...)
 	if err != nil {
 		logErrMsg = "kubectl drain node error"
