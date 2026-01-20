@@ -36,8 +36,10 @@
 
 > 中文 | [English](README.md)
 
-[KubeClipper](https://kubeclipper.io/) 是一个轻量级的 Web 服务，为 **Kubernetes 集群生命周期管理** 提供友好的 Web 控制台 GUI、API 和 CLI 工具。  
-KubeClipper 提供灵活的 Kubernetes 即服务（KaaS），允许用户在任何地方（云、虚拟机、裸机）快速部署 K8S 集群，并提供持续的生命周期管理功能（安装、删除、升级、备份和恢复、集群扩展、远程访问、插件管理、应用商店）。详细信息见[功能列表](https://github.com/kubeclipper/kubeclipper/blob/master/README_zh.md#features)
+[KubeClipper](https://kubeclipper.io/) 是一个轻量级的 Web 服务，为 **Kubernetes 集群生命周期管理**
+提供友好的 Web 控制台 GUI、API 和 CLI 工具。\
+KubeClipper 提供灵活的 Kubernetes 即服务（KaaS），允许用户在任何地方（云、虚拟机、裸机）快速部署 K8S
+集群，并提供持续的生命周期管理功能（安装、删除、升级、备份和恢复、集群扩展、远程访问、插件管理、应用商店）。详细信息见[功能列表](https://github.com/kubeclipper/kubeclipper/blob/master/README_zh.md#features)
 
 **🎯 项目目标**：以最轻松便捷的方式管理 Kubernetes。
 
@@ -47,7 +49,7 @@ KubeClipper 提供灵活的 Kubernetes 即服务（KaaS），允许用户在任�
   <summary><b>☸️ 集群生命周期管理</b></summary>
   支持在任何基础设施上部署 Kubernetes，并提供完整的集群生命周期管理。
 
-  <ul>
+<ul>
   <li>生命周期管理：支持集群创建、删除、备份、恢复、升级、增删节点</li>
   <li>多部署方式：在线/离线部署支持</li>
   <li>多架构：x86/64&arm64 支持</li>
@@ -70,46 +72,52 @@ KubeClipper 提供灵活的 Kubernetes 即服务（KaaS），允许用户在任�
   <summary><b>🚪 身份和访问管理（IAM）</b></summary>
   提供统一的认证鉴权与细粒度的基于角色的授权系统。
 
-  <ul>
+<ul>
   <li>基于 RBAC 的用户权限系统</li>
   <li>OIDC 集成</li>
   <li>...</li>
   </ul>
 </details>
 
-
 ## Roadmap & Todo list
-* 🚀 集群安装优化
-  * 使用 OCI 镜像封装离线安装包，降低复杂度
-* 💻 Kubernetes web console
-  * 工作负载 & 监控显示
-  * 基于租户的集群访问控制
-* 📦 应用商店
-  * 应用生命周期管理
-  * 支持 Web UI 和 CLI 工具
-* 🧩 常见应用程序和插件集成
-  * LB & Ingress
-  * Monitor
-  * Kubernetes Dashboard
-  * KubeEdge
-  * ...
-* 🕸 托管集群
-  * 支持 KoK 集群
+
+- 🚀 集群安装优化
+  - 使用 OCI 镜像封装离线安装包，降低复杂度
+- 💻 Kubernetes web console
+  - 工作负载 & 监控显示
+  - 基于租户的集群访问控制
+- 📦 应用商店
+  - 应用生命周期管理
+  - 支持 Web UI 和 CLI 工具
+- 🧩 常见应用程序和插件集成
+  - LB & Ingress
+  - Monitor
+  - Kubernetes Dashboard
+  - KubeEdge
+  - ...
+- 🕸 托管集群
+  - 支持 KoK 集群
 
 ## Architecture
+
 ### Core
+
 ![kc-arch1](docs/img/kc-arch.png)
 
 ### Node
+
 ![kc-arch2](docs/img/kc-arch2.png)
 
 ### Network
+
 ![kc-network](docs/img/kc-network.png)
 
 更多 Kubeclipper 架构信息见 [kubeclipper.io](https://kubeclipper.io/docs/overview/)。
+
 ## Quick Start
 
-对于初次接触 KubeClipper 并想快速上手的用户，建议使用 All-in-One 安装模式，它能够帮助您零配置快速部署 KubeClipper。
+对于初次接触 KubeClipper 并想快速上手的用户，建议使用 All-in-One
+安装模式，它能够帮助您零配置快速部署 KubeClipper。
 
 ### 准备工作
 
@@ -144,8 +152,9 @@ curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=master bash -
 ```
 
-> 强烈建议您安装最新的发布版本，体验更多功能特性。  
-> 您也可以在 **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)** 下载指定版本。
+> 强烈建议您安装最新的发布版本，体验更多功能特性。\
+> 您也可以在 **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)**
+> 下载指定版本。
 
 通过以下命令检测是否安装成功:
 
@@ -168,10 +177,11 @@ KC_VERSION=master kcctl deploy
 
 如果想安装多个节点，可以使用 `kcctl deploy -h` 获取更多帮助信息
 
-执行该命令后，Kcctl 将检查您的安装环境，若满足条件将会进入安装流程。在打印出如下的 KubeClipper banner 后即表示安装完成。
+执行该命令后，Kcctl 将检查您的安装环境，若满足条件将会进入安装流程。在打印出如下的 KubeClipper
+banner 后即表示安装完成。
 
 ```console
- _   __      _          _____ _ _
+_   __      _          _____ _ _
 | | / /     | |        /  __ \ (_)
 | |/ / _   _| |__   ___| /  \/ |_ _ __  _ __   ___ _ __
 |    \| | | | '_ \ / _ \ |   | | | '_ \| '_ \ / _ \ '__|
@@ -193,7 +203,8 @@ KC_VERSION=master kcctl deploy
 
 ### 创建 k8s 集群
 
-部署成功后您可以使用 **kcctl 工具**或者通过**控制台**创建 k8s 集群。在本快速入门教程中使用 kcctl 工具进行创建。
+部署成功后您可以使用 **kcctl 工具**或者通过**控制台**创建 k8s 集群。在本快速入门教程中使用 kcctl
+工具进行创建。
 
 然后使用以下命令创建 k8s 集群:
 
@@ -253,4 +264,5 @@ KubeClipper is a <a href="https://landscape.cncf.io/?group=certified-partners-an
 </p>
 
 ---
+
 Copyright © contributors to KubeClipper, established as KubeClipper a Series of LF Projects, LLC.

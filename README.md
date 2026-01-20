@@ -36,11 +36,13 @@
 
 > English | [中文](README_zh.md)
 
-[KubeClipper](https://kubeclipper.io/) is a lightweight web service that provides a friendly web console GUI, APIs, and a CLI tool for **Kubernetes cluster lifecycle management**.
-KubeClipper provides flexible Kubernetes as a Service (KaaS), which allows users to rapidly deploy K8S clusters
+[KubeClipper](https://kubeclipper.io/) is a lightweight web service that provides a friendly web
+console GUI, APIs, and a CLI tool for **Kubernetes cluster lifecycle management**. KubeClipper
+provides flexible Kubernetes as a Service (KaaS), which allows users to rapidly deploy K8S clusters
 anywhere(cloud, hypervisor, bare metal) and provides continuous lifecycle management capabilities
-(installation, deleting, upgrading, backup and restoration, cluster scaling, remote access, plug-in management,
-application store).see [Feature List](https://github.com/kubeclipper/kubeclipper#features) for details.
+(installation, deleting, upgrading, backup and restoration, cluster scaling, remote access, plug-in
+management, application store).see
+[Feature List](https://github.com/kubeclipper/kubeclipper#features) for details.
 
 **🎯 Project Goal**：Manage Kubernetes in the most light and convenient way.
 
@@ -50,7 +52,7 @@ application store).see [Feature List](https://github.com/kubeclipper/kubeclipper
   <summary><b>☸️ Cluster Lifecycle Management</b></summary>
   Supports deployment of Kubernetes on any infrastructure and provides comprehensive cluster lifecycle management.
 
-  <ul>
+<ul>
   <li>Lifecycle Management: cluster creation, deletion, backup, restoration, upgrade, and node manipulation</li>
   <li>Multiple Deployment Modes: online/offline deployment support</li>
   <li>Multi-Architecture: x86/64 &amp; arm64 support</li>
@@ -73,7 +75,7 @@ application store).see [Feature List](https://github.com/kubeclipper/kubeclipper
   <summary><b>🚪 Identity and Access Management (IAM)</b></summary>
   Provides a unified authentication and authorization system with fine-grained role-based access control.
 
-  <ul>
+<ul>
   <li>RBAC-based user permission system</li>
   <li>OIDC integration</li>
   <li>...</li>
@@ -82,21 +84,22 @@ application store).see [Feature List](https://github.com/kubeclipper/kubeclipper
 
 ## Roadmap & Todo list
 
-* 🚀 Cluster Installation Optimization
-    * Use images to encapsulate installation package resources to reduce complexity. Reuse mature image technology
-* 💻 Kubernetes Web Console
-    * Workload resources & monitoring presentation
-    * Tenant based cluster access control
-* 📦 Application Store
-    * Application lifecycle management
-    * Support web UI & CLI interface
-* 🧩 Common Application and Plugin Integrations
-    * LB & Ingress
-    * Monitoring
-    * Kubernetes Dashboard
-    * KubeEdge
-* 🕸 Managed Clusters
-    * Support KoK clusters.
+- 🚀 Cluster Installation Optimization
+  - Use images to encapsulate installation package resources to reduce complexity. Reuse mature
+    image technology
+- 💻 Kubernetes Web Console
+  - Workload resources & monitoring presentation
+  - Tenant based cluster access control
+- 📦 Application Store
+  - Application lifecycle management
+  - Support web UI & CLI interface
+- 🧩 Common Application and Plugin Integrations
+  - LB & Ingress
+  - Monitoring
+  - Kubernetes Dashboard
+  - KubeEdge
+- 🕸 Managed Clusters
+  - Support KoK clusters.
 
 ## Architecture
 
@@ -116,26 +119,31 @@ Explore the architecture of Kubeclipper on [kubeclipper.io](https://kubeclipper.
 
 ## Quick Start
 
-For users who are new to KubeClipper and want to get started quickly, it is recommended to use the All-in-One installation mode, which can help you quickly deploy KubeClipper with zero configuration.
+For users who are new to KubeClipper and want to get started quickly, it is recommended to use the
+All-in-One installation mode, which can help you quickly deploy KubeClipper with zero configuration.
 
 ### Preparations
 
-KubeClipper itself does not take up too many resources, but in order to run Kubernetes better in the future,  it is recommended that the hardware configuration should not be lower than the minimum requirements.
+KubeClipper itself does not take up too many resources, but in order to run Kubernetes better in the
+future, it is recommended that the hardware configuration should not be lower than the minimum
+requirements.
 
-You only need to prepare a host with reference to the following requirements for machine hardware and operating system.
+You only need to prepare a host with reference to the following requirements for machine hardware
+and operating system.
 
 #### Hardware recommended configuration
 
-* Make sure your machine meets the minimum hardware requirements: CPU >= 2 cores, RAM >= 2GB.
-* Operating System: CentOS 7.x / Ubuntu 18.04 / Ubuntu 20.04.
+- Make sure your machine meets the minimum hardware requirements: CPU >= 2 cores, RAM >= 2GB.
+- Operating System: CentOS 7.x / Ubuntu 18.04 / Ubuntu 20.04.
 
 #### Node requirements
 
-* Nodes must be able to connect via `SSH`.
+- Nodes must be able to connect via `SSH`.
 
-* You can use the `sudo` / `curl` / `wget` / `tar` command on this node.
+- You can use the `sudo` / `curl` / `wget` / `tar` command on this node.
 
-> It is recommended that your operating system is in a clean state (no additional software is installed), otherwise, conflicts may occur.
+> It is recommended that your operating system is in a clean state (no additional software is
+> installed), otherwise, conflicts may occur.
 
 ### Deploy KubeClipper
 
@@ -154,8 +162,9 @@ curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=master bash -
 ```
 
-> It is highly recommended that you install the latest release to experience more features.
-> You can also download the specified version on the **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)**.
+> It is highly recommended that you install the latest release to experience more features. You can
+> also download the specified version on the
+> **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)**.
 
 Check if the installation is successful with the following command:
 
@@ -165,7 +174,7 @@ kcctl version
 
 #### Get Started with Installation
 
-In this quick start tutorial, you only need to run  just one command for installation:
+In this quick start tutorial, you only need to run just one command for installation:
 
 If you want to install AIO mode
 
@@ -178,12 +187,13 @@ KC_VERSION=master kcctl deploy
 
 If you want to install multi node, Use `kcctl deploy -h` for more information about a command
 
-After you runn this command, kcctl will check your installation environment and enter the installation process, if the conditions are met.
+After you runn this command, kcctl will check your installation environment and enter the
+installation process, if the conditions are met.
 
 After printing the KubeClipper banner, the installation is complete.
 
 ```bash
- _   __      _          _____ _ _
+_   __      _          _____ _ _
 | | / /     | |        /  __ \ (_)
 | |/ / _   _| |__   ___| /  \/ |_ _ __  _ __   ___ _ __
 |    \| | | | '_ \ / _ \ |   | | | '_ \| '_ \ / _ \ '__|
@@ -195,17 +205,20 @@ After printing the KubeClipper banner, the installation is complete.
 
 ### Login Console
 
-When deployed successfully, you can open a browser and visit `http://$IP` to enter the KubeClipper console.
+When deployed successfully, you can open a browser and visit `http://$IP` to enter the KubeClipper
+console.
 
 ![](docs/img/console-login.png)
 
- You can log in with the default account and password `admin / Thinkbig1`.
+You can log in with the default account and password `admin / Thinkbig1`.
 
-> You may need to configure port forwarding rules and open ports in security groups for external users to access the console.
+> You may need to configure port forwarding rules and open ports in security groups for external
+> users to access the console.
 
 ### Create a k8s cluster
 
-When `kubeclipper` is deployed successfully, you can use the **kcctl** **tool** or **console** to create a  k8s cluster. In the quick start tutorial, we use the kcctl tool to create.
+When `kubeclipper` is deployed successfully, you can use the **kcctl** **tool** or **console** to
+create a k8s cluster. In the quick start tutorial, we use the kcctl tool to create.
 
 Then create a k8s cluster with the following command:
 
@@ -215,7 +228,8 @@ NODE=$(kcctl get node -o yaml|grep ipv4DefaultIP:|sed 's/ipv4DefaultIP: //')
 kcctl create cluster --master $NODE --name demo --untaint-master
 ```
 
-The cluster creation will be completed in about 3 minutes, or you can use the following command to view the cluster status:
+The cluster creation will be completed in about 3 minutes, or you can use the following command to
+view the cluster status:
 
 ```bash
 kcctl get cluster -o yaml|grep status -A5
@@ -223,7 +237,8 @@ kcctl get cluster -o yaml|grep status -A5
 
 > You can also enter the console to view real-time logs.
 
-Once the cluster enter  the `Running` state , it means that the creation is complete. You can use `kubectl get cs` command to view the cluster status.
+Once the cluster enter the `Running` state , it means that the creation is complete. You can use
+`kubectl get cs` command to view the cluster status.
 
 ## Development and Debugging
 
@@ -260,8 +275,9 @@ See [GOVERNANCE.md](./GOVERNANCE.md) for project governance and decision-making 
 
 ## Code of Conduct
 
-This project follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md).
-Please read our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for details.
+This project follows the
+[CNCF Code of Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md). Please read
+our [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for details.
 
 ## Star History
 
@@ -276,4 +292,5 @@ KubeClipper is a <a href="https://landscape.cncf.io/?group=certified-partners-an
 </p>
 
 ---
+
 Copyright © contributors to KubeClipper, established as KubeClipper a Series of LF Projects, LLC.

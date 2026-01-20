@@ -30,7 +30,6 @@ related #
 4-8 sentences of the proposed solution
 -->
 
-
 ## User Experience
 
 ### Use Cases
@@ -42,7 +41,6 @@ in depth description of user experience
 
 include full examples and references
 -->
-
 
 ## Implementation
 
