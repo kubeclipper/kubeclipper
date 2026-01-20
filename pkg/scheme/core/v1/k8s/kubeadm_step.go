@@ -1175,7 +1175,7 @@ func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step,
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "kubectl -n kube-system get configmap kubeadm-config -o jsonpath='{.data.ClusterConfiguration}' > /tmp/.k8s/kubeadm-new.yaml"},
+					ShellCommand: []string{"bash", "-c", "mkdir -p /tmp/.k8s && kubectl -n kube-system get configmap kubeadm-config -o jsonpath='{.data.ClusterConfiguration}' > /tmp/.k8s/kubeadm-new.yaml"},
 				},
 			},
 		},
