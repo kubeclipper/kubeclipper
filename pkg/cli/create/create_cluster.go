@@ -30,6 +30,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -155,6 +156,8 @@ type CreateClusterOptions struct {
 	Name                             string
 	createdByIP                      bool
 	CertSans                         []string
+	ExternalIP                       string
+	ExternalDomain                   string
 	CaCertFile                       string
 	CaKeyFile                        string
 	DNSDomain                        string
@@ -224,6 +227,8 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.CNI, "cni", o.CNI, "k8s cni type, calico or others")
 	cmd.Flags().StringVar(&o.CNIVersion, "cni-version", o.CNIVersion, "k8s cni version")
 	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
+	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, "k8s apiserver external ip")
+	cmd.Flags().StringVar(&o.ExternalDomain, "external-domain", o.ExternalDomain, "k8s apiserver external domain")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
 	cmd.Flags().StringVar(&o.DNSDomain, "cluster-dns-domain", o.DNSDomain, "k8s cluster domain")
@@ -401,6 +406,20 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 		}
 	}
 
+	// validate external IP
+	if l.ExternalIP != "" {
+		if !netutil.IsValidIP(l.ExternalIP) {
+			return utils.UsageErrorf(cmd, "invalid external IP: %s", l.ExternalIP)
+		}
+	}
+
+	// validate external domain
+	if l.ExternalDomain != "" {
+		if err := netutil.IsValidDomain(l.ExternalDomain); err != nil {
+			return utils.UsageErrorf(cmd, "invalid external domain: %s: %s", l.ExternalDomain, err)
+		}
+	}
+
 	return nil
 }
 
@@ -480,6 +499,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        l.Name,
 			Annotations: annotations,
+			Labels:      make(map[string]string),
 		},
 
 		Masters:           nil,
@@ -516,6 +536,13 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		FeatureGates: l.FeatureGates,
 
 		Status: v1.ClusterStatus{},
+	}
+
+	if l.ExternalIP != "" {
+		c.Labels[common.LabelExternalIP] = l.ExternalIP
+	}
+	if l.ExternalDomain != "" {
+		c.Labels[common.LabelExternalDomain] = l.ExternalDomain
 	}
 
 	masters := make([]v1.WorkerNode, 0)

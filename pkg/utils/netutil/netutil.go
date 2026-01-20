@@ -19,12 +19,15 @@
 package netutil
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 func IsValidPort(port int) bool {
@@ -74,4 +77,20 @@ func Reachable(protocol string, addr string, timeout time.Duration) error {
 		connection.Close()
 	}
 	return err
+}
+
+func IsValidDomain(domain string) error {
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return errors.New("domain cannot be empty or whitespace")
+	}
+
+	lowerDomain := strings.ToLower(domain)
+
+	errs := validation.IsDNS1123Subdomain(lowerDomain)
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+
+	return nil
 }
