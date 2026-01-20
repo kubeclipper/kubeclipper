@@ -19,7 +19,8 @@ Arch
 Development Environment：
 
 1. Docker & containerd are both in `/usr/bin/containerd`
-2. If deploy cluster, new containerd will be installed in `/usr/local/bin/containerd` by kubeclipper, which could co-exist with old containerd
+2. If deploy cluster, new containerd will be installed in `/usr/local/bin/containerd` by
+   kubeclipper, which could co-exist with old containerd
 
 Config SSH (permit root login with id_rsa) & `apt update -y && apt upgrade -y`
 
@@ -110,7 +111,7 @@ Server:
   GitCommit:        
  docker-init:
   Version:          0.19.0
-  GitCommit:        
+  GitCommit:
 ```
 
 Config Docker Mirror in China Mainland
@@ -215,7 +216,9 @@ KC_VERSION=release-1.4 kcctl deploy --server 10.0.4.12 --agent 10.0.4.12 --pk-fi
 # kcctl deploy --server $IPADDR_SERVER --agent $IPADDR_AGENT --passwd xxx # or --pk-file
 ```
 
-**DO NOT USE** `KC_VERSION=release-1.4 kcctl deploy` since it will not add `pkFile` & `privateKey` in `.kc/deploy-config.yaml`, which will cause `kcctl resource` cmd to fail with notification: "one of pkfile or password must be specify,please config it in ".
+**DO NOT USE** `KC_VERSION=release-1.4 kcctl deploy` since it will not add `pkFile` & `privateKey`
+in `.kc/deploy-config.yaml`, which will cause `kcctl resource` cmd to fail with notification: "one
+of pkfile or password must be specify,please config it in ".
 
 ```console
 # KC_VERSION=release-1.4 kcctl deploy --server 10.0.4.12 --agent 10.0.4.12 --pk-file ~/.ssh/id_rsa
@@ -322,7 +325,8 @@ bash tarball-kubernetes.sh -a amd64 -v 1.23.17 -o /tmp -s https://github.com/dui
 cd /tmp
 ```
 
-After `tarball-kubernetes.sh`, you will get a k8s folder like this, **Always keep one version per time**
+After `tarball-kubernetes.sh`, you will get a k8s folder like this, **Always keep one version per
+time**
 
 ```console
 # find k8s
@@ -394,9 +398,12 @@ Normal should be:
 
 ![](img/kc-install-cluster-normal-calico.png)
 
-Modify metadata.json,change CNI version as below, also fail with 1.23.17, maybe hardcode logic. **TODO** check later.
+Modify metadata.json,change CNI version as below, also fail with 1.23.17, maybe hardcode logic.
+**TODO** check later.
 
-And as above, new k8s resources didn't add to metadata.json, may be a bug, we need to add it manually now. Without it, in webpage: <http://kc-console/cluster/create>，we could select containerd version with 1.29+ k8s version.
+And as above, new k8s resources didn't add to metadata.json, may be a bug, we need to add it
+manually now. Without it, in webpage: <http://kc-console/cluster/create>，we could select containerd
+version with 1.29+ k8s version.
 
 ```bash
 vi /opt/kubeclipper-server/resource/metadata.json
@@ -511,7 +518,8 @@ Then, `systemctl restart containerd`
 
 Pause installation from webpage, then resume from the breakpoint.
 
-You also can backup /tmp/.k8s and reboot host server, however pause & resume from webpage is much eaiser. 
+You also can backup /tmp/.k8s and reboot host server, however pause & resume from webpage is much
+eaiser.
 
 ```bash
 # Just log the steps here FYI.
@@ -574,7 +582,7 @@ tar xf kubectl.tar
 mv usr/bin/kubectl /usr/bin/
 ```
 
-### 4.2  deploy kubeedge with keadm
+### 4.2 deploy kubeedge with keadm
 
 ```bash
 # cloudnode
@@ -701,7 +709,6 @@ keadm join  --cloudcore-ipport=172.18.0.2:10000 \
 systemctl status  edgecore.service
 # systemctl restart  edgecore.service
 journalctl -u edgecore.service -xe
-
 ```
 
 ### 4.3 Config kube api in kubeedge node
@@ -718,7 +725,6 @@ docker exec -it kind-control-plane bash
 crictl pods
 # restart cloudcore pod
 crictl stopp cloudcore-5d9ccb9dc8-lv2qb
-
 ```
 
 #### 4.3.2 EdgeCore Side
@@ -783,7 +789,6 @@ ctr image import nginx.tar
 ctr -n k8s.io image list
 ctr image list
 netstat -natp|grep nginx
-
 ```
 
 #### 4.4.2 cloud node
@@ -792,7 +797,6 @@ netstat -natp|grep nginx
 kubectl apply -f hostnginx.yaml
 kubectl get pods -o wide
 kubectl describe pod  nginx-deployment-799c65967c-q8nvt
-
 ```
 
 #### 4.4.3 Application yaml file
@@ -822,5 +826,4 @@ spec:
         ports:
         - containerPort: 80
           hostPort: 80
-
 ```

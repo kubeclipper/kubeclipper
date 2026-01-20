@@ -6,6 +6,7 @@
 -->
 
 ### What type of PR is this?
+
 <!--
 Add one of the following kinds:
 /kind bug
@@ -22,21 +23,24 @@ Optionally add one or more of the following kinds if applicable:
 /kind regression
 -->
 
-
 ### What this PR does / why we need it:
 
 ### Which issue(s) this PR fixes:
+
 <!--
 Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
 _If PR is about `failing-tests or flakes`, please post the related issues/tests in a comment and do not use `Fixes`_*
 -->
+
 Fixes #
 
 ### Special notes for reviewers:
+
 ```
 ```
 
 ### Does this PR introduced a user-facing change?
+
 <!--
 If no, just write "None" in the release-note block below.
 If yes, a release note is required:
@@ -44,11 +48,12 @@ Enter your extended release note in the block below. If the PR requires addition
 
 For more information on release notes see: https://github.com/kubernetes/community/blob/master/contributors/guide/release-notes.md
 -->
-```release-note
 
+```release-note
 ```
 
 ### Additional documentation, usage docs, etc.:
+
 <!--
 This section can be blank if this pull request does not require a release note.
 Please use the following format for linking documentation or pass the
@@ -57,6 +62,6 @@ section below:
 - [Usage]: <link>
 - [Other doc]: <link>
 -->
-```docs
 
+```docs
 ```
