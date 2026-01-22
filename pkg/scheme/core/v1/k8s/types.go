@@ -143,14 +143,14 @@ type ClusterConfiguration struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterConfigurationV1Beta4 contains cluster-wide configuration for a kubeadm cluster (v1beta4 API version)
-// The main difference from ClusterConfiguration is that Etcd uses LocalEtcdV2 which supports
-// ExtraArgs as an array format instead of a map.
+// The main difference from ClusterConfiguration is that Etcd uses EtcdV2 which supports
+// ExtraArgs as an array format in a nested local structure.
 type ClusterConfigurationV1Beta4 struct {
 	clusterConfigurationBase `json:",inline"`
 
 	// Etcd holds configuration for etcd.
 	// +optional
-	Etcd LocalEtcdV2 `json:"etcd,omitempty"`
+	Etcd EtcdV2 `json:"etcd,omitempty"`
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -306,6 +306,13 @@ type LocalEtcd struct {
 	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
 }
 
+// EtcdV2 holds configuration for etcd in v1beta4
+type EtcdV2 struct {
+	// Local provides configuration knobs for configuring the local etcd instance
+	// +optional
+	Local *LocalEtcdV2 `json:"local,omitempty"`
+}
+
 // LocalEtcdV2 support v1.beta4
 type LocalEtcdV2 struct {
 	// ImageMeta allows to customize the container used for etcd
@@ -332,8 +339,8 @@ type LocalEtcdV2 struct {
 }
 
 type ArgumentItem struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
+	Name  string `json:"name" yaml:"name"`
+	Value string `json:"value" yaml:"value"`
 }
 
 // ExternalEtcd describes an external etcd cluster.
