@@ -49,7 +49,7 @@ DOWNLOAD_URL="https://oss.kubeclipper.io/kc"
 BIN_DIR="/usr/local/bin"
 
 if [[ -z "${KC_VERSION}" ]]; then
-  KC_VERSION="v1.4.1"
+  KC_VERSION="v1.5.0"
 fi
 info "The ${KC_VERSION} version will be installed"
 
