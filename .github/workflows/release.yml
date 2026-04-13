@@ -72,7 +72,7 @@ jobs:
           ossutil cp -rf dist/kc-darwin-arm64.tar.gz oss://${{ secrets.OSS_BUCKET }}/kc/${{ steps.extract_branch.outputs.version }}/
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/kc-linux-arm64.tar.gz
