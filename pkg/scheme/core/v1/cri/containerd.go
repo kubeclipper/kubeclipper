@@ -255,12 +255,98 @@ func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, d
 	if err := os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
 		return err
 	}
-	// render config.toml
+	// First-time install: full template rendering to generate complete config.toml
 	if err := fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, runnable.renderTo, dryRun); err != nil {
 		return err
 	}
+
 	// render certs.d
 	return runnable.renderRegistryConfig(dryRun)
+}
+
+// mergeRegistryAuthIntoConfig selectively updates only the registry.configs.auth section
+// in the existing config.toml, preserving all other configuration such as nvidia runtime
+// settings or manual user edits.
+// Follows the same pattern as addOrRemoveContainerdInsecureRegistry in pkg/component/utils/registry.go.
+func (runnable *ContainerdRunnable) mergeRegistryAuthIntoConfig(ctx context.Context, configPath string, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+
+	// If no RegistryWithAuth to configure, nothing to do
+	if len(runnable.RegistryWithAuth) == 0 {
+		return nil
+	}
+
+	// Load existing config.toml
+	conf, err := toml.LoadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// File doesn't exist: fallback to full template rendering
+			logger.Infof("containerd config not found, generating full config")
+			return fileutil.WriteFileWithContext(ctx, configPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, runnable.renderTo, dryRun)
+		}
+		return fmt.Errorf("failed to load containerd config: %w", err)
+	}
+
+	// Ensure plugins."io.containerd.grpc.v1.cri".registry.configs path exists
+	registryPath := []string{"plugins", "io.containerd.grpc.v1.cri", "registry"}
+	if conf.GetPath(registryPath) == nil {
+		configsTree, treeErr := toml.TreeFromMap(map[string]interface{}{})
+		if treeErr != nil {
+			return fmt.Errorf("failed to create configs tree: %w", treeErr)
+		}
+		conf.SetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs"}, configsTree)
+	}
+
+	registryTree := conf.GetPath(registryPath)
+	registryToml, ok := registryTree.(*toml.Tree)
+	if !ok {
+		return fmt.Errorf("unexpected type at registry path in containerd config")
+	}
+
+	if !registryToml.Has("configs") {
+		configsTree, treeErr := toml.TreeFromMap(map[string]interface{}{})
+		if treeErr != nil {
+			return fmt.Errorf("failed to create configs tree: %w", treeErr)
+		}
+		registryToml.Set("configs", configsTree)
+	}
+
+	// For each RegistryWithAuth, build an auth Tree and set only the auth subsection
+	for _, reg := range runnable.RegistryWithAuth {
+		if reg.Host == "" || reg.RegistryAuth == nil {
+			continue
+		}
+		authTree, treeErr := toml.TreeFromMap(map[string]interface{}{
+			"username":      reg.RegistryAuth.Username,
+			"password":      reg.RegistryAuth.Password,
+			"auth":          "",
+			"identitytoken": "",
+		})
+		if treeErr != nil {
+			return fmt.Errorf("failed to create auth tree for %s: %w", reg.Host, treeErr)
+		}
+		conf.SetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs", reg.Host, "auth"}, authTree)
+		logger.Infof("updated registry auth config for %s", reg.Host)
+	}
+
+	// Serialize and write back, preserving file mode
+	data, err := conf.ToTomlString()
+	if err != nil {
+		return fmt.Errorf("failed to serialize containerd config: %w", err)
+	}
+
+	info, err := os.Stat(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat containerd config: %w", err)
+	}
+
+	if err = os.WriteFile(configPath, []byte(data), info.Mode()); err != nil {
+		return fmt.Errorf("failed to write containerd config: %w", err)
+	}
+
+	return nil
 }
 
 func (runnable *ContainerdRunnable) enableContainerdService(ctx context.Context, dryRun bool) error {
@@ -356,13 +442,13 @@ func (c *ContainerdRegistryConfigure) Install(ctx context.Context, opts componen
 		}
 	}
 
-	// 2. render config.toml
+	// 2. selectively merge registry auth into config.toml
 	cf := filepath.Join(containerdDefaultConfigDir, "config.toml")
 	if err = os.MkdirAll(containerdDefaultConfigDir, 0755); err != nil {
 		logger.Errorf("mkdir containerd config dir: %s failed:%s", cf, err)
 	}
-	if err = fileutil.WriteFileWithContext(ctx, cf, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644, c.ContainerdRunnable.renderTo, false); err != nil {
-		logger.Errorf("render containerd config: %s failed:%s", cf, err)
+	if err = c.ContainerdRunnable.mergeRegistryAuthIntoConfig(ctx, cf, false); err != nil {
+		logger.Errorf("merge registry auth into containerd config: %s failed:%s", cf, err)
 	}
 	// restart containerd
 	if err = systemctl.ReloadDeamon(ctx); err != nil {

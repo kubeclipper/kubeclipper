@@ -20,12 +20,14 @@ package cri
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -174,4 +176,273 @@ func TestContainerdRegistryRender(t *testing.T) {
 	hostConfig, err := os.ReadFile(filepath.Join(dir, "docker.io", "hosts.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, exp, string(hostConfig))
+}
+
+func TestMergeRegistryAuthIntoConfig(t *testing.T) {
+	baseConfig := `disabled_plugins = []
+root = "/var/lib/containerd"
+state = "/run/containerd"
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    sandbox_image = "registry.k8s.io/pause:3.2"
+
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "nvidia"
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+          runtime_type = "io.containerd.runc.v2"
+
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+            BinaryName = "/usr/bin/nvidia-container-runtime"
+            SystemdCgroup = true
+
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+
+      [plugins."io.containerd.grpc.v1.cri".registry.configs]
+
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+`
+
+	tests := []struct {
+		name              string
+		existingConfig    string
+		registryWithAuth  []v1.RegistrySpec
+		wantAuthHosts     []string
+		wantAuthUsername  map[string]string
+		wantAuthPassword  map[string]string
+		wantPreservePath  []string
+		wantPreserveValue string
+	}{
+		{
+			name:           "add new auth preserves nvidia runtime",
+			existingConfig: baseConfig,
+			registryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "registry.example.com",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "admin",
+						Password: "s3cret",
+					},
+				},
+			},
+			wantAuthHosts:     []string{"registry.example.com"},
+			wantAuthUsername:  map[string]string{"registry.example.com": "admin"},
+			wantAuthPassword:  map[string]string{"registry.example.com": "s3cret"},
+			wantPreservePath:  []string{"plugins", "io.containerd.grpc.v1.cri", "containerd", "runtimes", "nvidia", "options", "BinaryName"},
+			wantPreserveValue: "/usr/bin/nvidia-container-runtime",
+		},
+		{
+			name: "update existing auth preserves other sections",
+			existingConfig: `disabled_plugins = []
+root = "/var/lib/containerd"
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    sandbox_image = "registry.k8s.io/pause:3.2"
+
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+
+      [plugins."io.containerd.grpc.v1.cri".registry.configs]
+
+        [plugins."io.containerd.grpc.v1.cri".registry.configs."registry.example.com"]
+
+          [plugins."io.containerd.grpc.v1.cri".registry.configs."registry.example.com".auth]
+            username = "olduser"
+            password = "oldpass"
+            auth = ""
+            identitytoken = ""
+
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+`,
+			registryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "registry.example.com",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "newuser",
+						Password: "newpass",
+					},
+				},
+			},
+			wantAuthHosts:     []string{"registry.example.com"},
+			wantAuthUsername:  map[string]string{"registry.example.com": "newuser"},
+			wantAuthPassword:  map[string]string{"registry.example.com": "newpass"},
+			wantPreservePath:  []string{"plugins", "io.containerd.grpc.v1.cri", "sandbox_image"},
+			wantPreserveValue: "registry.k8s.io/pause:3.2",
+		},
+		{
+			name: "add auth when configs section is empty",
+			existingConfig: `root = "/var/lib/containerd"
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    sandbox_image = "registry.k8s.io/pause:3.2"
+
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+`,
+			registryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "my-registry.local",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "testuser",
+						Password: "testpass",
+					},
+				},
+			},
+			wantAuthHosts:     []string{"my-registry.local"},
+			wantAuthUsername:  map[string]string{"my-registry.local": "testuser"},
+			wantAuthPassword:  map[string]string{"my-registry.local": "testpass"},
+			wantPreservePath:  []string{"root"},
+			wantPreserveValue: "/var/lib/containerd",
+		},
+		{
+			name:           "multiple registry auth entries",
+			existingConfig: baseConfig,
+			registryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "registry1.example.com",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "user1",
+						Password: "pass1",
+					},
+				},
+				{
+					Host: "registry2.example.com",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "user2",
+						Password: "pass2",
+					},
+				},
+			},
+			wantAuthHosts:     []string{"registry1.example.com", "registry2.example.com"},
+			wantAuthUsername:  map[string]string{"registry1.example.com": "user1", "registry2.example.com": "user2"},
+			wantAuthPassword:  map[string]string{"registry1.example.com": "pass1", "registry2.example.com": "pass2"},
+			wantPreservePath:  []string{"plugins", "io.containerd.grpc.v1.cri", "containerd", "default_runtime_name"},
+			wantPreserveValue: "nvidia",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			configPath := filepath.Join(dir, "config.toml")
+			err := os.WriteFile(configPath, []byte(tt.existingConfig), 0644)
+			require.NoError(t, err)
+
+			runnable := &ContainerdRunnable{
+				Base: Base{
+					RegistryWithAuth: tt.registryWithAuth,
+				},
+			}
+
+			err = runnable.mergeRegistryAuthIntoConfig(context.Background(), configPath, false)
+			require.NoError(t, err)
+
+			result, err := toml.LoadFile(configPath)
+			require.NoError(t, err)
+
+			for _, host := range tt.wantAuthHosts {
+				authPath := []string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs", host, "auth"}
+				authTree := result.GetPath(authPath)
+				require.NotNil(t, authTree, "expected auth config for %s", host)
+
+				authToml, ok := authTree.(*toml.Tree)
+				require.True(t, ok, "auth section for %s should be a TOML tree", host)
+
+				assert.Equal(t, tt.wantAuthUsername[host], authToml.Get("username"), "username mismatch for %s", host)
+				assert.Equal(t, tt.wantAuthPassword[host], authToml.Get("password"), "password mismatch for %s", host)
+				assert.NotNil(t, authToml.Get("auth"), "auth field should exist for %s", host)
+				assert.NotNil(t, authToml.Get("identitytoken"), "identitytoken field should exist for %s", host)
+			}
+
+			preservedValue := result.GetPath(tt.wantPreservePath)
+			assert.Equal(t, tt.wantPreserveValue, preservedValue,
+				"preserved value at %v should remain unchanged", tt.wantPreservePath)
+		})
+	}
+}
+
+func TestMergeRegistryAuthIntoConfig_NoAuthEntries(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.toml")
+	err := os.WriteFile(configPath, []byte("root = \"/var/lib/containerd\"\n"), 0644)
+	require.NoError(t, err)
+
+	runnable := &ContainerdRunnable{
+		Base: Base{
+			RegistryWithAuth: []v1.RegistrySpec{},
+		},
+	}
+
+	err = runnable.mergeRegistryAuthIntoConfig(context.Background(), configPath, false)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "root = \"/var/lib/containerd\"\n", string(data))
+}
+
+func TestMergeRegistryAuthIntoConfig_FileNotExist(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.toml")
+
+	runnable := &ContainerdRunnable{
+		Base: Base{
+			Version:     "1.6.4",
+			DataRootDir: "/var/lib/containerd",
+			RegistryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "registry.example.com",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "admin",
+						Password: "s3cret",
+					},
+				},
+			},
+		},
+		KubeVersion:         "1.23.6",
+		PauseVersion:        "3.2",
+		RegistryConfigDir:   "/etc/containerd/certs.d",
+		EnableSystemdCgroup: "true",
+	}
+
+	err := runnable.mergeRegistryAuthIntoConfig(context.Background(), configPath, false)
+	require.NoError(t, err)
+
+	_, err = os.Stat(configPath)
+	assert.NoError(t, err, "config file should be created when it doesn't exist")
+}
+
+func TestMergeRegistryAuthIntoConfig_DryRun(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.toml")
+	originalContent := "root = \"/var/lib/containerd\"\n"
+	err := os.WriteFile(configPath, []byte(originalContent), 0644)
+	require.NoError(t, err)
+
+	runnable := &ContainerdRunnable{
+		Base: Base{
+			RegistryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "registry.example.com",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "admin",
+						Password: "s3cret",
+					},
+				},
+			},
+		},
+	}
+
+	err = runnable.mergeRegistryAuthIntoConfig(context.Background(), configPath, true)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, originalContent, string(data))
 }
