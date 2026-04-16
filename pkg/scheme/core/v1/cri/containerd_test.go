@@ -370,7 +370,28 @@ root = "/var/lib/containerd"
 func TestMergeRegistryAuthIntoConfig_NoAuthEntries(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.toml")
-	err := os.WriteFile(configPath, []byte("root = \"/var/lib/containerd\"\n"), 0644)
+	existingConfig := `root = "/var/lib/containerd"
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    sandbox_image = "registry.k8s.io/pause:3.2"
+
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+
+      [plugins."io.containerd.grpc.v1.cri".registry.configs]
+
+        [plugins."io.containerd.grpc.v1.cri".registry.configs."stale-registry.local"]
+
+          [plugins."io.containerd.grpc.v1.cri".registry.configs."stale-registry.local".auth]
+            username = "olduser"
+            password = "oldpass"
+            auth = ""
+            identitytoken = ""
+
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+`
+	err := os.WriteFile(configPath, []byte(existingConfig), 0644)
 	require.NoError(t, err)
 
 	runnable := &ContainerdRunnable{
@@ -382,9 +403,15 @@ func TestMergeRegistryAuthIntoConfig_NoAuthEntries(t *testing.T) {
 	err = runnable.mergeRegistryAuthIntoConfig(context.Background(), configPath, false)
 	require.NoError(t, err)
 
-	data, err := os.ReadFile(configPath)
+	result, err := toml.LoadFile(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, "root = \"/var/lib/containerd\"\n", string(data))
+
+	// Stale auth should be removed
+	authPath := []string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs", "stale-registry.local", "auth"}
+	assert.Nil(t, result.GetPath(authPath), "stale auth should be removed when no RegistryWithAuth")
+
+	// Other config preserved
+	assert.Equal(t, "registry.k8s.io/pause:3.2", result.GetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "sandbox_image"}))
 }
 
 func TestMergeRegistryAuthIntoConfig_FileNotExist(t *testing.T) {
@@ -416,6 +443,81 @@ func TestMergeRegistryAuthIntoConfig_FileNotExist(t *testing.T) {
 
 	_, err = os.Stat(configPath)
 	assert.NoError(t, err, "config file should be created when it doesn't exist")
+}
+
+func TestMergeRegistryAuthIntoConfig_RemoveStaleAuth(t *testing.T) {
+	existingConfig := `root = "/var/lib/containerd"
+
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    sandbox_image = "registry.k8s.io/pause:3.2"
+
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "nvidia"
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+          runtime_type = "io.containerd.runc.v2"
+
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+
+      [plugins."io.containerd.grpc.v1.cri".registry.configs]
+
+        [plugins."io.containerd.grpc.v1.cri".registry.configs."old-registry.local"]
+
+          [plugins."io.containerd.grpc.v1.cri".registry.configs."old-registry.local".auth]
+            username = "olduser"
+            password = "oldpass"
+            auth = ""
+            identitytoken = ""
+
+        [plugins."io.containerd.grpc.v1.cri".registry.configs."new-registry.local"]
+
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+`
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.toml")
+	err := os.WriteFile(configPath, []byte(existingConfig), 0644)
+	require.NoError(t, err)
+
+	runnable := &ContainerdRunnable{
+		Base: Base{
+			RegistryWithAuth: []v1.RegistrySpec{
+				{
+					Host: "new-registry.local",
+					RegistryAuth: &v1.RegistryAuth{
+						Username: "newuser",
+						Password: "newpass",
+					},
+				},
+			},
+		},
+	}
+
+	err = runnable.mergeRegistryAuthIntoConfig(context.Background(), configPath, false)
+	require.NoError(t, err)
+
+	result, err := toml.LoadFile(configPath)
+	require.NoError(t, err)
+
+	// Old auth should be removed
+	oldAuthPath := []string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs", "old-registry.local", "auth"}
+	assert.Nil(t, result.GetPath(oldAuthPath), "stale auth for old-registry.local should be removed")
+
+	// New auth should be added
+	newAuthPath := []string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs", "new-registry.local", "auth"}
+	newAuthTree := result.GetPath(newAuthPath)
+	require.NotNil(t, newAuthTree, "auth for new-registry.local should be added")
+	newAuthToml, ok := newAuthTree.(*toml.Tree)
+	require.True(t, ok)
+	assert.Equal(t, "newuser", newAuthToml.Get("username"))
+	assert.Equal(t, "newpass", newAuthToml.Get("password"))
+
+	// nvidia runtime preserved (sandbox_image as proxy check, nvidia options.BinaryName not in this test config)
+	assert.Equal(t, "registry.k8s.io/pause:3.2", result.GetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "sandbox_image"}))
+	assert.Equal(t, "nvidia", result.GetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "containerd", "default_runtime_name"}))
 }
 
 func TestMergeRegistryAuthIntoConfig_DryRun(t *testing.T) {

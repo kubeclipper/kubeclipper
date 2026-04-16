@@ -273,11 +273,6 @@ func (runnable *ContainerdRunnable) mergeRegistryAuthIntoConfig(ctx context.Cont
 		return nil
 	}
 
-	// If no RegistryWithAuth to configure, nothing to do
-	if len(runnable.RegistryWithAuth) == 0 {
-		return nil
-	}
-
 	// Load existing config.toml
 	conf, err := toml.LoadFile(configPath)
 	if err != nil {
@@ -311,6 +306,35 @@ func (runnable *ContainerdRunnable) mergeRegistryAuthIntoConfig(ctx context.Cont
 			return fmt.Errorf("failed to create configs tree: %w", treeErr)
 		}
 		registryToml.Set("configs", configsTree)
+	}
+
+	configsTree, ok := registryToml.Get("configs").(*toml.Tree)
+	if !ok {
+		return fmt.Errorf("unexpected type at registry.configs in containerd config")
+	}
+
+	// Build set of hosts that should have auth configured
+	authHosts := make(map[string]struct{}, len(runnable.RegistryWithAuth))
+	for _, reg := range runnable.RegistryWithAuth {
+		if reg.Host != "" && reg.RegistryAuth != nil {
+			authHosts[reg.Host] = struct{}{}
+		}
+	}
+
+	// Remove auth entries for hosts no longer in the registry list.
+	// Access host subtrees via conf.GetPath (not configsTree.Get) because
+	// go-toml's Get treats dots in key names as path separators.
+	for _, host := range configsTree.Keys() {
+		if _, want := authHosts[host]; !want {
+			hostTree, ok := conf.GetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "registry", "configs", host}).(*toml.Tree)
+			if !ok {
+				continue
+			}
+			if hostTree.Has("auth") {
+				hostTree.Delete("auth")
+				logger.Infof("removed registry auth config for %s", host)
+			}
+		}
 	}
 
 	// For each RegistryWithAuth, build an auth Tree and set only the auth subsection
