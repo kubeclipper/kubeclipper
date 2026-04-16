@@ -331,8 +331,11 @@ func (runnable *ContainerdRunnable) mergeRegistryAuthIntoConfig(ctx context.Cont
 				continue
 			}
 			if hostTree.Has("auth") {
-				hostTree.Delete("auth")
-				logger.Infof("removed registry auth config for %s", host)
+				if err := hostTree.Delete("auth"); err != nil {
+					logger.Warnf("failed to delete auth for %s: %s", host, err)
+				} else {
+					logger.Infof("removed registry auth config for %s", host)
+				}
 			}
 		}
 	}
