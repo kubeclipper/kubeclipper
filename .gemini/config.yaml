@@ -1,0 +1,28 @@
+# https://developers.google.com/gemini-code-assist/docs/customize-gemini-behavior-github
+
+# Keep tone professional, no humor or casual language
+have_fun: false
+
+# Allow Gemini to remember project context across sessions
+memory_config:
+  disabled: false
+
+code_review:
+  # Enable code review on pull requests
+  disable: false
+  # Only comment on MEDIUM or higher severity issues, filter out LOW noise
+  comment_severity_threshold: MEDIUM
+  # No limit on the number of review comments per PR
+  max_review_comments: -1
+  pull_request_opened:
+    # Don't post "how to use" help comments on new PRs
+    help: false
+    # Don't auto-generate PR summary — authors write their own
+    summary: false
+    # Automatically trigger code review when PR is opened
+    code_review: true
+    # Skip draft PRs to avoid noise while code is still in progress
+    include_drafts: false
+
+# File patterns to exclude from review (empty = review everything)
+ignore_patterns: []
