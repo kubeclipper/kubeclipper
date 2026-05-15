@@ -30,8 +30,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 )
 
 const (
@@ -54,8 +54,8 @@ const (
 )
 
 type SetClusterOptions struct {
-	PrintFlags         *printer.PrintFlags
-	CliOpts            *options.CliOptions
+	PrintFlags *printer.PrintFlags
+	CliOpts    *options.CliOptions
 	options.IOStreams
 	Client *kc.Client
 
@@ -160,6 +160,9 @@ func (o *SetClusterOptions) Run() error {
 	clusterList, err := o.Client.DescribeCluster(context.TODO(), o.ClusterName)
 	if err != nil {
 		return err
+	}
+	if clusterList == nil || len(clusterList.Items) == 0 {
+		return fmt.Errorf("cluster %q not found", o.ClusterName)
 	}
 	cluster := clusterList.Items[0]
 

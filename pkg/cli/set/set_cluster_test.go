@@ -47,7 +47,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "valid external IP",
 			o: &SetClusterOptions{
-				ExternalIP:         "1.2.3.4",
+				ExternalIP:        "1.2.3.4",
 				changedExternalIP: true,
 			},
 			wantErr: false,
@@ -55,7 +55,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "invalid external IP",
 			o: &SetClusterOptions{
-				ExternalIP:         "not-an-ip",
+				ExternalIP:        "not-an-ip",
 				changedExternalIP: true,
 			},
 			wantErr: true,
@@ -63,7 +63,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "clear external IP with empty string",
 			o: &SetClusterOptions{
-				ExternalIP:         "",
+				ExternalIP:        "",
 				changedExternalIP: true,
 			},
 			wantErr: false,
@@ -71,7 +71,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "valid external domain",
 			o: &SetClusterOptions{
-				ExternalDomain:         "api.example.com",
+				ExternalDomain:        "api.example.com",
 				changedExternalDomain: true,
 			},
 			wantErr: false,
@@ -79,7 +79,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "invalid external domain",
 			o: &SetClusterOptions{
-				ExternalDomain:         "invalid!domain",
+				ExternalDomain:        "invalid!domain",
 				changedExternalDomain: true,
 			},
 			wantErr: true,
@@ -87,7 +87,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "valid external port",
 			o: &SetClusterOptions{
-				ExternalPort:         "8443",
+				ExternalPort:        "8443",
 				changedExternalPort: true,
 			},
 			wantErr: false,
@@ -95,7 +95,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "invalid external port zero",
 			o: &SetClusterOptions{
-				ExternalPort:         "0",
+				ExternalPort:        "0",
 				changedExternalPort: true,
 			},
 			wantErr: true,
@@ -103,7 +103,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "invalid external port too large",
 			o: &SetClusterOptions{
-				ExternalPort:         "70000",
+				ExternalPort:        "70000",
 				changedExternalPort: true,
 			},
 			wantErr: true,
@@ -111,7 +111,7 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "valid external domain port",
 			o: &SetClusterOptions{
-				ExternalDomainPort:         "8443",
+				ExternalDomainPort:        "8443",
 				changedExternalDomainPort: true,
 			},
 			wantErr: false,
@@ -119,10 +119,10 @@ func TestSetClusterOptions_Validate(t *testing.T) {
 		{
 			name: "multiple flags changed",
 			o: &SetClusterOptions{
-				ExternalIP:               "1.2.3.4",
-				ExternalPort:             "8443",
-				changedExternalIP:        true,
-				changedExternalPort:      true,
+				ExternalIP:          "1.2.3.4",
+				ExternalPort:        "8443",
+				changedExternalIP:   true,
+				changedExternalPort: true,
 			},
 			wantErr: false,
 		},
