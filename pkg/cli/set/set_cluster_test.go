@@ -2,32 +2,6 @@ package set
 
 import "testing"
 
-func Test_validatePort(t *testing.T) {
-	tests := []struct {
-		name    string
-		port    string
-		wantErr bool
-	}{
-		{name: "valid port", port: "443", wantErr: false},
-		{name: "valid max port", port: "65535", wantErr: false},
-		{name: "valid min port", port: "1", wantErr: false},
-		{name: "zero port", port: "0", wantErr: true},
-		{name: "negative port", port: "-1", wantErr: true},
-		{name: "port too large", port: "70000", wantErr: true},
-		{name: "not a number", port: "abc", wantErr: true},
-		{name: "empty string", port: "", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validatePort(tt.port)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validatePort(%q) error = %v, wantErr %v", tt.port, err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestSetClusterOptions_Validate(t *testing.T) {
 	tests := []struct {
 		name    string

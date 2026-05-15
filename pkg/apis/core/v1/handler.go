@@ -503,13 +503,13 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		}
 	}
 	if port, ok := c.Labels[common.LabelExternalPort]; ok {
-		if err := validateExternalPort(port); err != nil {
+		if err := netutil.IsValidPortStr(port); err != nil {
 			restplus.HandleBadRequest(response, request, err)
 			return
 		}
 	}
 	if port, ok := c.Labels[common.LabelExternalDomainPort]; ok {
-		if err := validateExternalPort(port); err != nil {
+		if err := netutil.IsValidPortStr(port); err != nil {
 			restplus.HandleBadRequest(response, request, err)
 			return
 		}
@@ -539,17 +539,6 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 	}
 
 	response.WriteHeader(http.StatusOK)
-}
-
-func validateExternalPort(portStr string) error {
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("invalid port: %s is not a valid number", portStr)
-	}
-	if port < 1 || port > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535, got %d", port)
-	}
-	return nil
 }
 
 func (h *handler) UpdateClusterCertification(request *restful.Request, response *restful.Response) {

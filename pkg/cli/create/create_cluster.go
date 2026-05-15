@@ -426,17 +426,15 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 
 	// validate external port
 	if l.ExternalPort != "" {
-		port, err := strconv.Atoi(l.ExternalPort)
-		if err != nil || port < 1 || port > 65535 {
-			return utils.UsageErrorf(cmd, "invalid external port: %s, must be between 1 and 65535", l.ExternalPort)
+		if err := netutil.IsValidPortStr(l.ExternalPort); err != nil {
+			return utils.UsageErrorf(cmd, "invalid external port: %s", err)
 		}
 	}
 
 	// validate external domain port
 	if l.ExternalDomainPort != "" {
-		port, err := strconv.Atoi(l.ExternalDomainPort)
-		if err != nil || port < 1 || port > 65535 {
-			return utils.UsageErrorf(cmd, "invalid external domain port: %s, must be between 1 and 65535", l.ExternalDomainPort)
+		if err := netutil.IsValidPortStr(l.ExternalDomainPort); err != nil {
+			return utils.UsageErrorf(cmd, "invalid external domain port: %s", err)
 		}
 	}
 

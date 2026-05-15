@@ -22,7 +22,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -142,13 +141,13 @@ func (o *SetClusterOptions) Validate() error {
 	}
 
 	if o.changedExternalPort && o.ExternalPort != "" {
-		if err := validatePort(o.ExternalPort); err != nil {
+		if err := netutil.IsValidPortStr(o.ExternalPort); err != nil {
 			return fmt.Errorf("invalid external port: %s", err)
 		}
 	}
 
 	if o.changedExternalDomainPort && o.ExternalDomainPort != "" {
-		if err := validatePort(o.ExternalDomainPort); err != nil {
+		if err := netutil.IsValidPortStr(o.ExternalDomainPort); err != nil {
 			return fmt.Errorf("invalid external domain port: %s", err)
 		}
 	}
@@ -207,16 +206,5 @@ func (o *SetClusterOptions) Run() error {
 	}
 
 	fmt.Fprintf(o.Out, "cluster %q updated\n", o.ClusterName)
-	return nil
-}
-
-func validatePort(portStr string) error {
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("%s is not a valid port number", portStr)
-	}
-	if port < 1 || port > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535, got %d", port)
-	}
 	return nil
 }

@@ -24,6 +24,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +32,20 @@ import (
 )
 
 func IsValidPort(port int) bool {
-	return port > 0 && port < 65535
+	return port > 0 && port <= 65535
+}
+
+// IsValidPortStr parses and validates a port string.
+// Returns error if the string is not a valid number or port is out of range [1, 65535].
+func IsValidPortStr(portStr string) error {
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return fmt.Errorf("%s is not a valid port number", portStr)
+	}
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535, got %d", port)
+	}
+	return nil
 }
 
 func IsValidIP(ip string) bool {
