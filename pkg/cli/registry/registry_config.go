@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
-	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 )
 
 const DefaultRegistryConfigFile = "registry-config.yaml"
@@ -81,7 +80,7 @@ func SaveRegistryConfig(cfg *RegistryConfig) error {
 	if err != nil {
 		return fmt.Errorf("marshal registry config: %w", err)
 	}
-	if err = utils.WriteToFile(path, data); err != nil {
+	if err = os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write registry config: %w", err)
 	}
 	return nil
@@ -161,8 +160,8 @@ func applyEntryToOptions(o *RegistryOptions, entry *RegistryEntry, nodeChanged, 
 	if !portChanged && entry.Port != 0 {
 		o.RegistryPort = entry.Port
 	}
-	if o.SSHConfig != nil && entry.SSH.User != "" {
-		if !sshUserChanged && o.SSHConfig.User == "" {
+	if o.SSHConfig != nil {
+		if !sshUserChanged && entry.SSH.User != "" {
 			o.SSHConfig.User = entry.SSH.User
 		}
 		if !pkFileChanged && o.SSHConfig.PkFile == "" && entry.SSH.PkFile != "" {

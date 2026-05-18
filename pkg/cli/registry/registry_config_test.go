@@ -338,6 +338,31 @@ func TestApplyEntryToOptions(t *testing.T) {
 			wantPkPasswd:    "otherpw",
 		},
 		{
+			name: "config user overrides default",
+			o: &RegistryOptions{
+				Node:         "",
+				RegistryPort: 0,
+				SSHConfig:    sshutils.NewSSH(), // User defaults to "root"
+			},
+			entry: &RegistryEntry{
+				Node: "10.0.0.1",
+				Port: 6666,
+				SSH: RegistrySSH{
+					User: "admin",
+				},
+			},
+			nodeChanged:     false,
+			portChanged:     false,
+			sshUserChanged:  false,
+			pkFileChanged:   false,
+			pkPasswdChanged: false,
+			wantNode:        "10.0.0.1",
+			wantPort:        6666,
+			wantSSHUser:     "admin",
+			wantPkFile:      "",
+			wantPkPasswd:    "",
+		},
+		{
 			name: "partial override - node from config, port from cli",
 			o: &RegistryOptions{
 				Node:         "",
@@ -408,6 +433,14 @@ func TestSaveAndLoadRegistryConfig(t *testing.T) {
 
 	if err := SaveRegistryConfig(cfg); err != nil {
 		t.Fatalf("SaveRegistryConfig failed: %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(dir, "registry-config.yaml"))
+	if err != nil {
+		t.Fatalf("stat config file: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Fatalf("expected file permission 0600, got %04o", perm)
 	}
 
 	loaded, err := LoadRegistryConfig()

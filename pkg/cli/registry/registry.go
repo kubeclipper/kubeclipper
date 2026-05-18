@@ -321,7 +321,7 @@ func NewCmdRegistryList(o *RegistryOptions) *cobra.Command {
 
 func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "delete (--pk-file <file path>) [--node <node>] (--name <name>) (--tag <tag>) [flags]",
+		Use:                   "delete [--node <node>] (--name <name>) (--tag <tag>) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "registry delete image",
 		Long:                  deleteLongDescription,
