@@ -489,10 +489,28 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		return
 	}
 
-	// TODO: vlidate update-cluster struct
+	// validate external access labels
 	if ip, ok := c.Labels[common.LabelExternalIP]; ok {
 		if !netutil.IsValidIP(ip) {
-			restplus.HandleBadRequest(response, request, fmt.Errorf("external IP %s is valid", ip))
+			restplus.HandleBadRequest(response, request, fmt.Errorf("invalid external IP: %s", ip))
+			return
+		}
+	}
+	if domain, ok := c.Labels[common.LabelExternalDomain]; ok {
+		if err := netutil.IsValidDomain(domain); err != nil {
+			restplus.HandleBadRequest(response, request, fmt.Errorf("invalid external domain: %s: %s", domain, err))
+			return
+		}
+	}
+	if port, ok := c.Labels[common.LabelExternalPort]; ok {
+		if err := netutil.IsValidPortStr(port); err != nil {
+			restplus.HandleBadRequest(response, request, err)
+			return
+		}
+	}
+	if port, ok := c.Labels[common.LabelExternalDomainPort]; ok {
+		if err := netutil.IsValidPortStr(port); err != nil {
+			restplus.HandleBadRequest(response, request, err)
 			return
 		}
 	}

@@ -158,6 +158,8 @@ type CreateClusterOptions struct {
 	CertSans                         []string
 	ExternalIP                       string
 	ExternalDomain                   string
+	ExternalPort                     string
+	ExternalDomainPort               string
 	CaCertFile                       string
 	CaKeyFile                        string
 	DNSDomain                        string
@@ -229,6 +231,8 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.CertSans, "cert-sans", o.CertSans, "k8s cluster certificate signing ipList or domainList")
 	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, "k8s apiserver external ip")
 	cmd.Flags().StringVar(&o.ExternalDomain, "external-domain", o.ExternalDomain, "k8s apiserver external domain")
+	cmd.Flags().StringVar(&o.ExternalPort, "external-port", o.ExternalPort, "k8s apiserver external port (1-65535)")
+	cmd.Flags().StringVar(&o.ExternalDomainPort, "external-domain-port", o.ExternalDomainPort, "k8s apiserver external domain port (1-65535)")
 	cmd.Flags().StringVar(&o.CaCertFile, "ca-cert", o.CaCertFile, "k8s external root-ca cert file")
 	cmd.Flags().StringVar(&o.CaKeyFile, "ca-key", o.CaKeyFile, "k8s external root-ca key file")
 	cmd.Flags().StringVar(&o.DNSDomain, "cluster-dns-domain", o.DNSDomain, "k8s cluster domain")
@@ -420,6 +424,20 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 		}
 	}
 
+	// validate external port
+	if l.ExternalPort != "" {
+		if err := netutil.IsValidPortStr(l.ExternalPort); err != nil {
+			return utils.UsageErrorf(cmd, "invalid external port: %s", err)
+		}
+	}
+
+	// validate external domain port
+	if l.ExternalDomainPort != "" {
+		if err := netutil.IsValidPortStr(l.ExternalDomainPort); err != nil {
+			return utils.UsageErrorf(cmd, "invalid external domain port: %s", err)
+		}
+	}
+
 	return nil
 }
 
@@ -543,6 +561,12 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	}
 	if l.ExternalDomain != "" {
 		c.Labels[common.LabelExternalDomain] = l.ExternalDomain
+	}
+	if l.ExternalPort != "" {
+		c.Labels[common.LabelExternalPort] = l.ExternalPort
+	}
+	if l.ExternalDomainPort != "" {
+		c.Labels[common.LabelExternalDomainPort] = l.ExternalDomainPort
 	}
 
 	masters := make([]v1.WorkerNode, 0)
