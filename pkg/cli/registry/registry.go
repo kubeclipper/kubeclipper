@@ -67,9 +67,13 @@ const (
   # Push docker image to registry
   kcctl registry push --pk-file key --node 10.0.0.111 --pkg images.tar.gz
   # List repositories in docker registry
-  kcctl registry list --node 10.0.0.111  --type repository
+  kcctl registry list
+  # List repositories with explicit node
+  kcctl registry list --node 10.0.0.111
+  # List images
+  kcctl registry list --type image --name etcd
   # Delete docker image
-  kcctl registry delete --node 10.0.0.111  --name etcd --tag 1.5.1-0
+  kcctl registry delete --node 10.0.0.111 --name etcd --tag 1.5.1-0
 
   Please read 'kcctl registry -h' get more registry flags.`
 	deployLongDescription = `
@@ -89,11 +93,11 @@ const (
 	cleanExample = `
   # Clean docker registry
   kcctl registry clean --pk-file key --node 10.0.0.111
+  # Clean docker registry using saved config (node and SSH from registry-config.yaml)
+  kcctl registry clean
   # Clean docker registry, specify data directory.
   # If you used custom data directory when deploy,then must specify it in this cmd to clear data.
   kcctl registry clean --pk-file key --node 10.0.0.111 --registry-volume /opt/registry --data-root /var/lib/docker
-  # Clean docker registry
-  kcctl registry clean --pk-file key --node 10.0.0.111
   # Forced to clean docker registry
   kcctl registry clean --pk-file key --node 10.0.0.111  --force
 
@@ -105,24 +109,30 @@ const (
   # You can use [docker save  $images > images.tar] or [docker save  $images > images.tar && gzip -f images.tar]  to generate image pkg
   # example: docker save k8s.gcr.io/pause:3.2 k8s.gcr.io/coredns/coredns:1.6.7 > images.tar
   # example: docker save k8s.gcr.io/pause:3.2 k8s.gcr.io/coredns/coredns:1.6.7 > images.tar && gzip -f images.tar
-  kcctl registry push --pk-file key --node 10.0.0.111  --pkg images.tar
-  kcctl registry push --pk-file key --node 10.0.0.111  --pkg images.tar.gz
+  kcctl registry push --node 10.0.0.111 --pkg images.tar
+  kcctl registry push --node 10.0.0.111 --pkg images.tar.gz
+  # Push using saved config
+  kcctl registry push --pkg images.tar.gz
 
   Please read 'kcctl registry push -h' get more registry push flags.`
 	listLongDescription = `
   Lists docker repositories or images by flags.`
 	listExample = `
-  # Lists docker repositories
-  kcctl registry list --node 10.0.0.111  --type repository
+  # Lists docker repositories (uses saved config or --node)
+  kcctl registry list
+  # Lists docker repositories with explicit node
+  kcctl registry list --node 10.0.0.111
   # Lists docker images
-  kcctl registry list --node 10.0.0.111  --type image --name etcd 
+  kcctl registry list --type image --name etcd
 
   Please read 'kcctl registry list -h' get more registry list flags.`
 	deleteLongDescription = `
   Delete the docker image by name and tag.`
 	deleteExample = `
   # Delete docker image
-  kcctl registry delete --pk-file key --node 10.0.0.111  --name etcd --tag 3.5.1-0
+  kcctl registry delete --pk-file key --node 10.0.0.111 --name etcd --tag 3.5.1-0
+  # Delete using saved config
+  kcctl registry delete --name etcd --tag 3.5.1-0
 
   Please read 'kcctl registry delete -h' get more registry delete flags.`
 )
@@ -144,6 +154,13 @@ type RegistryOptions struct {
 	Number        int
 	SkipImageLoad bool
 	TagSuffix     string
+
+	// tracks which flags were explicitly set by the user
+	nodeChanged     bool
+	portChanged     bool
+	sshUserChanged  bool
+	pkFileChanged   bool
+	pkPasswdChanged bool
 }
 
 var (
@@ -190,6 +207,8 @@ func NewCmdRegistryDeploy(o *RegistryOptions) *cobra.Command {
 		Example:               deployExample,
 		Args:                  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			o.trackChangedFlags(cmd)
+			utils.CheckErr(o.Complete(cmd))
 			utils.CheckErr(o.ValidateArgsDeploy())
 			if !o.sudoPreCheck() {
 				return
@@ -213,13 +232,15 @@ func NewCmdRegistryDeploy(o *RegistryOptions) *cobra.Command {
 
 func NewCmdRegistryClean(o *RegistryOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "clean (--user | -u <user>) (--passwd <passwd>) (--pk-file <pk-file>) (--pk-passwd <pk-passwd>) (--node <node>)",
+		Use:                   "clean (--user | -u <user>) (--passwd <passwd>) (--pk-file <pk-file>) (--pk-passwd <pk-passwd>) [--node <node>]",
 		DisableFlagsInUseLine: true,
 		Short:                 "registry clean",
 		Long:                  cleanLongDescription,
 		Example:               cleanExample,
 		Args:                  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			o.trackChangedFlags(cmd)
+			utils.CheckErr(o.Complete(cmd))
 			utils.CheckErr(o.ValidateArgs())
 			if !o.sudoPreCheck() {
 				return
@@ -229,20 +250,21 @@ func NewCmdRegistryClean(o *RegistryOptions) *cobra.Command {
 	}
 
 	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
-	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node.")
-	utils.CheckErr(cmd.MarkFlagRequired("node"))
+	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node. If not specified, uses the current registry from config.")
 	return cmd
 }
 
 func NewCmdRegistryPush(o *RegistryOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "push (--node <node>) (--pkg <pkg>) [--registry-port <registry-port>] [flags]",
+		Use:                   "push [--node <node>] (--pkg <pkg>) [--registry-port <registry-port>] [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "registry push image",
 		Long:                  pushLongDescription,
 		Example:               pushExample,
 		Args:                  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			o.trackChangedFlags(cmd)
+			utils.CheckErr(o.Complete(cmd))
 			utils.CheckErr(o.ValidateArgsPush())
 			if !o.healthPreCheck() {
 				return
@@ -251,25 +273,26 @@ func NewCmdRegistryPush(o *RegistryOptions) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node.")
+	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node. If not specified, uses the current registry from config.")
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "docker images pkg,use `docker save $images > images.tar && gzip -f images.tar` to generate images.tar.gz")
 	cmd.Flags().StringVar(&o.TagSuffix, "tag-suffix", o.TagSuffix, "Append a suffix to the final image tag. For example, if the original image is library/busybox:1.36 and you set --tag-suffix=-amd64, the image will be pushed as library/busybox:1.36-amd64. Useful for creating architecture-specific tags in one shot.")
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "registry port.")
 
-	utils.CheckErr(cmd.MarkFlagRequired("node"))
 	utils.CheckErr(cmd.MarkFlagRequired("pkg"))
 	return cmd
 }
 
 func NewCmdRegistryList(o *RegistryOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "list (--node <node>) (--name <name>) (--registry-port <registry-port>) (--type <type>) (--number <number>) [flags]list (--node <node>) (--name <name>) (--registry-port <registry-port>) (--type <type>) (--number <number>) [flags]",
+		Use:                   "list [--node <node>] [--name <name>] [--registry-port <registry-port>] [--type <type>] [--number <number>] [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "registry list repository or image",
 		Long:                  listLongDescription,
 		Example:               listExample,
 		Args:                  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
+			o.trackChangedFlags(cmd)
+			utils.CheckErr(o.Complete(cmd))
 			utils.CheckErr(o.ValidateArgsList())
 			if !o.healthPreCheck() {
 				return
@@ -279,10 +302,10 @@ func NewCmdRegistryList(o *RegistryOptions) *cobra.Command {
 	}
 	o.PrintFlags.AddFlags(cmd)
 	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
-	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node")
+	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node. If not specified, uses the current registry from config.")
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "registry port")
 
-	cmd.Flags().StringVar(&o.Type, "type", o.Type, "image or repository")
+	cmd.Flags().StringVar(&o.Type, "type", o.Type, "image or repository (default: repository)")
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "image name")
 	cmd.Flags().IntVar(&o.Number, "number", o.Number, "number of entries in each response. It not present, all entries will be returned.")
 
@@ -293,19 +316,19 @@ func NewCmdRegistryList(o *RegistryOptions) *cobra.Command {
 		return o.listRepos(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}))
 
-	utils.CheckErr(cmd.MarkFlagRequired("node"))
-	utils.CheckErr(cmd.MarkFlagRequired("type"))
 	return cmd
 }
 
 func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   "delete (--pk-file <file path>) (--node <node>) (--name <name>) (--tag <tag>) [flags]delete (--pk-file <file path>) (--node <node>) (--name <name>)  (--tag <tag>) [flags]",
+		Use:                   "delete (--pk-file <file path>) [--node <node>] (--name <name>) (--tag <tag>) [flags]",
 		DisableFlagsInUseLine: true,
 		Short:                 "registry delete image",
 		Long:                  deleteLongDescription,
 		Example:               deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			o.trackChangedFlags(cmd)
+			utils.CheckErr(o.Complete(cmd))
 			utils.CheckErr(o.ValidateArgsDelete(cmd))
 			if !o.healthPreCheck() {
 				return
@@ -316,7 +339,7 @@ func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 
 	options.AddFlagsToSSH(o.SSHConfig, cmd.Flags())
 	cmd.Flags().IntVar(&o.RegistryPort, "registry-port", o.RegistryPort, "registry port")
-	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node.")
+	cmd.Flags().StringVar(&o.Node, "node", o.Node, "registry node. If not specified, uses the current registry from config.")
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "image name")
 	cmd.Flags().StringVar(&o.Tag, "tag", o.Tag, "image tag")
 
@@ -327,10 +350,37 @@ func NewCmdRegistryDelete(o *RegistryOptions) *cobra.Command {
 		return o.listTags(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}))
 
-	utils.CheckErr(cmd.MarkFlagRequired("node"))
 	utils.CheckErr(cmd.MarkFlagRequired("name"))
 	utils.CheckErr(cmd.MarkFlagRequired("tag"))
 	return cmd
+}
+
+// trackChangedFlags records which flags were explicitly set by the user.
+func (o *RegistryOptions) trackChangedFlags(cmd *cobra.Command) {
+	o.nodeChanged = cmd.Flags().Changed("node")
+	o.portChanged = cmd.Flags().Changed("registry-port")
+	o.sshUserChanged = cmd.Flags().Changed("user")
+	o.pkFileChanged = cmd.Flags().Changed("pk-file")
+	o.pkPasswdChanged = cmd.Flags().Changed("pk-passwd")
+}
+
+// Complete loads registry config and fills in unset options from the matching registry entry.
+// When --node is specified, it looks up that node's entry; otherwise uses the current entry.
+func (o *RegistryOptions) Complete(_ *cobra.Command) error {
+	cfg, err := LoadRegistryConfig()
+	if err != nil {
+		return fmt.Errorf("load registry config: %w", err)
+	}
+	var entry *RegistryEntry
+	if o.nodeChanged && o.Node != "" {
+		entry = findRegistry(cfg, o.Node)
+	} else {
+		entry = GetCurrentRegistry(cfg)
+	}
+	if entry != nil {
+		applyEntryToOptions(o, entry, o.nodeChanged, o.portChanged, o.sshUserChanged, o.pkFileChanged, o.pkPasswdChanged)
+	}
+	return nil
 }
 
 func (o *RegistryOptions) healthPreCheck() bool {
@@ -342,18 +392,18 @@ func (o *RegistryOptions) sudoPreCheck() bool {
 }
 
 func (o *RegistryOptions) ValidateArgs() error {
+	if o.Node == "" {
+		return fmt.Errorf("--node must be specified, or run 'kcctl registry deploy' first to save registry config")
+	}
 	if o.SSHConfig.PkFile == "" && o.SSHConfig.Password == "" {
 		return fmt.Errorf("one of --pk-file or --passwd must be specified")
-	}
-	if o.Node == "" {
-		return fmt.Errorf("--node must be specified")
 	}
 	return nil
 }
 
 func (o *RegistryOptions) ValidateArgsPush() error {
 	if o.Node == "" {
-		return fmt.Errorf("--node must be specified")
+		return fmt.Errorf("--node must be specified, or run 'kcctl registry deploy' first to save registry config")
 	}
 	if o.Pkg == "" {
 		return fmt.Errorf("--pkg must be specified")
@@ -376,7 +426,7 @@ func (o *RegistryOptions) ValidateArgsDeploy() error {
 
 func (o *RegistryOptions) ValidateArgsList() error {
 	if o.Node == "" {
-		return fmt.Errorf("--node must be specified")
+		return fmt.Errorf("--node must be specified, or run 'kcctl registry deploy' first to save registry config")
 	}
 	if o.Type != "image" && o.Type != "repository" {
 		return fmt.Errorf("--type must be one of image,repository")
@@ -389,7 +439,7 @@ func (o *RegistryOptions) ValidateArgsList() error {
 
 func (o *RegistryOptions) ValidateArgsDelete(cmd *cobra.Command) error {
 	if o.Node == "" {
-		return fmt.Errorf("--node must be specified")
+		return fmt.Errorf("--node must be specified, or run 'kcctl registry deploy' first to save registry config")
 	}
 	if o.Name == "" {
 		return utils.UsageErrorf(cmd, "image name must be specified")
@@ -444,7 +494,7 @@ func (o *RegistryOptions) GetKcRegistryConfigTemplateContent() (string, error) {
 		return "", fmt.Errorf("template parse failed: %s", err.Error())
 	}
 
-	var data = make(map[string]interface{})
+	var data = make(map[string]any)
 	data["RegistryPort"] = o.RegistryPort
 	data["DataRoot"] = o.DataRoot
 	var buffer bytes.Buffer
@@ -473,8 +523,22 @@ func (o *RegistryOptions) Install() error {
 		return fmt.Errorf("remove pkg error: %s", err.Error())
 	}
 
+	// save registry config
+	if err := o.saveRegistryConfigAfterDeploy(); err != nil {
+		logger.Warnf("save registry config failed: %s", err.Error())
+	}
+
 	o.printUsage()
 	return nil
+}
+
+func (o *RegistryOptions) saveRegistryConfigAfterDeploy() error {
+	cfg, err := LoadRegistryConfig()
+	if err != nil {
+		return err
+	}
+	AddOrUpdateRegistry(cfg, newEntryFromOptions(o))
+	return SaveRegistryConfig(cfg)
 }
 
 func (o *RegistryOptions) printUsage() {
@@ -482,9 +546,9 @@ func (o *RegistryOptions) printUsage() {
 	usage1 := fmt.Sprintf("\t1. visit http://%s/v2/_catalog\n", o.registry())
 	usage2 := ""
 	if o.RegistryPort != 5000 {
-		usage2 = fmt.Sprintf("\t2. run cmd [kcctl registry list --node %s --registry-port %v --type repository]", o.Node, o.RegistryPort)
+		usage2 = fmt.Sprintf("\t2. run cmd [kcctl registry list --node %s --registry-port %v]", o.Node, o.RegistryPort)
 	} else {
-		usage2 = fmt.Sprintf("\t2. run cmd [kcctl registry list --node %s --type repository]", o.Node)
+		usage2 = "\t2. run cmd [kcctl registry list]"
 	}
 	fmt.Printf("\033[1;36;36m%s\033[0m\n", success+usage1+usage2)
 }
@@ -501,8 +565,23 @@ func (o *RegistryOptions) Uninstall() error {
 	if err != nil {
 		return err
 	}
+
+	// remove from registry config
+	if err := o.removeRegistryConfigAfterClean(); err != nil {
+		logger.Warnf("remove registry config failed: %s", err.Error())
+	}
+
 	logger.Info("registry uninstall successfully")
 	return nil
+}
+
+func (o *RegistryOptions) removeRegistryConfigAfterClean() error {
+	cfg, err := LoadRegistryConfig()
+	if err != nil {
+		return err
+	}
+	RemoveRegistry(cfg, o.Node)
+	return SaveRegistryConfig(cfg)
 }
 
 func (o *RegistryOptions) cleanRegistry() error {
