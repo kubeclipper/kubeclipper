@@ -287,14 +287,10 @@ func (s *ClusterStatusMon) updateClusterControlPlaneStatus(clu *v1.Cluster) erro
 			s.log.Error("get master node error", zap.String("node", id), zap.String("cluster", clu.Name))
 			return err
 		}
-		proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
 		floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
 		apiServer := node.Status.NodeIpv4DefaultIP + ":6443"
 		if floatIP != "" {
 			apiServer = floatIP + ":6443"
-		}
-		if proxyAPIServer != "" {
-			apiServer = proxyAPIServer
 		}
 		health := v1.ControlPlaneHealth{
 			ID:       id,

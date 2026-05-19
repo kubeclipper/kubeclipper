@@ -17,7 +17,7 @@ deps:
 		CLIENT_GEN=$(shell which client-gen)
     endif
 
-.PHONY: build build-server build-agent build-proxy build-cli openapi licfmt
+.PHONY: build build-server build-agent build-cli openapi licfmt
 build: build-server build-agent build-cli
 
 build-server:
@@ -25,9 +25,6 @@ build-server:
 
 build-agent:
 	KUBE_VERBOSE=2 bash hack/make-rules/build.sh cmd/kubeclipper-agent
-
-build-proxy:
-	KUBE_VERBOSE=2 bash hack/make-rules/build.sh cmd/kubeclipper-proxy
 
 build-cli:
 	KUBE_VERBOSE=2 bash hack/make-rules/build.sh cmd/kcctl

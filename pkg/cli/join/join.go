@@ -94,15 +94,9 @@ agents:
   192.168.234.41:
     #region: default
     #floatIP:
-    #proxyServer:
-    #proxyAPIServer:
-    #proxySSH:
   192.168.234.42:
     #region: default2
     #floatIP:
-    #proxyServer:
-    #proxyAPIServer:
-    #proxySSH:
   kcctl join --join-config join-config.yaml
   Please read 'kcctl join -h' get more deploy flags`
 )

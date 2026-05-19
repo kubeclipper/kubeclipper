@@ -104,24 +104,6 @@ func Metadata() Setter {
 			delete(node.Annotations, common.AnnotationMetadataFloatIP)
 		}
 
-		if conf.Metadata.ProxyServer != "" {
-			node.Annotations[common.AnnotationMetadataProxyServer] = conf.Metadata.ProxyServer
-		} else {
-			delete(node.Annotations, common.AnnotationMetadataProxyServer)
-		}
-
-		if conf.Metadata.ProxyAPIServer != "" {
-			node.Annotations[common.AnnotationMetadataProxyAPIServer] = conf.Metadata.ProxyAPIServer
-		} else {
-			delete(node.Annotations, common.AnnotationMetadataProxyAPIServer)
-		}
-
-		if conf.Metadata.ProxySSH != "" {
-			node.Annotations[common.AnnotationMetadataProxySSH] = conf.Metadata.ProxySSH
-		} else {
-			delete(node.Annotations, common.AnnotationMetadataProxySSH)
-		}
-
 		return nil
 	}
 }
