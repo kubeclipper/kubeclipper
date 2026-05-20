@@ -166,7 +166,7 @@ Check assembly results:
 
 ```console
 # ls dist/
-kcctl  kubeclipper-agent  kubeclipper-proxy  kubeclipper-server
+kcctl  kubeclipper-agent  kubeclipper-server
 ```
 
 ## 2. Installing & Debugging
@@ -184,7 +184,6 @@ mkdir: created directory '/etc/kc'
 [INFO]  Downloading package https://oss.kubeclipper.io/kc/release-1.4/kc-linux-amd64.tar.gz
 kubeclipper-server
 kubeclipper-agent
-kubeclipper-proxy
 kcctl
 [INFO]  Installing kcctl to /usr/local/bin/kcctl
 

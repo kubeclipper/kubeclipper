@@ -64,10 +64,7 @@ const (
 	AnnotationInternal         = "kubeclipper.io/internal"
 	AnnotationHidden           = "kubeclipper.io/hidden"
 
-	AnnotationMetadataFloatIP        = "metadata.kubeclipper.io/floatIP"
-	AnnotationMetadataProxyServer    = "metadata.kubeclipper.io/proxyServer"
-	AnnotationMetadataProxyAPIServer = "metadata.kubeclipper.io/proxyAPIServer"
-	AnnotationMetadataProxySSH       = "metadata.kubeclipper.io/proxySSH"
+	AnnotationMetadataFloatIP = "metadata.kubeclipper.io/floatIP"
 
 	// AnnotationOnlyInstallKubernetesComp mean not install cni when create cluster
 	AnnotationOnlyInstallKubernetesComp = "kubeclipper.io/only-install-kubernetes-component"

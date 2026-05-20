@@ -80,16 +80,15 @@ const (
 	DefaultRegion = "default"
 
 	// EtcdCa          = "etcd-ca"   //ca
-	Ca               = "ca"
-	EtcdPeer         = "etcd-peer" // peer
-	EtcdServer       = "etcd"      // server
-	EtcdKcClient     = "kc-server-etcd-client"
-	EtcdHealthCheck  = "kube-etcd-healthcheck-client" // healthcheck-client
-	NatsIOClient     = "kc-server-nats-client"
-	NatsIOServer     = "kc-server-nats-server"
-	KCServer         = "kc-server"
-	NatsAltNameProxy = "proxy.kubeclipper.io" // add nats server SAN for agent proxy
-	KCServerAltName  = "server.kubeclipper.io"
+	Ca              = "ca"
+	EtcdPeer        = "etcd-peer" // peer
+	EtcdServer      = "etcd"      // server
+	EtcdKcClient    = "kc-server-etcd-client"
+	EtcdHealthCheck = "kube-etcd-healthcheck-client" // healthcheck-client
+	NatsIOClient    = "kc-server-nats-client"
+	NatsIOServer    = "kc-server-nats-server"
+	KCServer        = "kc-server"
+	KCServerAltName = "server.kubeclipper.io"
 
 	AdminKcctlCert = "admin"
 )
@@ -263,13 +262,6 @@ type Metadata struct {
 	AgentID string `json:"agentID" yaml:"agentID,omitempty"`
 	Region  string `json:"region" yaml:"region,omitempty"`
 	FloatIP string `json:"floatIP" yaml:"floatIP,omitempty"`
-
-	// proxy server for proxy kc-server(mq and static server)
-	ProxyServer string `json:"proxyServer" yaml:"proxyServer,omitempty"`
-	// address for server to access k8s apiserver
-	ProxyAPIServer string `json:"proxyAPIServer" yaml:"proxyAPIServer,omitempty"`
-	// address for server to access node's ssh
-	ProxySSH string `json:"proxySSH" yaml:"proxySSH,omitempty"`
 }
 
 type DeployConfig struct {
@@ -278,7 +270,6 @@ type DeployConfig struct {
 	EtcdConfig                 *Etcd                          `json:"etcd" yaml:"etcd,omitempty"`
 	ServerIPs                  []string                       `json:"serverIPs" yaml:"serverIPs,omitempty"`
 	Agents                     Agents                         `json:"agents" yaml:"agents,omitempty"`
-	Proxys                     []string                       `json:"proxys" yaml:"proxys,omitempty"`
 	IPDetect                   string                         `json:"ipDetect" yaml:"ipDetect,omitempty"`
 	NodeIPDetect               string                         `json:"nodeIPDetect" yaml:"nodeIPDetect,omitempty"`
 	Debug                      bool                           `json:"debug" yaml:"debug,omitempty"`

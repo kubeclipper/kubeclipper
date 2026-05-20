@@ -381,15 +381,11 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 			zap.String("node", c.Masters[0].ID), zap.String("cluster", c.Name), zap.Error(err))
 		return "", err
 	}
-	// there is 3 ip maybe used in kubeconfig,sort by priority: proxyServer > floatIP > defaultIP
-	proxyAPIServer := node.Annotations[common.AnnotationMetadataProxyAPIServer]
+	// there is 2 ip maybe used in kubeconfig,sort by priority: floatIP > defaultIP
 	floatIP := node.Annotations[common.AnnotationMetadataFloatIP]
 	apiServer := node.Status.NodeIpv4DefaultIP + ":6443"
 	if floatIP != "" {
 		apiServer = floatIP + ":6443"
-	}
-	if proxyAPIServer != "" {
-		apiServer = proxyAPIServer
 	}
 	// kubeconfig already used same ip, do nothing.
 	// else we need use current ip to generate a new kubeconfig.
