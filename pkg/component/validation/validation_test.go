@@ -140,37 +140,6 @@ func TestIsHostNameRFC952(t *testing.T) {
 	}
 }
 
-func TestIsURL(t *testing.T) {
-	type args struct {
-		raw string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "test with a correct url",
-			args: args{
-				raw: "https://localhost:8080",
-			},
-			want: true,
-		},
-		{
-			name: "test with an incorrect url",
-			args: args{
-				raw: "-https://localhost:8080",
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, IsURL(tt.args.raw), "IsURL(%v)", tt.args.raw)
-		})
-	}
-}
-
 func TestMatchKubernetesReclaimPolicy(t *testing.T) {
 	type args struct {
 		policy string

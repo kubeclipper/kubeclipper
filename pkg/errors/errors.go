@@ -49,19 +49,6 @@ func (s *StatusError) Error() string {
 	return fmt.Sprintf("%s due to reason %s", s.Message, s.Reason)
 }
 
-func StatusErrorCause(err error, name CauseType) (StatusCause, bool) {
-	s, ok := err.(*StatusError)
-	if !ok || s == nil || s.Details == nil {
-		return StatusCause{}, false
-	}
-	for _, cause := range s.Details.Causes {
-		if cause.Type == name {
-			return cause, true
-		}
-	}
-	return StatusCause{}, false
-}
-
 // IsConflict TODO: make 409 enum or const
 func IsConflict(err error) bool {
 	return CodeForError(err) == 409

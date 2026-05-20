@@ -19,7 +19,6 @@
 package errors
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -54,53 +53,6 @@ func TestStatusError_Error(t *testing.T) {
 			}
 			if got := s.Error(); got != tt.want {
 				t.Errorf("Error() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestStatusErrorCause(t *testing.T) {
-	type args struct {
-		err  error
-		name CauseType
-	}
-	tests := []struct {
-		name  string
-		args  args
-		want  StatusCause
-		want1 bool
-	}{
-		{
-			name: "base",
-			args: args{
-				err: &StatusError{
-					Message: "This is a demo error",
-					Details: &StatusDetails{
-						Causes: []StatusCause{
-							{
-								Type:    Marshal,
-								Message: "marshal error",
-							},
-						},
-					},
-				},
-				name: Marshal,
-			},
-			want: StatusCause{
-				Message: "marshal error",
-				Type:    Marshal,
-			},
-			want1: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := StatusErrorCause(tt.args.err, tt.args.name)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("StatusErrorCause() got = %v, want %v", got, tt.want)
-			}
-			if got1 != tt.want1 {
-				t.Errorf("StatusErrorCause() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

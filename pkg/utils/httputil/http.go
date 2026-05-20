@@ -22,18 +22,11 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 )
-
-type RespError struct {
-	Code    string      `json:"code,omitempty"`
-	Message string      `json:"message,omitempty"`
-	Detail  interface{} `json:"detail,omitempty"`
-}
 
 func CommonRequest(requestURL, httpMethod string, header, rawQuery map[string]string, postBody json.RawMessage) ([]byte, int, error) {
 	var req *http.Request
@@ -76,27 +69,6 @@ func CommonRequest(requestURL, httpMethod string, header, rawQuery map[string]st
 		return []byte{}, http.StatusInternalServerError, readBodyErr
 	}
 	return body, resp.StatusCode, nil
-}
-
-func CodeDispose(body []byte, code int) ([]byte, error) {
-	switch code {
-	case 200:
-		return body, nil
-	case 202:
-		return body, nil
-	default:
-		errs := make(map[string][]RespError)
-		if marshalErr := json.Unmarshal(body, &errs); marshalErr != nil {
-			return []byte{}, marshalErr
-		}
-		var res string
-		for _, err := range errs {
-			for _, e := range err {
-				res = e.Message
-			}
-		}
-		return []byte{}, fmt.Errorf("there is an error in the input: %s", res)
-	}
 }
 
 func IsURL(u string) (url.URL, bool) {

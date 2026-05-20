@@ -19,19 +19,11 @@
 package fileutil
 
 import (
-	"bufio"
-	"crypto/md5"
 	"fmt"
 	"hash"
 	"io"
 	"os"
 	"path/filepath"
-	"time"
-)
-
-const (
-	// BufferSize defines the buffer size when reading and writing file.
-	bufferSize = 8 * 1024 * 1024
 )
 
 // IsRegularFile reports whether the file is a regular file.
@@ -42,27 +34,6 @@ func IsRegularFile(name string) bool {
 		return false
 	}
 	return f.Mode().IsRegular()
-}
-
-// Md5Sum generates md5 for a given file.
-func Md5Sum(name string) string {
-	if !IsRegularFile(name) {
-		return ""
-	}
-	f, err := os.Open(name)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-	r := bufio.NewReaderSize(f, bufferSize)
-	h := md5.New()
-
-	_, err = io.Copy(h, r)
-	if err != nil {
-		return ""
-	}
-
-	return GetMd5Sum(h, nil)
 }
 
 // GetMd5Sum gets md5 sum as a string and appends the current hash to b.
@@ -94,15 +65,6 @@ func DeleteFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-// DeleteFiles deletes all the given files.
-func DeleteFiles(filePaths ...string) {
-	if len(filePaths) > 0 {
-		for _, f := range filePaths {
-			_ = DeleteFile(f)
-		}
-	}
-}
-
 // PathExist reports whether the path is exist.
 // Any error get from os.Stat, it will return false.
 func PathExist(name string) bool {
@@ -127,39 +89,6 @@ func CreateDirIfNotExists(path string, perm os.FileMode) error {
 		return err
 	}
 	return nil
-}
-
-func WriteTxtToFile(filePath, txtToWrite string) error {
-	f, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString(txtToWrite)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func Backup(filePath, dir string) (bakFile string, err error) {
-	if err = CreateDirIfNotExists(dir, 0644); err != nil {
-		return
-	}
-	src, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer src.Close()
-	// ${timestamp}.bak as suffix
-	bakFile = filePath + fmt.Sprintf(".%s.bak", time.Now().Format("20060102150405"))
-	dst, err := os.Create(bakFile)
-	if err != nil {
-		return "", err
-	}
-	defer dst.Close()
-	_, err = io.Copy(dst, src)
-	return
 }
 
 // CopyFile copies the source file to destnation one.

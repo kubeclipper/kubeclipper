@@ -37,13 +37,6 @@ func HasString(slice []string, str string) bool {
 	return false
 }
 
-func MergeSlice(s1 []string, s2 []string) []string {
-	s := make([]string, len(s1)+len(s2))
-	copy(s, s1)
-	copy(s[len(s1):], s2)
-	return s
-}
-
 func StringMask(s string, start, end int, maskChar rune) string {
 	if s == "" {
 		return ""

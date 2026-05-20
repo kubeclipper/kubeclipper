@@ -37,22 +37,6 @@ func StringDefaultIfEmpty(dft, src string) string {
 	return src
 }
 
-func TrimDuplicates(src []string) []string {
-	if src == nil {
-		return nil
-	}
-	m := map[string]struct{}{}
-	i := 0
-	for _, str := range src {
-		if _, ok := m[str]; !ok {
-			m[str] = struct{}{}
-			src[i] = str
-			i++
-		}
-	}
-	return src[:i]
-}
-
 // ParseGitDescribeInfo parse `git describe` command return information
 // Determine if there are currently any new commits
 // new commit info example: v1.1.0-11+b25c67df4a2e87, it must be a branch.
