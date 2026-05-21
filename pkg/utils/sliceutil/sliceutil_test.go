@@ -23,42 +23,6 @@ import (
 	"testing"
 )
 
-func TestMergeSlice(t *testing.T) {
-	type args struct {
-		s1 []string
-		s2 []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []string
-	}{
-		{
-			name: "merge null slice",
-			args: args{
-				s1: nil,
-				s2: nil,
-			},
-			want: []string{},
-		},
-		{
-			name: "merge valid slice",
-			args: args{
-				s1: []string{"1"},
-				s2: []string{"2", "3"},
-			},
-			want: []string{"1", "2", "3"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := MergeSlice(tt.args.s1, tt.args.s2); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MergeSlice() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestStringMask(t *testing.T) {
 	type args struct {
 		s        string

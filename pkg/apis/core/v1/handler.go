@@ -2712,7 +2712,7 @@ func (h *handler) SSHToNode(request *restful.Request, response *restful.Response
 	}
 	defer sshClient.Close()
 
-	sshConn, err := sshutils.NewLoginSSHWSSession(cols, rows, true, sshClient, wsConn)
+	sshConn, err := sshutils.NewLoginSSHWSSession(cols, rows, sshClient, wsConn)
 	if err != nil {
 		_ = wsConn.CloseHandler()(4002, "ssh connection failed")
 		return

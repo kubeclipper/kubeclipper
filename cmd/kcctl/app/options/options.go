@@ -364,15 +364,6 @@ func NewDeployOptions() *DeployConfig {
 	}
 }
 
-func (c *DeployConfig) MergeDeployOptions() {
-	d := NewDeployOptions()
-
-	if c.OpLog == nil {
-		c.OpLog = d.OpLog
-	}
-
-}
-
 /*
 NOTE: deploy cmd use local deploy-config,others cmd use online deploy-config.
 and clean cmd use online deploy-config first,if can't get online deploy-config,

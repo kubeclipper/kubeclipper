@@ -20,7 +20,6 @@ package validation
 
 import (
 	"errors"
-	"net/url"
 	"regexp"
 )
 
@@ -58,11 +57,6 @@ func IsHostNameRFC952(hostname string) bool {
 
 func MatchLinuxFilePath(path string) bool {
 	return linuxFilePathReg.MatchString(path)
-}
-
-func IsURL(raw string) bool {
-	_, err := url.ParseRequestURI(raw)
-	return err == nil
 }
 
 func MatchKubernetesReclaimPolicy(policy string) error {

@@ -82,11 +82,6 @@ type Meta struct {
 	Schema         *JSONSchemaProps `json:"schema"`
 }
 
-func PropsMax(i int) *int {
-	max := i
-	return &max
-}
-
 type ObjectMeta interface {
 	NewInstance() ObjectMeta
 }

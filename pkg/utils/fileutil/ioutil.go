@@ -34,18 +34,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 )
 
-func WriteFile(path string, flag int, perm os.FileMode, data []byte) error {
-	f, err := os.OpenFile(path, flag, perm)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.Write(data); err != nil {
-		return err
-	}
-	return nil
-}
-
 func WriteFileWithDataFunc(path string, flag int, perm os.FileMode, dataFunc func(w io.Writer) error, dryRun bool) error {
 	if dryRun {
 		return nil

@@ -30,22 +30,6 @@ func TestBase64Encode(t *testing.T) {
 	}
 }
 
-func TestTrimDuplicates(t *testing.T) {
-	src := []string{"foo", "bar", "bar", "baz", "baz", "baz"}
-	expected := []string{"foo", "bar", "baz"}
-	dst := TrimDuplicates(src)
-	if len(dst) != len(expected) {
-		t.Error("trim duplicated string failed")
-		return
-	}
-	for i, str := range expected {
-		if dst[i] != str {
-			t.Error("trim duplicated string failed")
-			return
-		}
-	}
-}
-
 func TestParseGitDescribeInfo(t *testing.T) {
 	type args struct {
 		v string

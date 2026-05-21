@@ -35,6 +35,20 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 )
 
+const (
+	wsMsgCmd    = "cmd"
+	wsMsgResize = "resize"
+
+	MagicExecShell = "(clear && bash) || (clear && ash) || (clear && sh) || bash || ash || sh"
+)
+
+type wsMsg struct {
+	Type string `json:"type"`
+	Cmd  string `json:"cmd"`
+	Cols int    `json:"cols"`
+	Rows int    `json:"rows"`
+}
+
 func NewSSHClient(username, password, ip string, port int) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		Timeout:         5 * time.Second,
@@ -71,17 +85,14 @@ func (w *safeBuffer) Reset() {
 }
 
 type LogicSSHWsSession struct {
-	stdinPipe       io.WriteCloser
-	comboOutput     *safeBuffer
-	logBuff         *safeBuffer
-	inputFilterBuff *safeBuffer
-	session         *ssh.Session
-	wsConn          *websocket.Conn
-	isAdmin         bool
-	IsFlagged       bool
+	stdinPipe   io.WriteCloser
+	comboOutput *safeBuffer
+	logBuff     *safeBuffer
+	session     *ssh.Session
+	wsConn      *websocket.Conn
 }
 
-func NewLoginSSHWSSession(cols, rows int, isAdmin bool, sshClient *ssh.Client, wsConn *websocket.Conn) (*LogicSSHWsSession, error) {
+func NewLoginSSHWSSession(cols, rows int, sshClient *ssh.Client, wsConn *websocket.Conn) (*LogicSSHWsSession, error) {
 	sshSession, err := sshClient.NewSession()
 	if err != nil {
 		return nil, err
@@ -92,7 +103,6 @@ func NewLoginSSHWSSession(cols, rows int, isAdmin bool, sshClient *ssh.Client, w
 	}
 	comboWriter := new(safeBuffer)
 	logBuf := new(safeBuffer)
-	inputBuf := new(safeBuffer)
 	//ssh.stdout and stderr will write output into comboWriter
 	sshSession.Stdout = comboWriter
 	sshSession.Stderr = comboWriter
@@ -110,14 +120,11 @@ func NewLoginSSHWSSession(cols, rows int, isAdmin bool, sshClient *ssh.Client, w
 		return nil, err
 	}
 	return &LogicSSHWsSession{
-		stdinPipe:       stdinP,
-		comboOutput:     comboWriter,
-		logBuff:         logBuf,
-		inputFilterBuff: inputBuf,
-		session:         sshSession,
-		wsConn:          wsConn,
-		isAdmin:         isAdmin,
-		IsFlagged:       false,
+		stdinPipe:   stdinP,
+		comboOutput: comboWriter,
+		logBuff:     logBuf,
+		session:     sshSession,
+		wsConn:      wsConn,
 	}, nil
 }
 
@@ -225,9 +232,6 @@ func (sws *LogicSSHWsSession) Wait(quitChan chan struct{}, gracefulExitChan chan
 	}
 	logger.Debug("ssh session exit by remote peer")
 	close(gracefulExitChan)
-}
-func (sws *LogicSSHWsSession) LogString() string {
-	return sws.logBuff.buffer.String()
 }
 func setQuit(ch chan struct{}) {
 	ch <- struct{}{}
