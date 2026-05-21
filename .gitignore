@@ -28,6 +28,11 @@ tools/kcctldocs-gen/generators/build/
 tools/kcctldocs-gen/generators/includes/
 tools/kcctldocs-gen/generators/manifest.json
 
-openspec/
-.claude/
+# Local kcctl binary
 /kcctl
+
+# OpenSpec change tracking
+openspec/
+
+# Claude Code
+.claude/
