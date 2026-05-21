@@ -969,9 +969,21 @@ func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
 			constatns.DeployConfigConfigMapKey: string(dcData),
 		},
 	}
-	_, err = client.CreateConfigMap(context.TODO(), dc)
-	if err != nil {
-		logger.Fatal(err)
+	// Check if configmap already exists (e.g., from a previous deploy attempt)
+	existing, err := client.DescribeConfigMap(context.TODO(), constatns.DeployConfigConfigMapName)
+	if err == nil && len(existing.Items) > 0 {
+		cm := existing.Items[0]
+		if cm.Data == nil {
+			cm.Data = make(map[string]string)
+		}
+		cm.Data[constatns.DeployConfigConfigMapKey] = string(dcData)
+		if _, err = client.UpdateConfigMap(context.TODO(), &cm); err != nil {
+			logger.Fatalf("update deploy-config failed: %v", err)
+		}
+		return
+	}
+	if _, err = client.CreateConfigMap(context.TODO(), dc); err != nil {
+		logger.Fatalf("create deploy-config failed: %v", err)
 	}
 }
 
