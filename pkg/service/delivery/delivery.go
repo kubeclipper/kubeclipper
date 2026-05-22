@@ -160,7 +160,7 @@ func (s *Service) stepStatusChannelController() {
 		if status.DryRun {
 			logger.Debug("dry run update step status", zap.String("op", status.OperationIdentity),
 				zap.String("step", status.OperationCondition.StepID), zap.Any("step_status", status.OperationCondition))
-			return
+			continue
 		}
 		// TODO: 简化更新,允许强制更新?
 		for i := 0; i < updateOperationStatusRetry; i++ {

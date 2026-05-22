@@ -112,7 +112,7 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		if err != nil {
 			s.log.Error("get k8s cluster healthz failed", zap.Error(err))
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentUnKnown)
-			return
+			continue
 		}
 		if "ok" == string(content) {
 			s.updateClusterComponentStatus(clu.Name, "kubernetes", "kubernetes", v1.ComponentHealthy)
@@ -236,7 +236,7 @@ func (s *ClusterStatusMon) GetCertificationFromKC(clu *v1.Cluster) ([]v1.Certifi
 	splitRes := strings.Split(string(res), "\n\n")
 	if len(splitRes) != 3 {
 		logger.Errorf("read cluster certs error")
-		return nil, err
+		return nil, fmt.Errorf("unexpected cert check output format: expected 3 sections, got %d", len(splitRes))
 	}
 	crts := strings.Split(splitRes[1], "\n")
 	cas := strings.Split(splitRes[2], "\n")
@@ -246,7 +246,7 @@ func (s *ClusterStatusMon) GetCertificationFromKC(clu *v1.Cluster) ([]v1.Certifi
 		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
 		if parErr != nil {
 			s.log.Warn("get cluster failed when get cluster ca expiration time", zap.String("cluster", clu.Name))
-			return nil, err
+			return nil, parErr
 		}
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],
@@ -259,7 +259,7 @@ func (s *ClusterStatusMon) GetCertificationFromKC(clu *v1.Cluster) ([]v1.Certifi
 		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
 		if parErr != nil {
 			s.log.Warn("get cluster failed when get cluster cert expiration time", zap.String("cluster", clu.Name))
-			return nil, err
+			return nil, parErr
 		}
 		certification = append(certification, v1.Certification{
 			Name:           crt[0],

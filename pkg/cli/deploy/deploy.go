@@ -1044,7 +1044,7 @@ func uploadCerts(client *kc.Client) {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	etcdhealthcheckkey, err := os.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.crt", etcdPath))
+	etcdhealthcheckkey, err := os.ReadFile(fmt.Sprintf("%s/kube-etcd-healthcheck-client.key", etcdPath))
 	if err != nil {
 		logger.Fatal(err)
 	}

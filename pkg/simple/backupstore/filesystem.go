@@ -86,6 +86,7 @@ func (fs *FilesystemStore) Download(ctx context.Context, fileName string, w io.W
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
 	write := bufio.NewWriter(w)
 
