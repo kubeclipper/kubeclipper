@@ -314,3 +314,209 @@ version = 2
   address = ""
   gid = 0
   uid = 0`
+
+const configTomlV3Template = `disabled_plugins = []
+imports = []
+oom_score = 0
+plugin_dir = ""
+required_plugins = []
+{{- if .DataRootDir}}
+root = "{{.DataRootDir}}"
+{{- else}}
+root = "/var/lib/containerd"
+{{- end}}
+state = "/run/containerd"
+temp = ""
+version = 3
+
+[cgroup]
+  path = ""
+
+[debug]
+  address = ""
+  format = ""
+  gid = 0
+  level = ""
+  uid = 0
+
+[grpc]
+  address = "/run/containerd/containerd.sock"
+  gid = 0
+  max_recv_message_size = 16777216
+  max_send_message_size = 16777216
+  tcp_address = ""
+  tcp_tls_ca = ""
+  tcp_tls_cert = ""
+  tcp_tls_key = ""
+  uid = 0
+
+[metrics]
+  address = ""
+  grpc_histogram = false
+
+[plugins]
+
+  [plugins."io.containerd.gc.v1.scheduler"]
+    deletion_threshold = 0
+    mutation_threshold = 100
+    pause_threshold = 0.02
+    schedule_delay = "0s"
+    startup_delay = "100ms"
+
+  [plugins."io.containerd.cri.v1.images"]
+    disable_snapshot_annotations = true
+    discard_unpacked_layers = false
+    snapshotter = "overlayfs"
+{{- if .LocalRegistry }}
+    [plugins."io.containerd.cri.v1.images".pinned_images]
+      sandbox = "{{.LocalRegistry}}/pause:{{$.PauseVersion}}"
+{{- else}}
+    [plugins."io.containerd.cri.v1.images".pinned_images]
+      sandbox = "{{.PauseRegistry}}/pause:{{$.PauseVersion}}"
+{{- end}}
+    [plugins."io.containerd.cri.v1.images".registry]
+      config_path = "{{.RegistryConfigDir}}"
+
+      [plugins."io.containerd.cri.v1.images".registry.auths]
+
+      [plugins."io.containerd.cri.v1.images".registry.configs]
+        {{- if .RegistryWithAuth }}
+          {{- range $reg := .RegistryWithAuth }}
+            {{- if $reg.Host }}
+        [plugins."io.containerd.cri.v1.images".registry.configs."{{ $reg.Host }}"]
+              {{- if $reg.RegistryAuth }}
+          [plugins."io.containerd.cri.v1.images".registry.configs."{{ $reg.Host }}".auth]
+            username = "{{ $reg.RegistryAuth.Username }}"
+            password = "{{ $reg.RegistryAuth.Password }}"
+            auth = ""
+            identitytoken = ""
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+
+      [plugins."io.containerd.cri.v1.images".registry.headers]
+
+      [plugins."io.containerd.cri.v1.images".registry.mirrors]
+
+  [plugins."io.containerd.cri.v1.runtime"]
+    device_ownership_from_security_context = false
+    enable_selinux = false
+    tolerate_missing_hugetlb_controller = true
+    unset_seccomp_profile = ""
+
+    [plugins."io.containerd.cri.v1.runtime".cni]
+      bin_dir = "/opt/cni/bin"
+      conf_dir = "/etc/cni/net.d"
+      conf_template = ""
+      ip_pref = ""
+      max_conf_num = 1
+
+    [plugins."io.containerd.cri.v1.runtime".containerd]
+      default_runtime_name = "runc"
+      ignore_rdt_not_enabled_errors = false
+
+      [plugins."io.containerd.cri.v1.runtime".containerd.runtimes]
+
+        [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc]
+          runtime_type = "io.containerd.runc.v2"
+
+          [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc.options]
+            BinaryName = ""
+            IoGid = 0
+            IoUid = 0
+            NoNewKeyring = false
+            NoPivotRoot = false
+            Root = ""
+            ShimCgroup = ""
+            SystemdCgroup = {{.EnableSystemdCgroup}}
+
+  [plugins."io.containerd.grpc.v1.cri"]
+    disable_tcp_service = true
+    enable_tls_streaming = false
+    stream_idle_timeout = "4h0m0s"
+    stream_server_address = "127.0.0.1"
+    stream_server_port = "0"
+
+  [plugins."io.containerd.internal.v1.opt"]
+    path = "/opt/containerd"
+
+  [plugins."io.containerd.internal.v1.restart"]
+    interval = "10s"
+
+  [plugins."io.containerd.internal.v1.tracing"]
+    sampling_ratio = 1.0
+    service_name = "containerd"
+
+  [plugins."io.containerd.metadata.v1.bolt"]
+    content_sharing_policy = "shared"
+
+  [plugins."io.containerd.monitor.task.v1.cgroups"]
+    no_prometheus = false
+
+  [plugins."io.containerd.runtime.v2.task"]
+    platforms = ["linux/amd64"]
+    sched_core = false
+
+  [plugins."io.containerd.service.v1.diff-service"]
+    default = ["walking"]
+
+  [plugins."io.containerd.service.v1.tasks-service"]
+    rdt_config_file = ""
+
+  [plugins."io.containerd.snapshotter.v1.btrfs"]
+    root_path = ""
+
+  [plugins."io.containerd.snapshotter.v1.devmapper"]
+    async_remove = false
+    base_image_size = ""
+    discard_blocks = false
+    fs_options = ""
+    fs_type = ""
+    pool_name = ""
+    root_path = ""
+
+  [plugins."io.containerd.snapshotter.v1.native"]
+    root_path = ""
+
+  [plugins."io.containerd.snapshotter.v1.overlayfs"]
+    root_path = ""
+    upperdir_label = false
+
+  [plugins."io.containerd.snapshotter.v1.zfs"]
+    root_path = ""
+
+  [plugins."io.containerd.tracing.processor.v1.otlp"]
+    endpoint = ""
+    insecure = false
+    protocol = ""
+
+[proxy_plugins]
+
+[stream_processors]
+
+  [stream_processors."io.containerd.ocicrypt.decoder.v1.tar"]
+    accepts = ["application/vnd.oci.image.layer.v1.tar+encrypted"]
+    args = ["--decryption-keys-path", "/etc/containerd/ocicrypt/keys"]
+    env = ["OCICRYPT_KEYPROVIDER_CONFIG=/etc/containerd/ocicrypt/ocicrypt_keyprovider.conf"]
+    path = "ctd-decoder"
+    returns = "application/vnd.oci.image.layer.v1.tar"
+
+  [stream_processors."io.containerd.ocicrypt.decoder.v1.tar.gzip"]
+    accepts = ["application/vnd.oci.image.layer.v1.tar+gzip+encrypted"]
+    args = ["--decryption-keys-path", "/etc/containerd/ocicrypt/keys"]
+    env = ["OCICRYPT_KEYPROVIDER_CONFIG=/etc/containerd/ocicrypt/ocicrypt_keyprovider.conf"]
+    path = "ctd-decoder"
+    returns = "application/vnd.oci.image.layer.v1.tar+gzip"
+
+[timeouts]
+  "io.containerd.timeout.bolt.open" = "0s"
+  "io.containerd.timeout.shim.cleanup" = "5s"
+  "io.containerd.timeout.shim.load" = "5s"
+  "io.containerd.timeout.shim.shutdown" = "3s"
+  "io.containerd.timeout.task.state" = "2s"
+
+[ttrpc]
+  address = ""
+  gid = 0
+  uid = 0`
