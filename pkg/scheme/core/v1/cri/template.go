@@ -406,7 +406,7 @@ version = 3
     unset_seccomp_profile = ""
 
     [plugins."io.containerd.cri.v1.runtime".cni]
-      bin_dir = "/opt/cni/bin"
+      bin_dirs = ["/opt/cni/bin"]
       conf_dir = "/etc/cni/net.d"
       conf_template = ""
       ip_pref = ""
@@ -443,10 +443,6 @@ version = 3
 
   [plugins."io.containerd.internal.v1.restart"]
     interval = "10s"
-
-  [plugins."io.containerd.internal.v1.tracing"]
-    sampling_ratio = 1.0
-    service_name = "containerd"
 
   [plugins."io.containerd.metadata.v1.bolt"]
     content_sharing_policy = "shared"
