@@ -533,6 +533,8 @@ func TestIsContainerdV2(t *testing.T) {
 		{"v0", "0.9.0", false},
 		{"empty", "", false},
 		{"no patch", "2.0", true},
+		{"v2 with v prefix", "v2.0.0", true},
+		{"v1 with v prefix", "v1.7.29", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

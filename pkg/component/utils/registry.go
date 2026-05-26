@@ -67,7 +67,11 @@ func addOrRemoveContainerdInsecureRegistry(ctx context.Context, registry string,
 		}
 	}
 	var logMsg string
-	insecureRegistries := conf.GetPath([]string{"plugins", pluginPrefix, "registry"}).(*toml.Tree)
+	registryTree := conf.GetPath([]string{"plugins", pluginPrefix, "registry"})
+	insecureRegistries, ok := registryTree.(*toml.Tree)
+	if !ok || insecureRegistries == nil {
+		return fmt.Errorf("registry configuration path 'plugins.%s.registry' not found or invalid in containerd config", pluginPrefix)
+	}
 	if add {
 		// add registry table
 		// if the key already exists, it will not be added again.

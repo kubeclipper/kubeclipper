@@ -242,11 +242,12 @@ func (runnable *ContainerdRunnable) matchPauseVersion(kubeVersion string) (strin
 	return k8sMatchPauseVersion[kubeVersion], registry
 }
 
-func (r *ContainerdRunnable) isContainerdV2() bool {
-	if r.Version == "" {
+func (runnable *ContainerdRunnable) isContainerdV2() bool {
+	if runnable.Version == "" {
 		return false
 	}
-	parts := strings.SplitN(r.Version, ".", 2)
+	version := strings.TrimPrefix(runnable.Version, "v")
+	parts := strings.SplitN(version, ".", 2)
 	major, err := strconv.Atoi(parts[0])
 	if err != nil {
 		return false
@@ -448,13 +449,13 @@ func (runnable *ContainerdRunnable) disableContainerdService(ctx context.Context
 	}
 }
 
-func (r *ContainerdRunnable) renderTo(w io.Writer) error {
+func (runnable *ContainerdRunnable) renderTo(w io.Writer) error {
 	at := tmplutil.New()
-	if r.isContainerdV2() {
-		_, err := at.RenderTo(w, configTomlV3Template, r)
+	if runnable.isContainerdV2() {
+		_, err := at.RenderTo(w, configTomlV3Template, runnable)
 		return err
 	}
-	_, err := at.RenderTo(w, configTomlTemplate, r)
+	_, err := at.RenderTo(w, configTomlTemplate, runnable)
 	return err
 }
 

@@ -167,4 +167,3 @@ root = "/var/lib/containerd"
 	endpoint := result.GetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "registry", "mirrors", "myregistry.io:5000", "endpoint"})
 	require.NotNil(t, endpoint, "insecure registry should be added under grpc.v1.cri path for v2 config")
 }
-
