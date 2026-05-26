@@ -31,9 +31,10 @@ import (
 )
 
 const (
-	containerdDefaultConfig = "/etc/containerd/config.toml"
-	dockerDefaultConfig     = "/etc/docker/daemon.json"
+	dockerDefaultConfig = "/etc/docker/daemon.json"
 )
+
+var containerdDefaultConfig = "/etc/containerd/config.toml"
 
 func AddOrRemoveInsecureRegistryToCRI(ctx context.Context, criType, registry string, add, dryRun bool) error {
 	switch criType {
@@ -59,8 +60,18 @@ func addOrRemoveContainerdInsecureRegistry(ctx context.Context, registry string,
 	if err != nil {
 		return
 	}
+	pluginPrefix := "io.containerd.grpc.v1.cri"
+	if v := conf.Get("version"); v != nil {
+		if n, ok := v.(int64); ok && int(n) >= 3 {
+			pluginPrefix = "io.containerd.cri.v1.images"
+		}
+	}
 	var logMsg string
-	insecureRegistries := conf.GetPath([]string{"plugins", "io.containerd.grpc.v1.cri", "registry"}).(*toml.Tree)
+	registryTree := conf.GetPath([]string{"plugins", pluginPrefix, "registry"})
+	insecureRegistries, ok := registryTree.(*toml.Tree)
+	if !ok || insecureRegistries == nil {
+		return fmt.Errorf("registry configuration path 'plugins.%s.registry' not found or invalid in containerd config", pluginPrefix)
+	}
 	if add {
 		// add registry table
 		// if the key already exists, it will not be added again.
