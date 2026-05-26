@@ -18113,3 +18113,137 @@ calicoctl:
 kubernetesServiceEndpoint:
   host: ""
   port: "6443"`
+const calicoV3315 = `installation:
+  enabled: true
+  kubernetesProvider: ""
+  registry: {{with .CNI.LocalRegistry}}{{.}}{{end}}
+  kubeletVolumePluginPath: "None"
+  imagePullSecrets: []
+  cni:
+    type: Calico
+    ipam:
+      type: Calico
+  calicoNetwork:
+    {{if eq .CNI.Calico.Mode "BGP"}}
+    bgp: Enabled
+    {{else}}
+    bgp: Disabled
+    {{end}}
+    # Iptables, BPF
+    linuxDataplane: Iptables
+    mtu: {{.CNI.Calico.MTU}}
+    nodeAddressAutodetectionV4:
+      {{if eq .NodeAddressDetectionV4.Type "first-found"}}
+      firstFound: true
+      {{else if eq .NodeAddressDetectionV4.Type "interface"}}
+      interface: {{.NodeAddressDetectionV4.Value}}
+      {{else if eq .NodeAddressDetectionV4.Type "skip-interface"}}
+      skipInterface: {{.NodeAddressDetectionV4.Value}}
+      {{else if eq .NodeAddressDetectionV4.Type "can-reach"}}
+      canReach: {{.NodeAddressDetectionV4.Value}}
+      {{end}}
+    {{if .DualStack}}
+    nodeAddressAutodetectionV6:
+      {{if eq .NodeAddressDetectionV6.Type "first-found"}}
+      firstFound: true
+      {{else if eq .NodeAddressDetectionV6.Type "interface"}}
+      interface: {{.NodeAddressDetectionV6.Value}}
+      {{else if eq .NodeAddressDetectionV6.Type "skip-interface"}}
+      skipInterface: {{.NodeAddressDetectionV6.Value}}
+      {{else if eq .NodeAddressDetectionV6.Type "can-reach"}}
+      canReach: {{.NodeAddressDetectionV6.Value}}
+      {{end}}
+    {{end}}
+    ipPools:
+      - blockSize: 26
+        cidr: {{.PodIPv4CIDR}}
+        {{if eq .CNI.Calico.Mode "Overlay-IPIP-All"}}
+        encapsulation: IPIP
+        {{else if eq .CNI.Calico.Mode "Overlay-IPIP-Cross-Subnet"}}
+        encapsulation: IPIPCrossSubnet
+        {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-All"}}
+        encapsulation: VXLAN
+        {{else if eq .CNI.Calico.Mode "Overlay-Vxlan-Cross-Subnet"}}
+        encapsulation: VXLANCrossSubnet
+        {{else}}
+        encapsulation: None
+        {{end}}
+        natOutgoing: Enabled
+        nodeSelector: all()
+      {{if .DualStack}}
+      - blockSize: 122
+        cidr: {{.PodIPv6CIDR}}
+        encapsulation: None
+        natOutgoing: Enabled
+        nodeSelector: all()
+      {{end}}
+
+apiServer:
+  enabled: true
+
+goldmane:
+  enabled: false
+
+whisker:
+  enabled: false
+
+defaultFelixConfiguration:
+  enabled: false
+
+certs:
+  node:
+    key:
+    cert:
+    commonName:
+  typha:
+    key:
+    cert:
+    commonName:
+    caBundle:
+
+manageCRDs: true
+
+# Resource requests and limits for the tigera/operator pod
+resources: {}
+
+# Common labels for all resources created by this chart
+additionalLabels: {}
+
+# Tolerations for the tigera/operator pod
+tolerations:
+- effect: NoExecute
+  operator: Exists
+- effect: NoSchedule
+  operator: Exists
+
+# NodeSelector for the tigera/operator pod
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Affinity for the tigera/operator pod
+affinity: {}
+
+# PriorityClassName for the tigera/operator pod
+priorityClassName: ""
+
+# Custom annotations for the tigera/operator pod
+podAnnotations: {}
+
+# Custom labels for the tigera/operator pod
+podLabels: {}
+
+# Custom DNS configuration for the tigera/operator pod
+dnsConfig: {}
+
+tigeraOperator:
+  image: tigera/operator
+  version: v1.40.8
+  registry: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}
+calicoctl:
+  image: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}/calico/ctl
+  tag: v3.31.5
+
+# Optionally configure the host and port used to access the Kubernetes API server
+kubernetesServiceEndpoint:
+  host: ""
+  port: "6443"`
