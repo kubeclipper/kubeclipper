@@ -107,6 +107,8 @@ func NewCmdLogs(streams options.IOStreams) *cobra.Command {
 
 // Run executes the logs command
 func (o *LogsOptions) Run() error {
+	fmt.Fprintln(o.ErrOut, `Warning: "kcctl logs" is deprecated, use "kcctl operation logs" instead.`)
+
 	c, err := kc.FromConfig(o.cliOpts.ToRawConfig())
 	if err != nil {
 		return err
