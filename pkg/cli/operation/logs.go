@@ -11,12 +11,12 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"golang.org/x/term"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
-	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/operation/tui"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
@@ -135,7 +135,7 @@ func (o *LogsOptions) runClusterMode() error {
 	if !isTTY() {
 		return o.nonTTYClusterFallback()
 	}
-	return tui.RunTUI(o.Client, o.Cluster)
+	return tui.RunTUI(o.Client, o.Cluster, o.In, o.Out)
 }
 
 // nonTTYClusterFallback lists operations for the cluster when no TTY is available.
@@ -162,8 +162,7 @@ func (o *LogsOptions) nonTTYClusterFallback() error {
 		}
 		fmt.Fprintf(o.Out, "  %s (%s)\n", op.Name, action)
 	}
-	os.Exit(1)
-	return nil
+	return fmt.Errorf("non-interactive terminal: use 'kcctl operation logs <ID>' instead")
 }
 
 // runSingleOperation handles the plain-text log output for a single operation ID.

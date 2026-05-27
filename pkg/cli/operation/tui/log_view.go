@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +41,12 @@ type tickMsg time.Time
 type logFetchedMsg struct {
 	content string
 	offset  int64
+}
+
+// operationStatusMsg carries the refreshed operation from a periodic poll.
+type operationStatusMsg struct {
+	operation *v1.Operation
+	err       error
 }
 
 // LogModel renders the split-panel log view.
@@ -234,6 +240,17 @@ func followTickCmd() tea.Cmd {
 	})
 }
 
+// fetchOperationStatusCmd returns a command that re-fetches the operation to update
+// its status (needed for follow mode to detect completion).
+func (m LogModel) fetchOperationStatusCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		op, err := m.client.DescribeOperation(ctx, m.operation.Name)
+		return operationStatusMsg{operation: op, err: err}
+	}
+}
+
 // Init initializes the log model by fetching the first log.
 func (m LogModel) Init() tea.Cmd {
 	return m.fetchInitialLogCmd()
@@ -272,16 +289,6 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 
 	case tickMsg:
 		if m.followMode {
-			if m.operation.Status.Status == v1.OperationStatusSuccessful ||
-				m.operation.Status.Status == v1.OperationStatusFailed ||
-				m.operation.Status.Status == v1.OperationStatusTermination {
-				m.followMode = false
-				m.rawContent += "\n--- Operation completed, follow mode disabled ---\n"
-				m.viewport.SetContent(m.rawContent)
-				m.viewport.GotoBottom()
-				return m, nil
-			}
-
 			if len(m.steps) > 0 && m.cursor < len(m.steps) && len(m.steps[m.cursor].Nodes) > 0 {
 				step := m.steps[m.cursor]
 				node := step.Nodes[0]
@@ -290,6 +297,22 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 				cmds = append(cmds, m.fetchLogCmd(step.ID, node.ID, offset, key))
 			}
 			cmds = append(cmds, followTickCmd())
+			cmds = append(cmds, m.fetchOperationStatusCmd())
+		}
+
+	case operationStatusMsg:
+		if msg.err == nil && msg.operation != nil {
+			m.operation = msg.operation
+			m.steps = buildStepEntries(msg.operation)
+			if msg.operation.Status.Status == v1.OperationStatusSuccessful ||
+				msg.operation.Status.Status == v1.OperationStatusFailed ||
+				msg.operation.Status.Status == v1.OperationStatusTermination {
+				m.followMode = false
+				m.rawContent += "\n--- Operation completed, follow mode disabled ---\n"
+				m.viewport.SetContent(m.rawContent)
+				m.viewport.GotoBottom()
+				return m, nil
+			}
 		}
 
 	case tea.KeyMsg:

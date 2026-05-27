@@ -15,7 +15,7 @@ func TestTerminateStatusValidation(t *testing.T) {
 		errSubstr string
 	}{
 		{
-			name:    "running operation can be terminated",
+			name:     "running operation can be terminated",
 			opStatus: v1.OperationStatusRunning,
 			wantErr:  false,
 		},

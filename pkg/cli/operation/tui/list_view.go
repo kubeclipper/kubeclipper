@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -84,8 +85,8 @@ func (m ListModel) View() string {
 	for i, op := range m.operations {
 		status := string(op.Status.Status)
 		name := op.Name
-		if len(name) > 28 {
-			name = name[:28] + ".."
+		if utf8.RuneCountInString(name) > 28 {
+			name = string([]rune(name)[:28]) + ".."
 		}
 
 		action := op.Labels["kubeclipper.io/operation"]
@@ -96,8 +97,15 @@ func (m ListModel) View() string {
 		created := op.CreationTimestamp.Format("2006-01-02 15:04:05")
 		steps := fmt.Sprintf("%d", len(op.Steps))
 
+		// Apply style to status, then pad based on the plain-text length
+		// to avoid ANSI escape sequences breaking column alignment.
+		const statusColWidth = 14
 		statusStyled := statusStyle(status).Render(status)
-		row := fmt.Sprintf("%-30s %-14s %-22s %-6s", name, statusStyled, created, steps)
+		padLen := statusColWidth - utf8.RuneCountInString(status)
+		if padLen < 0 {
+			padLen = 0
+		}
+		row := fmt.Sprintf("%-30s %s%s %-22s %-6s", name, statusStyled, strings.Repeat(" ", padLen), created, steps)
 
 		if i == m.cursor {
 			row = SelectedStyle.Render(row)

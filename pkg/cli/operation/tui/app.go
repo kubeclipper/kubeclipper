@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -110,7 +111,9 @@ func (m Model) View() string {
 
 // RunTUI launches the TUI program. It handles the logic of whether to show
 // the list view or skip directly to the log view.
-func RunTUI(client *kc.Client, clusterName string) error {
+// The in and out parameters allow the caller to control the TUI input/output
+// (e.g., os.Stdin/os.Stdout), enabling testability.
+func RunTUI(client *kc.Client, clusterName string, in io.Reader, out io.Writer) error {
 	ctx := context.Background()
 
 	labelSelector := fmt.Sprintf("kubeclipper.io/cluster=%s", clusterName)
@@ -133,7 +136,7 @@ func RunTUI(client *kc.Client, clusterName string) error {
 		model = NewModel(client, clusterName, operations)
 	}
 
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithInput(in), tea.WithOutput(out))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}

@@ -49,8 +49,8 @@ func makeTestOperationForLogView() *v1.Operation {
 					StepID: "step-2",
 					Status: []v1.StepStatus{
 						{
-							Node:   "node-1",
-							Status: v1.StepStatusSuccessful,
+							Node:    "node-1",
+							Status:  v1.StepStatusSuccessful,
 							StartAt: metav1.Time{Time: time.Date(2025, 6, 24, 8, 9, 57, 0, time.UTC)},
 							EndAt:   metav1.Time{Time: time.Date(2025, 6, 24, 8, 10, 2, 0, time.UTC)},
 						},
@@ -266,25 +266,6 @@ func TestLogModelLogFetchedMsgUpdatesContent(t *testing.T) {
 	}
 }
 
-func TestLogModelTickTerminalStatusDisablesFollow(t *testing.T) {
-	op := makeTestOperationForLogView()
-	op.Status.Status = v1.OperationStatusFailed
-	m := NewLogModel(nil, op, 80, 24)
-	m.followMode = true
-
-	// Send tick message -- should disable follow mode for terminal status
-	m, cmd := m.Update(tickMsg{})
-	if m.followMode {
-		t.Error("follow mode should be disabled after tick for terminal status")
-	}
-	if cmd != nil {
-		t.Error("expected no further commands when follow mode is disabled due to terminal status")
-	}
-	if !containsSubstring(m.rawContent, "Operation completed") {
-		t.Errorf("rawContent should contain completion notice, got %q", m.rawContent)
-	}
-}
-
 func TestLogModelTickRunningStatusContinuesFollow(t *testing.T) {
 	op := makeTestOperationForLogView()
 	op.Status.Status = v1.OperationStatusRunning
@@ -295,6 +276,41 @@ func TestLogModelTickRunningStatusContinuesFollow(t *testing.T) {
 	m, _ = m.Update(tickMsg{})
 	if !m.followMode {
 		t.Error("follow mode should remain on for running status")
+	}
+}
+
+func TestLogModelOperationStatusMsgDisablesFollow(t *testing.T) {
+	op := makeTestOperationForLogView()
+	op.Status.Status = v1.OperationStatusRunning
+	m := NewLogModel(nil, op, 80, 24)
+	m.followMode = true
+
+	// Simulate a refreshed operation with terminal status
+	failedOp := op.DeepCopy()
+	failedOp.Status.Status = v1.OperationStatusFailed
+	m, cmd := m.Update(operationStatusMsg{operation: failedOp})
+	if m.followMode {
+		t.Error("follow mode should be disabled after operationStatusMsg with terminal status")
+	}
+	if cmd != nil {
+		t.Error("expected no further commands when follow mode is disabled due to terminal status")
+	}
+	if !containsSubstring(m.rawContent, "Operation completed") {
+		t.Errorf("rawContent should contain completion notice, got %q", m.rawContent)
+	}
+}
+
+func TestLogModelOperationStatusMsgRunningContinuesFollow(t *testing.T) {
+	op := makeTestOperationForLogView()
+	op.Status.Status = v1.OperationStatusRunning
+	m := NewLogModel(nil, op, 80, 24)
+	m.followMode = true
+
+	// Simulate a refreshed operation that is still running
+	runningOp := op.DeepCopy()
+	m, _ = m.Update(operationStatusMsg{operation: runningOp})
+	if !m.followMode {
+		t.Error("follow mode should remain on when operation is still running")
 	}
 }
 

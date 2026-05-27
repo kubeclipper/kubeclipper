@@ -178,10 +178,10 @@ func TestGetStepStartTime(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		stepID     string
-		wantZero   bool
-		wantTime   time.Time
+		name     string
+		stepID   string
+		wantZero bool
+		wantTime time.Time
 	}{
 		{
 			name:     "returns earliest from multiple nodes",

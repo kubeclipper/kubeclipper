@@ -172,7 +172,6 @@ func (cli *Client) DescribeOperation(ctx context.Context, name string) (*v1.Oper
 	return &operation, err
 }
 
-
 func (cli *Client) ListRoles(ctx context.Context, query Queries) (*RoleList, error) {
 	serverResp, err := cli.get(ctx, rolesPath, query.ToRawQuery(), nil)
 	defer ensureReaderClosed(serverResp)
@@ -645,10 +644,10 @@ func (cli *Client) GetStepNodeLog(ctx context.Context, operation, step, node str
 	v.Set("node", node)
 	v.Set("offset", fmt.Sprintf("%d", offset))
 	serverResp, err := cli.get(ctx, LogStreamPath, v, nil)
-	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
 	}
+	defer ensureReaderClosed(serverResp)
 	var stepLog corev1.StepLog
 	if err := json.NewDecoder(serverResp.body).Decode(&stepLog); err != nil {
 		return nil, err
@@ -659,13 +658,19 @@ func (cli *Client) GetStepNodeLog(ctx context.Context, operation, step, node str
 // RetryOperation retries a failed operation by its ID.
 func (cli *Client) RetryOperation(ctx context.Context, opID string) error {
 	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, opID, "retry"), nil, nil, nil)
+	if err != nil {
+		return err
+	}
 	defer ensureReaderClosed(serverResp)
-	return err
+	return nil
 }
 
 // TerminateOperation terminates a running operation by its ID.
 func (cli *Client) TerminateOperation(ctx context.Context, opID string) error {
 	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, opID, "termination"), nil, nil, nil)
+	if err != nil {
+		return err
+	}
 	defer ensureReaderClosed(serverResp)
-	return err
+	return nil
 }

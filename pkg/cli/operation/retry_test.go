@@ -8,15 +8,15 @@ import (
 
 func TestRetryStatusValidation(t *testing.T) {
 	tests := []struct {
-		name       string
-		opStatus   v1.OperationStatusType
-		wantErr    bool
-		errSubstr  string
+		name      string
+		opStatus  v1.OperationStatusType
+		wantErr   bool
+		errSubstr string
 	}{
 		{
-			name:      "failed operation can be retried",
-			opStatus:  v1.OperationStatusFailed,
-			wantErr:   false,
+			name:     "failed operation can be retried",
+			opStatus: v1.OperationStatusFailed,
+			wantErr:  false,
 		},
 		{
 			name:      "successful operation cannot be retried",

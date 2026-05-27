@@ -45,11 +45,11 @@ func TestPrintStepTitle(t *testing.T) {
 			wantIn:   "init-cluster",
 		},
 		{
-			name:    "step ID present",
+			name:     "step ID present",
 			stepName: "step",
-			stepID:  "step-4",
-			status:  "failed",
-			wantIn:  "step-4",
+			stepID:   "step-4",
+			status:   "failed",
+			wantIn:   "step-4",
 		},
 	}
 
