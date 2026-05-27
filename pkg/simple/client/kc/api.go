@@ -53,7 +53,6 @@ const (
 	regionPath           = "/api/core.kubeclipper.io/v1/regions"
 
 	operationPath = "/api/core.kubeclipper.io/v1/operations"
-	logPath       = "/api/core.kubeclipper.io/v1/logs"
 	LogStreamPath = "/api/core.kubeclipper.io/v1/logs"
 )
 
@@ -173,30 +172,6 @@ func (cli *Client) DescribeOperation(ctx context.Context, name string) (*v1.Oper
 	return &operation, err
 }
 
-func (cli *Client) PrintLogs(ctx context.Context, operation v1.Operation) error {
-	fmt.Println("operation: ", operation.Name)
-	for _, step := range operation.Steps {
-		for _, node := range step.Nodes {
-			v := url.Values{}
-			v.Add("operation", operation.Name)
-			v.Add("node", node.ID)
-			v.Add("step", step.ID)
-			serverResp, err := cli.get(ctx, logPath, v, nil)
-			if err != nil {
-				return err
-			}
-			log := corev1.StepLog{}
-			err = json.NewDecoder(serverResp.body).Decode(&log)
-			ensureReaderClosed(serverResp)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("step: %s-%s\n", step.Name, step.ID)
-			fmt.Printf("logstatus: %s, log: %s\n", log.Status, log.Content)
-		}
-	}
-	return nil
-}
 
 func (cli *Client) ListRoles(ctx context.Context, query Queries) (*RoleList, error) {
 	serverResp, err := cli.get(ctx, rolesPath, query.ToRawQuery(), nil)
@@ -662,20 +637,35 @@ func (cli *Client) ListRegion(ctx context.Context, query Queries) (*v1.RegionLis
 	return &regions, err
 }
 
-// GetStepNodeLog 拉取某个 operation/step/node 的日志。
-func (cli *Client) GetStepNodeLog(ctx context.Context, operation, step, node string) (string, error) {
+// GetStepNodeLog fetches the log for a specific operation/step/node with byte offset.
+func (cli *Client) GetStepNodeLog(ctx context.Context, operation, step, node string, offset int64) (*corev1.StepLog, error) {
 	v := url.Values{}
 	v.Set("operation", operation)
 	v.Set("step", step)
 	v.Set("node", node)
+	v.Set("offset", fmt.Sprintf("%d", offset))
 	serverResp, err := cli.get(ctx, LogStreamPath, v, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var stepLog corev1.StepLog
 	if err := json.NewDecoder(serverResp.body).Decode(&stepLog); err != nil {
-		return "", err
+		return nil, err
 	}
-	return stepLog.Content, nil
+	return &stepLog, nil
+}
+
+// RetryOperation retries a failed operation by its ID.
+func (cli *Client) RetryOperation(ctx context.Context, opID string) error {
+	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, opID, "retry"), nil, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
+}
+
+// TerminateOperation terminates a running operation by its ID.
+func (cli *Client) TerminateOperation(ctx context.Context, opID string) error {
+	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, opID, "termination"), nil, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
 }

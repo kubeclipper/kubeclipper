@@ -66,9 +66,15 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 			}
 			for _, op := range opList.Items {
 				if op.Labels[common.LabelOperationAction] == "CreateCluster" {
-					err := c.PrintLogs(context.TODO(), op)
-					if err != nil {
-						framework.Logf("Print Step Log Failed: %v", err)
+					for _, step := range op.Steps {
+						for _, node := range step.Nodes {
+							log, logErr := c.GetStepNodeLog(context.TODO(), op.Name, step.ID, node.ID, 0)
+							if logErr != nil {
+								framework.Logf("Print Step Log Failed: %v", logErr)
+							} else {
+								framework.Logf("step: %s-%s, logstatus: %s, log: %s", step.Name, step.ID, log.Status, log.Content)
+							}
+						}
 					}
 				}
 			}
