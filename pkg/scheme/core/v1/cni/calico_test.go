@@ -122,6 +122,29 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "v3.31.5",
+			stepper: CalicoRunnable{
+				KubeletDataDir: "/var/lib/kubelet",
+				BaseCni: BaseCni{
+					DualStack:   true,
+					PodIPv4CIDR: constatns.ClusterPodSubnet,
+					PodIPv6CIDR: "fd00::/64",
+					CNI: v1.CNI{
+						LocalRegistry: "172.0.0.1:5000",
+						Type:          "calico",
+						Version:       "v3.31.5",
+						Calico: &v1.Calico{
+							IPv4AutoDetection: "interface=eth0",
+							IPv6AutoDetection: "interface=eth0",
+							Mode:              "Overlay-Vxlan-All",
+							IPManger:          true,
+							MTU:               1440,
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		tt.stepper.NodeAddressDetectionV4 = ParseNodeAddressDetection(tt.stepper.Calico.IPv4AutoDetection)
@@ -150,6 +173,23 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 				}
 				if !strings.Contains(output, "v3.29.6") {
 					t.Errorf("rendered template should contain calicoctl version v3.29.6, got: %s", output)
+				}
+			}
+			if tt.name == "v3.31.5" {
+				if !strings.Contains(output, "v1.40.8") {
+					t.Errorf("rendered template should contain tigera operator version v1.40.8, got: %s", output)
+				}
+				if !strings.Contains(output, "v3.31.5") {
+					t.Errorf("rendered template should contain calicoctl version v3.31.5, got: %s", output)
+				}
+				if !strings.Contains(output, `kubeletVolumePluginPath: "None"`) {
+					t.Errorf("rendered template should contain kubeletVolumePluginPath None, got: %s", output)
+				}
+				if !strings.Contains(output, "goldmane") {
+					t.Errorf("rendered template should contain goldmane section, got: %s", output)
+				}
+				if !strings.Contains(output, "whisker") {
+					t.Errorf("rendered template should contain whisker section, got: %s", output)
 				}
 			}
 			t.Log(output)
