@@ -279,7 +279,7 @@ func PrintLogLine(w io.Writer, line string) {
 // PrintErrorLine prints error message in red
 // nolint
 func PrintErrorLine(w io.Writer, format string, a ...interface{}) {
-	fmt.Fprintf(w, color.RedString(format, a...))
+	fmt.Fprint(w, color.RedString(format, a...))
 }
 
 // SplitLines splits a string into lines
