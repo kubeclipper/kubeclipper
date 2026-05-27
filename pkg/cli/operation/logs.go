@@ -12,9 +12,11 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"golang.org/x/term"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/operation/tui"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
@@ -45,8 +47,9 @@ func NewLogsOptions(streams options.IOStreams) *LogsOptions {
 const logsLong = `
   Show plain-text logs of an operation, grouped by step and node.
 
-  When --cluster is provided, a TUI mode will be available in the future.
-  For now, use the operation ID directly to get plain-text logs.`
+  When --cluster is provided, an interactive TUI log viewer is launched
+  showing operations for that cluster. Use the operation ID directly
+  for plain-text logs.`
 
 const logsExample = `
   # Show logs of an operation
@@ -61,7 +64,7 @@ const logsExample = `
   # Set max log length to 100 characters per entry
   kcctl operation logs <OPERATION_ID> --max-length 100
 
-  # (Coming soon) TUI mode for cluster-wide operation logs
+  # TUI mode for cluster-wide operation logs
   kcctl operation logs --cluster my-cluster`
 
 // NewCmdLogs creates the operation logs subcommand.
@@ -85,7 +88,7 @@ func NewCmdLogs(streams options.IOStreams) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", false, "Follow log output in real time")
 	cmd.Flags().IntVarP(&o.MaxLength, "max-length", "m", defaultMaxLength, "Max log length to display per entry (0 for unlimited)")
-	cmd.Flags().StringVarP(&o.Cluster, "cluster", "c", "", "Cluster name (TUI mode, coming soon)")
+	cmd.Flags().StringVarP(&o.Cluster, "cluster", "c", "", "Cluster name (launches TUI log viewer)")
 	cmd.Flags().BoolVarP(&o.Summary, "summary", "s", false, "Show only step/node status, not log content")
 	o.CliOpts.AddFlags(cmd.Flags())
 	return cmd
@@ -93,8 +96,8 @@ func NewCmdLogs(streams options.IOStreams) *cobra.Command {
 
 // Validate checks that the options are valid.
 func (o *LogsOptions) Validate() error {
-	if o.Cluster != "" && o.OperationID == "" {
-		return fmt.Errorf("TUI mode coming soon, use: kcctl operation logs <ID>")
+	if o.Cluster != "" && o.OperationID != "" {
+		return fmt.Errorf("cannot specify both OPERATION_ID and --cluster")
 	}
 	if o.Cluster == "" && o.OperationID == "" {
 		return fmt.Errorf("either OPERATION_ID or --cluster must be provided")
@@ -117,6 +120,54 @@ func (o *LogsOptions) Complete(opts *options.CliOptions) error {
 
 // Run executes the logs command.
 func (o *LogsOptions) Run() error {
+	// Cluster mode: launch TUI or show non-TTY fallback
+	if o.Cluster != "" {
+		return o.runClusterMode()
+	}
+
+	// Single operation mode: plain-text output
+	return o.runSingleOperation()
+}
+
+// runClusterMode handles the --cluster flag by launching TUI or falling back
+// to a non-TTY listing.
+func (o *LogsOptions) runClusterMode() error {
+	if !isTTY() {
+		return o.nonTTYClusterFallback()
+	}
+	return tui.RunTUI(o.Client, o.Cluster)
+}
+
+// nonTTYClusterFallback lists operations for the cluster when no TTY is available.
+func (o *LogsOptions) nonTTYClusterFallback() error {
+	ctx := context.Background()
+	labelSelector := fmt.Sprintf("kubeclipper.io/cluster=%s", o.Cluster)
+	list, err := o.Client.ListOperation(ctx, kc.Queries{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list operations for cluster %s: %w", o.Cluster, err)
+	}
+
+	if len(list.Items) == 0 {
+		return fmt.Errorf("no operations found for cluster %s", o.Cluster)
+	}
+
+	fmt.Fprintln(o.Out, "TUI requires an interactive terminal. Use 'kcctl operation logs <ID>' instead.")
+	fmt.Fprintln(o.Out, "Operations:")
+	for _, op := range list.Items {
+		action := op.Labels["kubeclipper.io/operation"]
+		if action == "" {
+			action = op.Name
+		}
+		fmt.Fprintf(o.Out, "  %s (%s)\n", op.Name, action)
+	}
+	os.Exit(1)
+	return nil
+}
+
+// runSingleOperation handles the plain-text log output for a single operation ID.
+func (o *LogsOptions) runSingleOperation() error {
 	ctx := context.TODO()
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
@@ -198,6 +249,11 @@ func (o *LogsOptions) Run() error {
 	return nil
 }
 
+// isTTY checks if stdout is connected to an interactive terminal.
+func isTTY() bool {
+	return term.IsTerminal(int(os.Stdout.Fd()))
+}
+
 // printStepTitle prints a step header with a separator line, step name, ID, and color-coded status.
 func printStepTitle(w io.Writer, name, id, status string, startTime metav1.Time) {
 	timeStr := ""
@@ -256,5 +312,6 @@ func printLogLine(w io.Writer, line string) {
 
 // printErrorLine prints an error message in red.
 func printErrorLine(w io.Writer, format string, a ...interface{}) {
-	fmt.Fprintf(w, color.RedString(format, a...))
+	redMsg := fmt.Sprintf(format, a...)
+	fmt.Fprint(w, color.RedString(redMsg))
 }
