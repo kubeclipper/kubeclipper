@@ -188,6 +188,9 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 				if !strings.Contains(output, "goldmane") {
 					t.Errorf("rendered template should contain goldmane section, got: %s", output)
 				}
+				if !strings.Contains(output, "whisker") {
+					t.Errorf("rendered template should contain whisker section, got: %s", output)
+				}
 			}
 			t.Log(output)
 		})
