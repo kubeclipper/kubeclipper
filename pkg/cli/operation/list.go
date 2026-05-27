@@ -98,6 +98,14 @@ func (o *ListOptions) RunList() error {
 	if err != nil {
 		return err
 	}
+	if len(result.Items) == 0 {
+		if o.Cluster != "" {
+			fmt.Fprintf(o.Out, "No operations found for cluster %s\n", o.Cluster)
+		} else {
+			fmt.Fprintln(o.Out, "No operations found")
+		}
+		return nil
+	}
 	return o.PrintFlags.Print(result, o.Out)
 }
 

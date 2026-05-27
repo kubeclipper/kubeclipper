@@ -80,7 +80,7 @@ func (o *DescribeOptions) RunDescribe() error {
 	ctx := context.TODO()
 	op, err := o.Client.DescribeOperation(ctx, o.OperationID)
 	if err != nil {
-		return err
+		return fmt.Errorf("operation %s not found: %w", o.OperationID, err)
 	}
 	renderOperation(o.Out, op)
 	return nil
