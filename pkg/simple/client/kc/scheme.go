@@ -325,16 +325,17 @@ func (n *OperationList) YAMLPrint() ([]byte, error) {
 
 func (n *OperationList) TablePrint() ([]string, [][]string) {
 	// output e.g.: dev InstallComponents  successful 2024-08-12 15:20:00 4
-	title := []string{"id", "cluster", "name", "status", "created_at", "steps"}
+	title := []string{"id", "cluster", "name", "status", "sponsor", "created_at", "steps"}
 	var data [][]string
 	for _, op := range n.Items {
 		id := op.ObjectMeta.Name
 		cluster := op.ObjectMeta.Labels[common.LabelClusterName]
 		name := op.ObjectMeta.Labels[common.LabelOperationAction]
 		status := string(op.Status.Status)
+		sponsor := op.ObjectMeta.Labels[common.LabelOperationSponsor]
 		created := op.ObjectMeta.CreationTimestamp.Time.Format("2006-01-02 15:04:05")
 		steps := fmt.Sprintf("%d", len(op.Steps))
-		data = append(data, []string{id, cluster, name, status, created, steps})
+		data = append(data, []string{id, cluster, name, status, sponsor, created, steps})
 	}
 	return title, data
 }

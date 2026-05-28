@@ -107,6 +107,8 @@ func NewCmdLogs(streams options.IOStreams) *cobra.Command {
 
 // Run executes the logs command
 func (o *LogsOptions) Run() error {
+	fmt.Fprintln(o.ErrOut, `Warning: "kcctl logs" is deprecated, use "kcctl operation logs" instead.`)
+
 	c, err := kc.FromConfig(o.cliOpts.ToRawConfig())
 	if err != nil {
 		return err
@@ -151,13 +153,13 @@ func (o *LogsOptions) Run() error {
 				if o.Summary {
 					continue
 				}
-				log, err := c.GetStepNodeLog(ctx, o.Operator, step.ID, node.ID)
+				stepLog, err := c.GetStepNodeLog(ctx, o.Operator, step.ID, node.ID, 0)
 				if err != nil {
 					PrintErrorLine(o.ErrOut, "[step:%s][node:%s] log fetch error: %v\n", step.ID, node.ID, err)
 					continue
 				}
-				if log != "" {
-					for _, line := range SplitLines(truncateLog(log, o.MaxLength)) {
+				if stepLog.Content != "" {
+					for _, line := range SplitLines(truncateLog(stepLog.Content, o.MaxLength)) {
 						PrintLogLine(o.Out, line)
 					}
 				}
@@ -277,7 +279,7 @@ func PrintLogLine(w io.Writer, line string) {
 // PrintErrorLine prints error message in red
 // nolint
 func PrintErrorLine(w io.Writer, format string, a ...interface{}) {
-	fmt.Fprintf(w, color.RedString(format, a...))
+	fmt.Fprint(w, color.RedString(format, a...))
 }
 
 // SplitLines splits a string into lines
