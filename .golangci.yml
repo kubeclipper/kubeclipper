@@ -1,6 +1,7 @@
 version: "2"
 
 run:
+  timeout: 10m
   concurrency: 4
   modules-download-mode: readonly
   build-tags:
