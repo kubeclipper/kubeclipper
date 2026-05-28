@@ -1,79 +1,157 @@
+version: "2"
+
 run:
-  skip-dirs:
-    - dist
-    - vendor
-    - hack
-    - generated.*
+  concurrency: 4
+  modules-download-mode: readonly
   build-tags:
     - codeanalysis
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
-    - ineffassign
-    - exportloopref
+    - copyloopvar
+    - dupl
     - errcheck
-    - goimports
-    - gosimple
-    - gofmt
+    - errorlint
+    - funlen
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - mnd
+    - goprintffuncname
+    - gosec
     - govet
-    - staticcheck
-    - unconvert
+    - ineffassign
+    - intrange
+    - lll
+    - misspell
+    - modernize
+    - nakedret
+    - noctx
+    - nolintlint
     - revive
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unparam
     - unused
+    - whitespace
+
+  settings:
+    dupl:
+      threshold: 100
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    errorlint:
+      asserts: false
+    funlen:
+      lines: -1
+      statements: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+      ignore-tests: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+      disabled-checks:
+        - commentedOutCode
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+    gocyclo:
+      min-complexity: 15
+    godot:
+      scope: declarations
+      capital: false
+    godox:
+      keywords:
+        - FIXME
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      ignored-numbers:
+        - '0'
+        - '1'
+        - '2'
+        - '3'
+    govet:
+      enable:
+        - nilness
+        - shadow
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+    modernize:
+      disable:
+        - omitzero
+    nolintlint:
+      allow-unused: false
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        - name: indent-error-flow
+        - name: unused-parameter
+        - name: unused-receiver
+
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+      - legacy
+    paths:
+      - dist
+      - vendor
+      - hack
+      - generated.*
+    rules:
+      - path: (.+)_test\.go
+        linters:
+          - dupl
+          - mnd
+          - lll
+          - goconst
+      - path: vendor
+        linters:
+          - all
 
 issues:
-  exclude-use-default: true
-  max-issues-per-linter: 0
-  max-same-issues: 0
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    # Exclude some linters from running at present, wait fix
-    - path: registry
-      linters:
-        - golint
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - exportloopref
-        - errcheck
-    - path: pkg/auditing/audit.go
-      linters:
-        - staticcheck
-      text: SA1019
-linters-settings:
-  revive:
-    rules:
-      - name: exported
-        arguments:
-         - disableStutteringCheck
-         - checkPrivateReceivers
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-        #- name: empty-block
-      - name: superfluous-else
-        #- name: unused-parameter
-      - name: unreachable-code
-      - name: redefines-builtin-id
-  staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: "1.19"
-    # https://staticcheck.io/docs/options#checks
-    checks: [ "all" ]
+  new: true
+  uniq-by-line: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+      rewrite-rules:
+        - pattern: 'interface{}'
+          replacement: 'any'
+    goimports:
+      local-prefixes:
+        - github.com/kubeclipper
+  exclusions:
+    paths:
+      - dist
+      - vendor
+      - hack
+      - generated.*
