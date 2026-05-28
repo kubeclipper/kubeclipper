@@ -134,7 +134,7 @@ linters:
           - all
 
 issues:
-  new: true
+  new-from-rev: origin/master
   uniq-by-line: true
 
 formatters:
