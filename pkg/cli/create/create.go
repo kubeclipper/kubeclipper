@@ -62,7 +62,8 @@ func NewCmdCreate(streams options.IOStreams) *cobra.Command {
 		Long:                  longDescription,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			_ = cmd.Help()
+			//nolint:errcheck // show help text on Run, error is harmless
+			cmd.Help()
 		},
 	}
 
