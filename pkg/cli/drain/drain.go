@@ -90,7 +90,7 @@ func NewCmdDrain(streams options.IOStreams) *cobra.Command {
 		Example:               drainExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
-			utils.CheckErr(o.ValidateArgs())
+			utils.CheckErr(o.ValidateArgs(cmd))
 			if !o.preCheck() {
 				return
 			}
@@ -151,16 +151,16 @@ func (c *DrainOptions) Complete() error {
 	return nil
 }
 
-func (c *DrainOptions) ValidateArgs() error {
+func (c *DrainOptions) ValidateArgs(cmd *cobra.Command) error {
 	if c.deployConfig.SSHConfig.PkFile == "" && c.deployConfig.SSHConfig.Password == "" {
-		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", c.deployConfig.Config)
+		return utils.UsageErrorf(cmd, "one of pkfile or password must be specified, please config it in %s", c.deployConfig.Config)
 	}
 	if c.cliOpts.Config == "" {
-		return errors.New("config path cannot be empty")
+		return utils.UsageErrorf(cmd, "config path cannot be empty")
 	}
 
 	if len(c.agents) == 0 {
-		return errors.New("--agent is required")
+		return utils.UsageErrorf(cmd, "--agent is required")
 	}
 
 	for i, agent := range c.agents {
@@ -310,6 +310,7 @@ func (c *DrainOptions) removeAgentData(node *v1.Node) error {
 }
 
 func (c *DrainOptions) runDrainServerNode() error {
+	// TODO: implement server node drain logic
 	return nil
 }
 

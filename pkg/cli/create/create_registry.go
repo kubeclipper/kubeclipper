@@ -41,7 +41,10 @@ const (
   kcctl create registry --name myregistry --host 1.1.1.1:5000
 
   # Create registry with all parameters
-  kcctl create registry --name myregistry --host 1.1.1.1:5000 --scheme http --skip-tls-verify true --ca xxxxx --auth-username myuser --auth-password myassword --description 'a full info registry''
+  kcctl create registry --name myregistry --host 1.1.1.1:5000 \
+    --scheme http --skip-tls-verify true --ca xxxxx \
+    --auth-username myuser --auth-password mypassword \
+    --description 'a full info registry'
 
   Please read 'kcctl create registry -h' get more create registry flags.`
 )
@@ -76,7 +79,7 @@ func NewCreateRegistryOptions(streams options.IOStreams) *CreateRegistryOptions 
 func NewCmdCreateRegistry(streams options.IOStreams) *cobra.Command {
 	o := NewCreateRegistryOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "registry (--host) (--scheme) (--ca) (--skip-tls-versify) (--auth-username) (--auth-password) [flag]",
+		Use:                   "registry (--host) (--scheme) (--ca) (--skip-tls-verify) (--auth-username) (--auth-password) [flag]",
 		DisableFlagsInUseLine: true,
 		Short:                 "create kubeclipper registry resource",
 		Long:                  registryLongDescription,
@@ -90,7 +93,7 @@ func NewCmdCreateRegistry(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.Name, "name", "", "registry name")
 	cmd.Flags().StringVar(&o.Scheme, "scheme", o.Scheme, "registry scheme")
 	cmd.Flags().StringVar(&o.Host, "host", "", "registry host")
-	cmd.Flags().BoolVar(&o.SkipTLSVerify, "skip-tls-verify", o.SkipTLSVerify, "user email address")
+	cmd.Flags().BoolVar(&o.SkipTLSVerify, "skip-tls-verify", o.SkipTLSVerify, "skip TLS certificate verification")
 	cmd.Flags().StringVar(&o.Description, "description", "", "registry description")
 	cmd.Flags().StringVar(&o.CA, "ca", "", "registry ca")
 	cmd.Flags().StringVar(&o.Username, "auth-username", "", "registry auth username")

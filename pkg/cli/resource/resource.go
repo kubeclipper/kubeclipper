@@ -181,7 +181,7 @@ func NewCmdResourceList(o *ResourceOptions) *cobra.Command {
 	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Type, "type", o.Type, "offline resource type.")
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "offline resource name.")
-	cmd.Flags().StringVar(&o.Version, "version", o.Name, "offline resource version.")
+	cmd.Flags().StringVar(&o.Version, "version", o.Version, "offline resource version.")
 	cmd.Flags().StringVar(&o.Arch, "arch", o.Arch, "offline resource arch.")
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -255,7 +255,7 @@ func NewCmdResourceDelete(o *ResourceOptions) *cobra.Command {
 
 	o.cliOpts.AddFlags(cmd.Flags())
 	cmd.Flags().StringVar(&o.Name, "name", o.Name, "offline resource name.")
-	cmd.Flags().StringVar(&o.Version, "version", o.Name, "offline resource version.")
+	cmd.Flags().StringVar(&o.Version, "version", o.Version, "offline resource version.")
 	cmd.Flags().StringVar(&o.Arch, "arch", o.Arch, "offline resource arch.")
 
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("name", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
