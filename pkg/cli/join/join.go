@@ -148,7 +148,7 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 		Args:                  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete())
-			utils.CheckErr(o.ValidateArgs())
+			utils.CheckErr(o.ValidateArgs(cmd))
 			if !o.preCheck() {
 				return
 			}
@@ -256,23 +256,23 @@ func (c *JoinOptions) preCheck() bool {
 	return sudo.MultiNIC("ipDetect", c.sshConfig, c.IOStreams, c.parseAgent.ListIP(), c.ipDetect)
 }
 
-func (c *JoinOptions) ValidateArgs() error {
+func (c *JoinOptions) ValidateArgs(cmd *cobra.Command) error {
 	if c.sshConfig.PkFile == "" && c.sshConfig.Password == "" {
-		return fmt.Errorf("one of pkfile or password must be specify,please config it in %s", c.deployConfig.Config)
+		return utils.UsageErrorf(cmd, "one of pkfile or password must be specified, please config it in %s", c.deployConfig.Config)
 	}
 	if c.ipDetect != "" && !autodetection.CheckMethod(c.ipDetect) {
-		return fmt.Errorf("invalid ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
+		return utils.UsageErrorf(cmd, "invalid ip detect method, support [first-found,interface=xxx,cidr=xxx] now")
 	}
 	if c.nodeIPDetect != "" && !autodetection.CheckMethod(c.nodeIPDetect) {
-		return fmt.Errorf("invalid node ip detect method,suppot [first-found,interface=xxx,cidr=xxx] now")
+		return utils.UsageErrorf(cmd, "invalid node ip detect method, support [first-found,interface=xxx,cidr=xxx] now")
 	}
 	if len(c.parseAgent) == 0 {
-		return fmt.Errorf("must specified at least one agent node")
+		return utils.UsageErrorf(cmd, "must specified at least one agent node")
 	}
 	if len(c.deployConfig.ServerIPs) == 0 {
 		logger.Error("join an agent node requires specifying at least one server node")
 		logger.Info("example: kcctl join --agent 172.10.10.20 --server 172.10.10.10")
-		return fmt.Errorf("join an agent node requires specifying at least one server node")
+		return utils.UsageErrorf(cmd, "join an agent node requires specifying at least one server node")
 	}
 	return nil
 }
@@ -402,6 +402,7 @@ func (c *JoinOptions) runJoinServerNode() error {
 }
 
 func (c *JoinOptions) checkServerNode(node string) error {
+	// TODO: implement server node pre-check validation
 	return nil
 }
 

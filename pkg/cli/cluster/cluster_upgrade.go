@@ -92,6 +92,9 @@ func NewCmdClusterUpgrade(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().BoolVar(&c.Online, "online", c.Online, "The way to upgrade")
 	cmd.Flags().StringVarP(&c.LocalRegistry, "local-registry", "r", c.LocalRegistry, "image registry address")
 
+	utils.CheckErr(cmd.MarkFlagRequired("cluster-name"))
+	utils.CheckErr(cmd.MarkFlagRequired("version"))
+
 	return cmd
 }
 
@@ -108,9 +111,6 @@ func (c *ClusterUpgradeOpts) Complete() error {
 }
 
 func (c *ClusterUpgradeOpts) Validates() error {
-	if c.Version == "" {
-		return errors.New("please specify version")
-	}
 	if err := c.checkVersionFormat(); err != nil {
 		return err
 	}

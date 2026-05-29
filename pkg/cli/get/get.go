@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -237,6 +238,8 @@ func ValidArgsFunction(o *GetOptions) func(cmd *cobra.Command, args []string, to
 			return o.listCluster(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		case options.ResourceConfigMap:
 			return o.listConfigMaps(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+		case options.ResourceRegistry:
+			return o.listRegistry(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -322,6 +325,25 @@ func (l *GetOptions) listConfigMaps(toComplete string) []string {
 	for _, v := range data.Items {
 		if strings.HasPrefix(v.Name, toComplete) {
 			list = append(list, v.Name)
+		}
+	}
+	return list
+}
+
+func (l *GetOptions) listRegistry(toComplete string) []string {
+	list := make([]string, 0)
+	q := query.New()
+	q.LabelSelector = l.LabelSelector
+	q.FieldSelector = l.FieldSelector
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	data, err := l.client.ListRegistries(ctx, kc.Queries(*q))
+	if err != nil {
+		return nil
+	}
+	for i := range data.Items {
+		if strings.HasPrefix(data.Items[i].Name, toComplete) {
+			list = append(list, data.Items[i].Name)
 		}
 	}
 	return list

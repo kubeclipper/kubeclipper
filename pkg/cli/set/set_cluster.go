@@ -20,14 +20,16 @@ package set
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
@@ -87,9 +89,10 @@ func NewCmdSetCluster(streams options.IOStreams) *cobra.Command {
 		Long:                  setClusterLongDesc,
 		Example:               setClusterExample,
 		Args:                  cobra.ExactArgs(1),
+		ValidArgsFunction:     o.completeClusterNames,
 		Run: func(cmd *cobra.Command, args []string) {
 			utils.CheckErr(o.Complete(cmd, args))
-			utils.CheckErr(o.Validate())
+			utils.CheckErr(o.Validate(cmd))
 			utils.CheckErr(o.Run())
 		},
 	}
@@ -123,35 +126,60 @@ func (o *SetClusterOptions) Complete(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func (o *SetClusterOptions) Validate() error {
-	if !o.changedExternalIP && !o.changedExternalDomain && !o.changedExternalPort && !o.changedExternalDomainPort {
-		return errors.New("at least one flag must be specified, use --external-ip, --external-domain, --external-port, or --external-domain-port")
+func (o *SetClusterOptions) Validate(cmd *cobra.Command) error {
+	if !o.changedExternalIP && !o.changedExternalDomain &&
+		!o.changedExternalPort && !o.changedExternalDomainPort {
+		return utils.UsageErrorf(cmd,
+			"at least one flag must be specified, use --external-ip, --external-domain, --external-port, or --external-domain-port")
 	}
 
-	if o.changedExternalIP && o.ExternalIP != "" {
-		if !netutil.IsValidIP(o.ExternalIP) {
-			return fmt.Errorf("invalid external IP: %s", o.ExternalIP)
-		}
+	if err := o.validateExternalIP(); err != nil {
+		return err
+	}
+	if err := o.validateExternalDomain(); err != nil {
+		return err
+	}
+	if err := o.validateExternalPort(); err != nil {
+		return err
+	}
+	if err := o.validateExternalDomainPort(); err != nil {
+		return err
 	}
 
+	return nil
+}
+
+func (o *SetClusterOptions) validateExternalIP() error {
+	if o.changedExternalIP && o.ExternalIP != "" && !netutil.IsValidIP(o.ExternalIP) {
+		return fmt.Errorf("invalid external IP: %s", o.ExternalIP)
+	}
+	return nil
+}
+
+func (o *SetClusterOptions) validateExternalDomain() error {
 	if o.changedExternalDomain && o.ExternalDomain != "" {
 		if err := netutil.IsValidDomain(o.ExternalDomain); err != nil {
 			return fmt.Errorf("invalid external domain: %s: %s", o.ExternalDomain, err)
 		}
 	}
+	return nil
+}
 
+func (o *SetClusterOptions) validateExternalPort() error {
 	if o.changedExternalPort && o.ExternalPort != "" {
 		if err := netutil.IsValidPortStr(o.ExternalPort); err != nil {
 			return fmt.Errorf("invalid external port: %s", err)
 		}
 	}
+	return nil
+}
 
+func (o *SetClusterOptions) validateExternalDomainPort() error {
 	if o.changedExternalDomainPort && o.ExternalDomainPort != "" {
 		if err := netutil.IsValidPortStr(o.ExternalDomainPort); err != nil {
 			return fmt.Errorf("invalid external domain port: %s", err)
 		}
 	}
-
 	return nil
 }
 
@@ -207,4 +235,36 @@ func (o *SetClusterOptions) Run() error {
 
 	fmt.Fprintf(o.Out, "cluster %q updated\n", o.ClusterName)
 	return nil
+}
+
+func (o *SetClusterOptions) completeClusterNames(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) > 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	if err := o.CliOpts.Complete(); err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	client, err := kc.FromConfig(o.CliOpts.ToRawConfig())
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	return o.listCluster(client, toComplete), cobra.ShellCompDirectiveNoFileComp
+}
+
+func (*SetClusterOptions) listCluster(client *kc.Client, toComplete string) []string {
+	list := make([]string, 0)
+	q := query.New()
+	q.Limit = 100
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	data, err := client.ListClusters(ctx, kc.Queries(*q))
+	if err != nil {
+		return nil
+	}
+	for i := range data.Items {
+		if strings.HasPrefix(data.Items[i].Name, toComplete) {
+			list = append(list, data.Items[i].Name)
+		}
+	}
+	return list
 }

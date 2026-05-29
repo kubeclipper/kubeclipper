@@ -81,7 +81,6 @@ func NewCmdVersion(streams options.IOStreams) *cobra.Command {
 }
 
 func (v *VersionOptions) Complete(opts *options.CliOptions) error {
-	// ignore error when get version
 	if err := opts.Complete(); err != nil {
 		return nil
 	}
@@ -102,7 +101,7 @@ func (v *VersionOptions) RunVersion() error {
 	if v.client != nil {
 		serverVersion, err = v.client.Version(context.TODO())
 		if err != nil {
-			_, _ = v.ErrOut.Write([]byte("get server version error\n"))
+			_, _ = fmt.Fprintf(v.ErrOut, "get server version error: %v\n", err)
 		}
 	}
 	switch v.output {
