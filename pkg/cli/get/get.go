@@ -68,7 +68,7 @@ const (
   kcctl get user --field-selector .metadata.name=foo
 
   # List other resource
-  kcctl get [role,cluster,node,operation]
+  kcctl get [role,cluster,node]
 `
 )
 
@@ -85,7 +85,7 @@ type GetOptions struct {
 }
 
 var (
-	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap, options.ResourceRegistry, options.ResourceOperation)
+	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap, options.ResourceRegistry)
 )
 
 func NewGetOptions(streams options.IOStreams) *GetOptions {
@@ -127,6 +127,9 @@ func (l *GetOptions) ValidateArgs(cmd *cobra.Command, args []string) error {
 	args = args[1:]
 	if len(args) > 0 {
 		l.name = args[0]
+	}
+	if l.resource == options.ResourceOperation {
+		return fmt.Errorf("use 'kcctl operation' command instead to manage operations, see 'kcctl operation -h' for details")
 	}
 	if !allowedResource.Has(l.resource) {
 		return utils.UsageErrorf(cmd, "unsupported resource type,support %v now", allowedResource.List())
@@ -174,8 +177,7 @@ func (l *GetOptions) list() error {
 		result, err = l.client.ListConfigMaps(context.TODO(), kc.Queries(*q))
 	case options.ResourceRegistry:
 		result, err = l.client.ListRegistries(context.TODO(), kc.Queries(*q))
-	case options.ResourceOperation:
-		result, err = l.client.ListOperation(context.TODO(), kc.Queries(*q))
+
 	default:
 		return fmt.Errorf("unsupported resource,support %s now", allowedResource.List())
 	}

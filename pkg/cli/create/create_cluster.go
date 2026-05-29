@@ -493,7 +493,7 @@ func (l *CreateClusterOptions) transformNodeIP() error {
 func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	var annotations = map[string]string{}
 	if l.Offline {
-		annotations[common.AnnotationOffline] = ""
+		annotations[common.AnnotationOffline] = "true"
 	}
 	if l.OnlyInstallKubernetesComp {
 		annotations[common.AnnotationOnlyInstallKubernetesComp] = "true"

@@ -164,7 +164,9 @@ func (l *DeleteOptions) RunDelete() error {
 	default:
 		return fmt.Errorf("unsupported resource")
 	}
-	return nil
+
+	_, err = fmt.Fprintf(l.IOStreams.Out, "%s %s deleted\n", l.resource, l.name)
+	return err
 }
 
 func (l *DeleteOptions) precheck() bool {
@@ -190,6 +192,8 @@ func ValidArgsFunction(o *DeleteOptions) func(cmd *cobra.Command, args []string,
 			return o.listRole(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		case options.ResourceCluster:
 			return o.listCluster(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+		case options.ResourceRegistry:
+			return o.listRegistry(toComplete), cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -218,6 +222,21 @@ func (l *DeleteOptions) listUser(toComplete string) []string {
 		return nil
 	}
 	for _, v := range users.Items {
+		if strings.HasPrefix(v.Name, toComplete) {
+			list = append(list, v.Name)
+		}
+	}
+	return list
+}
+
+func (l *DeleteOptions) listRegistry(toComplete string) []string {
+	list := make([]string, 0)
+	q := query.New()
+	data, err := l.Client.ListRegistries(context.TODO(), kc.Queries(*q))
+	if err != nil {
+		return nil
+	}
+	for _, v := range data.Items {
 		if strings.HasPrefix(v.Name, toComplete) {
 			list = append(list, v.Name)
 		}

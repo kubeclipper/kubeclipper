@@ -163,12 +163,48 @@ func (c *DrainOptions) ValidateArgs() error {
 		return errors.New("--agent is required")
 	}
 
-	for _, agent := range c.agents {
-		if !isAgentID(agent) {
-			return fmt.Errorf("--agent need a node id, %s is invalid", agent)
+	for i, agent := range c.agents {
+		if isAgentID(agent) {
+			continue
 		}
+		id, err := c.resolveNodeID(agent)
+		if err != nil {
+			return err
+		}
+		c.agents[i] = id
 	}
 	return nil
+}
+
+func (c *DrainOptions) resolveNodeID(ip string) (string, error) {
+	q := query.New()
+	nodes, err := c.client.ListNodes(context.TODO(), kc.Queries(*q))
+	if err != nil {
+		return "", fmt.Errorf("failed to list nodes: %w", err)
+	}
+	var matched []string
+	for _, node := range nodes.Items {
+		switch {
+		case node.Status.Ipv4DefaultIP == ip:
+			matched = append(matched, node.Name)
+		case node.Status.NodeIpv4DefaultIP == ip:
+			matched = append(matched, node.Name)
+		default:
+			for _, addr := range node.Status.Addresses {
+				if addr.Address == ip {
+					matched = append(matched, node.Name)
+					break
+				}
+			}
+		}
+	}
+	if len(matched) == 0 {
+		return "", fmt.Errorf("node with ip %s not found, please use node id instead", ip)
+	}
+	if len(matched) > 1 {
+		return "", fmt.Errorf("ip %s matches multiple nodes, please use node id instead", ip)
+	}
+	return matched[0], nil
 }
 
 func isAgentID(id string) bool {

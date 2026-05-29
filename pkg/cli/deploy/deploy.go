@@ -384,12 +384,16 @@ func (d *DeployOptions) precheckTimeLag() bool {
 			defer wg.Done()
 			ret, err := sshutils.SSHCmd(d.deployConfig.SSHConfig, host, "date +%s")
 			if err != nil {
-				logger.Fatal("get timestamp failed", err)
+				logger.Errorf("get timestamp from %s failed: %s", host, err.Error())
+				nodeErrChan <- struct{}{}
+				return
 			}
 			output := ret.StdoutToString("")
 			ts, err := strconv.ParseInt(output, 10, 64)
 			if err != nil {
-				logger.Fatal("get timestamp failed", err)
+				logger.Errorf("parse timestamp from %s failed: %s", host, err.Error())
+				nodeErrChan <- struct{}{}
+				return
 			}
 			t := time.Unix(ts, 0)
 			diff := t.Sub(now).Seconds()
@@ -952,6 +956,21 @@ func (d *DeployOptions) sendDefaultAdminConf() error {
 	return err
 }
 
+func createOrUpdateConfigMap(client *kc.Client, cm *v1.ConfigMap) {
+	existing, err := client.DescribeConfigMap(context.TODO(), cm.Name)
+	if err == nil && len(existing.Items) > 0 {
+		existingCM := existing.Items[0]
+		existingCM.Data = cm.Data
+		if _, err = client.UpdateConfigMap(context.TODO(), &existingCM); err != nil {
+			logger.Fatalf("update configmap %s failed: %v", cm.Name, err)
+		}
+		return
+	}
+	if _, err = client.CreateConfigMap(context.TODO(), cm); err != nil {
+		logger.Fatalf("create configmap %s failed: %v", cm.Name, err)
+	}
+}
+
 func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
 	dcData, err := yaml.Marshal(deployConfig)
 	if err != nil {
@@ -969,22 +988,7 @@ func uploadDeployConfig(client *kc.Client, deployConfig *options.DeployConfig) {
 			constatns.DeployConfigConfigMapKey: string(dcData),
 		},
 	}
-	// Check if configmap already exists (e.g., from a previous deploy attempt)
-	existing, err := client.DescribeConfigMap(context.TODO(), constatns.DeployConfigConfigMapName)
-	if err == nil && len(existing.Items) > 0 {
-		cm := existing.Items[0]
-		if cm.Data == nil {
-			cm.Data = make(map[string]string)
-		}
-		cm.Data[constatns.DeployConfigConfigMapKey] = string(dcData)
-		if _, err = client.UpdateConfigMap(context.TODO(), &cm); err != nil {
-			logger.Fatalf("update deploy-config failed: %v", err)
-		}
-		return
-	}
-	if _, err = client.CreateConfigMap(context.TODO(), dc); err != nil {
-		logger.Fatalf("create deploy-config failed: %v", err)
-	}
+	createOrUpdateConfigMap(client, dc)
 }
 
 func uploadCerts(client *kc.Client) {
@@ -1010,10 +1014,7 @@ func uploadCerts(client *kc.Client) {
 			"ca.key": base64.StdEncoding.EncodeToString(cakey),
 		},
 	}
-	_, err = client.CreateConfigMap(context.TODO(), cacm)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	createOrUpdateConfigMap(client, cacm)
 
 	etcdPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultEtcdPKIPath)
 	etcdcrt, err := os.ReadFile(fmt.Sprintf("%s/etcd.crt", etcdPath))
@@ -1067,10 +1068,7 @@ func uploadCerts(client *kc.Client) {
 			"kube-etcd-healthcheck-client.key": base64.StdEncoding.EncodeToString(etcdhealthcheckkey),
 		},
 	}
-	_, err = client.CreateConfigMap(context.TODO(), etcdcm)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	createOrUpdateConfigMap(client, etcdcm)
 
 	natsPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultNatsPKIPath)
 	natsservercert, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.crt", natsPath))
@@ -1104,10 +1102,7 @@ func uploadCerts(client *kc.Client) {
 			"kc-server-nats-client.key": base64.StdEncoding.EncodeToString(natsclientkey),
 		},
 	}
-	_, err = client.CreateConfigMap(context.TODO(), natscm)
-	if err != nil {
-		logger.Fatal(err)
-	}
+	createOrUpdateConfigMap(client, natscm)
 }
 
 func caList() []certutils.Config {
