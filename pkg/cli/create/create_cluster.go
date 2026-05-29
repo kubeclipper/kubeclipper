@@ -54,6 +54,7 @@ import (
 )
 
 const (
+	annotationValTrue      = "true"
 	clusterLongDescription = `
   Create cluster using command line`
 	createClusterExample = `
@@ -493,10 +494,10 @@ func (l *CreateClusterOptions) transformNodeIP() error {
 func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	var annotations = map[string]string{}
 	if l.Offline {
-		annotations[common.AnnotationOffline] = "true"
+		annotations[common.AnnotationOffline] = annotationValTrue
 	}
 	if l.OnlyInstallKubernetesComp {
-		annotations[common.AnnotationOnlyInstallKubernetesComp] = "true"
+		annotations[common.AnnotationOnlyInstallKubernetesComp] = annotationValTrue
 	}
 
 	if l.KubeadmInitIgnorePreflightErrors != "" {

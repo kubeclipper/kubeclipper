@@ -183,16 +183,16 @@ func (c *DrainOptions) resolveNodeID(ip string) (string, error) {
 		return "", fmt.Errorf("failed to list nodes: %w", err)
 	}
 	var matched []string
-	for _, node := range nodes.Items {
+	for i := range nodes.Items {
 		switch {
-		case node.Status.Ipv4DefaultIP == ip:
-			matched = append(matched, node.Name)
-		case node.Status.NodeIpv4DefaultIP == ip:
-			matched = append(matched, node.Name)
+		case nodes.Items[i].Status.Ipv4DefaultIP == ip:
+			matched = append(matched, nodes.Items[i].Name)
+		case nodes.Items[i].Status.NodeIpv4DefaultIP == ip:
+			matched = append(matched, nodes.Items[i].Name)
 		default:
-			for _, addr := range node.Status.Addresses {
+			for _, addr := range nodes.Items[i].Status.Addresses {
 				if addr.Address == ip {
-					matched = append(matched, node.Name)
+					matched = append(matched, nodes.Items[i].Name)
 					break
 				}
 			}

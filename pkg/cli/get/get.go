@@ -85,7 +85,11 @@ type GetOptions struct {
 }
 
 var (
-	allowedResource = sets.NewString(options.ResourceUser, options.ResourceRole, options.ResourceNode, options.ResourceCluster, options.ResourceConfigMap, options.ResourceRegistry)
+	allowedResource = sets.NewString(
+		options.ResourceUser, options.ResourceRole,
+		options.ResourceNode, options.ResourceCluster,
+		options.ResourceConfigMap, options.ResourceRegistry,
+	)
 )
 
 func NewGetOptions(streams options.IOStreams) *GetOptions {

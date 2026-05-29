@@ -165,7 +165,7 @@ func (l *DeleteOptions) RunDelete() error {
 		return fmt.Errorf("unsupported resource")
 	}
 
-	_, err = fmt.Fprintf(l.IOStreams.Out, "%s %s deleted\n", l.resource, l.name)
+	_, err = fmt.Fprintf(l.Out, "%s %s deleted\n", l.resource, l.name)
 	return err
 }
 
@@ -236,9 +236,9 @@ func (l *DeleteOptions) listRegistry(toComplete string) []string {
 	if err != nil {
 		return nil
 	}
-	for _, v := range data.Items {
-		if strings.HasPrefix(v.Name, toComplete) {
-			list = append(list, v.Name)
+	for i := range data.Items {
+		if strings.HasPrefix(data.Items[i].Name, toComplete) {
+			list = append(list, data.Items[i].Name)
 		}
 	}
 	return list
