@@ -88,6 +88,14 @@ project of Cloud Native Computing Foundation (CNCF).
   </ul>
 </details>
 
+## 支持的版本
+
+| Kubernetes | Calico | Containerd |
+|------------|--------|------------|
+| v1.34.2 | v3.29.6 | v1.7.29 |
+| v1.35.0 | v3.29.6 | v1.7.29 |
+| v1.36.1 | v3.31.5 | v2.2.4 |
+
 ## Roadmap & Todo list
 
 - 🚀 集群安装优化
