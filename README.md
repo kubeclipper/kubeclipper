@@ -50,9 +50,9 @@ management, application store).see
 
 ![logo](https://landscape.cncf.io/images/cncf-landscape-horizontal-color.svg)
 
-KubeClipper is a sandbox and  
-[landscape](https://landscape.cncf.io/?item=platform--certified-kubernetes-installer--kubeclipper)   
-project of Cloud Native Computing Foundation (CNCF).
+KubeClipper is a sandbox and [landscape](https://landscape.cncf.io/?item=platform--certified-kubernetes-installer--kubeclipper) project of Cloud Native Computing Foundation (CNCF).
+
+KubeClipper has passed the [CNCF Kubernetes Conformance Certification](https://www.cncf.io/certification/software-conformance/).
 
 ## Features
 
@@ -94,7 +94,7 @@ project of Cloud Native Computing Foundation (CNCF).
 
 | Kubernetes | Calico | Containerd |
 |------------|--------|------------|
-| v1.36.1 | v3.31.5 | v2.2.4 |
+| v1.36.1 (default) | v3.31.5 | v2.2.4 |
 | v1.35.0 | v3.29.6 | v1.7.29 |
 | v1.34.2 | v3.29.6 | v1.7.29 |
 
