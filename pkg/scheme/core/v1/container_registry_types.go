@@ -46,6 +46,17 @@ type RegistrySpec struct {
 	RegistryAuth *RegistryAuth `json:"auth,omitempty"`
 }
 
+// RegistryAuth holds credentials for authenticating with a container registry.
+//
+// TODO: registry.configs.*.auth is deprecated since containerd 2.1. The Transfer Service
+// (default since containerd 2.1) does not support inline auth in config.toml and will
+// automatically fall back to Local Pull Mode with a warning. hosts.toml has no auth field,
+// and containerd recommends using Kubernetes ImagePullSecrets instead. There is no removal
+// timeline yet — containerd says it won't be removed "until a suitable secret management
+// alternative is available as a plugin". Once we migrate auth to the Kubernetes layer
+// (ImagePullSecrets), this struct and all code paths that write registry.configs.*.auth
+// should be removed.
+// Ref: https://github.com/containerd/containerd/blob/main/docs/cri/registry.md
 type RegistryAuth struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
