@@ -436,11 +436,18 @@ func (d *DeployOptions) precheckTimeLag() bool {
 }
 
 func (d *DeployOptions) precheckPorts() bool {
+	var (
+		missingToolHosts = make(map[string]bool)
+		mu               sync.Mutex
+	)
 	toolCheck := func(sshConfig *sshutils.SSH, host string) error {
 		_, err := sshutils.SSHCmdWithSudo(sshConfig, host, "which ss")
 		if err != nil {
 			_, err = sshutils.SSHCmdWithSudo(sshConfig, host, "which netstat")
 			if err != nil {
+				mu.Lock()
+				missingToolHosts[host] = true
+				mu.Unlock()
 				return fmt.Errorf("port check tool (ss or netstat) not found on %s, "+
 					"skip port availability check, deployment may fail if port is occupied", host)
 			}
@@ -460,16 +467,36 @@ func (d *DeployOptions) precheckPorts() bool {
 		{d.deployConfig.EtcdConfig.MetricsPort, "kc-etcd-metrics"},
 		{d.deployConfig.ServerPort, "kc-server"},
 		{d.deployConfig.StaticServerPort, "kc-server-static"},
-		{d.deployConfig.MQ.Port, "kc-mq"},
-		{d.deployConfig.MQ.ClusterPort, "kc-mq-cluster"},
 		{d.deployConfig.ConsolePort, "kc-console"},
+	}
+	if !d.deployConfig.MQ.External {
+		serverPorts = append(serverPorts,
+			struct {
+				port int
+				name string
+			}{d.deployConfig.MQ.Port, "kc-mq"},
+			struct {
+				port int
+				name string
+			}{d.deployConfig.MQ.ClusterPort, "kc-mq-cluster"},
+		)
 	}
 
 	for _, p := range serverPorts {
 		if !d.precheckService(
 			fmt.Sprintf("PORT-%d(%s)", p.port, p.name),
 			d.deployConfig.ServerIPs,
-			precheckPortFunc(p.port, p.name),
+			func(port int, svc string) precheckFunc {
+				return func(sshConfig *sshutils.SSH, host string) error {
+					mu.Lock()
+					missing := missingToolHosts[host]
+					mu.Unlock()
+					if missing {
+						return nil
+					}
+					return precheckPortFunc(port, svc)(sshConfig, host)
+				}
+			}(p.port, p.name),
 		) {
 			return false
 		}
