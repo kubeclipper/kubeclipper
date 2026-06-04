@@ -440,7 +440,8 @@ func (d *DeployOptions) precheckPorts() bool {
 			return fmt.Errorf("check port tool on %s failed: %w", host, err)
 		}
 		if ret.StdoutToString("") == "" {
-			return fmt.Errorf("port check tool (ss or netstat) not found on %s, skip port availability check, deployment may fail if port is occupied", host)
+			return fmt.Errorf("port check tool (ss or netstat) not found on %s, "+
+				"skip port availability check, deployment may fail if port is occupied", host)
 		}
 		return nil
 	}
