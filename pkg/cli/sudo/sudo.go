@@ -105,39 +105,24 @@ func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 		logger.Infof("============>%s PRECHECK OK!", name)
 		return true
 	}
-	var multiNICNodes []string
-	var mu sync.Mutex
-	var firstErr error
+	hasMultiNIC := make([]bool, len(allNodes))
+	errs := make([]error, len(allNodes))
 	wg := sync.WaitGroup{}
-	for _, node := range allNodes {
+	for i, node := range allNodes {
 		wg.Add(1)
-		go func(host string) {
+		go func(idx int, host string) {
 			defer wg.Done()
 			result, err := sshutils.SSHCmd(sshConfig, host, `ip a|grep ": "|awk {'print $2'}|sed 's/://'`)
 			if err != nil {
 				if strings.Contains(err.Error(), "handshake failed: ssh: unable to authenticate, attempted methods [none password]") {
-					authErr := fmt.Errorf("passwd or user error while ssh '%s@%s',please try again", sshConfig.User, host)
-					mu.Lock()
-					if firstErr == nil {
-						firstErr = authErr
-					}
-					mu.Unlock()
-					return
+					errs[idx] = fmt.Errorf("passwd or user error while ssh '%s@%s',please try again", sshConfig.User, host)
+				} else {
+					errs[idx] = err
 				}
-				mu.Lock()
-				if firstErr == nil {
-					firstErr = err
-				}
-				mu.Unlock()
 				return
 			}
 			if result.ExitCode != 0 {
-				cmdErr := fmt.Errorf("%s stderr:%s", result.Short(), result.Stderr)
-				mu.Lock()
-				if firstErr == nil {
-					firstErr = cmdErr
-				}
-				mu.Unlock()
+				errs[idx] = fmt.Errorf("%s stderr:%s", result.Short(), result.Stderr)
 				return
 			}
 			ifaces := strings.Split(result.Stdout, "\n")
@@ -146,13 +131,19 @@ func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 			})
 			rifcae := filterLogicIface(ifaces)
 			if len(rifcae) > 1 {
-				mu.Lock()
-				multiNICNodes = append(multiNICNodes, host)
-				mu.Unlock()
+				hasMultiNIC[idx] = true
 			}
-		}(node)
+		}(i, node)
 	}
 	wg.Wait()
+
+	var firstErr error
+	for _, err := range errs {
+		if err != nil {
+			firstErr = err
+			break
+		}
+	}
 
 	if firstErr != nil {
 		logger.Error(firstErr)
@@ -165,6 +156,12 @@ func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 		return utils.AskForConfirmation()
 	}
 
+	var multiNICNodes []string
+	for i, host := range allNodes {
+		if hasMultiNIC[i] {
+			multiNICNodes = append(multiNICNodes, host)
+		}
+	}
 	if len(multiNICNodes) == 0 {
 		logger.Infof("============>%s PRECHECK OK!", name)
 		return true
@@ -179,9 +176,9 @@ func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 		return true
 	}
 	logger.Errorf("===========>%s PRECHECK FAILED!", name)
-	_, _ = streams.Out.Write([]byte("node has multi nic,and --ip-detect flag not specified,default ip " +
-		"detect method is 'first-found',which maybe chose a wrong one,you can add --ip-detect flag to specify it." + "\n"))
-	_, _ = streams.Out.Write([]byte("Ignore this error, still exec cmd? Please input (yes/no)"))
+	fmt.Fprintln(streams.Out, "node has multi nic,and --ip-detect flag not specified,default ip "+
+		"detect method is 'first-found',which maybe chose a wrong one,you can add --ip-detect flag to specify it.")
+	fmt.Fprint(streams.Out, "Ignore this error, still exec cmd? Please input (yes/no)")
 	return utils.AskForConfirmation()
 }
 

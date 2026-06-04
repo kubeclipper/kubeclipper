@@ -86,11 +86,11 @@ func TestDeployOptions_getKcConsoleTemplateContent(t *testing.T) {
 
 func TestDeployOptions_nodeRole(t *testing.T) {
 	tests := []struct {
-		name       string
-		serverIPs  []string
-		agentIPs   []string
-		queryIP    string
-		wantRole   string
+		name      string
+		serverIPs []string
+		agentIPs  []string
+		queryIP   string
+		wantRole  string
 	}{
 		{
 			name:      "server only",

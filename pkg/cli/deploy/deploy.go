@@ -34,6 +34,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -147,20 +148,8 @@ func NewDeployOptions(streams options.IOStreams) *DeployOptions {
 }
 
 func (d *DeployOptions) nodeRole(ip string) string {
-	isServer := false
-	isAgent := false
-	for _, s := range d.deployConfig.ServerIPs {
-		if s == ip {
-			isServer = true
-			break
-		}
-	}
-	for _, a := range d.deployConfig.Agents.ListIP() {
-		if a == ip {
-			isAgent = true
-			break
-		}
-	}
+	isServer := slices.Contains(d.deployConfig.ServerIPs, ip)
+	_, isAgent := d.deployConfig.Agents[ip]
 	switch {
 	case isServer && isAgent:
 		return "server+agent"
@@ -386,43 +375,53 @@ func generateCommonPreCheckFunc(name string) precheckFunc {
 	}
 }
 
-type nodeError struct {
-	host string
-	err  error
-}
-
 func (d *DeployOptions) precheckService(name string, nodes []string, fn precheckFunc) bool {
 	logger.Infof("============>%s PRECHECK ...", name)
-	var errs []nodeError
-	var mu sync.Mutex
+	errs := make([]error, len(nodes))
 	wg := sync.WaitGroup{}
-	for _, node := range nodes {
+	for i, node := range nodes {
 		wg.Add(1)
-		go func(host string) {
+		go func(idx int, host string) {
 			defer wg.Done()
 			if err := fn(d.deployConfig.SSHConfig, host); err != nil {
-				mu.Lock()
-				errs = append(errs, nodeError{host: host, err: err})
-				mu.Unlock()
+				errs[idx] = err
 			}
-		}(node)
+		}(i, node)
 	}
 	wg.Wait()
-	if len(errs) == 0 {
+
+	hasError := false
+	for _, err := range errs {
+		if err != nil {
+			hasError = true
+			break
+		}
+	}
+	if !hasError {
 		logger.Infof("============>%s PRECHECK OK!", name)
 		return true
 	}
+
 	groups := make(map[string][]string)
-	for _, ne := range errs {
-		msg := ne.err.Error()
-		role := d.nodeRole(ne.host)
-		ref := fmt.Sprintf("[%s@%s]", role, ne.host)
+	var msgOrder []string
+	for i, err := range errs {
+		if err == nil {
+			continue
+		}
+		msg := err.Error()
+		host := nodes[i]
+		role := d.nodeRole(host)
+		ref := fmt.Sprintf("[%s@%s]", role, host)
 		if role == "" {
-			ref = fmt.Sprintf("[%s]", ne.host)
+			ref = fmt.Sprintf("[%s]", host)
+		}
+		if _, exists := groups[msg]; !exists {
+			msgOrder = append(msgOrder, msg)
 		}
 		groups[msg] = append(groups[msg], ref)
 	}
-	for msg, refs := range groups {
+	for _, msg := range msgOrder {
+		refs := groups[msg]
 		logger.Warnf("%s:", msg)
 		for _, ref := range refs {
 			logger.Warnf("  - %s", ref)
@@ -436,64 +435,68 @@ func (d *DeployOptions) precheckService(name string, nodes []string, fn precheck
 	return utils.AskForConfirmation()
 }
 
-type timeLagError struct {
-	host string
-	lag  float64
-}
-
 func (d *DeployOptions) precheckTimeLag() bool {
 	logger.Infof("============>TIME-LAG PRECHECK ...")
-	var lags []timeLagError
-	var mu sync.Mutex
+	type timeLagEntry struct {
+		lag float64
+		ok  bool
+	}
+	entries := make([]timeLagEntry, len(d.allNodes))
 	wg := sync.WaitGroup{}
 	now := time.Now()
 	logger.Infof("BaseLine Time: %s", now.Format(time.RFC3339))
-	for _, node := range d.allNodes {
+	for i, node := range d.allNodes {
 		wg.Add(1)
-		go func(host string) {
+		go func(idx int, host string) {
 			defer wg.Done()
 			ret, err := sshutils.SSHCmd(d.deployConfig.SSHConfig, host, "date +%s")
 			if err != nil {
 				logger.Errorf("get timestamp from %s failed: %s", host, err.Error())
-				mu.Lock()
-				lags = append(lags, timeLagError{host: host})
-				mu.Unlock()
+				entries[idx] = timeLagEntry{ok: true}
 				return
 			}
 			output := ret.StdoutToString("")
 			ts, err := strconv.ParseInt(output, 10, 64)
 			if err != nil {
 				logger.Errorf("parse timestamp from %s failed: %s", host, err.Error())
-				mu.Lock()
-				lags = append(lags, timeLagError{host: host})
-				mu.Unlock()
+				entries[idx] = timeLagEntry{ok: true}
 				return
 			}
 			t := time.Unix(ts, 0)
 			diff := t.Sub(now).Seconds()
 			logger.Infof("[%s] %v seconds", host, diff)
 			if math.Abs(diff) > float64(5) {
-				mu.Lock()
-				lags = append(lags, timeLagError{host: host, lag: diff})
-				mu.Unlock()
+				entries[idx] = timeLagEntry{lag: diff, ok: true}
 			}
-		}(node)
+		}(i, node)
 	}
 	wg.Wait()
-	if len(lags) == 0 {
+
+	hasLag := false
+	for _, e := range entries {
+		if e.ok {
+			hasLag = true
+			break
+		}
+	}
+	if !hasLag {
 		logger.Infof("all nodes time lag less then 5 seconds")
 		logger.Infof("============>TIME-LAG PRECHECK OK!")
 		return true
 	}
 	logger.Warnf("time lag exceeds 5s threshold:")
-	for _, lag := range lags {
-		role := d.nodeRole(lag.host)
-		ref := fmt.Sprintf("[%s@%s]", role, lag.host)
-		if role == "" {
-			ref = fmt.Sprintf("[%s]", lag.host)
+	for i, e := range entries {
+		if !e.ok {
+			continue
 		}
-		if lag.lag != 0 {
-			logger.Warnf("  - %s %.1fs", ref, lag.lag)
+		host := d.allNodes[i]
+		role := d.nodeRole(host)
+		ref := fmt.Sprintf("[%s@%s]", role, host)
+		if role == "" {
+			ref = fmt.Sprintf("[%s]", host)
+		}
+		if e.lag != 0 {
+			logger.Warnf("  - %s %.1fs", ref, e.lag)
 		} else {
 			logger.Warnf("  - %s (failed to get time)", ref)
 		}
