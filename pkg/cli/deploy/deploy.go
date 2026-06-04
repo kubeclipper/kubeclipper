@@ -327,6 +327,20 @@ var (
 	}
 )
 
+func precheckPortFunc(port int, serviceName string) precheckFunc {
+	return func(sshConfig *sshutils.SSH, host string) error {
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host,
+			"command -v ss >/dev/null 2>&1 && ss -tlnp || (command -v netstat >/dev/null 2>&1 && netstat -tlnp)")
+		if err != nil {
+			return fmt.Errorf("check port %d on %s failed: %w", port, host, err)
+		}
+		if strings.Contains(ret.StdoutToString(""), fmt.Sprintf(":%d ", port)) {
+			return fmt.Errorf("port %d is already in use on %s, required by %s", port, host, serviceName)
+		}
+		return nil
+	}
+}
+
 func generateCommonPreCheckFunc(name string) precheckFunc {
 	return func(sshConfig *sshutils.SSH, host string) error {
 		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, fmt.Sprintf("systemctl --all --type service | grep %s | wc -l", name))
@@ -417,6 +431,49 @@ func (d *DeployOptions) precheckTimeLag() bool {
 	return utils.AskForConfirmation()
 }
 
+func (d *DeployOptions) precheckPorts() bool {
+	// Check if port detection tools are available on all server nodes.
+	toolCheck := func(sshConfig *sshutils.SSH, host string) error {
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host,
+			"command -v ss >/dev/null 2>&1 && echo ss || (command -v netstat >/dev/null 2>&1 && echo netstat)")
+		if err != nil {
+			return fmt.Errorf("check port tool on %s failed: %w", host, err)
+		}
+		if ret.StdoutToString("") == "" {
+			return fmt.Errorf("port check tool (ss or netstat) not found on %s, skip port availability check, deployment may fail if port is occupied", host)
+		}
+		return nil
+	}
+	if !d.precheckService("PORT-TOOL", d.deployConfig.ServerIPs, toolCheck) {
+		return false
+	}
+
+	serverPorts := []struct {
+		port int
+		name string
+	}{
+		{d.deployConfig.EtcdConfig.ClientPort, "kc-etcd-client"},
+		{d.deployConfig.EtcdConfig.PeerPort, "kc-etcd-peer"},
+		{d.deployConfig.EtcdConfig.MetricsPort, "kc-etcd-metrics"},
+		{d.deployConfig.ServerPort, "kc-server"},
+		{d.deployConfig.StaticServerPort, "kc-server-static"},
+		{d.deployConfig.MQ.Port, "kc-mq"},
+		{d.deployConfig.MQ.ClusterPort, "kc-mq-cluster"},
+		{d.deployConfig.ConsolePort, "kc-console"},
+	}
+
+	for _, p := range serverPorts {
+		if !d.precheckService(
+			fmt.Sprintf("PORT-%d(%s)", p.port, p.name),
+			d.deployConfig.ServerIPs,
+			precheckPortFunc(p.port, p.name),
+		) {
+			return false
+		}
+	}
+	return true
+}
+
 func (d *DeployOptions) preCheck() bool {
 	if !d.precheckService("kc-etcd", d.deployConfig.ServerIPs, precheckKcEtcdFunc) {
 		return false
@@ -428,6 +485,9 @@ func (d *DeployOptions) preCheck() bool {
 		return false
 	}
 	if !d.precheckTimeLag() {
+		return false
+	}
+	if !d.precheckPorts() {
 		return false
 	}
 	if !d.precheckService("NTP", d.allNodes, precheckNtpFunc) {
