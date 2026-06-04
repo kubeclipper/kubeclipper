@@ -329,12 +329,16 @@ var (
 
 func precheckPortFunc(port int, serviceName string) precheckFunc {
 	return func(sshConfig *sshutils.SSH, host string) error {
-		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host,
-			"command -v ss >/dev/null 2>&1 && ss -tlnp || (command -v netstat >/dev/null 2>&1 && netstat -tlnp)")
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "ss -tlnp")
 		if err != nil {
-			return fmt.Errorf("check port %d on %s failed: %w", port, host, err)
+			ret, err = sshutils.SSHCmdWithSudo(sshConfig, host, "netstat -tlnp")
+			if err != nil {
+				return fmt.Errorf("check port %d on %s failed: %w", port, host, err)
+			}
 		}
-		if strings.Contains(ret.StdoutToString(""), fmt.Sprintf(":%d ", port)) {
+		output := ret.StdoutToString("")
+		if strings.Contains(output, fmt.Sprintf(":%d ", port)) ||
+			strings.Contains(output, fmt.Sprintf(":%d\t", port)) {
 			return fmt.Errorf("port %d is already in use on %s, required by %s", port, host, serviceName)
 		}
 		return nil
@@ -432,21 +436,25 @@ func (d *DeployOptions) precheckTimeLag() bool {
 }
 
 func (d *DeployOptions) precheckPorts() bool {
-	// Check if port detection tools are available on all server nodes.
+	var hasTools bool
 	toolCheck := func(sshConfig *sshutils.SSH, host string) error {
-		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host,
-			"command -v ss >/dev/null 2>&1 && echo ss || (command -v netstat >/dev/null 2>&1 && echo netstat)")
+		_, err := sshutils.SSHCmdWithSudo(sshConfig, host, "which ss")
 		if err != nil {
-			return fmt.Errorf("check port tool on %s failed: %w", host, err)
+			_, err = sshutils.SSHCmdWithSudo(sshConfig, host, "which netstat")
+			if err != nil {
+				return fmt.Errorf("port check tool (ss or netstat) not found on %s, "+
+					"skip port availability check, deployment may fail if port is occupied", host)
+			}
 		}
-		if ret.StdoutToString("") == "" {
-			return fmt.Errorf("port check tool (ss or netstat) not found on %s, "+
-				"skip port availability check, deployment may fail if port is occupied", host)
-		}
+		hasTools = true
 		return nil
 	}
 	if !d.precheckService("PORT-TOOL", d.deployConfig.ServerIPs, toolCheck) {
 		return false
+	}
+	if !hasTools {
+		logger.Warn("Port check tools are missing on some nodes, skipping port availability checks.")
+		return true
 	}
 
 	serverPorts := []struct {
