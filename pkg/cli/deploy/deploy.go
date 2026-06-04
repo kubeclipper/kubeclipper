@@ -146,6 +146,33 @@ func NewDeployOptions(streams options.IOStreams) *DeployOptions {
 	}
 }
 
+func (d *DeployOptions) nodeRole(ip string) string {
+	isServer := false
+	isAgent := false
+	for _, s := range d.deployConfig.ServerIPs {
+		if s == ip {
+			isServer = true
+			break
+		}
+	}
+	for _, a := range d.deployConfig.Agents.ListIP() {
+		if a == ip {
+			isAgent = true
+			break
+		}
+	}
+	switch {
+	case isServer && isAgent:
+		return "server+agent"
+	case isServer:
+		return "server"
+	case isAgent:
+		return "agent"
+	default:
+		return ""
+	}
+}
+
 func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 	o := NewDeployOptions(streams)
 	cmd := &cobra.Command{
@@ -333,13 +360,13 @@ func precheckPortFunc(port int, serviceName string) precheckFunc {
 		if err != nil {
 			ret, err = sshutils.SSHCmdWithSudo(sshConfig, host, "netstat -tlnp")
 			if err != nil {
-				return fmt.Errorf("check port %d on %s failed: %w", port, host, err)
+				return fmt.Errorf("check port %d failed: %w", port, err)
 			}
 		}
 		output := ret.StdoutToString("")
 		if strings.Contains(output, fmt.Sprintf(":%d ", port)) ||
 			strings.Contains(output, fmt.Sprintf(":%d\t", port)) {
-			return fmt.Errorf("port %d is already in use on %s, required by %s", port, host, serviceName)
+			return fmt.Errorf("port %d is already in use, required by %s", port, serviceName)
 		}
 		return nil
 	}
@@ -359,27 +386,47 @@ func generateCommonPreCheckFunc(name string) precheckFunc {
 	}
 }
 
+type nodeError struct {
+	host string
+	err  error
+}
+
 func (d *DeployOptions) precheckService(name string, nodes []string, fn precheckFunc) bool {
 	logger.Infof("============>%s PRECHECK ...", name)
-	nodeErrChan := make(chan error, len(nodes))
-	defer close(nodeErrChan)
+	var errs []nodeError
+	var mu sync.Mutex
 	wg := sync.WaitGroup{}
 	for _, node := range nodes {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
 			if err := fn(d.deployConfig.SSHConfig, host); err != nil {
-				nodeErrChan <- err
+				mu.Lock()
+				errs = append(errs, nodeError{host: host, err: err})
+				mu.Unlock()
 			}
 		}(node)
 	}
 	wg.Wait()
-	if len(nodeErrChan) == 0 {
+	if len(errs) == 0 {
 		logger.Infof("============>%s PRECHECK OK!", name)
 		return true
 	}
-	for i := 0; i < len(nodeErrChan); i++ {
-		logger.Warn(<-nodeErrChan)
+	groups := make(map[string][]string)
+	for _, ne := range errs {
+		msg := ne.err.Error()
+		role := d.nodeRole(ne.host)
+		ref := fmt.Sprintf("[%s@%s]", role, ne.host)
+		if role == "" {
+			ref = fmt.Sprintf("[%s]", ne.host)
+		}
+		groups[msg] = append(groups[msg], ref)
+	}
+	for msg, refs := range groups {
+		logger.Warnf("%s:", msg)
+		for _, ref := range refs {
+			logger.Warnf("  - %s", ref)
+		}
 	}
 	logger.Errorf("===========>%s PRECHECK FAILED!", name)
 	if options.AssumeYes {
@@ -389,10 +436,15 @@ func (d *DeployOptions) precheckService(name string, nodes []string, fn precheck
 	return utils.AskForConfirmation()
 }
 
+type timeLagError struct {
+	host string
+	lag  float64
+}
+
 func (d *DeployOptions) precheckTimeLag() bool {
 	logger.Infof("============>TIME-LAG PRECHECK ...")
-	nodeErrChan := make(chan struct{}, len(d.allNodes))
-	defer close(nodeErrChan)
+	var lags []timeLagError
+	var mu sync.Mutex
 	wg := sync.WaitGroup{}
 	now := time.Now()
 	logger.Infof("BaseLine Time: %s", now.Format(time.RFC3339))
@@ -403,29 +455,48 @@ func (d *DeployOptions) precheckTimeLag() bool {
 			ret, err := sshutils.SSHCmd(d.deployConfig.SSHConfig, host, "date +%s")
 			if err != nil {
 				logger.Errorf("get timestamp from %s failed: %s", host, err.Error())
-				nodeErrChan <- struct{}{}
+				mu.Lock()
+				lags = append(lags, timeLagError{host: host})
+				mu.Unlock()
 				return
 			}
 			output := ret.StdoutToString("")
 			ts, err := strconv.ParseInt(output, 10, 64)
 			if err != nil {
 				logger.Errorf("parse timestamp from %s failed: %s", host, err.Error())
-				nodeErrChan <- struct{}{}
+				mu.Lock()
+				lags = append(lags, timeLagError{host: host})
+				mu.Unlock()
 				return
 			}
 			t := time.Unix(ts, 0)
 			diff := t.Sub(now).Seconds()
 			logger.Infof("[%s] %v seconds", host, diff)
 			if math.Abs(diff) > float64(5) {
-				nodeErrChan <- struct{}{}
+				mu.Lock()
+				lags = append(lags, timeLagError{host: host, lag: diff})
+				mu.Unlock()
 			}
 		}(node)
 	}
 	wg.Wait()
-	if len(nodeErrChan) == 0 {
+	if len(lags) == 0 {
 		logger.Infof("all nodes time lag less then 5 seconds")
 		logger.Infof("============>TIME-LAG PRECHECK OK!")
 		return true
+	}
+	logger.Warnf("time lag exceeds 5s threshold:")
+	for _, lag := range lags {
+		role := d.nodeRole(lag.host)
+		ref := fmt.Sprintf("[%s@%s]", role, lag.host)
+		if role == "" {
+			ref = fmt.Sprintf("[%s]", lag.host)
+		}
+		if lag.lag != 0 {
+			logger.Warnf("  - %s %.1fs", ref, lag.lag)
+		} else {
+			logger.Warnf("  - %s (failed to get time)", ref)
+		}
 	}
 	logger.Errorf("===========>TIME-LAG PRECHECK FAILED!")
 	if options.AssumeYes {
@@ -448,8 +519,8 @@ func (d *DeployOptions) precheckPorts() bool {
 				mu.Lock()
 				missingToolHosts[host] = true
 				mu.Unlock()
-				return fmt.Errorf("port check tool (ss or netstat) not found on %s, "+
-					"skip port availability check, deployment may fail if port is occupied", host)
+				return fmt.Errorf("port check tool (ss or netstat) not found, " +
+					"skip port availability check, deployment may fail if port is occupied")
 			}
 		}
 		return nil
