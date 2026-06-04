@@ -327,8 +327,11 @@ var (
 	}
 )
 
-func precheckPortFunc(port int, serviceName string) precheckFunc {
+func precheckPortFunc(port int, serviceName string, hostsWithTool *sync.Map) precheckFunc {
 	return func(sshConfig *sshutils.SSH, host string) error {
+		if _, ok := hostsWithTool.Load(host); !ok {
+			return nil
+		}
 		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "ss -tlnp")
 		if err != nil {
 			ret, err = sshutils.SSHCmdWithSudo(sshConfig, host, "netstat -tlnp")
@@ -436,7 +439,7 @@ func (d *DeployOptions) precheckTimeLag() bool {
 }
 
 func (d *DeployOptions) precheckPorts() bool {
-	var hasTools bool
+	var hostsWithTool sync.Map
 	toolCheck := func(sshConfig *sshutils.SSH, host string) error {
 		_, err := sshutils.SSHCmdWithSudo(sshConfig, host, "which ss")
 		if err != nil {
@@ -446,14 +449,19 @@ func (d *DeployOptions) precheckPorts() bool {
 					"skip port availability check, deployment may fail if port is occupied", host)
 			}
 		}
-		hasTools = true
+		hostsWithTool.Store(host, true)
 		return nil
 	}
 	if !d.precheckService("PORT-TOOL", d.deployConfig.ServerIPs, toolCheck) {
 		return false
 	}
-	if !hasTools {
-		logger.Warn("Port check tools are missing on some nodes, skipping port availability checks.")
+	hasAnyTool := false
+	hostsWithTool.Range(func(_, _ interface{}) bool {
+		hasAnyTool = true
+		return false
+	})
+	if !hasAnyTool {
+		logger.Warn("Port check tools are missing on all nodes, skipping port availability checks.")
 		return true
 	}
 
@@ -475,7 +483,7 @@ func (d *DeployOptions) precheckPorts() bool {
 		if !d.precheckService(
 			fmt.Sprintf("PORT-%d(%s)", p.port, p.name),
 			d.deployConfig.ServerIPs,
-			precheckPortFunc(p.port, p.name),
+			precheckPortFunc(p.port, p.name, &hostsWithTool),
 		) {
 			return false
 		}
