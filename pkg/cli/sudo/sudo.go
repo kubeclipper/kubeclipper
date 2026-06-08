@@ -19,10 +19,10 @@
 package sudo
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
@@ -98,10 +98,6 @@ func PreCheck(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 	return utils.AskForConfirmation()
 }
 
-var (
-	errorMultiNIC = errors.New("node has multi nic bug not specify --ip-detect flag")
-)
-
 // MultiNIC check node has multi NIC but node specify ip-detect flag.
 func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, allNodes []string, ipDetect string) bool {
 	logger.Infof("============>%s PRECHECK ...", name)
@@ -109,47 +105,81 @@ func MultiNIC(name string, sshConfig *sshutils.SSH, streams options.IOStreams, a
 		logger.Infof("============>%s PRECHECK OK!", name)
 		return true
 	}
-	// check iface list
-	// ifconfig|grep ": "|awk {'print $1'}|sed 's/://'
-	err := sshutils.CmdBatch(sshConfig, allNodes, `ip a|grep ": "|awk {'print $2'}|sed 's/://'`, func(result sshutils.Result, err error) error {
-		if err != nil {
-			if strings.Contains(err.Error(), "handshake failed: ssh: unable to authenticate, attempted methods [none password]") {
-				return fmt.Errorf("passwd or user error while ssh '%s@%s',please try again", result.User, result.Host)
+	hasMultiNIC := make([]bool, len(allNodes))
+	errs := make([]error, len(allNodes))
+	wg := sync.WaitGroup{}
+	for i, node := range allNodes {
+		wg.Add(1)
+		go func(idx int, host string) {
+			defer wg.Done()
+			result, err := sshutils.SSHCmd(sshConfig, host, `ip a|grep ": "|awk {'print $2'}|sed 's/://'`)
+			if err != nil {
+				if strings.Contains(err.Error(), "handshake failed: ssh: unable to authenticate, attempted methods [none password]") {
+					errs[idx] = fmt.Errorf("passwd or user error while ssh '%s@%s',please try again", sshConfig.User, host)
+				} else {
+					errs[idx] = err
+				}
+				return
 			}
-			return err
-		}
-		if result.ExitCode != 0 {
-			return fmt.Errorf("%s stderr:%s", result.Short(), result.Stderr)
-		}
-		ifaces := strings.Split(result.Stdout, "\n")
-		ifaces = sliceutil.RemoveString(ifaces, func(item string) bool {
-			return item == ""
-		})
-		rifcae := filterLogicIface(ifaces)
+			if result.ExitCode != 0 {
+				errs[idx] = fmt.Errorf("%s stderr:%s", result.Short(), result.Stderr)
+				return
+			}
+			ifaces := strings.Split(result.Stdout, "\n")
+			ifaces = sliceutil.RemoveString(ifaces, func(item string) bool {
+				return item == ""
+			})
+			rifcae := filterLogicIface(ifaces)
+			if len(rifcae) > 1 {
+				hasMultiNIC[idx] = true
+			}
+		}(i, node)
+	}
+	wg.Wait()
 
-		if len(rifcae) > 1 {
-			return errorMultiNIC
+	var firstErr error
+	for _, err := range errs {
+		if err != nil {
+			firstErr = err
+			break
 		}
-		return nil
-	})
+	}
 
-	if err != nil {
-		logger.Error(err)
+	if firstErr != nil {
+		logger.Error(firstErr)
 		if options.AssumeYes {
 			logger.Infof("skip this error,continue exec cmd")
 			return true
 		}
 		logger.Errorf("===========>%s PRECHECK FAILED!", name)
-		if errors.Is(err, errorMultiNIC) {
-			_, _ = streams.Out.Write([]byte("node has multi nic,and --ip-detect flag not specified,default ip " +
-				"detect method is 'first-found',which maybe chose a wrong one,you can add --ip-detect flag to specify it." + "\n"))
-		}
 		_, _ = streams.Out.Write([]byte("Ignore this error, still exec cmd? Please input (yes/no)"))
 		return utils.AskForConfirmation()
 	}
 
-	logger.Infof("============>%s PRECHECK OK!", name)
-	return true
+	var multiNICNodes []string
+	for i, host := range allNodes {
+		if hasMultiNIC[i] {
+			multiNICNodes = append(multiNICNodes, host)
+		}
+	}
+	if len(multiNICNodes) == 0 {
+		logger.Infof("============>%s PRECHECK OK!", name)
+		return true
+	}
+
+	logger.Warnf("node has multiple network interfaces, --ip-detect not specified (default: first-found may choose wrong interface):")
+	for _, host := range multiNICNodes {
+		logger.Warnf("  - [agent@%s]", host)
+	}
+	if options.AssumeYes {
+		logger.Infof("skip this error,continue exec cmd")
+		return true
+	}
+	logger.Errorf("===========>%s PRECHECK FAILED!", name)
+	fmt.Fprintln(streams.Out, "node has multi nic,and --ip-detect flag not specified,default ip "+
+		"detect method is 'first-found',which maybe chose a wrong one,you can add --ip-detect flag to specify it.")
+	fmt.Fprint(streams.Out, "Ignore this error, still exec cmd? Please input (yes/no)")
+	return utils.AskForConfirmation()
 }
 
 func filterLogicIface(ifcaes []string) []string {

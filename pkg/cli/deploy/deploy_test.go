@@ -83,3 +83,56 @@ func TestDeployOptions_getKcConsoleTemplateContent(t *testing.T) {
 
 	t.Log(d.getKcConsoleTemplateContent())
 }
+
+func TestDeployOptions_nodeRole(t *testing.T) {
+	tests := []struct {
+		name      string
+		serverIPs []string
+		agentIPs  []string
+		queryIP   string
+		wantRole  string
+	}{
+		{
+			name:      "server only",
+			serverIPs: []string{"10.0.0.1", "10.0.0.2"},
+			agentIPs:  []string{"10.0.0.3"},
+			queryIP:   "10.0.0.1",
+			wantRole:  "server",
+		},
+		{
+			name:      "agent only",
+			serverIPs: []string{"10.0.0.1"},
+			agentIPs:  []string{"10.0.0.2", "10.0.0.3"},
+			queryIP:   "10.0.0.2",
+			wantRole:  "agent",
+		},
+		{
+			name:      "AIO node is server+agent",
+			serverIPs: []string{"10.0.0.1"},
+			agentIPs:  []string{"10.0.0.1", "10.0.0.2"},
+			queryIP:   "10.0.0.1",
+			wantRole:  "server+agent",
+		},
+		{
+			name:      "unknown IP returns empty",
+			serverIPs: []string{"10.0.0.1"},
+			agentIPs:  []string{"10.0.0.2"},
+			queryIP:   "10.0.0.99",
+			wantRole:  "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDeployOptions(options.IOStreams{})
+			d.deployConfig.ServerIPs = tt.serverIPs
+			d.deployConfig.Agents = make(options.Agents)
+			for _, ip := range tt.agentIPs {
+				d.deployConfig.Agents[ip] = options.Metadata{}
+			}
+			got := d.nodeRole(tt.queryIP)
+			if got != tt.wantRole {
+				t.Errorf("nodeRole(%q) = %q, want %q", tt.queryIP, got, tt.wantRole)
+			}
+		})
+	}
+}
