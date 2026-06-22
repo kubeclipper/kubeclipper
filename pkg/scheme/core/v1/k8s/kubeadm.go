@@ -991,7 +991,7 @@ func (stepper *Kubectl) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *Kubectl) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("Kubectl does not support uninstall")
+	return nil, fmt.Errorf("Kubectl does not support install")
 }
 
 func (stepper *Kubectl) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
