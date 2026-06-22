@@ -44,7 +44,11 @@ Usage:
   kcctl create role
 
 Examples:
-TODO..
+  # Create a role with permission to view clusters
+  kcctl create role --name cluster_viewer --rules=role-template-view-clusters
+
+  # Create a role with multiple aggregated role templates
+  kcctl create role --name viewer --rules=role-template-view-clusters --rules=role-template-view-users
 
 Flags:
   -c, --config string   Path to the config file to use for CLI requests.
@@ -136,7 +140,6 @@ func (l *CreateRoleOptions) ValidateArgs(cmd *cobra.Command) error {
 }
 
 func (l *CreateRoleOptions) RunCreate() error {
-	// TODO: check role template
 	ruleByte, err := json.Marshal(l.Rules)
 	if err != nil {
 		return err

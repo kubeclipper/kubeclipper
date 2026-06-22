@@ -1141,7 +1141,7 @@ func (stepper *KubectlTerminal) InstallSteps(stepMaster0 []v1.StepNode) ([]v1.St
 }
 
 func (stepper *KubectlTerminal) UninstallSteps() ([]v1.Step, error) {
-	return nil, fmt.Errorf("KubectlTerminal dose not support uninstall")
+	return nil, fmt.Errorf("KubectlTerminal does not support uninstall")
 }
 
 func (stepper *SAN) InitStepper() *SAN {

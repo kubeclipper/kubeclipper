@@ -50,7 +50,7 @@ import (
 type Setter func(node *v1.Node) error
 
 func NodeAddress(ipDetectMethod, nodeIPDetectMethod string) Setter {
-	log.Printf("ip detect method: %s, node ip detect methd: %s \n", ipDetectMethod, nodeIPDetectMethod)
+	log.Printf("ip detect method: %s, node ip detect method: %s\n", ipDetectMethod, nodeIPDetectMethod)
 	return func(node *v1.Node) error {
 		var nodeAddress []v1.NodeAddress
 		addresses, err := net.InterfaceAddrs()

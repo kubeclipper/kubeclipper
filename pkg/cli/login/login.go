@@ -119,7 +119,7 @@ func (l *LoginOptions) RunLogin() error {
 			_, _ = fmt.Fprintf(l.IOStreams.Out, "\n")
 		}
 	}
-	// TODO use WithCAData insteadof WithInsecureSkipTLSVerify
+	// TODO: use WithCAData instead of WithInsecureSkipTLSVerify.
 	c, err := kc.NewClientWithOpts(kc.WithEndpoint(l.Host), kc.WithInsecureSkipTLSVerify())
 	if err != nil {
 		return err
@@ -143,7 +143,7 @@ func (l *LoginOptions) RunLogin() error {
 		Servers: map[string]*config.Server{
 			"default": {
 				Server: l.Host,
-				// TODO get ca form kc server
+				// TODO: get CA data from the kc server.
 				InsecureSkipTLSVerify: true,
 			},
 		},

@@ -28,8 +28,8 @@ import (
 func NewKiAgentCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:           "kubeclipper-agent",
-		Short:         "kubeclipper-agent: k8s installer agent",
-		Long:          "TODO: Add long description for kubeclipper-agent",
+		Short:         "KubeClipper node agent",
+		Long:          "Run the KubeClipper agent on a managed node.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}

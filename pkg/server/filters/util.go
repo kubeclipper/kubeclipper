@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-//nolint:unused
 type PathExclude struct {
 	excludePaths sets.Set[string]
 	prefixes     []string

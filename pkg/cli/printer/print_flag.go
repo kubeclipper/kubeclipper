@@ -39,7 +39,7 @@ func (p *PrintFlags) AllowedFormats() []string {
 	return []string{"json", "yaml", "table"}
 }
 
-// TODO
+// Print renders the response in the format selected by the CLI flags.
 func (p *PrintFlags) Print(pr ResourcePrinter, w io.Writer) error {
 	switch p.format {
 	case "json":

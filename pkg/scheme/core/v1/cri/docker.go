@@ -188,11 +188,11 @@ func (runnable DockerRunnable) Uninstall(ctx context.Context, opts component.Opt
 }
 
 func (runnable *DockerRunnable) OfflineUpgrade(ctx context.Context, dryRun bool) ([]byte, error) {
-	return nil, fmt.Errorf("DockerRunnable dose not supported offlineUpgrade")
+	return nil, fmt.Errorf("DockerRunnable does not support offlineUpgrade")
 }
 
 func (runnable *DockerRunnable) OnlineUpgrade(ctx context.Context, dryRun bool) ([]byte, error) {
-	return nil, fmt.Errorf("DockerRunnable dose not supported onlineUpgrade")
+	return nil, fmt.Errorf("DockerRunnable does not support onlineUpgrade")
 }
 
 func (runnable *DockerRunnable) setupDockerConfig(ctx context.Context, dryRun bool) error {

@@ -80,10 +80,6 @@ func (l *leaseOperator) GetLeaseWithNamespaceEx(ctx context.Context, name string
 	return op.(*coordinationv1.Lease), nil
 }
 
-func (l *leaseOperator) ListLeasesEx(ctx context.Context, query *query.Query) (*models.PageableResponse, error) {
-	panic("implement me")
-}
-
 func (l *leaseOperator) GetLeaseWithNamespace(ctx context.Context, name string, namespace string) (*coordinationv1.Lease, error) {
 	ctx = genericapirequest.WithNamespace(ctx, namespace)
 	obj, err := models.Get(ctx, l.storage, name, "")

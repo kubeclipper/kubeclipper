@@ -303,7 +303,7 @@ type ContainerRuntime struct {
 	Type        string `json:"type" enum:"docker|containerd"`
 	Version     string `json:"version,omitempty" enum:"1.4.4"`
 	DataRootDir string `json:"rootDir,omitempty"`
-	// Deprecated use Registries  insteadof
+	// Deprecated: use Registries instead.
 	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
 	// When updating
 	Registries []CRIRegistry `json:"registries,omitempty"`

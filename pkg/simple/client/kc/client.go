@@ -170,7 +170,12 @@ func (cli *Client) getAPIPath(ctx context.Context, p string, query url.Values) s
 }
 
 func (cli *Client) Validate() error {
-	// TODO
+	if cli.host == "" {
+		return errors.New("host must not be empty")
+	}
+	if cli.scheme == "" {
+		return errors.New("scheme must not be empty")
+	}
 	return nil
 }
 

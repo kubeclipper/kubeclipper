@@ -2775,7 +2775,7 @@ func (h *handler) watchTemplates(req *restful.Request, resp *restful.Response, q
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Templates"), req, resp, timeout)
+	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Template"), req, resp, timeout)
 }
 
 func (h *handler) DescribeTemplate(request *restful.Request, response *restful.Response) {

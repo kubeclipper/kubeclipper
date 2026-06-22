@@ -137,7 +137,6 @@ func (l *CreateUserOptions) ValidateArgs(cmd *cobra.Command) error {
 }
 
 func (l *CreateUserOptions) RunCreate() error {
-	// TODO: check user template
 	c := l.newUser()
 	resp, err := l.Client.CreateUser(context.TODO(), c)
 	if err != nil {

@@ -10,12 +10,9 @@ generate: deps
 	./hack/generate_types.sh
 
 deps:
-    ifeq (, $(shell which client-gen))
-		go install k8s.io/code-generator/cmd/{client-gen,lister-gen,informer-gen,deepcopy-gen,defaulter-gen,conversion-gen,openapi-gen}@v0.22.3
-		CLIENT_GEN=$(GOBIN)/client-gen
-    else
-		CLIENT_GEN=$(shell which client-gen)
-    endif
+	@if ! command -v client-gen >/dev/null 2>&1; then \
+		go install k8s.io/code-generator/cmd/{client-gen,lister-gen,informer-gen,deepcopy-gen,defaulter-gen,conversion-gen,openapi-gen}@v0.22.3; \
+	fi
 
 .PHONY: build build-server build-agent build-cli openapi licfmt
 build: build-server build-agent build-cli
@@ -41,14 +38,14 @@ test:
 
 .PHONY: format-deps checkfmt fmt goimports vet lint
 format-deps:
-    ifeq (, $(shell which golangci-lint))
-		go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
-    endif
-    ifeq (, $(shell which goimports))
-		go install golang.org/x/tools/cmd/goimports@latest
-    endif
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2; \
+	fi
+	@if ! command -v goimports >/dev/null 2>&1; then \
+		go install golang.org/x/tools/cmd/goimports@latest; \
+	fi
 
-checkfmt: fmt goimports format-deps lint
+checkfmt: format-deps fmt goimports lint
 
 fmt:
 	gofmt -s -w ./pkg ./cmd ./tools ./test

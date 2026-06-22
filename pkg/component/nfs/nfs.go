@@ -422,12 +422,12 @@ func (n *NFSProvisioner) GetUpgradeSteps() []v1.Step {
 }
 
 func (n *NFSProvisioner) Install(ctx context.Context) error {
-	// TODO:
+	// Installation is driven by the generated step pipeline, so this hook is intentionally a no-op.
 	return nil
 }
 
 func (n *NFSProvisioner) UnInstall(ctx context.Context) error {
-	// TODO:
+	// Uninstallation is driven by the generated step pipeline, so this hook is intentionally a no-op.
 	return nil
 }
 
