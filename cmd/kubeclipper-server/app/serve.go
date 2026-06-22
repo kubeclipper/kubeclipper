@@ -39,7 +39,7 @@ func newServeCommand(stopCh <-chan struct{}) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Launch a kubeclipper-server",
-		Long:  "TODO: add long description for kubeclipper-server",
+		Long:  "Start the KubeClipper API server using the configured runtime options.",
 		RunE: func(c *cobra.Command, args []string) error {
 			s, err := completionOptions(s)
 			if err != nil {
@@ -80,7 +80,7 @@ func completionOptions(s *options.ServerOptions) (*options.ServerOptions, error)
 	conf, err := serverconfig.TryLoadFromDisk()
 	if err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			fmt.Println("config file not found, use cmd line...")
+			fmt.Println("config file not found, falling back to command-line options")
 		} else {
 			return nil, fmt.Errorf("error parsing configuration file %s", err)
 		}

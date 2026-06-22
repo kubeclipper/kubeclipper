@@ -796,7 +796,7 @@ func (c *clusterOperator) ListCloudProviders(ctx context.Context, query *query.Q
 	if err != nil {
 		return nil, err
 	}
-	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("CloudProvider"))
+	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("CloudProviderList"))
 	return list.(*v1.CloudProviderList), nil
 }
 
@@ -879,7 +879,7 @@ func (c *clusterOperator) ListRegistries(ctx context.Context, query *query.Query
 	if err != nil {
 		return nil, err
 	}
-	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("Registry"))
+	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("RegistryList"))
 	return list.(*v1.RegistryList), nil
 }
 

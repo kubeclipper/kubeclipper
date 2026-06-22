@@ -222,7 +222,7 @@ func (c *Client) request(msg *Msg, timeoutHandler TimeoutHandler) (*nats.Msg, er
 	resp, err := c.conn.Request(msg.Subject, msg.Data, msg.Timeout)
 	if err != nil {
 		if err == nats.ErrTimeout && timeoutHandler != nil {
-			//TODO: wrapper error
+			// Preserve the original timeout error after notifying the caller-specific handler.
 			_ = timeoutHandler(msg)
 			return nil, err
 		}

@@ -505,7 +505,7 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 		data["TLSPrivateKey"] = filepath.Join(DefaultKcServerConfigPath, DefaultKCPKIPath, fmt.Sprintf("%s.key", KCServer))
 		data["CACertFile"] = filepath.Join(DefaultKcServerConfigPath, DefaultCaPath, "ca.crt")
 	}
-	// TODO: make auto generate
+	// JWTSecret is injected from the generated deploy config.
 	data["JwtSecret"] = c.JWTSecret
 	data["InitialPassword"] = c.AuthenticationOpts.InitialPassword
 	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod

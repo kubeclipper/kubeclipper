@@ -41,7 +41,7 @@ const daemonConfigTemplate = `{
 }
 `
 
-// not implement Registry TLS
+// Registry TLS options are not rendered in this legacy template yet.
 const configTomlTemplate = `disabled_plugins = []
 imports = []
 oom_score = 0

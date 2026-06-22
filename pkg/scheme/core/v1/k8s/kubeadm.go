@@ -832,7 +832,7 @@ func (stepper *ClusterNode) Install(ctx context.Context, opts component.Options)
 }
 
 func (stepper *ClusterNode) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("ClusterNode dose not support uninstall")
+	return nil, fmt.Errorf("ClusterNode does not support uninstall")
 }
 
 func (stepper *ClusterNode) generatesIPSOCareStaticPod(ctx context.Context) error {
@@ -967,7 +967,7 @@ func (stepper *Container) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *Container) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("Container dose not support install")
+	return nil, fmt.Errorf("Container does not support install")
 }
 
 func (stepper *Container) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
@@ -979,7 +979,7 @@ func (stepper *Container) Uninstall(ctx context.Context, opts component.Options)
 			logger.Warnf("delete containerd container error: %s", err.Error())
 		}
 	case "docker":
-	// TODO
+		// Docker cleanup is intentionally skipped here because this step only removes containerd-managed containers.
 	default:
 		logger.Errorf("current cri type is '%s', '%s' is not supported clean", stepper.CriType, stepper.CriType)
 	}
@@ -991,7 +991,7 @@ func (stepper *Kubectl) NewInstance() component.ObjectMeta {
 }
 
 func (stepper *Kubectl) Install(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("Kubectl dose not support uninstall")
+	return nil, fmt.Errorf("Kubectl does not support install")
 }
 
 func (stepper *Kubectl) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {

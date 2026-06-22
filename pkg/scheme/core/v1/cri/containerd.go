@@ -219,7 +219,7 @@ func (runnable ContainerdRunnable) Uninstall(ctx context.Context, opts component
 }
 
 func (runnable *ContainerdRunnable) OfflineUpgrade(ctx context.Context, dryRun bool) ([]byte, error) {
-	return nil, fmt.Errorf("ContainerdRunnable dose not support offlineUpgrade")
+	return nil, fmt.Errorf("ContainerdRunnable does not support offlineUpgrade")
 }
 
 func (runnable *ContainerdRunnable) OnlineUpgrade(ctx context.Context, dryRun bool) ([]byte, error) {

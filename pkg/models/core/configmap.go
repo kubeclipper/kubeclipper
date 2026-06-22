@@ -58,7 +58,7 @@ func (o operator) ListConfigMaps(ctx context.Context, query *query.Query) (*v1.C
 	if err != nil {
 		return nil, err
 	}
-	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("ConfigMap"))
+	list.GetObjectKind().SetGroupVersionKind(v1.SchemeGroupVersion.WithKind("ConfigMapList"))
 	return list.(*v1.ConfigMapList), nil
 }
 

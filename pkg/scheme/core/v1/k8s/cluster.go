@@ -797,7 +797,7 @@ func (stepper *Recovery) Install(ctx context.Context, opts component.Options) ([
 }
 
 func (stepper *Recovery) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {
-	return nil, fmt.Errorf("recovery dose not support uninstall")
+	return nil, fmt.Errorf("recovery does not support uninstall")
 }
 
 func (stepper *Recovery) NewInstance() component.ObjectMeta {

@@ -6,8 +6,6 @@
 <b>Manage kubernetes in the most light and convenient way</b>
 </p>
 
-<!-- TODO: 添加 cicd 执行情况，代码质量等标签 -->
-
 <p align="center">
   <img alt="repo status" src="https://img.shields.io/badge/-Repo_Status_>-000000?style=flat-square&logo=github&logoColor=white" />
   <a href="https://codecov.io/gh/kubeclipper/kubeclipper" target="_blank"><img alt="coverage" src="https://codecov.io/gh/kubeclipper/kubeclipper/branch/master/graph/badge.svg"/></a>
@@ -39,9 +37,9 @@
 [KubeClipper](https://kubeclipper.io/) is a lightweight web service that provides a friendly web
 console GUI, APIs, and a CLI tool for **Kubernetes cluster lifecycle management**. KubeClipper
 provides flexible Kubernetes as a Service (KaaS), which allows users to rapidly deploy K8S clusters
-anywhere(cloud, hypervisor, bare metal) and provides continuous lifecycle management capabilities
-(installation, deleting, upgrading, backup and restoration, cluster scaling, remote access, plug-in
-management, application store).see
+anywhere (cloud, hypervisor, bare metal) and provides continuous lifecycle management capabilities
+(installation, deletion, upgrades, backup and restoration, cluster scaling, remote access, plugin
+management, application store). See
 [Feature List](https://github.com/kubeclipper/kubeclipper#features) for details.
 
 **🎯 Project Goal**：Manage Kubernetes in the most light and convenient way.
@@ -167,14 +165,14 @@ and operating system.
 
 KubeClipper provides command line tools 🔧 kcctl to simplify operations.
 
-You can download the latest version of kcctl directly with the following command:
+You can download the latest version of `kcctl` directly with the following command:
 
 ```bash
 # Install latest release
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | bash -
 # In China, you can add env "KC_REGION=cn", we use registry.aliyuncs.com/google_containers instead of k8s.gcr.io
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
-# The latest release version is downloaded by default. You can download the specified version. For example, specify the master development version to be installed
+# The latest release is downloaded by default. You can also install a specific version, for example the master development build.
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=master bash -
 ```
 
@@ -201,9 +199,9 @@ kcctl deploy
 KC_VERSION=master kcctl deploy
 ```
 
-If you want to install multi node, Use `kcctl deploy -h` for more information about a command
+If you want to install a multi-node environment, use `kcctl deploy -h` for more information.
 
-After you runn this command, kcctl will check your installation environment and enter the
+After you run this command, `kcctl` will check your installation environment and enter the
 installation process, if the conditions are met.
 
 After printing the KubeClipper banner, the installation is complete.

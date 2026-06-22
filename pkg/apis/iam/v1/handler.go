@@ -380,7 +380,7 @@ func (h *handler) CreateRoles(request *restful.Request, response *restful.Respon
 func (h *handler) ListRoles(request *restful.Request, response *restful.Response) {
 	q := query.ParseQueryParameter(request)
 	if q.Watch {
-		h.watchUser(request, response, q)
+		h.watchRole(request, response, q)
 		return
 	}
 	result, err := h.iamOperator.ListRoleEx(context.TODO(), q)
@@ -406,7 +406,6 @@ func (h *handler) CheckRolesExist(request *restful.Request, response *restful.Re
 	response.WriteHeader(http.StatusOK)
 }
 
-//nolint:unused
 func (h *handler) watchRole(req *restful.Request, resp *restful.Response, q *query.Query) {
 	timeout := query.MinTimeoutSeconds * time.Second
 	if q.TimeoutSeconds != nil {

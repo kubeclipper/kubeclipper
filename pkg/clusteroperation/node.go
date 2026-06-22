@@ -262,5 +262,5 @@ func (p *PatchNodes) getPackageSteps(cluster *corev1.Cluster, action corev1.Step
 		return pack.UninstallSteps(pNodes)
 	}
 
-	return nil, fmt.Errorf("packageSteps dose not support action: %s", action)
+	return nil, fmt.Errorf("packageSteps does not support action: %s", action)
 }

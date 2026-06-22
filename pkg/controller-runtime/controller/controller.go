@@ -299,10 +299,6 @@ func (c *controller) Start(ctx context.Context) error {
 	return nil
 }
 
-func (c *controller) GetLogger() logger.Logging {
-	panic("implement me")
-}
-
 func HandlerCrash() {
 	if r := recover(); r != nil {
 		logger.Error("handler crash", zap.Any("recover_for", r))

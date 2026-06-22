@@ -28,8 +28,8 @@ import (
 func NewKiServerCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:           "kubeclipper-server",
-		Short:         "kubeclipper-server: k8s installer server",
-		Long:          "TODO: Add long description for kubeclipper-server",
+		Short:         "KubeClipper API server",
+		Long:          "Run the KubeClipper API server and control plane services.",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}

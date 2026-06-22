@@ -6,8 +6,6 @@
 <b>Manage kubernetes in the most light and convenient way</b>
 </p>
 
-<!-- TODO: 添加 cicd 执行情况，代码质量等标签 -->
-
 <p align="center">
   <img alt="repo status" src="https://img.shields.io/badge/-Repo_Status_>-000000?style=flat-square&logo=github&logoColor=white" />
   <a href="https://codecov.io/gh/kubeclipper/kubeclipper" target="_blank"><img alt="coverage" src="https://codecov.io/gh/kubeclipper/kubeclipper/branch/master/graph/badge.svg"/></a>
@@ -39,7 +37,7 @@
 [KubeClipper](https://kubeclipper.io/) 是一个轻量级的 Web 服务，为 **Kubernetes 集群生命周期管理**
 提供友好的 Web 控制台 GUI、API 和 CLI 工具。\
 KubeClipper 提供灵活的 Kubernetes 即服务（KaaS），允许用户在任何地方（云、虚拟机、裸机）快速部署 K8S
-集群，并提供持续的生命周期管理功能（安装、删除、升级、备份和恢复、集群扩展、远程访问、插件管理、应用商店）。详细信息见[功能列表](https://github.com/kubeclipper/kubeclipper/blob/master/README_zh.md#features)
+集群，并提供持续的生命周期管理功能（安装、删除、升级、备份和恢复、集群扩展、远程访问、插件管理、应用商店）。详细信息见 [功能列表](https://github.com/kubeclipper/kubeclipper/blob/master/README_zh.md#features)。
 
 **🎯 项目目标**：以最轻松便捷的方式管理 Kubernetes。
 
@@ -162,9 +160,9 @@ KubeClipper 提供了命令行工具🔧 kcctl 以简化运维工作，您可以
 ```bash
 # 安装最新的 release 版本
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | bash -
-# 如果你在中国，你可以在安装时使用 cn 环境变量, 此时我们会使用 registry.aliyuncs.com/google_containers 代替 k8s.gcr.io
+# 如果你在中国，可以在安装时使用 `KC_REGION=cn` 环境变量，此时我们会使用 `registry.aliyuncs.com/google_containers` 代替 `k8s.gcr.io`
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn bash -
-# 默认会下载最新版本，你可以通过指定 KC_VERSION 下载所需版本. 比如指定安装 master 开发版本
+# 默认会下载最新版本，你也可以通过指定 KC_VERSION 下载所需版本，比如安装 master 开发版本
 curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=master bash -
 ```
 
@@ -172,7 +170,7 @@ curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSIO
 > 您也可以在 **[GitHub Release Page](https://github.com/kubeclipper/kubeclipper/releases)**
 > 下载指定版本。
 
-通过以下命令检测是否安装成功:
+通过以下命令检查是否安装成功：
 
 ```bash
 kcctl version
@@ -191,9 +189,9 @@ kcctl deploy
 KC_VERSION=master kcctl deploy
 ```
 
-如果想安装多个节点，可以使用 `kcctl deploy -h` 获取更多帮助信息
+如果想安装多节点环境，可以使用 `kcctl deploy -h` 获取更多帮助信息。
 
-执行该命令后，Kcctl 将检查您的安装环境，若满足条件将会进入安装流程。在打印出如下的 KubeClipper
+执行该命令后，`kcctl` 将检查您的安装环境，若满足条件将会进入安装流程。在打印出如下的 KubeClipper
 banner 后即表示安装完成。
 
 ```console

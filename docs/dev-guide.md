@@ -51,7 +51,6 @@ wget https://golang.google.cn/dl/go1.24.0.linux-amd64.tar.gz
 # wget https://golang.google.cn/dl/go1.24.3.linux-arm64.tar.gz
 
 tar zxvf go1.24.0.linux-amd64.tar.gz
-g
 
 mkdir -p /opt/go
 
@@ -187,7 +186,7 @@ kubeclipper-agent
 kcctl
 [INFO]  Installing kcctl to /usr/local/bin/kcctl
 
-  Kcctl has been installed successfully!
+  kcctl has been installed successfully!
     Run 'kcctl version' to view the version.
     Run 'kcctl -h' for more help.
 
@@ -397,8 +396,7 @@ Normal should be:
 
 ![](img/kc-install-cluster-normal-calico.png)
 
-Modify metadata.json,change CNI version as below, also fail with 1.23.17, maybe hardcode logic.
-**TODO** check later.
+Modify `metadata.json` and change the CNI version as shown below. This still fails with `1.23.17`, so the behavior likely depends on additional hardcoded logic that needs follow-up validation.
 
 And as above, new k8s resources didn't add to metadata.json, may be a bug, we need to add it
 manually now. Without it, in webpage: <http://kc-console/cluster/create>，we could select containerd
@@ -501,7 +499,7 @@ Modify metadata.json:
 
 ### 3.3 Deploy k8s using kcctl, add pause tag
 
-**TODO** A bug, will check later.
+Known issue: in some environments the generated containerd config omits the pause image tag, so it must be corrected manually before retrying deployment.
 
 Modify `/etc/containerd/config.toml`
 

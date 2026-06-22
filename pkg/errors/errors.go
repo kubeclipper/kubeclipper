@@ -49,7 +49,7 @@ func (s *StatusError) Error() string {
 	return fmt.Sprintf("%s due to reason %s", s.Message, s.Reason)
 }
 
-// IsConflict TODO: make 409 enum or const
+// IsConflict reports whether the error maps to HTTP 409 semantics.
 func IsConflict(err error) bool {
 	return CodeForError(err) == 409
 }

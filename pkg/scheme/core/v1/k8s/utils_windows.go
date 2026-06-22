@@ -20,6 +20,8 @@
 
 package k8s
 
+import "fmt"
+
 func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
-	panic("not implement")
+	return fmt.Errorf("unmount kubelet directory is not supported on Windows: %s", absoluteKubeletRunDirectory)
 }
