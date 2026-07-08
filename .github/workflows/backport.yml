@@ -1,0 +1,67 @@
+name: Backport
+
+on:
+  pull_request_target:
+    types: [closed, labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  backport-by-label:
+    name: Backport pull request by label
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.merged &&
+      contains(toJSON(github.event.pull_request.labels.*.name), '"backport ')
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create backport pull requests
+        uses: korthout/backport-action@v4.6.0
+        with:
+          comment_style: summary
+          merge_commits: skip
+
+  determine-comment-targets:
+    name: Determine comment backport targets
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/backport ')
+    outputs:
+      target_branches: ${{ steps.parse-comment.outputs.target_branches }}
+    steps:
+      - name: Parse target branches
+        id: parse-comment
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          branches=$(printf '%s\n' "$COMMENT_BODY" | sed -n '1s#^/backport[[:space:]]\+##p')
+          branches=$(printf '%s\n' "$branches" | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//')
+
+          if ! printf '%s\n' "$branches" | grep -Eq '^[A-Za-z0-9._/-]+( [A-Za-z0-9._/-]+)*$'; then
+            branches=''
+          fi
+
+          echo "target_branches=${branches}" >> "$GITHUB_OUTPUT"
+
+  backport-by-comment:
+    name: Backport pull request by comment
+    runs-on: ubuntu-latest
+    needs: determine-comment-targets
+    if: needs.determine-comment-targets.outputs.target_branches != ''
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create backport pull requests
+        uses: korthout/backport-action@v4.6.0
+        with:
+          comment_style: summary
+          merge_commits: skip
+          source_pr_number: ${{ github.event.issue.number }}
+          target_branches: ${{ needs.determine-comment-targets.outputs.target_branches }}
