@@ -74,7 +74,7 @@ const (
 
 var (
 	allowedOnline = sets.NewString("master", "latest")
-	onlinePkg     = "https://oss.kubeclipper.io/release/%s/kc-upgrade-%s.tar.gz"
+	onlinePkg     = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/%s/kc-upgrade-%s.tar.gz"
 )
 
 type BaseOptions struct {
