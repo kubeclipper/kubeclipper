@@ -175,12 +175,12 @@ kcctl  kubeclipper-agent  kubeclipper-server
 Deploy kcctl
 
 ```console
-# curl -sfL https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=release-1.4 bash -
+# curl -sfLk https://oss.kubeclipper.io/get-kubeclipper.sh | KC_REGION=cn KC_VERSION=release-1.4 bash -
 [INFO]  The release-1.4 version will be installed
 [INFO]  KC_REGION is assigned cn, kc.env file will be created
 [INFO]  env: Creating environment file /etc/kc/kc.env}
 mkdir: created directory '/etc/kc'
-[INFO]  Downloading package https://oss.kubeclipper.io/kc/release-1.4/kc-linux-amd64.tar.gz
+[INFO]  Downloading package https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/kc/release-1.4/kc-linux-amd64.tar.gz
 kubeclipper-server
 kubeclipper-agent
 kcctl
@@ -241,7 +241,7 @@ of pkfile or password must be specify,please config it in ".
 [2025-05-30T10:08:59+08:00][INFO] ============>ipDetect PRECHECK ...
 [2025-05-30T10:08:59+08:00][INFO] ============>ipDetect PRECHECK OK!
 [2025-05-30T10:09:02+08:00][INFO] ------ Send packages ------
---2025-05-30 10:09:02--  https://oss.kubeclipper.io/release/release-1.4/kc-amd64.tar.gz
+--2025-05-30 10:09:02--  https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/release-1.4/kc-amd64.tar.gz
 2025-05-30 10:11:29 (6.44 MB/s) - ‘kc-amd64.tar.gz’ saved [982526790/982526790]
 10.0.4.12: done!   
 [2025-05-30T10:11:44+08:00][INFO] ------ Install kc-etcd ------

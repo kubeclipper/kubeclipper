@@ -19,7 +19,7 @@
 package downloader
 
 var (
-	CloudStaticServer = "https://oss.kubeclipper.io/packages"
+	CloudStaticServer = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/packages"
 )
 
 type Options struct {

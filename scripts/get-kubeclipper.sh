@@ -43,8 +43,8 @@ fi
 
 OS_TYPE="linux"
 
-# default github repo
-DOWNLOAD_URL="https://oss.kubeclipper.io/kc"
+# default AliCloud OSS endpoint
+DOWNLOAD_URL="https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/kc"
 # default directory for storing binary files
 BIN_DIR="/usr/local/bin"
 
@@ -109,7 +109,7 @@ set_env() {
     fi
     create_env_file "$mirror"
     # set download url
-    DOWNLOAD_URL="https://oss.kubeclipper.io/kc"
+    DOWNLOAD_URL="https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/kc"
   fi
 
   if [ -n "${KC_BIN_DIR}" ]; then
@@ -157,7 +157,7 @@ download() {
   info "Downloading package $2"
   case $DOWNLOADER in
   curl)
-    curl -o "$1" "$2"
+    curl -fL -o "$1" "$2"
     ;;
   wget)
     wget -O "$1" "$2"

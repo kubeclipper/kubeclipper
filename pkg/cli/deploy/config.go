@@ -109,7 +109,7 @@ agents:
 #jwtSecret: ""
 
 # deploy resource package,support url or file absolute path.
-#pkg: https://oss.kubeclipper.io/release/v1.1.0/kc-amd64.tar.gz
+#pkg: https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.1.0/kc-amd64.tar.gz
 pkg: /tmp/kc-minimal.tar.gz
 
 # mq config,support internal or external mq.
