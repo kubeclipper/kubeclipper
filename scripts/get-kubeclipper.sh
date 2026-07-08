@@ -44,7 +44,8 @@ fi
 OS_TYPE="linux"
 
 # default AliCloud OSS endpoint
-DOWNLOAD_URL="https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/kc"
+OSS_ENDPOINT="https://kubeclipper.oss-ap-southeast-1.aliyuncs.com"
+DOWNLOAD_URL="${OSS_ENDPOINT}/kc"
 # default directory for storing binary files
 BIN_DIR="/usr/local/bin"
 
@@ -109,7 +110,7 @@ set_env() {
     fi
     create_env_file "$mirror"
     # set download url
-    DOWNLOAD_URL="https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/kc"
+    DOWNLOAD_URL="${OSS_ENDPOINT}/kc"
   fi
 
   if [ -n "${KC_BIN_DIR}" ]; then
@@ -193,4 +194,3 @@ verify_install() {
   install_pkg
   verify_install
 }
-

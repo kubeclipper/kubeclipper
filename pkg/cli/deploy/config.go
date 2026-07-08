@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 )
 
 const (
@@ -109,7 +110,7 @@ agents:
 #jwtSecret: ""
 
 # deploy resource package,support url or file absolute path.
-#pkg: https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.1.0/kc-amd64.tar.gz
+#pkg: ` + constatns.KubeClipperReleaseBaseURL + `/v1.1.0/kc-amd64.tar.gz
 pkg: /tmp/kc-minimal.tar.gz
 
 # mq config,support internal or external mq.
