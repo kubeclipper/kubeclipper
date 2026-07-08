@@ -18,8 +18,10 @@
 
 package downloader
 
+import "github.com/kubeclipper/kubeclipper/pkg/constatns"
+
 var (
-	CloudStaticServer = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/packages"
+	CloudStaticServer = constatns.KubeClipperCloudStaticBaseURL
 )
 
 type Options struct {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 
 	"github.com/spf13/cobra"
 
@@ -74,7 +75,7 @@ const (
 
 var (
 	allowedOnline = sets.NewString("master", "latest")
-	onlinePkg     = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/%s/kc-upgrade-%s.tar.gz"
+	onlinePkg     = constatns.KubeClipperReleaseBaseURL + "/%s/kc-upgrade-%s.tar.gz"
 )
 
 type BaseOptions struct {
