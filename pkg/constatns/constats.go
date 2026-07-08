@@ -36,3 +36,10 @@ const (
 	ClusterServiceSubnet = "10.96.0.0/12"
 	ClusterPodSubnet     = "172.25.0.0/16"
 )
+
+const (
+	KubeClipperOSSEndpoint        = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com"
+	KubeClipperKCDownloadBaseURL  = KubeClipperOSSEndpoint + "/kc"
+	KubeClipperReleaseBaseURL     = KubeClipperOSSEndpoint + "/release"
+	KubeClipperCloudStaticBaseURL = KubeClipperOSSEndpoint + "/packages"
+)
