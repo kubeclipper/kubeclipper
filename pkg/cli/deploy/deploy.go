@@ -78,7 +78,8 @@ import (
 )
 
 const (
-	longDescription = `
+	deployExamplePkg = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
+	longDescription  = `
   Deploy Kubeclipper Platform from deploy-config.yaml or cmd flags.
 
   Kubeclipper Platform must have one kc-server node at lease, kc-server use etcd as db backend.
@@ -104,34 +105,34 @@ const (
   # Deploy env use remove http/https resource server
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3 \
     --pk-file ~/.ssh/id_rsa \
-    --pkg https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.4.0/kc-amd64.tar.gz
+    --pkg ` + deployExamplePkg + `
 
   # Deploy env with many agent node in same region.
   kcctl deploy --server 192.168.234.3 --agent us-west-1:192.168.10.123,192.168.10.124 \
     --pk-file ~/.ssh/id_rsa \
-    --pkg https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.4.0/kc-amd64.tar.gz
+    --pkg ` + deployExamplePkg + `
 
   # Deploy env with many agent node in different region.
   kcctl deploy --server 192.168.234.3 \
     --agent us-west-1:1.1.1.1,1.1.1.2 --agent us-west-2:1.1.1.3 \
     --pk-file ~/.ssh/id_rsa \
-    --pkg https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.4.0/kc-amd64.tar.gz
+    --pkg ` + deployExamplePkg + `
 
   # Deploy env with many agent node which has orderly ip.
   # this will add 10 agent,1.1.1.1, 1.1.1.2, ... 1.1.1.10.
   kcctl deploy --server 192.168.234.3 --agent us-west-1:1.1.1.1-1.1.1.10 \
     --pk-file ~/.ssh/id_rsa \
-    --pkg https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.4.0/kc-amd64.tar.gz
+    --pkg ` + deployExamplePkg + `
   
   # Deploy env with many agent nodes and specify ip detect method for these nodes
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 \
     --ip-detect=interface=eth0 --pk-file ~/.ssh/id_rsa \
-    --pkg https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.4.0/kc-amd64.tar.gz
+    --pkg ` + deployExamplePkg + `
 
   # Deploy env with many agent nodes and specify node ip detect method for these nodes, used for routing between nodes in the kubernetes cluster
   kcctl deploy --server 192.168.234.3 --agent 192.168.234.3,192.168.234.4 \
     --node-ip-detect=interface=eth1 --pk-file ~/.ssh/id_rsa \
-    --pkg https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/v1.4.0/kc-amd64.tar.gz
+    --pkg ` + deployExamplePkg + `
 
   # Deploy from config.
   kcctl deploy --deploy-config deploy-config.yaml
@@ -139,7 +140,7 @@ const (
   kcctl deploy --server 172.20.149.198 --agent us-west-1:10.0.0.10 --agent us-west-2:20.0.0.11 --fip 10.0.0.10:172.20.149.199 --fip 20.0.0.11:172.20.149.200
 
   Please read 'kcctl deploy -h' get more deploy flags`
-	defaultPkg = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com/release/%s/kc-%s.tar.gz"
+	defaultPkg = constatns.KubeClipperReleaseBaseURL + "/%s/kc-%s.tar.gz"
 )
 
 type DeployOptions struct {
