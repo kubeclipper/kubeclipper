@@ -20,13 +20,12 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
-
-	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
@@ -130,7 +129,7 @@ func NewMetadata(c *v1.Cluster) *component.ExtraMetadata {
 		ClusterName:        c.Name,
 		ClusterStatus:      c.Status.Phase,
 		Offline:            c.Offline(),
-		LocalRegistry:      c.LocalRegistry,
+		ImageRepository:    c.ImageRepository,
 		CRI:                c.ContainerRuntime.Type,
 		KubeVersion:        c.KubernetesVersion,
 		KubeletDataDir:     c.Kubelet.RootDir,
@@ -141,94 +140,90 @@ func NewMetadata(c *v1.Cluster) *component.ExtraMetadata {
 }
 
 func GetClusterCRIRegistries(c *v1.Cluster, op cluster.Operator) ([]v1.RegistrySpec, error) {
-	/*
-			NOTE: there are 3 way to set registry
-			1.cri registry,use to generate containerd config
-			2.insecure registry(local registry),use to pull image for create k8s cluster
-			3.mirror registry,use to pull image for deploy k8s addons
-		insecure registry and mirror registry only used to config insecure for pull image
-		cri registry can use to config insecure and auth
-	*/
+	return GetClusterCRIRegistriesWithContext(context.Background(), c, op)
+}
 
-	registries := make([]v1.RegistrySpec, 0)
+func NormalizeImageRepository(repository string) (normalized, host string, err error) {
+	repository = strings.TrimSpace(strings.TrimSuffix(repository, "/"))
+	if repository == "" {
+		repository = v1.DefaultImageRepository
+	}
+	if strings.Contains(repository, "://") {
+		return "", "", fmt.Errorf("image repository %q must not include a URL scheme", repository)
+	}
+	parsed, err := url.Parse("https://" + repository)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", "", fmt.Errorf("invalid image repository %q", repository)
+	}
+	if strings.Contains(parsed.Host, "\\") || strings.Contains(parsed.Path, "\\") {
+		return "", "", fmt.Errorf("invalid image repository %q", repository)
+	}
+	return repository, parsed.Host, nil
+}
 
-	// First deal with cri registry(with auth) in Registries
-	for _, reg := range c.ContainerRuntime.Registries {
-		// cri registry
-		if reg.RegistryRef != nil && *reg.RegistryRef != "" {
-			//registry, err := r.RegistryLister.Get(*reg.RegistryRef)
-			// use operator not lister
-			registry, err := op.GetRegistry(context.Background(), *reg.RegistryRef)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					continue
-				}
-				return nil, fmt.Errorf("get cri registry %s:%w", *reg.RegistryRef, err)
-			}
-			logger.Debugf("【cluster-controller】 getClusterCRIRegistries registry:%#v  auth:%#v", registry, registry.RegistryAuth)
-			registries = appendUniqueRegistry(registries, registry.RegistrySpec)
-		} else {
-			// insecure registry in cri registry
-			registries = appendUniqueRegistry(registries,
-				v1.RegistrySpec{Scheme: "http", Host: reg.InsecureRegistry},
-				v1.RegistrySpec{Scheme: "https", Host: reg.InsecureRegistry, SkipVerify: true})
-			continue
+func GetClusterCRIRegistriesWithContext(ctx context.Context, c *v1.Cluster, op cluster.Operator) ([]v1.RegistrySpec, error) {
+	repository, host, err := NormalizeImageRepository(c.ImageRepository)
+	if err != nil {
+		return nil, err
+	}
+	c.ImageRepository = repository
+	registries := []v1.RegistrySpec{{Scheme: "https", Host: host}}
+	explicitHosts := make(map[string]v1.RegistrySpec)
+	for _, ref := range c.ContainerRuntime.Registries {
+		if ref.RegistryRef == nil || strings.TrimSpace(*ref.RegistryRef) == "" {
+			return nil, fmt.Errorf("container runtime registryRef must not be empty")
 		}
-	}
-
-	// Then,deal with insecure registry and mirror registry
-	type mirror struct {
-		ImageRepoMirror string `json:"imageRepoMirror"`
-	}
-	insecureRegistry := append([]string{}, c.ContainerRuntime.InsecureRegistry...)
-	sort.Strings(insecureRegistry)
-	// add addons mirror registry
-	for _, a := range c.Addons {
-		var m mirror
-		err := json.Unmarshal(a.Config.Raw, &m)
+		registry, err := op.GetRegistry(ctx, *ref.RegistryRef)
 		if err != nil {
+			return nil, fmt.Errorf("get cri registry %s: %w", *ref.RegistryRef, err)
+		}
+		spec, err := normalizeRegistrySpec(registry.RegistrySpec)
+		if err != nil {
+			return nil, fmt.Errorf("cri registry %s: %w", *ref.RegistryRef, err)
+		}
+		if existing, ok := explicitHosts[spec.Host]; ok {
+			if !reflect.DeepEqual(existing, spec) {
+				return nil, fmt.Errorf("cri registry %s: registry host %s has conflicting configuration", *ref.RegistryRef, spec.Host)
+			}
 			continue
 		}
-		if m.ImageRepoMirror != "" {
-			idx, ok := sort.Find(len(insecureRegistry), func(i int) int {
-				return strings.Compare(m.ImageRepoMirror, insecureRegistry[i])
-			})
-			if !ok {
-				if idx == len(insecureRegistry) {
-					insecureRegistry = append(insecureRegistry, m.ImageRepoMirror)
-				} else {
-					insecureRegistry = append(insecureRegistry[:idx+1], insecureRegistry[idx:]...)
-					insecureRegistry[idx] = m.ImageRepoMirror
-				}
-			}
-		}
+		explicitHosts[spec.Host] = spec
 	}
-
-	// insecure registry
-	for _, host := range insecureRegistry {
-		registries = appendUniqueRegistry(registries,
-			v1.RegistrySpec{Scheme: "http", Host: host},
-			v1.RegistrySpec{Scheme: "https", Host: host, SkipVerify: true})
+	explicitHostOrder := make([]string, 0, len(explicitHosts))
+	for explicitHost := range explicitHosts {
+		explicitHostOrder = append(explicitHostOrder, explicitHost)
 	}
-
+	sort.Strings(explicitHostOrder)
+	for _, host := range explicitHostOrder {
+		registries = replaceRegistryByHost(registries, explicitHosts[host])
+	}
+	sort.Slice(registries, func(i, j int) bool {
+		return registries[i].Host < registries[j].Host
+	})
 	return registries, nil
 }
 
-// Use scheme and host as unique key
-func appendUniqueRegistry(s []v1.RegistrySpec, items ...v1.RegistrySpec) []v1.RegistrySpec {
-	for _, r := range items {
-		key := r.Scheme + r.Host
-		idx, ok := sort.Find(len(s), func(i int) int {
-			return strings.Compare(key, s[i].Scheme+s[i].Host)
-		})
-		if !ok {
-			if idx == len(s) {
-				s = append(s, r)
-			} else {
-				s = append(s[:idx+1], s[idx:]...)
-				s[idx] = r
-			}
+func normalizeRegistrySpec(item v1.RegistrySpec) (v1.RegistrySpec, error) {
+	item.Scheme = strings.ToLower(strings.TrimSpace(item.Scheme))
+	item.Host = strings.TrimSuffix(strings.TrimSpace(item.Host), "/")
+	if item.Scheme == "" {
+		item.Scheme = "https"
+	}
+	if item.Host == "" {
+		return v1.RegistrySpec{}, fmt.Errorf("registry host must not be empty")
+	}
+	if strings.Contains(item.Host, "://") || strings.Contains(item.Host, "/") {
+		return v1.RegistrySpec{}, fmt.Errorf("registry host %q must not include a scheme or path", item.Host)
+	}
+	return item, nil
+}
+
+func replaceRegistryByHost(registries []v1.RegistrySpec, item v1.RegistrySpec) []v1.RegistrySpec {
+	result := registries[:0]
+	for i := range registries {
+		if registries[i].Host != item.Host {
+			result = append(result, registries[i])
 		}
 	}
-	return s
+	return append(result, item)
 }

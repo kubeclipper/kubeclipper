@@ -54,7 +54,7 @@ const (
 type ContainerdRunnable struct {
 	Base
 	RegistryConfigDir   string `json:"registryConfigDir"`
-	LocalRegistry       string `json:"localRegistry"`
+	ImageRepository     string `json:"imageRepository"`
 	KubeVersion         string `json:"kubeVersion"`
 	PauseVersion        string `json:"pauseVersion"`
 	PauseRegistry       string `json:"pauseRegistry"`
@@ -70,7 +70,7 @@ func (runnable *ContainerdRunnable) InitStep(ctx context.Context, cluster *v1.Cl
 	runnable.Version = cluster.ContainerRuntime.Version
 	runnable.Offline = metadata.Offline
 	runnable.DataRootDir = strutil.StringDefaultIfEmpty(containerdDefaultConfigDir, cluster.ContainerRuntime.DataRootDir)
-	runnable.LocalRegistry = metadata.LocalRegistry
+	runnable.ImageRepository = metadata.ImageRepository
 	runnable.Registies = registries
 	runnable.RegistryWithAuth = FilterRegistryWithAuth(runnable.Registies)
 	if runnable.RegistryConfigDir == "" {
@@ -271,10 +271,11 @@ func containerdConfigVersion(configPath string) int {
 }
 
 func (runnable *ContainerdRunnable) setupContainerdConfig(ctx context.Context, dryRun bool) error {
-	// local registry not filled and is in online mode, the default repo mirror proxy will be used
-	if !runnable.Offline && runnable.LocalRegistry == "" {
-		runnable.LocalRegistry = component.GetRepoMirror(ctx)
-		logger.Info("render containerd config, the default repo mirror proxy will be used", zap.String("local_registry", runnable.LocalRegistry))
+	// Use the configured online mirror when no image repository is provided.
+	if !runnable.Offline && runnable.ImageRepository == "" {
+		runnable.ImageRepository = component.GetRepoMirror(ctx)
+		logger.Info("render containerd config, the default repo mirror proxy will be used",
+			zap.String("image_repository", runnable.ImageRepository))
 	}
 	if runnable.RegistryConfigDir == "" {
 		runnable.RegistryConfigDir = ContainerdDefaultRegistryConfigDir

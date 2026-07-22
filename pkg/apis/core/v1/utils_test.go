@@ -67,13 +67,12 @@ var (
 		},
 		KubernetesVersion: "v1.18.6",
 		// ControlPlaneEndpoint: "172.18.94.114:6443",
-		CertSANs:      nil,
-		LocalRegistry: "172.18.94.144:5000",
+		CertSANs:        nil,
+		ImageRepository: "172.18.94.144:5000",
 		ContainerRuntime: v1.ContainerRuntime{
-			Type:             v1.CRIDocker,
-			Version:          "19.03.12",
-			DataRootDir:      "/var/lib/docker",
-			InsecureRegistry: []string{"172.18.94.144:5000"},
+			Type:        v1.CRIDocker,
+			Version:     "19.03.12",
+			DataRootDir: "/var/lib/docker",
 		},
 		Networking: v1.Networking{
 			IPFamily:      v1.IPFamilyIPv4,
@@ -89,9 +88,9 @@ var (
 			DataDir: "/var/lib/etcd",
 		},
 		CNI: v1.CNI{
-			LocalRegistry: "172.18.94.144:5000",
-			Type:          "calico",
-			Version:       "v3.11.2",
+			ImageRepository: "172.18.94.144:5000",
+			Type:            "calico",
+			Version:         "v3.11.2",
 			Calico: &v1.Calico{
 				IPv4AutoDetection: "first-found",
 				IPv6AutoDetection: "first-found",

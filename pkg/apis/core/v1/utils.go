@@ -31,7 +31,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/google/uuid"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -369,7 +368,6 @@ func MarkToOriginNode(ctx context.Context, operator cluster.Operator, kcNodeID s
 
 func (h *handler) parseAddonStep(ctx context.Context, clu *v1.Cluster, addons []v1.Addon, action v1.StepAction) ([]v1.Step, error) {
 	var steps []v1.Step
-	registry := sets.NewString(clu.ContainerRuntime.InsecureRegistry...)
 	for _, comp := range addons {
 		cInterface, ok := component.Load(fmt.Sprintf(component.RegisterFormat, comp.Name, comp.Version))
 		if !ok {
@@ -382,11 +380,6 @@ func (h *handler) parseAddonStep(ctx context.Context, clu *v1.Cluster, addons []
 		newComp, ok := instance.(component.Interface)
 		if !ok {
 			continue
-		}
-		if m := newComp.GetImageRepoMirror(); m != "" {
-			if !registry.Has(m) {
-				registry.Insert(m)
-			}
 		}
 		if err := h.initComponentExtraCluster(ctx, newComp); err != nil {
 			return []v1.Step{}, err
@@ -403,7 +396,6 @@ func (h *handler) parseAddonStep(ctx context.Context, clu *v1.Cluster, addons []
 		}
 		steps = append(steps, s...)
 	}
-	clu.ContainerRuntime.InsecureRegistry = registry.List()
 	return steps, nil
 }
 

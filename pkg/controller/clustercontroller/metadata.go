@@ -32,7 +32,7 @@ func (r *ClusterReconciler) assembleClusterExtraMetadata(ctx context.Context, c 
 		ClusterName:        c.Name,
 		ClusterStatus:      c.Status.Phase,
 		Offline:            c.Offline(),
-		LocalRegistry:      c.LocalRegistry,
+		ImageRepository:    c.ImageRepository,
 		CRI:                c.ContainerRuntime.Type,
 		KubeVersion:        c.KubernetesVersion,
 		KubeletDataDir:     c.Kubelet.RootDir,

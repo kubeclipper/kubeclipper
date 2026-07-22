@@ -44,7 +44,7 @@ const (
 `
 	clusterUpgradeExample = `
 	# offline upgrade cluster 
-	kcctl cluster upgrade --cluster-name clu-1 --version v1.21.3 --local-registry 172.20.150.138:5000
+	kcctl cluster upgrade --cluster-name clu-1 --version v1.21.3 --image-repository registry.example.com/kubernetes
 	# online upgrade cluster 
 	kcctl cluster upgrade --cluster-name clu-1 --version v1.21.3 --online
 `
@@ -57,10 +57,11 @@ const (
 
 type ClusterUpgradeOpts struct {
 	BaseOptions
-	ClusterName   string
-	Version       string
-	Online        bool
-	LocalRegistry string
+	ClusterName             string
+	Version                 string
+	Online                  bool
+	ImageRepository         string
+	imageRepositoryExplicit bool
 }
 
 func NewClusterUpgradeOpts(streams options.IOStreams) *ClusterUpgradeOpts {
@@ -70,6 +71,7 @@ func NewClusterUpgradeOpts(streams options.IOStreams) *ClusterUpgradeOpts {
 			CliOpts:    options.NewCliOptions(),
 			IOStreams:  streams,
 		},
+		ImageRepository: corev1.DefaultImageRepository,
 	}
 }
 
@@ -81,6 +83,7 @@ func NewCmdClusterUpgrade(streams options.IOStreams) *cobra.Command {
 		Long:    upgradeLongDescription,
 		Example: clusterUpgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			c.imageRepositoryExplicit = cmd.Flags().Changed("image-repository")
 			utils.CheckErr(c.Complete())
 			utils.CheckErr(c.Validates())
 			utils.CheckErr(c.Run())
@@ -90,7 +93,9 @@ func NewCmdClusterUpgrade(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVarP(&c.ClusterName, "cluster-name", "c", c.ClusterName, "cluster name")
 	cmd.Flags().StringVarP(&c.Version, "version", "v", c.Version, "target version")
 	cmd.Flags().BoolVar(&c.Online, "online", c.Online, "The way to upgrade")
-	cmd.Flags().StringVarP(&c.LocalRegistry, "local-registry", "r", c.LocalRegistry, "image registry address")
+	cmd.Flags().StringVarP(
+		&c.ImageRepository, "image-repository", "r", c.ImageRepository,
+		"Choose a container registry to pull control plane images from")
 
 	utils.CheckErr(cmd.MarkFlagRequired("cluster-name"))
 	utils.CheckErr(cmd.MarkFlagRequired("version"))
@@ -111,6 +116,9 @@ func (c *ClusterUpgradeOpts) Complete() error {
 }
 
 func (c *ClusterUpgradeOpts) Validates() error {
+	if !c.Online && !c.imageRepositoryExplicit {
+		return errors.New("--image-repository must be explicitly specified in offline mode")
+	}
 	if err := c.checkVersionFormat(); err != nil {
 		return err
 	}
@@ -132,9 +140,9 @@ func (c *ClusterUpgradeOpts) Validates() error {
 
 func (c *ClusterUpgradeOpts) Run() error {
 	clusterUpgrade := &v1.ClusterUpgrade{
-		Version:       c.Version,
-		Offline:       !c.Online,
-		LocalRegistry: c.LocalRegistry,
+		Version:         c.Version,
+		Offline:         !c.Online,
+		ImageRepository: c.ImageRepository,
 	}
 
 	return c.Client.UpgradeCluster(context.TODO(), c.ClusterName, clusterUpgrade)

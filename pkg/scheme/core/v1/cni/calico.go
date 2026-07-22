@@ -91,7 +91,7 @@ func (runnable *CalicoRunnable) InitStep(metadata *component.ExtraMetadata, cni 
 	}
 	stepper.CNI = *cni
 	stepper.KubeletDataDir = metadata.KubeletDataDir
-	stepper.LocalRegistry = cni.LocalRegistry
+	stepper.ImageRepository = cni.ImageRepository
 	stepper.BaseCni.Type = "calico"
 	stepper.Version = cni.Version
 	stepper.CriType = metadata.CRI
@@ -113,7 +113,7 @@ func (runnable *CalicoRunnable) LoadImage(nodes []v1.StepNode) ([]v1.Step, error
 		return nil, err
 	}
 
-	if runnable.Offline && runnable.LocalRegistry == "" {
+	if runnable.Offline && runnable.ImageRepository == "" {
 		return []v1.Step{LoadImage("calico", bytes, nodes)}, nil
 	}
 
@@ -162,7 +162,7 @@ func (runnable *CalicoRunnable) UninstallSteps(nodes []v1.StepNode) (steps []v1.
 	if err != nil {
 		return nil, err
 	}
-	if runnable.Offline && runnable.LocalRegistry == "" {
+	if runnable.Offline && runnable.ImageRepository == "" {
 		steps = append(steps, RemoveImage("calico", bytes, nodes))
 	}
 	return

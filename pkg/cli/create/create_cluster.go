@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	componentutils "github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
@@ -62,7 +63,7 @@ const (
   kcctl create cluster --name demo --master 192.168.10.123
 
   # Create cluster online
-  kcctl create cluster --name demo --master 192.168.10.123 --offline false --local-registry 192.168.10.123:5000
+  kcctl create cluster --name demo --master 192.168.10.123 --offline false --image-repository registry.k8s.io
 
   # Create cluster with taint manage
   kcctl create cluster --name demo --master 192.168.10.123 --untaint-master
@@ -146,8 +147,7 @@ type CreateClusterOptions struct {
 	Workers                          []string
 	UntaintMaster                    bool
 	Offline                          bool
-	LocalRegistry                    string
-	InsecureRegistries               []string
+	ImageRepository                  string
 	CRIRegistries                    []string
 	CRI                              string
 	CRIVersion                       string
@@ -188,6 +188,7 @@ func NewCreateClusterOptions(streams options.IOStreams) *CreateClusterOptions {
 		},
 		UntaintMaster:     false,
 		Offline:           true,
+		ImageRepository:   v1.DefaultImageRepository,
 		CRI:               "containerd",
 		CNI:               "calico",
 		createdByIP:       false,
@@ -221,8 +222,9 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.Workers, "worker", o.Workers, "k8s worker node id or ip")
 	cmd.Flags().BoolVar(&o.UntaintMaster, "untaint-master", o.UntaintMaster, "untaint master node after cluster create")
 	cmd.Flags().BoolVar(&o.Offline, "offline", o.Offline, "create cluster online(false) or offline(true)")
-	cmd.Flags().StringVar(&o.LocalRegistry, "local-registry", o.LocalRegistry, "use local registry address to pull image for create cluster")
-	cmd.Flags().StringSliceVar(&o.InsecureRegistries, "insecure-registry", o.InsecureRegistries, "use remote registry address to pull image")
+	cmd.Flags().StringVar(
+		&o.ImageRepository, "image-repository", o.ImageRepository,
+		"Choose a container registry to pull control plane images from")
 	cmd.Flags().StringSliceVar(&o.CRIRegistries, "cri-registry", o.CRIRegistries, "specify internal cri registry name to add registry config to containerd,run command [kcctl get registry] to show internal cri registry")
 	cmd.Flags().StringVar(&o.CRI, "cri", o.CRI, "k8s cri type, docker or containerd")
 	cmd.Flags().StringVar(&o.CRIVersion, "cri-version", o.CRIVersion, "k8s cri version")
@@ -252,12 +254,6 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("worker", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listNode(toComplete, append(o.Masters, o.Workers...)), cobra.ShellCompDirectiveNoFileComp
-	}))
-	utils.CheckErr(cmd.RegisterFlagCompletionFunc("local-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return o.listRegistry(toComplete), cobra.ShellCompDirectiveNoFileComp
-	}))
-	utils.CheckErr(cmd.RegisterFlagCompletionFunc("insecure-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return o.registry(toComplete), cobra.ShellCompDirectiveNoFileComp
 	}))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("cri", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return allowedCRI.List(), cobra.ShellCompDirectiveNoFileComp
@@ -354,6 +350,12 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 		return utils.UsageErrorf(cmd, "unsupported cni version,support %v now", cniVersions)
 	}
 
+	if l.Offline && !cmd.Flags().Changed("image-repository") {
+		return utils.UsageErrorf(cmd, "--image-repository must be explicitly specified in offline mode")
+	}
+	if _, _, err := componentutils.NormalizeImageRepository(l.ImageRepository); err != nil {
+		return utils.UsageErrorf(cmd, "%v", err)
+	}
 	criRegistries := l.listCRIRegistry()
 	for _, registry := range l.CRIRegistries {
 		if !sliceutil.HasString(criRegistries, registry) {
@@ -527,7 +529,7 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		CertSANs:          l.CertSans,
 		ExternalCaCert:    l.CaCertFile,
 		ExternalCaKey:     l.CaKeyFile,
-		LocalRegistry:     l.LocalRegistry,
+		ImageRepository:   l.ImageRepository,
 		ContainerRuntime:  v1.ContainerRuntime{},
 		Networking: v1.Networking{
 			IPFamily:      v1.IPFamilyIPv4,
@@ -541,9 +543,8 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 		KubeProxy: v1.KubeProxy{},
 		Etcd:      v1.Etcd{},
 		CNI: v1.CNI{
-			LocalRegistry: l.LocalRegistry,
-			Type:          l.CNI,
-			Version:       l.CNIVersion,
+			Type:    l.CNI,
+			Version: l.CNIVersion,
 			Calico: &v1.Calico{
 				IPv4AutoDetection: l.IPv4AutoDetection,
 				IPv6AutoDetection: "first-found",
@@ -602,10 +603,6 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	}
 	c.Masters = masters
 	c.Workers = workers
-	var insecureRegistry []string
-	if l.LocalRegistry != "" {
-		insecureRegistry = []string{l.LocalRegistry}
-	}
 	var criRegistry []v1.CRIRegistry
 	for _, registry := range l.CRIRegistries {
 		r := registry
@@ -617,19 +614,17 @@ func (l *CreateClusterOptions) newCluster() *v1.Cluster {
 	switch l.CRI {
 	case "docker":
 		c.ContainerRuntime = v1.ContainerRuntime{
-			Type:             v1.CRIDocker,
-			Version:          l.CRIVersion,
-			InsecureRegistry: append(insecureRegistry, l.InsecureRegistries...),
-			Registries:       criRegistry,
+			Type:       v1.CRIDocker,
+			Version:    l.CRIVersion,
+			Registries: criRegistry,
 		}
 	case "containerd":
 		fallthrough
 	default:
 		c.ContainerRuntime = v1.ContainerRuntime{
-			Type:             v1.CRIContainerd,
-			Version:          l.CRIVersion,
-			InsecureRegistry: append(insecureRegistry, l.InsecureRegistries...),
-			Registries:       criRegistry,
+			Type:       v1.CRIContainerd,
+			Version:    l.CRIVersion,
+			Registries: criRegistry,
 		}
 	}
 	return c
@@ -703,26 +698,6 @@ func (l *CreateClusterOptions) listNode(toComplete string, exclude []string) []s
 		return sliceutil.HasString(exclude, item)
 	})
 	return completions
-}
-
-func (l *CreateClusterOptions) listRegistry(toComplete string) []string {
-	utils.CheckErr(l.Complete(l.CliOpts))
-
-	return l.registry(toComplete)
-}
-
-func (l *CreateClusterOptions) registry(toComplete string) []string {
-	list := make([]string, 0)
-	template, err := l.Client.GetPlatformSetting(context.TODO())
-	if err != nil {
-		return nil
-	}
-	for _, v := range template.InsecureRegistry {
-		if strings.HasPrefix(v.Host, toComplete) {
-			list = append(list, v.Host)
-		}
-	}
-	return list
 }
 
 func (l *CreateClusterOptions) nodes(toComplete string) []string {

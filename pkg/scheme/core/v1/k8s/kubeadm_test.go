@@ -51,7 +51,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 		KubernetesVersion       string
 		ControlPlaneEndpoint    string
 		CertSANs                []string
-		LocalRegistry           string
+		ImageRepository         string
 		FeatureGates            map[string]bool
 		IgnorePreflightErrors   string
 	}
@@ -80,7 +80,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				KubernetesVersion:     "v1.23.6",
 				ControlPlaneEndpoint:  "apiserver.cluster.local:6443",
 				CertSANs:              []string{"127.0.0.1"},
-				LocalRegistry:         "127.0.0.1:5000",
+				ImageRepository:       "127.0.0.1:5000",
 				IgnorePreflightErrors: "",
 			},
 		},
@@ -104,7 +104,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				KubernetesVersion:     "v1.23.6",
 				ControlPlaneEndpoint:  "apiserver.cluster.local:6443",
 				CertSANs:              []string{"127.0.0.1"},
-				LocalRegistry:         "127.0.0.1:5000",
+				ImageRepository:       "127.0.0.1:5000",
 				IgnorePreflightErrors: "NumCPU",
 			},
 		},
@@ -128,7 +128,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				KubernetesVersion:    "v1.23.6",
 				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
 				CertSANs:             []string{"127.0.0.1"},
-				LocalRegistry:        "127.0.0.1:5000",
+				ImageRepository:      "127.0.0.1:5000",
 				FeatureGates: map[string]bool{
 					"AdmissionWebhookMatchConditions": true,
 					"AggregatedDiscoveryEndpoint":     true,
@@ -150,7 +150,7 @@ func TestKubeadmConfig_renderTo(t *testing.T) {
 				KubernetesVersion:       tt.fields.KubernetesVersion,
 				ControlPlaneEndpoint:    tt.fields.ControlPlaneEndpoint,
 				CertSANs:                tt.fields.CertSANs,
-				LocalRegistry:           tt.fields.LocalRegistry,
+				ImageRepository:         tt.fields.ImageRepository,
 				FeatureGates:            tt.fields.FeatureGates,
 				IgnorePreflightErrors:   parseIgnorePreflightErrors(tt.fields.IgnorePreflightErrors),
 			}
@@ -171,7 +171,7 @@ func TestClusterNode_renderIPVSCarePod(t *testing.T) {
 		NodeRole            string
 		WorkerNodeVIP       string
 		Masters             map[string]string
-		LocalRegistry       string
+		ImageRepository     string
 		APIServerDomainName string
 		JoinMasterIP        string
 		EtcdDataPath        string
@@ -190,7 +190,7 @@ func TestClusterNode_renderIPVSCarePod(t *testing.T) {
 				Masters: map[string]string{
 					"id": "dee4ee99-d102-48f6-8382-72a61160c353",
 				},
-				LocalRegistry:       "127.0.0.1:5000",
+				ImageRepository:     "127.0.0.1:5000",
 				APIServerDomainName: "domain",
 				JoinMasterIP:        "10.0.0.1",
 				EtcdDataPath:        "/var/etcd/lib",
@@ -203,7 +203,7 @@ func TestClusterNode_renderIPVSCarePod(t *testing.T) {
 				NodeRole:            tt.fields.NodeRole,
 				WorkerNodeVIP:       tt.fields.WorkerNodeVIP,
 				Masters:             tt.fields.Masters,
-				LocalRegistry:       tt.fields.LocalRegistry,
+				ImageRepository:     tt.fields.ImageRepository,
 				APIServerDomainName: tt.fields.APIServerDomainName,
 				JoinMasterIP:        tt.fields.JoinMasterIP,
 				EtcdDataPath:        tt.fields.EtcdDataPath,
@@ -231,7 +231,7 @@ func TestKubeadmConfig_renderJoin(t *testing.T) {
 		KubernetesVersion       string
 		ControlPlaneEndpoint    string
 		CertSANs                []string
-		LocalRegistry           string
+		ImageRepository         string
 		Offline                 bool
 		IsControlPlane          bool
 		CACertHashes            string
@@ -264,7 +264,7 @@ func TestKubeadmConfig_renderJoin(t *testing.T) {
 				KubernetesVersion:    "v1.23.6",
 				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
 				CertSANs:             []string{"127.0.0.1"},
-				LocalRegistry:        "127.0.0.1:5000",
+				ImageRepository:      "127.0.0.1:5000",
 				Offline:              true,
 				IsControlPlane:       true,
 				CACertHashes:         "hash1",
@@ -292,7 +292,7 @@ func TestKubeadmConfig_renderJoin(t *testing.T) {
 				KubernetesVersion:    "v1.23.6",
 				ControlPlaneEndpoint: "apiserver.cluster.local:6443",
 				CertSANs:             []string{"127.0.0.1"},
-				LocalRegistry:        "127.0.0.1:5000",
+				ImageRepository:      "127.0.0.1:5000",
 				Offline:              true,
 				IsControlPlane:       true,
 				CACertHashes:         "hash1",
@@ -314,7 +314,7 @@ func TestKubeadmConfig_renderJoin(t *testing.T) {
 				KubernetesVersion:       tt.fields.KubernetesVersion,
 				ControlPlaneEndpoint:    tt.fields.ControlPlaneEndpoint,
 				CertSANs:                tt.fields.CertSANs,
-				LocalRegistry:           tt.fields.LocalRegistry,
+				ImageRepository:         tt.fields.ImageRepository,
 				Offline:                 tt.fields.Offline,
 				IsControlPlane:          tt.fields.IsControlPlane,
 				CACertHashes:            tt.fields.CACertHashes,

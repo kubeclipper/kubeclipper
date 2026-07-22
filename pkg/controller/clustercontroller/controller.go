@@ -622,67 +622,7 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 }
 
 func (r *ClusterReconciler) getClusterCRIRegistries(c *v1.Cluster) ([]v1.RegistrySpec, error) {
-	type mirror struct {
-		ImageRepoMirror string `json:"imageRepoMirror"`
-	}
-	insecureRegistry := append([]string{}, c.ContainerRuntime.InsecureRegistry...)
-	sort.Strings(insecureRegistry)
-	// add addons mirror registry
-	for _, a := range c.Addons {
-		var m mirror
-		err := json.Unmarshal(a.Config.Raw, &m)
-		if err != nil {
-			continue
-		}
-		if m.ImageRepoMirror != "" {
-			idx, ok := sort.Find(len(insecureRegistry), func(i int) int {
-				return strings.Compare(m.ImageRepoMirror, insecureRegistry[i])
-			})
-			if !ok {
-				if idx == len(insecureRegistry) {
-					insecureRegistry = append(insecureRegistry, m.ImageRepoMirror)
-				} else {
-					insecureRegistry = append(insecureRegistry[:idx+1], insecureRegistry[idx:]...)
-					insecureRegistry[idx] = m.ImageRepoMirror
-				}
-			}
-		}
-	}
-
-	registries := make([]v1.RegistrySpec, 0, len(insecureRegistry)*2+len(c.ContainerRuntime.Registries))
-	// insecure registry
-	for _, host := range insecureRegistry {
-		registries = appendUniqueRegistry(registries,
-			v1.RegistrySpec{Scheme: "http", Host: host},
-			v1.RegistrySpec{Scheme: "https", Host: host, SkipVerify: true})
-	}
-
-	validRegistries := c.ContainerRuntime.Registries[:0]
-	for _, reg := range c.ContainerRuntime.Registries {
-		if reg.RegistryRef == nil || *reg.RegistryRef == "" {
-			// fix reg.RegistryRef=""
-			reg.RegistryRef = nil
-			registries = appendUniqueRegistry(registries,
-				v1.RegistrySpec{Scheme: "http", Host: reg.InsecureRegistry},
-				v1.RegistrySpec{Scheme: "https", Host: reg.InsecureRegistry, SkipVerify: true})
-			validRegistries = append(validRegistries, reg)
-			continue
-		}
-		//registry, err := r.RegistryLister.Get(*reg.RegistryRef)
-		// use operator not lister
-		registry, err := r.ClusterOperator.GetRegistry(context.Background(), *reg.RegistryRef)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				continue
-			}
-			return nil, fmt.Errorf("get registry %s:%w", *reg.RegistryRef, err)
-		}
-		logger.Debugf("【cluster-controller】 getClusterCRIRegistries registry:%#v  auth:%#v", registry, registry.RegistryAuth)
-		registries = appendUniqueRegistry(registries, registry.RegistrySpec)
-		validRegistries = append(validRegistries, reg)
-	}
-	c.ContainerRuntime.Registries = validRegistries
-	return registries, nil
+	return utils.GetClusterCRIRegistries(c, r.ClusterOperator)
 }
 
 func CRIRegistryUpdateStep(cluster *v1.Cluster, registries []v1.RegistrySpec, nodes []*v1.Node) (*v1.Step, error) {

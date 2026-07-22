@@ -43,7 +43,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 					PodIPv4CIDR: constatns.ClusterPodSubnet,
 					PodIPv6CIDR: "aaa:bbb",
 					CNI: v1.CNI{
-						LocalRegistry: "172.0.0.1:5000",
+						ImageRepository: "172.0.0.1:5000",
 						Type:          "calico",
 						Version:       "v3.26.1",
 						Calico: &v1.Calico{
@@ -65,7 +65,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 					DualStack:   false,
 					PodIPv4CIDR: "10.244.0.0/16",
 					CNI: v1.CNI{
-						LocalRegistry: "",
+						ImageRepository: "",
 						Type:          "calico",
 						Version:       "v3.26.1",
 						Calico: &v1.Calico{
@@ -86,7 +86,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 					DualStack:   false,
 					PodIPv4CIDR: "10.244.0.0/16",
 					CNI: v1.CNI{
-						LocalRegistry: "",
+						ImageRepository: "",
 						Type:          "calico",
 						Version:       "v3.26.1",
 						Calico: &v1.Calico{
@@ -108,7 +108,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 					PodIPv4CIDR: constatns.ClusterPodSubnet,
 					PodIPv6CIDR: "fd00::/64",
 					CNI: v1.CNI{
-						LocalRegistry: "172.0.0.1:5000",
+						ImageRepository: "172.0.0.1:5000",
 						Type:          "calico",
 						Version:       "v3.29.6",
 						Calico: &v1.Calico{
@@ -131,7 +131,7 @@ func TestCNI_renderCalicoTo(t *testing.T) {
 					PodIPv4CIDR: constatns.ClusterPodSubnet,
 					PodIPv6CIDR: "fd00::/64",
 					CNI: v1.CNI{
-						LocalRegistry: "172.0.0.1:5000",
+						ImageRepository: "172.0.0.1:5000",
 						Type:          "calico",
 						Version:       "v3.31.5",
 						Calico: &v1.Calico{

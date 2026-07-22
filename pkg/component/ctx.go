@@ -45,7 +45,7 @@ type ExtraMetadata struct {
 	Workers                   NodeList
 	ClusterStatus             v1.ClusterPhase
 	Offline                   bool
-	LocalRegistry             string
+	ImageRepository           string
 	CRI                       string
 	ClusterName               string
 	KubeVersion               string

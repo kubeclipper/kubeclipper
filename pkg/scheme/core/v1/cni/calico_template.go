@@ -491,7 +491,7 @@ spec:
      priorityClassName: system-node-critical
      initContainers:
        - name: upgrade-ipam
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+         image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
          command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
          env:
            - name: KUBERNETES_NODE_NAME
@@ -511,7 +511,7 @@ spec:
          securityContext:
            privileged: true
        - name: install-cni
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+         image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
          command: ["/install-cni.sh"]
          env:
            - name: CNI_CONF_NAME
@@ -540,7 +540,7 @@ spec:
          securityContext:
            privileged: true
        - name: flexvol-driver
-         image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
+         image: {{with .CNI.ImageRepository }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
          volumeMounts:
          - name: flexvol-driver-host
            mountPath: /host/driver
@@ -548,7 +548,7 @@ spec:
            privileged: true
      containers:
        - name: calico-node
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+         image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
          env:
            - name: DATASTORE_TYPE
              value: "kubernetes"
@@ -727,7 +727,7 @@ spec:
      priorityClassName: system-cluster-critical
      containers:
        - name: calico-kube-controllers
-         image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
+         image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
          env:
            - name: ENABLED_CONTROLLERS
              value: node
@@ -4745,7 +4745,7 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
         - name: upgrade-ipam
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
           - configMapRef:
@@ -4769,7 +4769,7 @@ spec:
           securityContext:
             privileged: true
         - name: install-cni
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/install"]
           envFrom:
           - configMapRef:
@@ -4802,7 +4802,7 @@ spec:
           securityContext:
             privileged: true
         - name: flexvol-driver
-          image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
           volumeMounts:
           - name: flexvol-driver-host
             mountPath: /host/driver
@@ -4810,7 +4810,7 @@ spec:
             privileged: true
       containers:
         - name: calico-node
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           envFrom:
           - configMapRef:
               name: kubernetes-services-endpoint
@@ -5021,7 +5021,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
           env:
             - name: ENABLED_CONTROLLERS
               value: node
@@ -8560,7 +8560,7 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
         - name: upgrade-ipam
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
             - configMapRef:
@@ -8584,7 +8584,7 @@ spec:
           securityContext:
             privileged: true
         - name: install-cni
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/install"]
           envFrom:
             - configMapRef:
@@ -8617,7 +8617,7 @@ spec:
           securityContext:
             privileged: true
         - name: flexvol-driver
-          image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
           volumeMounts:
             - name: flexvol-driver-host
               mountPath: /host/driver
@@ -8625,7 +8625,7 @@ spec:
             privileged: true
       containers:
         - name: calico-node
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           envFrom:
             - configMapRef:
                 name: kubernetes-services-endpoint
@@ -8821,7 +8821,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
           env:
             - name: ENABLED_CONTROLLERS
               value: node
@@ -12963,7 +12963,7 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
         - name: upgrade-ipam
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
             - configMapRef:
@@ -12987,7 +12987,7 @@ spec:
           securityContext:
             privileged: true
         - name: install-cni
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           command: ["/opt/cni/bin/install"]
           envFrom:
             - configMapRef:
@@ -13020,14 +13020,14 @@ spec:
           securityContext:
             privileged: true
         - name: flexvol-driver
-          image: {{with .CNI.LocalRegistry }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository }}{{.}}/{{end}}calico/pod2daemon-flexvol:{{.CNI.Version}}
           volumeMounts:
             - name: flexvol-driver-host
               mountPath: /host/driver
           securityContext:
             privileged: true
         - name: "mount-bpffs"
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           command: ["calico-node", "-init", "-best-effort"]
           volumeMounts:
             - mountPath: /sys/fs
@@ -13043,7 +13043,7 @@ spec:
             privileged: true
       containers:
         - name: calico-node
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           envFrom:
             - configMapRef:
                 name: kubernetes-services-endpoint
@@ -13260,7 +13260,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
           env:
             - name: ENABLED_CONTROLLERS
               value: node
@@ -17615,7 +17615,7 @@ spec:
       priorityClassName: system-node-critical
       initContainers:
         - name: upgrade-ipam
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           imagePullPolicy: IfNotPresent
           command: ["/opt/cni/bin/calico-ipam", "-upgrade"]
           envFrom:
@@ -17640,7 +17640,7 @@ spec:
           securityContext:
             privileged: true
         - name: install-cni
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/cni:{{.CNI.Version}}
           imagePullPolicy: IfNotPresent
           command: ["/opt/cni/bin/install"]
           envFrom:
@@ -17674,7 +17674,7 @@ spec:
           securityContext:
             privileged: true
         - name: "mount-bpffs"
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           imagePullPolicy: IfNotPresent
           command: ["calico-node", "-init", "-best-effort"]
           volumeMounts:
@@ -17691,7 +17691,7 @@ spec:
             privileged: true
       containers:
         - name: calico-node
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/node:{{.CNI.Version}}
           imagePullPolicy: IfNotPresent
           envFrom:
           - configMapRef:
@@ -17899,7 +17899,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: calico-kube-controllers
-          image: {{with .CNI.LocalRegistry}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
+          image: {{with .CNI.ImageRepository}}{{.}}/{{end}}calico/kube-controllers:{{.CNI.Version}}
           imagePullPolicy: IfNotPresent
           env:
             - name: ENABLED_CONTROLLERS
@@ -17923,7 +17923,7 @@ spec:
             periodSeconds: 10`
 
 const calicoV3261 = `installation:
-  registry: {{with .CNI.LocalRegistry}}{{.}}{{end}}
+  registry: {{with .CNI.ImageRepository}}{{.}}{{end}}
   kubeletVolumePluginPath: {{ if .KubeletDataDir }}{{ .KubeletDataDir }}{{ else }}/var/lib/kubelet{{ end }}
   cni:
     type: Calico
@@ -17992,15 +17992,15 @@ apiServer:
 tigeraOperator:
   image: tigera/operator
   version: v1.30.4
-  registry: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}
+  registry: {{with .CNI.ImageRepository}}{{.}}{{else}}quay.io{{end}}
 calicoctl:
-  image: {{with .CNI.LocalRegistry}}{{.}}{{else}}docker.io{{end}}/calico/ctl
+  image: {{with .CNI.ImageRepository}}{{.}}{{else}}docker.io{{end}}/calico/ctl
   tag: v3.26.1`
 
 const calicoV3296 = `installation:
   enabled: true
   kubernetesProvider: ""
-  registry: {{with .CNI.LocalRegistry}}{{.}}{{end}}
+  registry: {{with .CNI.ImageRepository}}{{.}}{{end}}
   kubeletVolumePluginPath: {{ if .KubeletDataDir }}{{ .KubeletDataDir }}{{ else }}/var/lib/kubelet{{ end }}
   cni:
     type: Calico
@@ -18104,9 +18104,9 @@ dnsConfig: {}
 tigeraOperator:
   image: tigera/operator
   version: v1.36.14
-  registry: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}
+  registry: {{with .CNI.ImageRepository}}{{.}}{{else}}quay.io{{end}}
 calicoctl:
-  image: {{with .CNI.LocalRegistry}}{{.}}{{else}}docker.io{{end}}/calico/ctl
+  image: {{with .CNI.ImageRepository}}{{.}}{{else}}docker.io{{end}}/calico/ctl
   tag: v3.29.6
 
 # Optionally configure the host and port used to access the Kubernetes API server
@@ -18116,7 +18116,7 @@ kubernetesServiceEndpoint:
 const calicoV3315 = `installation:
   enabled: true
   kubernetesProvider: ""
-  registry: {{with .CNI.LocalRegistry}}{{.}}{{end}}
+  registry: {{with .CNI.ImageRepository}}{{.}}{{end}}
   kubeletVolumePluginPath: "None"
   imagePullSecrets: []
   cni:
@@ -18238,9 +18238,9 @@ dnsConfig: {}
 tigeraOperator:
   image: tigera/operator
   version: v1.40.8
-  registry: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}
+  registry: {{with .CNI.ImageRepository}}{{.}}{{else}}quay.io{{end}}
 calicoctl:
-  image: {{with .CNI.LocalRegistry}}{{.}}{{else}}quay.io{{end}}/calico/ctl
+  image: {{with .CNI.ImageRepository}}{{.}}{{else}}quay.io{{end}}/calico/ctl
   tag: v3.31.5
 
 # Optionally configure the host and port used to access the Kubernetes API server

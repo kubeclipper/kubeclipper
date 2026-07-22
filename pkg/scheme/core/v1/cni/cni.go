@@ -80,7 +80,7 @@ func (runnable *BaseCni) Install(ctx context.Context, opts component.Options) ([
 		return nil, err
 	}
 
-	if runnable.Offline && runnable.LocalRegistry == "" {
+	if runnable.Offline && runnable.ImageRepository == "" {
 		dstFile, err := instance.DownloadImages()
 		if err != nil {
 			return nil, err
