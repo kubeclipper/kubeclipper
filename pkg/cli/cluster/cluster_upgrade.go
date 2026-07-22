@@ -95,9 +95,10 @@ func NewCmdClusterUpgrade(streams options.IOStreams) *cobra.Command {
 	cmd.Flags().StringVarP(
 		&c.ImageRegistry, "image-registry", "r", c.ImageRegistry,
 		"Choose a Registry resource to pull Kubernetes images from")
-	utils.CheckErr(cmd.RegisterFlagCompletionFunc("image-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	imageRegistryCompletion := func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return c.listImageRegistry(toComplete), cobra.ShellCompDirectiveNoFileComp
-	}))
+	}
+	utils.CheckErr(cmd.RegisterFlagCompletionFunc("image-registry", imageRegistryCompletion))
 
 	utils.CheckErr(cmd.MarkFlagRequired("cluster-name"))
 	utils.CheckErr(cmd.MarkFlagRequired("version"))
@@ -114,7 +115,8 @@ func (c *ClusterUpgradeOpts) listImageRegistry(toComplete string) []string {
 		return nil
 	}
 	completions := make([]string, 0, len(registries.Items))
-	for _, registry := range registries.Items {
+	for i := range registries.Items {
+		registry := &registries.Items[i]
 		if strings.HasPrefix(registry.Name, toComplete) {
 			completions = append(completions, fmt.Sprintf("%s\t%s://%s", registry.Name, registry.Scheme, registry.Host))
 		}
@@ -171,7 +173,8 @@ func (c *ClusterUpgradeOpts) checkImageRegistry() error {
 	if err != nil {
 		return err
 	}
-	for _, registry := range registries.Items {
+	for i := range registries.Items {
+		registry := &registries.Items[i]
 		if registry.Name == c.ImageRegistry {
 			return nil
 		}

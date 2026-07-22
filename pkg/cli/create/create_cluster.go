@@ -253,9 +253,10 @@ func NewCmdCreateCluster(streams options.IOStreams) *cobra.Command {
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("worker", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listNode(toComplete, append(o.Masters, o.Workers...)), cobra.ShellCompDirectiveNoFileComp
 	}))
-	utils.CheckErr(cmd.RegisterFlagCompletionFunc("image-registry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	imageRegistryCompletion := func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return o.listImageRegistry(toComplete), cobra.ShellCompDirectiveNoFileComp
-	}))
+	}
+	utils.CheckErr(cmd.RegisterFlagCompletionFunc("image-registry", imageRegistryCompletion))
 	utils.CheckErr(cmd.RegisterFlagCompletionFunc("cri", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return allowedCRI.List(), cobra.ShellCompDirectiveNoFileComp
 	}))
@@ -664,7 +665,8 @@ func (l *CreateClusterOptions) listCRIRegistry() []string {
 		return nil
 	}
 	names := make([]string, 0)
-	for _, registry := range registries.Items {
+	for i := range registries.Items {
+		registry := &registries.Items[i]
 		names = append(names, registry.Name)
 	}
 	return names
@@ -678,7 +680,8 @@ func (l *CreateClusterOptions) listImageRegistry(toComplete string) []string {
 		return nil
 	}
 	completions := make([]string, 0, len(registries.Items))
-	for _, registry := range registries.Items {
+	for i := range registries.Items {
+		registry := &registries.Items[i]
 		if strings.HasPrefix(registry.Name, toComplete) {
 			completions = append(completions, fmt.Sprintf("%s\t%s://%s", registry.Name, registry.Scheme, registry.Host))
 		}

@@ -31,7 +31,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 
-
 	"github.com/google/uuid"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 

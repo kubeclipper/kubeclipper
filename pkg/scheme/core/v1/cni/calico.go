@@ -187,7 +187,7 @@ func (runnable *CalicoRunnable) Render(ctx context.Context, opts component.Optio
 }
 
 func (runnable *CalicoRunnable) renderCalicoTo(w io.Writer) error {
-	runnable.CNI.ImageRegistry = runnable.ResolvedImageRegistry
+	runnable.ImageRegistry = runnable.ResolvedImageRegistry
 	at := tmplutil.New()
 	calicoTemp, err := runnable.CalicoTemplate()
 	if err != nil {
