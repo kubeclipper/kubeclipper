@@ -38,10 +38,12 @@ type Cluster struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
-	LocalRegistry     string         `json:"localRegistry,omitempty" optional:"true"`
-	Masters           WorkerNodeList `json:"masters"`
-	Workers           WorkerNodeList `json:"workers" optional:"true"`
-	KubernetesVersion string         `json:"kubernetesVersion" enum:"v1.20.13"`
+	// ImageRegistry references the Registry resource used for Kubernetes and CNI images.
+	ImageRegistry         string         `json:"imageRegistry,omitempty" optional:"true"`
+	ResolvedImageRegistry string         `json:"-"`
+	Masters               WorkerNodeList `json:"masters"`
+	Workers               WorkerNodeList `json:"workers" optional:"true"`
+	KubernetesVersion     string         `json:"kubernetesVersion" enum:"v1.20.13"`
 	// when generate cert,use GetAllCertSANs
 	CertSANs          []string           `json:"certSANs,omitempty" optional:"true"`
 	ExternalCaCert    string             `json:"externalCaCert,omitempty" optional:"true"`
@@ -174,7 +176,7 @@ func (c *Cluster) Complete() {
 	if c.Kubelet.RootDir == "" {
 		c.Kubelet.RootDir = "/var/lib/kubelet"
 	}
-	c.CNI.LocalRegistry = c.LocalRegistry
+	c.CNI.ImageRegistry = c.ResolvedImageRegistry
 	c.CNI.CriType = c.ContainerRuntime.Type
 	c.CNI.Offline = c.Offline()
 	if common.IsKubeVersionGreater(c.KubernetesVersion, 126) {
@@ -254,7 +256,8 @@ var (
 )
 
 type CNI struct {
-	LocalRegistry string `json:"localRegistry" optional:"true"`
+	// ImageRegistry is inherited from Cluster at runtime.
+	ImageRegistry string `json:"-"`
 	// TODO: Cluster multiple cni plugins are not supported at this time
 	Type      string  `json:"type" enum:"calico"`
 	Version   string  `json:"version"`
@@ -303,15 +306,12 @@ type ContainerRuntime struct {
 	Type        string `json:"type" enum:"docker|containerd"`
 	Version     string `json:"version,omitempty" enum:"1.4.4"`
 	DataRootDir string `json:"rootDir,omitempty"`
-	// Deprecated: use Registries instead.
-	InsecureRegistry []string `json:"insecureRegistry,omitempty"`
-	// When updating
+	// Registries references additional Registry resources configured for the CRI.
 	Registries []CRIRegistry `json:"registries,omitempty"`
 }
 
 type CRIRegistry struct {
-	InsecureRegistry string  `json:"insecureRegistry,omitempty"`
-	RegistryRef      *string `json:"registryRef,omitempty"`
+	RegistryRef *string `json:"registryRef,omitempty"`
 }
 
 // taint define

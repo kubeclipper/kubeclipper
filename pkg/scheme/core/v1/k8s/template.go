@@ -75,7 +75,7 @@ scheduler:
     mountPath: "/etc/localtime"
     readOnly: true
     pathType: File
-{{with .LocalRegistry}}imageRepository: {{.}}{{end}}
+{{with .ImageRegistry}}imageRepository: {{.}}{{end}}
 {{with .ClusterName}}clusterName: {{.}}{{end}}
 {{if gt (len .FeatureGates) 0}}
 featureGates:{{range $key,$value := .FeatureGates}}
@@ -201,7 +201,7 @@ spec:
     command:
     - /usr/bin/lvscare
     #image: fanux/lvscare:v1.1.1
-    image: {{with .LocalRegistry}}{{.}}/{{end}}fanux/lvscare:v1.1.1
+    image: {{with .ImageRegistry}}{{.}}/{{end}}fanux/lvscare:v1.1.1
     imagePullPolicy: IfNotPresent
     name: kube-lvscare
     resources: {}

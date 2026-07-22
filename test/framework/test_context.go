@@ -30,7 +30,7 @@ const (
 	defaultHost          = "http://127.0.0.1:8080"
 	defaultServiceSubnet = constatns.ClusterServiceSubnet
 	defaultPodSubnet     = constatns.ClusterPodSubnet
-	defaultLocalRegistry = "127.0.0.1:5000"
+	defaultImageRegistry = "127.0.0.1:5000"
 	defaultWorkerNodeVip = "169.254.169.100"
 )
 
@@ -39,7 +39,7 @@ type TestContextType struct {
 	InMemoryTest  bool
 	ServiceSubnet string
 	PodSubnet     string
-	LocalRegistry string
+	ImageRegistry string
 	WorkerNodeVip string
 }
 
@@ -64,7 +64,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 		"cluster svc sub net, default 10.96.0.0/12")
 	flag.StringVar(&TestContext.PodSubnet, "pod-subnet", defaultPodSubnet,
 		"cluster pod sub net, default 172.25.0.0/16")
-	flag.StringVar(&TestContext.LocalRegistry, "registry", defaultLocalRegistry,
+	flag.StringVar(&TestContext.ImageRegistry, "registry", defaultImageRegistry,
 		"cri image registry addr, default 127.0.0.1:5000")
 	flag.StringVar(&TestContext.WorkerNodeVip, "vip", defaultWorkerNodeVip,
 		"cluster worker node loadblance vip, default 169.254.169.100")

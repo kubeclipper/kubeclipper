@@ -37,7 +37,7 @@ import (
 func TestContainerdRunnable_renderTo(t *testing.T) {
 	type fields struct {
 		Base           Base
-		LocalRegistry  string
+		ImageRegistry  string
 		KubeVersion    string
 		PauseVersion   string
 		installSteps   []v1.Step
@@ -82,7 +82,7 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 						},
 					},
 				},
-				LocalRegistry: "",
+				ImageRegistry: "",
 				KubeVersion:   "1.23.6",
 				PauseVersion:  "3.2",
 			},
@@ -101,7 +101,7 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 						},
 					},
 				},
-				LocalRegistry: "127.0.0.1:5000",
+				ImageRegistry: "127.0.0.1:5000",
 				KubeVersion:   "1.23.6",
 				PauseVersion:  "3.2",
 			},
@@ -111,7 +111,7 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			runnable := &ContainerdRunnable{
 				Base:           tt.fields.Base,
-				LocalRegistry:  tt.fields.LocalRegistry,
+				ImageRegistry:  tt.fields.ImageRegistry,
 				KubeVersion:    tt.fields.KubeVersion,
 				PauseVersion:   tt.fields.PauseVersion,
 				installSteps:   tt.fields.installSteps,
@@ -600,7 +600,7 @@ func TestContainerdRunnable_renderTo_V3(t *testing.T) {
 				},
 			},
 		},
-		LocalRegistry:       "127.0.0.1:5000",
+		ImageRegistry:       "127.0.0.1:5000",
 		KubeVersion:         "1.29.0",
 		PauseVersion:        "3.9",
 		PauseRegistry:       "registry.k8s.io",

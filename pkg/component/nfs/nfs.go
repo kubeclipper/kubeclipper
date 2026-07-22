@@ -160,9 +160,9 @@ func (n *NFSProvisioner) Validate() error {
 func (n *NFSProvisioner) InitSteps(ctx context.Context) error {
 	metadata := component.GetExtraMetadata(ctx)
 	n.Replicas = len(metadata.Masters.GetNodeIDs())
-	// when the component does not specify an ImageRepoMirror, the cluster LocalRegistry is inherited
+	// when the component does not specify an ImageRepoMirror, the cluster ImageRegistry is inherited
 	if n.ImageRepoMirror == "" {
-		n.ImageRepoMirror = metadata.LocalRegistry
+		n.ImageRepoMirror = metadata.ImageRegistry
 	}
 	if metadata.Offline && n.ImageRepoMirror == "" {
 		// TODO: arch is unnecessary, version can be configured

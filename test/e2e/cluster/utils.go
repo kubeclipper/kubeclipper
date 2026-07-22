@@ -120,7 +120,7 @@ func initCluster() *corev1.Cluster {
 		Workers:           corev1.WorkerNodeList{},
 		KubernetesVersion: "v1.23.6",
 		CertSANs:          nil,
-		LocalRegistry:     "",
+		ImageRegistry:     corev1.DefaultImageRegistry,
 		ContainerRuntime: corev1.ContainerRuntime{
 			Type:    corev1.CRIContainerd,
 			Version: "1.6.4",
@@ -137,7 +137,7 @@ func initCluster() *corev1.Cluster {
 		KubeProxy: corev1.KubeProxy{},
 		Etcd:      corev1.Etcd{},
 		CNI: corev1.CNI{
-			LocalRegistry: "",
+			ImageRegistry: corev1.DefaultImageRegistry,
 			Type:          "calico",
 			Version:       "v3.22.4",
 			Calico: &corev1.Calico{
