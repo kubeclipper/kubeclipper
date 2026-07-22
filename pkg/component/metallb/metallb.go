@@ -157,9 +157,9 @@ func (n *MetalLB) Validate() error {
 
 func (n *MetalLB) InitSteps(ctx context.Context) error {
 	metadata := component.GetExtraMetadata(ctx)
-	// when the component does not specify an ImageRepoMirror, the cluster ImageRepository is inherited
+	// when the component does not specify an ImageRepoMirror, the cluster ImageRegistry is inherited
 	if n.ImageRepoMirror == "" {
-		n.ImageRepoMirror = metadata.ImageRepository
+		n.ImageRepoMirror = metadata.ImageRegistry
 	}
 	if metadata.Offline && n.ImageRepoMirror == "" {
 		// TODO: arch is unnecessary, version can be configured

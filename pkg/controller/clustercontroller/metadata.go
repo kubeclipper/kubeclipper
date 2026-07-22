@@ -22,17 +22,23 @@ import (
 	"context"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
+	componentutils "github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
 // assembleClusterExtraMetadata assemble cluster extra metadata, used to share data between the various steps
 func (r *ClusterReconciler) assembleClusterExtraMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
+	registry, err := componentutils.ResolveImageRegistry(ctx, c.ImageRegistry, r.ClusterOperator)
+	if err != nil {
+		return nil, err
+	}
+	c.ResolvedImageRegistry = registry.Host
 	meta := &component.ExtraMetadata{
 		ClusterName:        c.Name,
 		ClusterStatus:      c.Status.Phase,
 		Offline:            c.Offline(),
-		ImageRepository:    c.ImageRepository,
+		ImageRegistry:      c.ResolvedImageRegistry,
 		CRI:                c.ContainerRuntime.Type,
 		KubeVersion:        c.KubernetesVersion,
 		KubeletDataDir:     c.Kubelet.RootDir,

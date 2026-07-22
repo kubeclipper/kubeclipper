@@ -106,8 +106,8 @@ version = 2
     max_container_log_line_size = 16384
     netns_mounts_under_state_dir = false
     restrict_oom_score_adj = false
-{{- if .ImageRepository }}
-    sandbox_image = "{{.ImageRepository}}/pause:{{$.PauseVersion}}"
+{{- if .ImageRegistry }}
+    sandbox_image = "{{.ImageRegistry}}/pause:{{$.PauseVersion}}"
 {{- else}}
     sandbox_image = "{{.PauseRegistry}}/pause:{{.PauseVersion}}"
 {{- end}}
@@ -367,9 +367,9 @@ version = 3
     disable_snapshot_annotations = true
     discard_unpacked_layers = false
     snapshotter = "overlayfs"
-{{- if .ImageRepository }}
+{{- if .ImageRegistry }}
     [plugins."io.containerd.cri.v1.images".pinned_images]
-      sandbox = "{{.ImageRepository}}/pause:{{$.PauseVersion}}"
+      sandbox = "{{.ImageRegistry}}/pause:{{$.PauseVersion}}"
 {{- else}}
     [plugins."io.containerd.cri.v1.images".pinned_images]
       sandbox = "{{.PauseRegistry}}/pause:{{$.PauseVersion}}"

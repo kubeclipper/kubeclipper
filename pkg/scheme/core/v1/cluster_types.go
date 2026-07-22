@@ -38,11 +38,12 @@ type Cluster struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// move offline to metadata annotation
 	// Offline           bool   `json:"offline" optional:"true"`
-	// ImageRepository is the repository prefix used for Kubernetes and CNI images.
-	ImageRepository   string         `json:"imageRepository,omitempty" optional:"true"`
-	Masters           WorkerNodeList `json:"masters"`
-	Workers           WorkerNodeList `json:"workers" optional:"true"`
-	KubernetesVersion string         `json:"kubernetesVersion" enum:"v1.20.13"`
+	// ImageRegistry references the Registry resource used for Kubernetes and CNI images.
+	ImageRegistry         string         `json:"imageRegistry,omitempty" optional:"true"`
+	ResolvedImageRegistry string         `json:"-"`
+	Masters               WorkerNodeList `json:"masters"`
+	Workers               WorkerNodeList `json:"workers" optional:"true"`
+	KubernetesVersion     string         `json:"kubernetesVersion" enum:"v1.20.13"`
 	// when generate cert,use GetAllCertSANs
 	CertSANs          []string           `json:"certSANs,omitempty" optional:"true"`
 	ExternalCaCert    string             `json:"externalCaCert,omitempty" optional:"true"`
@@ -175,7 +176,7 @@ func (c *Cluster) Complete() {
 	if c.Kubelet.RootDir == "" {
 		c.Kubelet.RootDir = "/var/lib/kubelet"
 	}
-	c.CNI.ImageRepository = c.ImageRepository
+	c.CNI.ImageRegistry = c.ResolvedImageRegistry
 	c.CNI.CriType = c.ContainerRuntime.Type
 	c.CNI.Offline = c.Offline()
 	if common.IsKubeVersionGreater(c.KubernetesVersion, 126) {
@@ -255,8 +256,8 @@ var (
 )
 
 type CNI struct {
-	// ImageRepository is inherited from Cluster at runtime.
-	ImageRepository string `json:"-"`
+	// ImageRegistry is inherited from Cluster at runtime.
+	ImageRegistry string `json:"-"`
 	// TODO: Cluster multiple cni plugins are not supported at this time
 	Type      string  `json:"type" enum:"calico"`
 	Version   string  `json:"version"`

@@ -30,33 +30,6 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
-func TestNormalizeImageRepository(t *testing.T) {
-	tests := []struct {
-		name       string
-		repository string
-		wantRepo   string
-		wantHost   string
-		wantErr    bool
-	}{
-		{name: "default", wantRepo: v1.DefaultImageRepository, wantHost: "registry.k8s.io"},
-		{name: "host", repository: "registry.k8s.io", wantRepo: "registry.k8s.io", wantHost: "registry.k8s.io"},
-		{name: "path", repository: "harbor.example.com/kubernetes", wantRepo: "harbor.example.com/kubernetes", wantHost: "harbor.example.com"},
-		{name: "port and path", repository: "registry.example.com:5000/k8s", wantRepo: "registry.example.com:5000/k8s", wantHost: "registry.example.com:5000"},
-		{name: "scheme", repository: "https://registry.example.com/k8s", wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotRepo, gotHost, err := NormalizeImageRepository(tt.repository)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("NormalizeImageRepository() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if gotRepo != tt.wantRepo || gotHost != tt.wantHost {
-				t.Fatalf("NormalizeImageRepository() = (%q, %q), want (%q, %q)", gotRepo, gotHost, tt.wantRepo, tt.wantHost)
-			}
-		})
-	}
-}
-
 func TestGetClusterCRIRegistries(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	op := mockcluster.NewMockOperator(ctrl)
@@ -70,12 +43,10 @@ func TestGetClusterCRIRegistries(t *testing.T) {
 		RegistrySpec: v1.RegistrySpec{Scheme: "https", Host: "harbor.example.com", SkipVerify: true, RegistryAuth: auth},
 	}, nil)
 	business := "business"
-	imageAuth := "image-auth"
 	cluster := &v1.Cluster{
-		ImageRepository: "harbor.example.com/kubernetes",
+		ImageRegistry: "image-auth",
 		ContainerRuntime: v1.ContainerRuntime{Registries: []v1.CRIRegistry{
 			{RegistryRef: &business},
-			{RegistryRef: &imageAuth},
 		}},
 	}
 	got, err := GetClusterCRIRegistriesWithContext(context.Background(), cluster, op)
@@ -88,6 +59,9 @@ func TestGetClusterCRIRegistries(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("registries = %#v, want %#v", got, want)
+	}
+	if cluster.ResolvedImageRegistry != "harbor.example.com" {
+		t.Fatalf("resolved image registry = %q", cluster.ResolvedImageRegistry)
 	}
 }
 

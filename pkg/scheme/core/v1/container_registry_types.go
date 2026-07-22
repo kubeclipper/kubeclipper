@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const DefaultImageRepository = "registry.k8s.io"
+const DefaultImageRegistry = "registry.k8s.io"
 
 // +genclient
 // +genclient:nonNamespaced

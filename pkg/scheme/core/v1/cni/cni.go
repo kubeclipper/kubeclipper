@@ -57,9 +57,10 @@ const (
 
 type BaseCni struct {
 	v1.CNI
-	DualStack   bool   `json:"dualStack"`
-	PodIPv4CIDR string `json:"podIPv4CIDR"`
-	PodIPv6CIDR string `json:"podIPv6CIDR"`
+	ResolvedImageRegistry string `json:"imageRegistry,omitempty"`
+	DualStack             bool   `json:"dualStack"`
+	PodIPv4CIDR           string `json:"podIPv4CIDR"`
+	PodIPv6CIDR           string `json:"podIPv6CIDR"`
 }
 
 type Stepper interface {
@@ -80,7 +81,7 @@ func (runnable *BaseCni) Install(ctx context.Context, opts component.Options) ([
 		return nil, err
 	}
 
-	if runnable.Offline && runnable.ImageRepository == "" {
+	if runnable.Offline && runnable.ResolvedImageRegistry == "" {
 		dstFile, err := instance.DownloadImages()
 		if err != nil {
 			return nil, err

@@ -21,7 +21,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -125,11 +124,15 @@ func BuildKubeClientset(kubeconfigPath string) (*kubernetes.Clientset, error) {
 }
 
 func NewMetadata(c *v1.Cluster) *component.ExtraMetadata {
+	imageRegistry := c.ResolvedImageRegistry
+	if imageRegistry == "" {
+		imageRegistry = c.ImageRegistry
+	}
 	return &component.ExtraMetadata{
 		ClusterName:        c.Name,
 		ClusterStatus:      c.Status.Phase,
 		Offline:            c.Offline(),
-		ImageRepository:    c.ImageRepository,
+		ImageRegistry:      imageRegistry,
 		CRI:                c.ContainerRuntime.Type,
 		KubeVersion:        c.KubernetesVersion,
 		KubeletDataDir:     c.Kubelet.RootDir,
@@ -143,31 +146,13 @@ func GetClusterCRIRegistries(c *v1.Cluster, op cluster.Operator) ([]v1.RegistryS
 	return GetClusterCRIRegistriesWithContext(context.Background(), c, op)
 }
 
-func NormalizeImageRepository(repository string) (normalized, host string, err error) {
-	repository = strings.TrimSpace(strings.TrimSuffix(repository, "/"))
-	if repository == "" {
-		repository = v1.DefaultImageRepository
-	}
-	if strings.Contains(repository, "://") {
-		return "", "", fmt.Errorf("image repository %q must not include a URL scheme", repository)
-	}
-	parsed, err := url.Parse("https://" + repository)
-	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return "", "", fmt.Errorf("invalid image repository %q", repository)
-	}
-	if strings.Contains(parsed.Host, "\\") || strings.Contains(parsed.Path, "\\") {
-		return "", "", fmt.Errorf("invalid image repository %q", repository)
-	}
-	return repository, parsed.Host, nil
-}
-
 func GetClusterCRIRegistriesWithContext(ctx context.Context, c *v1.Cluster, op cluster.Operator) ([]v1.RegistrySpec, error) {
-	repository, host, err := NormalizeImageRepository(c.ImageRepository)
+	imageRegistry, err := ResolveImageRegistry(ctx, c.ImageRegistry, op)
 	if err != nil {
 		return nil, err
 	}
-	c.ImageRepository = repository
-	registries := []v1.RegistrySpec{{Scheme: "https", Host: host}}
+	c.ResolvedImageRegistry = imageRegistry.Host
+	registries := []v1.RegistrySpec{imageRegistry}
 	explicitHosts := make(map[string]v1.RegistrySpec)
 	for _, ref := range c.ContainerRuntime.Registries {
 		if ref.RegistryRef == nil || strings.TrimSpace(*ref.RegistryRef) == "" {
@@ -201,6 +186,22 @@ func GetClusterCRIRegistriesWithContext(ctx context.Context, c *v1.Cluster, op c
 		return registries[i].Host < registries[j].Host
 	})
 	return registries, nil
+}
+
+func ResolveImageRegistry(ctx context.Context, name string, op cluster.Operator) (v1.RegistrySpec, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return v1.RegistrySpec{Scheme: "https", Host: v1.DefaultImageRegistry}, nil
+	}
+	registry, err := op.GetRegistry(ctx, name)
+	if err != nil {
+		return v1.RegistrySpec{}, fmt.Errorf("get image registry %s: %w", name, err)
+	}
+	spec, err := normalizeRegistrySpec(registry.RegistrySpec)
+	if err != nil {
+		return v1.RegistrySpec{}, fmt.Errorf("image registry %s: %w", name, err)
+	}
+	return spec, nil
 }
 
 func normalizeRegistrySpec(item v1.RegistrySpec) (v1.RegistrySpec, error) {

@@ -61,7 +61,7 @@ var (
 		KubeProxy: v1.KubeProxy{},
 		Etcd:      v1.Etcd{},
 		CNI: v1.CNI{
-			ImageRepository: "172.20.150.138:5000",
+			ImageRegistry: "172.20.150.138:5000",
 			Type:          "calico",
 			Version:       "v3.21.2",
 			Calico: &v1.Calico{

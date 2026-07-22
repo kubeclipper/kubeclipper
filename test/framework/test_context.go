@@ -27,20 +27,20 @@ import (
 )
 
 const (
-	defaultHost            = "http://127.0.0.1:8080"
-	defaultServiceSubnet   = constatns.ClusterServiceSubnet
-	defaultPodSubnet       = constatns.ClusterPodSubnet
-	defaultImageRepository = "127.0.0.1:5000"
-	defaultWorkerNodeVip   = "169.254.169.100"
+	defaultHost          = "http://127.0.0.1:8080"
+	defaultServiceSubnet = constatns.ClusterServiceSubnet
+	defaultPodSubnet     = constatns.ClusterPodSubnet
+	defaultImageRegistry = "127.0.0.1:5000"
+	defaultWorkerNodeVip = "169.254.169.100"
 )
 
 type TestContextType struct {
-	Host            string
-	InMemoryTest    bool
-	ServiceSubnet   string
-	PodSubnet       string
-	ImageRepository string
-	WorkerNodeVip   string
+	Host          string
+	InMemoryTest  bool
+	ServiceSubnet string
+	PodSubnet     string
+	ImageRegistry string
+	WorkerNodeVip string
 }
 
 // TestContext should be used by all tests to access common context data.
@@ -64,7 +64,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 		"cluster svc sub net, default 10.96.0.0/12")
 	flag.StringVar(&TestContext.PodSubnet, "pod-subnet", defaultPodSubnet,
 		"cluster pod sub net, default 172.25.0.0/16")
-	flag.StringVar(&TestContext.ImageRepository, "registry", defaultImageRepository,
+	flag.StringVar(&TestContext.ImageRegistry, "registry", defaultImageRegistry,
 		"cri image registry addr, default 127.0.0.1:5000")
 	flag.StringVar(&TestContext.WorkerNodeVip, "vip", defaultWorkerNodeVip,
 		"cluster worker node loadblance vip, default 169.254.169.100")

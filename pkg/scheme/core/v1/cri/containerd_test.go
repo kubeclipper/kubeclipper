@@ -36,13 +36,13 @@ import (
 
 func TestContainerdRunnable_renderTo(t *testing.T) {
 	type fields struct {
-		Base            Base
-		ImageRepository string
-		KubeVersion     string
-		PauseVersion    string
-		installSteps    []v1.Step
-		uninstallSteps  []v1.Step
-		upgradeSteps    []v1.Step
+		Base           Base
+		ImageRegistry  string
+		KubeVersion    string
+		PauseVersion   string
+		installSteps   []v1.Step
+		uninstallSteps []v1.Step
+		upgradeSteps   []v1.Step
 	}
 	tests := []struct {
 		name    string
@@ -82,9 +82,9 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 						},
 					},
 				},
-				ImageRepository: "",
-				KubeVersion:     "1.23.6",
-				PauseVersion:    "3.2",
+				ImageRegistry: "",
+				KubeVersion:   "1.23.6",
+				PauseVersion:  "3.2",
 			},
 		},
 		{
@@ -101,22 +101,22 @@ func TestContainerdRunnable_renderTo(t *testing.T) {
 						},
 					},
 				},
-				ImageRepository: "127.0.0.1:5000",
-				KubeVersion:     "1.23.6",
-				PauseVersion:    "3.2",
+				ImageRegistry: "127.0.0.1:5000",
+				KubeVersion:   "1.23.6",
+				PauseVersion:  "3.2",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			runnable := &ContainerdRunnable{
-				Base:            tt.fields.Base,
-				ImageRepository: tt.fields.ImageRepository,
-				KubeVersion:     tt.fields.KubeVersion,
-				PauseVersion:    tt.fields.PauseVersion,
-				installSteps:    tt.fields.installSteps,
-				uninstallSteps:  tt.fields.uninstallSteps,
-				upgradeSteps:    tt.fields.upgradeSteps,
+				Base:           tt.fields.Base,
+				ImageRegistry:  tt.fields.ImageRegistry,
+				KubeVersion:    tt.fields.KubeVersion,
+				PauseVersion:   tt.fields.PauseVersion,
+				installSteps:   tt.fields.installSteps,
+				uninstallSteps: tt.fields.uninstallSteps,
+				upgradeSteps:   tt.fields.upgradeSteps,
 			}
 			w := &bytes.Buffer{}
 			err := runnable.renderTo(w)
@@ -600,7 +600,7 @@ func TestContainerdRunnable_renderTo_V3(t *testing.T) {
 				},
 			},
 		},
-		ImageRepository:     "127.0.0.1:5000",
+		ImageRegistry:       "127.0.0.1:5000",
 		KubeVersion:         "1.29.0",
 		PauseVersion:        "3.9",
 		PauseRegistry:       "registry.k8s.io",

@@ -425,8 +425,8 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	if v := request.QueryParameter("timeout"); v != "" {
 		timeoutSecs = v
 	}
-	if c.Offline() && strings.TrimSpace(c.ImageRepository) == "" {
-		restplus.HandleBadRequest(response, request, errors.New("imageRepository must be specified in offline mode"))
+	if c.Offline() && strings.TrimSpace(c.ImageRegistry) == "" {
+		restplus.HandleBadRequest(response, request, errors.New("imageRegistry must be specified in offline mode"))
 		return
 	}
 	c.Complete()
@@ -534,10 +534,10 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		// update fields
 		clu.Labels = c.Labels
 		clu.Annotations = c.Annotations
-		clu.ImageRepository = c.ImageRepository
+		clu.ImageRegistry = c.ImageRegistry
 		clu.ContainerRuntime.Registries = c.ContainerRuntime.Registries
-		if clu.Offline() && strings.TrimSpace(clu.ImageRepository) == "" {
-			restplus.HandleBadRequest(response, request, errors.New("imageRepository must be specified in offline mode"))
+		if clu.Offline() && strings.TrimSpace(clu.ImageRegistry) == "" {
+			restplus.HandleBadRequest(response, request, errors.New("imageRegistry must be specified in offline mode"))
 			return
 		}
 		if _, err = utils.GetClusterCRIRegistriesWithContext(request.Request.Context(), clu, h.clusterOperator); err != nil {
@@ -973,11 +973,11 @@ func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, 
 
 // TODO: it will be deprecated in the future
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
-	repository, _, err := utils.NormalizeImageRepository(c.ImageRepository)
+	registry, err := utils.ResolveImageRegistry(ctx, c.ImageRegistry, h.clusterOperator)
 	if err != nil {
 		return nil, err
 	}
-	c.ImageRepository = repository
+	c.ResolvedImageRegistry = registry.Host
 	c.Complete()
 	meta := utils.NewMetadata(c)
 
@@ -1949,11 +1949,11 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 	if v := request.QueryParameter("timeout"); v != "" {
 		timeoutSecs = v
 	}
-	if body.Offline && strings.TrimSpace(body.ImageRepository) == "" {
-		restplus.HandleBadRequest(response, request, errors.New("imageRepository must be specified in offline mode"))
+	if body.Offline && strings.TrimSpace(body.ImageRegistry) == "" {
+		restplus.HandleBadRequest(response, request, errors.New("imageRegistry must be specified in offline mode"))
 		return
 	}
-	clu.ImageRepository = body.ImageRepository
+	clu.ImageRegistry = body.ImageRegistry
 	extraMeta, err := h.getClusterMetadata(request.Request.Context(), clu, false)
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) || err == ErrNodesRegionDifferent {

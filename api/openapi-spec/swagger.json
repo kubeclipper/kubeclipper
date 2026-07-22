@@ -5940,7 +5940,7 @@
             "type": "boolean"
           }
         },
-        "imageRepository": {
+        "imageRegistry": {
           "type": "string"
         },
         "kind": {
@@ -6029,10 +6029,10 @@
       "required": [
         "version",
         "offline",
-        "imageRepository"
+        "imageRegistry"
       ],
       "properties": {
-        "imageRepository": {
+        "imageRegistry": {
           "type": "string"
         },
         "offline": {

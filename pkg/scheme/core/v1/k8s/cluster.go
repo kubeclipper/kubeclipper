@@ -74,11 +74,11 @@ func init() {
 }
 
 type Upgrade struct {
-	Kubeadm         *KubeadmConfig `json:"kubeadm"`
-	Offline         bool           `json:"offline"`
-	Version         string         `json:"version"`
-	ImageRepository string         `json:"imageRepository"`
-	installSteps    []v1.Step
+	Kubeadm       *KubeadmConfig `json:"kubeadm"`
+	Offline       bool           `json:"offline"`
+	Version       string         `json:"version"`
+	ImageRegistry string         `json:"imageRegistry"`
+	installSteps  []v1.Step
 }
 
 type UpgradePackage struct {
@@ -150,13 +150,14 @@ func (stepper *Upgrade) InitStepper(metadata *component.ExtraMetadata, c *v1.Clu
 		KubernetesVersion:       c.KubernetesVersion,
 		ControlPlaneEndpoint:    cpEndpoint,
 		CertSANs:                c.GetAllCertSANs(),
-		ImageRepository:         c.ImageRepository,
+		ImageRegistry:           c.ResolvedImageRegistry,
 		FeatureGates:            c.FeatureGates,
 		IgnorePreflightErrors:   parseIgnorePreflightErrors(c.Annotations[common.AnnotationOnlyIgnorePreflightErrors]),
 	}
 	stepper.Offline = metadata.Offline
 	stepper.Version = metadata.KubeVersion
-	stepper.ImageRepository = metadata.ImageRepository
+	stepper.ImageRegistry = metadata.ImageRegistry
+	stepper.Kubeadm.ImageRegistry = metadata.ImageRegistry
 }
 
 func (stepper *Upgrade) Validate() error {
@@ -190,14 +191,14 @@ func (stepper *Upgrade) InitSteps(ctx context.Context) error {
 		DownloadImage: false,
 	}
 	// master node only in this case will the image package be pulled
-	if extraMetadata.Offline && stepper.Kubeadm.ImageRepository == "" && stepper.ImageRepository == "" {
+	if extraMetadata.Offline && stepper.Kubeadm.ImageRegistry == "" && stepper.ImageRegistry == "" {
 		packageDownload.DownloadImage = true
 	}
 	// When the mirror repository used for the upgrade is valid and not equal to the one used for the cluster creation,
 	// the kubeadm configuration file is rendered with the new mirror repository.
 	// TODO: During the upgrade, if the image repository changes, synchronize the changes to the docker and containerd configurations
-	if stepper.ImageRepository != "" && stepper.Kubeadm.ImageRepository != stepper.ImageRepository {
-		stepper.Kubeadm.ImageRepository = stepper.ImageRepository
+	if stepper.ImageRegistry != "" && stepper.Kubeadm.ImageRegistry != stepper.ImageRegistry {
+		stepper.Kubeadm.ImageRegistry = stepper.ImageRegistry
 	}
 	download, err := json.Marshal(packageDownload)
 	if err != nil {

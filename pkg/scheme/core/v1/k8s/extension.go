@@ -56,7 +56,7 @@ type Extension struct {
 	Offline       bool   `json:"offline"`
 	Version       string `json:"version"`
 	CriType       string `json:"criType"`
-	ImageRepository string `json:"imageRepository"`
+	ImageRegistry string `json:"imageRegistry"`
 }
 
 func (stepper *Extension) NewInstance() component.ObjectMeta {
@@ -73,7 +73,7 @@ func (stepper *Extension) Install(ctx context.Context, opts component.Options) (
 		return nil, err
 	}
 	// In offline mode without a repository, load the packaged image archive.
-	if stepper.Offline && stepper.ImageRepository == "" {
+	if stepper.Offline && stepper.ImageRegistry == "" {
 		imageSrc, err := instance.DownloadImages()
 		if err != nil {
 			return nil, err
@@ -103,7 +103,7 @@ func (stepper *Extension) InitStepper(c *v1.Cluster) *Extension {
 	stepper.Offline = c.Offline()
 	stepper.Version = extensionVersion
 	stepper.CriType = c.ContainerRuntime.Type
-	stepper.ImageRepository = c.ImageRepository
+	stepper.ImageRegistry = c.ResolvedImageRegistry
 	return stepper
 }
 

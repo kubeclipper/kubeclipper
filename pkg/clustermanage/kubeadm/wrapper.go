@@ -244,8 +244,8 @@ type ClusterConfiguration struct {
 	// APIServer contains extra settings for the API server control plane component
 	APIServer APIServer `yaml:"apiServer,omitempty"`
 
-	// ImageRepository sets the container registry to pull images from.
-	ImageRepository string `yaml:"imageRepository,omitempty"`
+	// ImageRegistry sets the container registry to pull images from.
+	ImageRegistry string `yaml:"imageRegistry,omitempty"`
 
 	// The cluster name
 	ClusterName string `yaml:"clusterName,omitempty"`

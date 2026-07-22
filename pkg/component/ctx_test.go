@@ -62,7 +62,7 @@ func TestExtraMetadata_GetAllNodeIDs(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -115,7 +115,7 @@ func TestExtraMetadata_GetAllNodeIDs(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -140,7 +140,7 @@ func TestExtraMetadata_GetAllNodes(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -212,7 +212,7 @@ func TestExtraMetadata_GetAllNodes(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -237,7 +237,7 @@ func TestExtraMetadata_GetMasterHostname(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -304,7 +304,7 @@ func TestExtraMetadata_GetMasterHostname(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -329,7 +329,7 @@ func TestExtraMetadata_GetWorkerHostname(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -396,7 +396,7 @@ func TestExtraMetadata_GetWorkerHostname(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -421,7 +421,7 @@ func TestExtraMetadata_GetMasterNodeIP(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -465,7 +465,7 @@ func TestExtraMetadata_GetMasterNodeIP(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -490,7 +490,7 @@ func TestExtraMetadata_GetWorkerNodeIP(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -534,7 +534,7 @@ func TestExtraMetadata_GetWorkerNodeIP(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -559,7 +559,7 @@ func TestExtraMetadata_GetMasterNodeClusterIP(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -603,7 +603,7 @@ func TestExtraMetadata_GetMasterNodeClusterIP(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -628,7 +628,7 @@ func TestExtraMetadata_GetWorkerNodeClusterIP(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -672,7 +672,7 @@ func TestExtraMetadata_GetWorkerNodeClusterIP(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -697,7 +697,7 @@ func TestExtraMetadata_GetAvailableMasterNodes(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -742,7 +742,7 @@ func TestExtraMetadata_GetAvailableMasterNodes(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,
@@ -767,7 +767,7 @@ func TestExtraMetadata_IsAllMasterAvailable(t *testing.T) {
 		Workers            NodeList
 		ClusterStatus      v1.ClusterPhase
 		Offline            bool
-		ImageRepository    string
+		ImageRegistry      string
 		CRI                string
 		ClusterName        string
 		KubeVersion        string
@@ -832,7 +832,7 @@ func TestExtraMetadata_IsAllMasterAvailable(t *testing.T) {
 				Workers:            tt.fields.Workers,
 				ClusterStatus:      tt.fields.ClusterStatus,
 				Offline:            tt.fields.Offline,
-				ImageRepository:    tt.fields.ImageRepository,
+				ImageRegistry:      tt.fields.ImageRegistry,
 				CRI:                tt.fields.CRI,
 				ClusterName:        tt.fields.ClusterName,
 				KubeVersion:        tt.fields.KubeVersion,

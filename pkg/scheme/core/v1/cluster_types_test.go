@@ -11,8 +11,8 @@ func TestLegacyRegistryFieldsAreIgnored(t *testing.T) {
 	if err := json.Unmarshal([]byte(legacy), &cluster); err != nil {
 		t.Fatal(err)
 	}
-	if cluster.ImageRepository != "" {
-		t.Fatalf("legacy localRegistry unexpectedly populated imageRepository: %q", cluster.ImageRepository)
+	if cluster.ImageRegistry != "" {
+		t.Fatalf("legacy localRegistry unexpectedly populated imageRegistry: %q", cluster.ImageRegistry)
 	}
 	if len(cluster.ContainerRuntime.Registries) != 1 || cluster.ContainerRuntime.Registries[0].RegistryRef != nil {
 		t.Fatalf("legacy insecure registry unexpectedly populated the new registry model: %#v", cluster.ContainerRuntime)

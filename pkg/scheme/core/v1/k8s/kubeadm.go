@@ -105,11 +105,11 @@ var (
 )
 
 type Package struct {
-	Offline         bool   `json:"offline"`
-	Version         string `json:"version"`
-	CriType         string `json:"criType"`
-	ImageRepository string `json:"imageRepository"`
-	KubeletDir      string `json:"kubeletDir"`
+	Offline       bool   `json:"offline"`
+	Version       string `json:"version"`
+	CriType       string `json:"criType"`
+	ImageRegistry string `json:"imageRegistry"`
+	KubeletDir    string `json:"kubeletDir"`
 }
 
 type KubeadmConfig struct {
@@ -125,7 +125,7 @@ type KubeadmConfig struct {
 	KubernetesVersion     string          `json:"kubernetesVersion"`
 	ControlPlaneEndpoint  string          `json:"controlPlaneEndpoint"`
 	CertSANs              []string        `json:"certSANs"`
-	ImageRepository       string          `json:"imageRepository"`
+	ImageRegistry         string          `json:"imageRegistry"`
 	Offline               bool            `json:"offline"`
 	IsControlPlane        bool            `json:"isControlPlane,omitempty"`
 	CACertHashes          string          `json:"caCertHashes,omitempty"`
@@ -152,7 +152,7 @@ type ClusterNode struct {
 	WorkerNodeVIP string
 	// master ip
 	Masters             map[string]string // for IPVS rules
-	ImageRepository     string
+	ImageRegistry       string
 	APIServerDomainName string
 	JoinMasterIP        string
 	EtcdDataPath        string
@@ -183,7 +183,7 @@ func (stepper *Package) Install(ctx context.Context, opts component.Options) ([]
 		return nil, err
 	}
 	// In offline mode without a repository, load the packaged image archive.
-	if stepper.Offline && stepper.ImageRepository == "" {
+	if stepper.Offline && stepper.ImageRegistry == "" {
 		imageSrc, err := instance.DownloadImages()
 		if err != nil {
 			return nil, err
@@ -376,10 +376,10 @@ func (stepper KubeadmConfig) Render(ctx context.Context, opts component.Options)
 		stepper.Kubelet.RootDir = KubeletDefaultDataDir
 	}
 	// Use the configured online mirror when no image repository is provided.
-	if !stepper.Offline && stepper.ImageRepository == "" {
-		stepper.ImageRepository = component.GetRepoMirror(ctx)
+	if !stepper.Offline && stepper.ImageRegistry == "" {
+		stepper.ImageRegistry = component.GetRepoMirror(ctx)
 		logger.Info("render kubernetes config, the default repo mirror proxy will be used",
-			zap.String("image_repository", stepper.ImageRepository))
+			zap.String("image_repository", stepper.ImageRegistry))
 	}
 	agentIP, err := stepper.getAgentNodeIP()
 	if err != nil {
