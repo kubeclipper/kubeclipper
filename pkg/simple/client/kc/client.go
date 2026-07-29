@@ -51,13 +51,60 @@ type Client struct {
 }
 
 func FromConfig(c config.Config) (*Client, error) {
-	ctx := c.Contexts[c.CurrentContext]
-	currentServer := c.Servers[ctx.Server]
-	currentAuthInfo := c.AuthInfos[ctx.AuthInfo]
-	var opts []Opt
-	opts = append(opts,
-		WithEndpoint(c.Servers[ctx.Server].Server),
-		WithBearerAuth(c.AuthInfos[ctx.AuthInfo].Token))
+	cli, err := FromConfigWithoutValidation(c)
+	if err != nil {
+		return nil, err
+	}
+
+	// call api to check whether the token is valid
+	q := query.New()
+	if _, err = cli.ListConfigMaps(context.TODO(), Queries(*q)); err != nil {
+		if strings.Contains(err.Error(), "Unauthorized") {
+			return nil, errors.New("unauthorized,please use kcctl login cmd to login first")
+		}
+		return nil, err
+	}
+	return cli, nil
+}
+
+// FromConfigWithoutValidation creates a client without making a preliminary API request.
+// Diagnostic commands use it so they can report a partially unavailable platform.
+func FromConfigWithoutValidation(c config.Config) (*Client, error) {
+	currentServer, currentAuthInfo, err := currentConnectionConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	opts, err := serverClientOptions(currentServer)
+	if err != nil {
+		return nil, err
+	}
+	authOpts, err := authClientOptions(currentAuthInfo)
+	if err != nil {
+		return nil, err
+	}
+	return NewClientWithOpts(append(opts, authOpts...)...)
+}
+
+func currentConnectionConfig(c config.Config) (*config.Server, *config.AuthInfo, error) {
+	ctx, ok := c.Contexts[c.CurrentContext]
+	if !ok || ctx == nil {
+		return nil, nil, fmt.Errorf("current context %q is not configured", c.CurrentContext)
+	}
+	currentServer, ok := c.Servers[ctx.Server]
+	if !ok || currentServer == nil {
+		return nil, nil, fmt.Errorf("server %q is not configured", ctx.Server)
+	}
+	currentAuthInfo, ok := c.AuthInfos[ctx.AuthInfo]
+	if !ok || currentAuthInfo == nil {
+		return nil, nil, fmt.Errorf("user %q is not configured", ctx.AuthInfo)
+	}
+	return currentServer, currentAuthInfo, nil
+}
+
+func serverClientOptions(currentServer *config.Server) ([]Opt, error) {
+	opts := []Opt{
+		WithEndpoint(currentServer.Server),
+	}
 	if currentServer.TLSServerName != "" {
 		opts = append(opts, WithServerName(currentServer.TLSServerName))
 	}
@@ -74,7 +121,11 @@ func FromConfig(c config.Config) (*Client, error) {
 		}
 		opts = append(opts, WithCAData(caData))
 	}
+	return opts, nil
+}
 
+func authClientOptions(currentAuthInfo *config.AuthInfo) ([]Opt, error) {
+	opts := []Opt{WithBearerAuth(currentAuthInfo.Token)}
 	switch {
 	case len(currentAuthInfo.ClientCertificateData) != 0 && len(currentAuthInfo.ClientKeyData) != 0:
 		opts = append(opts, WithCertData(currentAuthInfo.ClientCertificateData, currentAuthInfo.ClientKeyData))
@@ -89,21 +140,7 @@ func FromConfig(c config.Config) (*Client, error) {
 		}
 		opts = append(opts, WithCertData(certData, keyData))
 	}
-
-	cli, err := NewClientWithOpts(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	// call api to  check is token valid
-	q := query.New()
-	if _, err = cli.ListConfigMaps(context.TODO(), Queries(*q)); err != nil {
-		if strings.Contains(err.Error(), "Unauthorized") {
-			return nil, errors.New("unauthorized,please use kcctl login cmd to login first")
-		}
-		return nil, err
-	}
-	return cli, nil
+	return opts, nil
 }
 
 func NewClientWithOpts(opts ...Opt) (*Client, error) {

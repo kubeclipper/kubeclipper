@@ -28,6 +28,7 @@ import (
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+	"github.com/kubeclipper/kubeclipper/pkg/platformstatus"
 
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -46,6 +47,7 @@ const (
 	publicKeyPath        = "/api/config.kubeclipper.io/v1/terminal.key"
 	versionPath          = "/version"
 	componentMetaPath    = "/api/config.kubeclipper.io/v1/componentmeta"
+	platformStatusPath   = "/api/config.kubeclipper.io/v1/status"
 	configmapPath        = "/api/core.kubeclipper.io/v1/configmaps"
 	templatePath         = "/api/core.kubeclipper.io/v1/templates"
 	registryPath         = "/api/core.kubeclipper.io/v1/registries"
@@ -55,6 +57,22 @@ const (
 	operationPath = "/api/core.kubeclipper.io/v1/operations"
 	LogStreamPath = "/api/core.kubeclipper.io/v1/logs"
 )
+
+func (cli *Client) PlatformStatus(ctx context.Context) (*platformstatus.PlatformStatus, error) {
+	serverResp, err := cli.get(ctx, platformStatusPath, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	result := &platformstatus.PlatformStatus{}
+	if err := json.NewDecoder(serverResp.body).Decode(result); err != nil {
+		return nil, err
+	}
+	if err := result.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid platform status response: %w", err)
+	}
+	return result, nil
+}
 
 func (cli *Client) ListNodes(ctx context.Context, query Queries) (*NodesList, error) {
 	serverResp, err := cli.get(ctx, ListNodesPath, query.ToRawQuery(), nil)

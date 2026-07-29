@@ -20,9 +20,13 @@ package manager
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
@@ -81,8 +85,11 @@ func (r RunnableFunc) Start(ctx context.Context) error {
 }
 
 const (
-	resourceLockNS   = "default"
-	resourceLockName = "nodelifecycle-controller"
+	resourceLockNS        = "default"
+	resourceLockName      = "nodelifecycle-controller"
+	readinessLeaseName    = "kc-controller-manager-ready"
+	readinessLeasePeriod  = 5 * time.Second
+	readinessLeaseTimeout = 15 * time.Second
 )
 
 type LoopFunc func()
@@ -100,6 +107,8 @@ type ControllerManager struct {
 	lock           resourcelock.Interface
 	leaderElector  *leaderelection.LeaderElector
 	leaderStopChan chan struct{}
+	identity       string
+	leaseOperator  lease.Operator
 
 	defaultWorkerLoopPeriod time.Duration
 	workerLoops             []workerLoop
@@ -156,6 +165,8 @@ func (s *ControllerManager) GetCmdDelivery() service.CmdDelivery {
 }
 
 func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, terminationChan *chan struct{}, setupFunc SetupFunc) (*ControllerManager, error) {
+	identity := uuid.New().String()
+	leaseOperator := lease.NewLeaseOperator(storageFactory.Leases())
 	s := &ControllerManager{
 		leaderStopChan:          make(chan struct{}, 1),
 		defaultWorkerLoopPeriod: time.Second,
@@ -164,9 +175,11 @@ func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorage
 		storageFactory:          storageFactory,
 		setupFunc:               setupFunc,
 		terminationChan:         terminationChan,
+		identity:                identity,
+		leaseOperator:           leaseOperator,
 	}
-	s.lock = leaderelect.NewLock(resourceLockNS, resourceLockName, lease.NewLeaseOperator(storageFactory.Leases()), resourcelock.ResourceLockConfig{
-		Identity:      uuid.New().String(),
+	s.lock = leaderelect.NewLock(resourceLockNS, resourceLockName, leaseOperator, resourcelock.ResourceLockConfig{
+		Identity:      identity,
 		EventRecorder: nil,
 	})
 	cs, err := clientset.NewForConfig(rc)
@@ -279,15 +292,95 @@ func (s *ControllerManager) runManager(ctx context.Context) {
 	s.runnableLock.Lock()
 	s.runnables = nil
 	s.runnableLock.Unlock()
-	// TODO: error should be caught
 	if err := s.setupFunc(s, inFactory, s.storageFactory); err != nil {
 		s.log.Error("setup controller manager failed", zap.Error(err))
+		return
 	}
 	inFactory.Start(ctx.Done())
+	if !inFactory.WaitForCacheSync(ctx) {
+		s.log.Error("controller manager informer cache sync failed")
+		return
+	}
 	s.runWorkerLoops(ctx)
 	s.runRunnables(ctx)
+	go s.runReadinessLease(ctx)
 	<-ctx.Done()
 	s.log.Debug("stop run manager...")
+}
+
+func (s *ControllerManager) Health(ctx context.Context) error {
+	leader, err := s.leaseOperator.GetLeaseWithNamespaceEx(ctx, resourceLockName, resourceLockNS, "0")
+	if err != nil {
+		return fmt.Errorf("get leader lease: %w", err)
+	}
+	ready, err := s.leaseOperator.GetLeaseWithNamespaceEx(ctx, readinessLeaseName, resourceLockNS, "0")
+	if err != nil {
+		return fmt.Errorf("get readiness lease: %w", err)
+	}
+	now := time.Now()
+	if err := validateLease(leader, now); err != nil {
+		return fmt.Errorf("leader lease: %w", err)
+	}
+	if err := validateLease(ready, now); err != nil {
+		return fmt.Errorf("readiness lease: %w", err)
+	}
+	if leader.Spec.HolderIdentity == nil || ready.Spec.HolderIdentity == nil || *leader.Spec.HolderIdentity != *ready.Spec.HolderIdentity {
+		return fmt.Errorf("leader and readiness lease holders do not match")
+	}
+	return nil
+}
+
+func validateLease(item *coordinationv1.Lease, now time.Time) error {
+	if item.Spec.RenewTime == nil || item.Spec.LeaseDurationSeconds == nil {
+		return fmt.Errorf("lease timing is incomplete")
+	}
+	expiresAt := item.Spec.RenewTime.Add(time.Duration(*item.Spec.LeaseDurationSeconds) * time.Second)
+	if !now.Before(expiresAt) {
+		return fmt.Errorf("lease expired")
+	}
+	return nil
+}
+
+func (s *ControllerManager) runReadinessLease(ctx context.Context) {
+	ticker := time.NewTicker(readinessLeasePeriod)
+	defer ticker.Stop()
+	for {
+		if err := s.renewReadinessLease(ctx); err != nil && ctx.Err() == nil {
+			s.log.Error("renew controller manager readiness lease failed", zap.Error(err))
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *ControllerManager) renewReadinessLease(ctx context.Context) error {
+	now := metav1.NewMicroTime(time.Now())
+	durationSeconds := int32(readinessLeaseTimeout / time.Second)
+	item, err := s.leaseOperator.GetLeaseWithNamespaceEx(ctx, readinessLeaseName, resourceLockNS, "0")
+	if apierrors.IsNotFound(err) {
+		item = &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Name: readinessLeaseName, Namespace: resourceLockNS},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       &s.identity,
+				LeaseDurationSeconds: &durationSeconds,
+				AcquireTime:          &now,
+				RenewTime:            &now,
+			},
+		}
+		_, err = s.leaseOperator.CreateLease(ctx, item)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	item.Spec.HolderIdentity = &s.identity
+	item.Spec.LeaseDurationSeconds = &durationSeconds
+	item.Spec.RenewTime = &now
+	_, err = s.leaseOperator.UpdateLease(ctx, item)
+	return err
 }
 
 func (s *ControllerManager) runWorkerLoops(ctx context.Context) {

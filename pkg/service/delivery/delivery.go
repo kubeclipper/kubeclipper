@@ -138,6 +138,13 @@ func (s *Service) Close() {
 	s.client.Close()
 }
 
+func (s *Service) Health(ctx context.Context) error {
+	if s.external {
+		return fmt.Errorf("embedded NATS is not enabled")
+	}
+	return s.client.Health(ctx)
+}
+
 func initPayload(operationIdentity string, operation service.Operation, step *v1.Step, lastStepReply []byte, cmds []string, dryRun, retry bool) ([]byte, error) {
 	payload := service.MsgPayload{
 		Op:                operation,

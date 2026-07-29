@@ -22,8 +22,10 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	"go.uber.org/zap"
 
@@ -34,12 +36,16 @@ import (
 
 var _ service.Interface = (*Service)(nil)
 
+const resourceDirectoryMode = os.FileMode(0755)
+
 type Service struct {
-	server *http.Server
-	path   string
+	server  *http.Server
+	path    string
+	secure  bool
+	running atomic.Bool
 }
 
-func NewService(opts *staticserver.Options) (service.Interface, error) {
+func NewService(opts *staticserver.Options) (*Service, error) {
 	httpSrv := &http.Server{
 		Addr: fmt.Sprintf("%s:%d", opts.BindAddress, opts.InsecurePort),
 	}
@@ -48,42 +54,120 @@ func NewService(opts *staticserver.Options) (service.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
-		httpSrv.TLSConfig.Certificates = []tls.Certificate{certificate}
+		httpSrv.TLSConfig = &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{certificate},
+		}
 		httpSrv.Addr = fmt.Sprintf("%s:%d", opts.BindAddress, opts.SecurePort)
 	}
 	return &Service{
 		server: httpSrv,
 		path:   opts.Path,
+		secure: opts.SecurePort != 0,
 	}, nil
 }
 
 func (s *Service) PrepareRun(stopCh <-chan struct{}) error {
-	if _, err := os.Stat(s.path); os.IsNotExist(err) {
-		return os.MkdirAll(s.path, os.ModeDir|0755)
+	if _, err := os.Stat(s.path); err != nil {
+		if os.IsNotExist(err) {
+			if mkdirErr := os.MkdirAll(s.path, os.ModeDir|resourceDirectoryMode); mkdirErr != nil {
+				return mkdirErr
+			}
+		} else {
+			return err
+		}
 	}
-	s.server.Handler = http.StripPrefix("/", http.FileServer(http.Dir(s.path)))
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir(s.path))))
+	s.server.Handler = mux
 	return nil
 }
 
 func (s *Service) Run(stopCh <-chan struct{}) error {
 	logger.Info("Static resource server start", zap.String("addr", s.server.Addr), zap.String("path", s.path))
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(context.Background(), "tcp", s.server.Addr)
+	if err != nil {
+		return err
+	}
+	s.server.Addr = listener.Addr().String()
+	s.running.Store(true)
 	go func() {
 		<-stopCh
 		_ = s.server.Shutdown(context.TODO())
 	}()
 	go func() {
-		var err error
-		if s.server.TLSConfig != nil {
-			err = s.server.ListenAndServeTLS("", "")
+		var serveErr error
+		if s.secure {
+			serveErr = s.server.ServeTLS(listener, "", "")
 		} else {
-			err = s.server.ListenAndServe()
+			serveErr = s.server.Serve(listener)
 		}
-		logger.Error("static resource server exit", zap.Error(err))
+		s.running.Store(false)
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			logger.Error("static resource server exit", zap.Error(serveErr))
+		}
 	}()
 
 	return nil
 }
 
 func (s *Service) Close() {
-	s.server.Close()
+	s.running.Store(false)
+	_ = s.server.Close()
+}
+
+func (s *Service) handleHealth(writer http.ResponseWriter, _ *http.Request) {
+	if !s.running.Load() {
+		http.Error(writer, "static resource server is not running", http.StatusServiceUnavailable)
+		return
+	}
+	info, err := os.Stat(s.path)
+	if err != nil || !info.IsDir() {
+		http.Error(writer, "static resource directory is unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	dir, err := os.Open(s.path)
+	if err != nil {
+		http.Error(writer, "static resource directory is unreadable", http.StatusServiceUnavailable)
+		return
+	}
+	_ = dir.Close()
+	writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if _, err := writer.Write([]byte("ok")); err != nil {
+		logger.Error("write static resource health response", zap.Error(err))
+	}
+}
+
+func (s *Service) Health(ctx context.Context) error {
+	host, port, err := net.SplitHostPort(s.server.Addr)
+	if err != nil {
+		return err
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	scheme := "http"
+	transport := http.DefaultTransport
+	if s.secure {
+		scheme = "https"
+		// The request only reaches this process through its listener address, which may not match the certificate host.
+		//nolint:gosec // TLS authenticity is established by the in-process listener, not a remote endpoint.
+		transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("%s://%s/healthz", scheme, net.JoinHostPort(host, port)), http.NoBody)
+	if err != nil {
+		return err
+	}
+	response, err := (&http.Client{Transport: transport}).Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("static resource health endpoint returned %s", response.Status)
+	}
+	return nil
 }

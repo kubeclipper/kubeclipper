@@ -27,6 +27,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/errors"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
+	"github.com/kubeclipper/kubeclipper/pkg/platformstatus"
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 
@@ -52,8 +53,13 @@ const (
 
 var GroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
-func AddToContainer(c *restful.Container, platformOperator platform.Operator, config *serverconfig.Config) error {
-	h := newHandler(platformOperator, config)
+func AddToContainer(
+	c *restful.Container,
+	platformOperator platform.Operator,
+	config *serverconfig.Config,
+	statusProvider platformstatus.Provider,
+) error {
+	h := newHandler(platformOperator, config, statusProvider)
 
 	webservice := runtime.NewWebService(GroupVersion)
 	webservice.Route(webservice.GET("/oauth").
@@ -68,6 +74,12 @@ func AddToContainer(c *restful.Container, platformOperator platform.Operator, co
 		To(func(request *restful.Request, response *restful.Response) {
 			_ = response.WriteAsJson(config.ToMap())
 		}).Returns(http.StatusOK, StatusOK, map[string]bool{}))
+
+	webservice.Route(webservice.GET("/status").
+		Doc("Current KubeClipper platform status").
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreConfigTag}).
+		To(h.GetPlatformStatus).
+		Returns(http.StatusOK, StatusOK, platformstatus.PlatformStatus{}))
 
 	webservice.Route(webservice.GET("/components").
 		Doc("Information about components").

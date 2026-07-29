@@ -878,7 +878,7 @@ var Roles = GlobalRoleList{
 			},
 			{
 				APIGroups: []string{"config.kubeclipper.io"},
-				Resources: []string{"configz", "components", "componentmeta"},
+				Resources: []string{"configz", "components", "componentmeta", "status"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{

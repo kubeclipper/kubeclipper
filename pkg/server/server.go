@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	authx509 "github.com/kubeclipper/kubeclipper/pkg/authentication/request/x509"
@@ -30,6 +31,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
@@ -86,6 +88,14 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/utils/metrics"
 )
 
+const (
+	authenticatedRoleName = "authenticated"
+	statusResourceName    = "status"
+	getVerb               = "get"
+	listVerb              = "list"
+	watchVerb             = "watch"
+)
+
 type APIServer struct {
 	Server                *http.Server
 	container             *restful.Container
@@ -99,6 +109,11 @@ type APIServer struct {
 	internalInformerUser  string
 	InternalInformerToken string
 	terminationChan       chan struct{}
+	clusterOperator       cluster.Operator
+	leaseOperator         lease.Operator
+	deliveryService       *delivery.Service
+	controllerManager     *manager.ControllerManager
+	staticResourceService *staticresource.Service
 }
 
 func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
@@ -263,18 +278,21 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		s.storageFactory.CloudProvider(),
 		s.storageFactory.Registry(),
 	)
+	s.clusterOperator = clusterOperator
 	coreOperator := core.NewOperator(s.storageFactory.ConfigMaps())
 	leaseOperator := lease.NewLeaseOperator(s.storageFactory.Leases())
+	s.leaseOperator = leaseOperator
 	opOperator := operation.NewOperationOperator(s.storageFactory.Operations())
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
 		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
 	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator, clusterOperator)
 
 	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator, &s.terminationChan)
+	s.deliveryService = deliverySvc
 	s.Services = append(s.Services, deliverySvc)
 
 	platformOperator := platform.NewPlatformOperator(s.storageFactory.PlatformSettings(), s.storageFactory.Events())
-	if err := configv1.AddToContainer(s.container, platformOperator, s.Config); err != nil {
+	if err := configv1.AddToContainer(s.container, platformOperator, s.Config, s); err != nil {
 		return err
 	}
 
@@ -324,6 +342,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
+	s.controllerManager = ctrl
 
 	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator,
 		leaseOperator, coreOperator, deliverySvc, tokenOperator, s.Config.GenericServerRunOptions, &s.terminationChan); err != nil {
@@ -337,6 +356,7 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		return err
 	}
 	s.Services = append(s.Services, staticResourceSvc)
+	s.staticResourceService = staticResourceSvc
 	return nil
 }
 
@@ -364,7 +384,35 @@ func (s *APIServer) migrateRole(operator iam.Operator) error {
 			return err
 		}
 	}
+	for i := range result.Items {
+		role := &result.Items[i]
+		if role.Name == authenticatedRoleName && ensureStatusPermission(role) {
+			if _, err := operator.UpdateRole(context.TODO(), role); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
+}
+
+func ensureStatusPermission(role *v1.GlobalRole) bool {
+	for i := range role.Rules {
+		rule := &role.Rules[i]
+		if !slices.Contains(rule.APIGroups, configv1.GroupName) || !slices.Contains(rule.Verbs, getVerb) {
+			continue
+		}
+		if slices.Contains(rule.Resources, statusResourceName) || slices.Contains(rule.Resources, rbacv1.ResourceAll) {
+			return false
+		}
+		rule.Resources = append(rule.Resources, statusResourceName)
+		return true
+	}
+	role.Rules = append(role.Rules, rbacv1.PolicyRule{
+		APIGroups: []string{configv1.GroupName},
+		Resources: []string{statusResourceName},
+		Verbs:     []string{getVerb, listVerb, watchVerb},
+	})
+	return true
 }
 
 func (s *APIServer) migrateRoleBinding(operator iam.Operator) error {

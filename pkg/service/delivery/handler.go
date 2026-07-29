@@ -21,12 +21,14 @@ package delivery
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/errors"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -259,8 +261,8 @@ func (s *Service) getNode(name string) (*v1.Node, error) {
 
 func (s *Service) UpdateNodeLeaseOperation(msg *nats.Msg, data []byte) *service.CommonReply {
 	resp := &service.CommonReply{}
-	lease := &coordinationv1.Lease{}
-	if err := json.Unmarshal(data, lease); err != nil {
+	requestedLease := &coordinationv1.Lease{}
+	if err := json.Unmarshal(data, requestedLease); err != nil {
 		logger.Error("failed to unmarshal payload", zap.Error(err))
 		resp.Error = &errors.StatusError{
 			Message: "unmarshal payload error with operation update node lease",
@@ -281,7 +283,7 @@ func (s *Service) UpdateNodeLeaseOperation(msg *nats.Msg, data []byte) *service.
 		}
 		return resp
 	}
-	lease, err := s.leaseOperator.GetLeaseWithNamespaceEx(context.TODO(), lease.Name, lease.Namespace, "0")
+	lease, err := s.leaseOperator.GetLeaseWithNamespaceEx(context.TODO(), requestedLease.Name, requestedLease.Namespace, "0")
 	if err != nil {
 		logger.Error("failed to get node lease", zap.Error(err))
 		resp.Error = &errors.StatusError{
@@ -306,6 +308,7 @@ func (s *Service) UpdateNodeLeaseOperation(msg *nats.Msg, data []byte) *service.
 		}
 		return resp
 	}
+	applyNodeLeaseRenewal(lease, requestedLease, time.Now())
 	leaseUpdated, err := s.leaseOperator.UpdateLease(context.TODO(), lease)
 	if err != nil {
 		logger.Error("failed to update node lease", zap.Error(err))
@@ -352,6 +355,13 @@ func (s *Service) UpdateNodeLeaseOperation(msg *nats.Msg, data []byte) *service.
 		}
 	}
 	return resp
+}
+
+func applyNodeLeaseRenewal(stored, requested *coordinationv1.Lease, now time.Time) {
+	renewTime := metav1.NewMicroTime(now)
+	stored.Spec.RenewTime = &renewTime
+	stored.Spec.HolderIdentity = requested.Spec.HolderIdentity
+	stored.Spec.LeaseDurationSeconds = requested.Spec.LeaseDurationSeconds
 }
 
 func (s *Service) getNodeLeaseOperation(msg *nats.Msg, name string, namespace string) *service.CommonReply {
@@ -426,6 +436,8 @@ func (s *Service) createNodeLeaseOperation(msg *nats.Msg, data []byte) *service.
 		}
 		return resp
 	}
+	now := metav1.NewMicroTime(time.Now())
+	lease.Spec.RenewTime = &now
 	leaseCreated, err := s.leaseOperator.CreateLease(context.TODO(), lease)
 	if err != nil {
 		resp.Error = &errors.StatusError{
