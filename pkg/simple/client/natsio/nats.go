@@ -22,14 +22,20 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	natServer "github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	certutil "k8s.io/client-go/util/cert"
 )
+
+const maxMonitoringResponseBytes = 64 * 1024
 
 var _ Interface = (*Client)(nil)
 
@@ -55,6 +61,8 @@ func NewNats(opts *NatsOptions) Interface {
 }
 
 func (c *Client) Close() {
+	c.serverRunningMux.Lock()
+	defer c.serverRunningMux.Unlock()
 	if c.server != nil {
 		c.server.Shutdown()
 	}
@@ -123,6 +131,8 @@ func (c *Client) setupServerOptions(opts *NatsOptions) {
 		Port:     opts.Server.Port,
 		Username: opts.Auth.UserName,
 		Password: opts.Auth.Password,
+		HTTPHost: "127.0.0.1",
+		HTTPPort: -1,
 		Cluster: natServer.ClusterOpts{
 			Host: opts.Server.Cluster.Host,
 			Port: opts.Server.Cluster.Port,
@@ -142,6 +152,48 @@ func (c *Client) setupServerOptions(opts *NatsOptions) {
 		c.serverOptions.TLSConfig = c.setTLSConfig(opts)
 		c.serverOptions.TLSVerify = true
 	}
+}
+
+func (c *Client) Health(ctx context.Context) error {
+	c.serverRunningMux.Lock()
+	server := c.server
+	conn := c.conn
+	c.serverRunningMux.Unlock()
+	if server == nil || !server.ReadyForConnections(time.Second) {
+		return fmt.Errorf("embedded NATS server is not ready")
+	}
+	monitorAddr := server.MonitorAddr()
+	if monitorAddr == nil {
+		return fmt.Errorf("embedded NATS monitoring is unavailable")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		fmt.Sprintf("http://127.0.0.1:%d/varz", monitorAddr.Port), http.NoBody)
+	if err != nil {
+		return err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("NATS health endpoint returned %s", response.Status)
+	}
+	var status struct {
+		ServerID string `json:"server_id"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, maxMonitoringResponseBytes)).Decode(&status); err != nil {
+		return fmt.Errorf("decode NATS monitoring response: %w", err)
+	}
+	if status.ServerID == "" {
+		return fmt.Errorf("NATS monitoring response has no server ID")
+	}
+	if conn == nil || conn.Status() != nats.CONNECTED {
+		return fmt.Errorf("NATS client is not connected")
+	}
+	flushCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	return conn.FlushWithContext(flushCtx)
 }
 
 func (c *Client) RunServer(stopCh <-chan struct{}) error {
@@ -165,14 +217,16 @@ func (c *Client) RunServer(stopCh <-chan struct{}) error {
 }
 
 func (c *Client) InitConn(stopCh <-chan struct{}) error {
-	var err error
-	c.conn, err = nats.Connect(c.url, c.clientOptions...)
+	conn, err := nats.Connect(c.url, c.clientOptions...)
 	if err != nil {
 		return err
 	}
+	c.serverRunningMux.Lock()
+	c.conn = conn
+	c.serverRunningMux.Unlock()
 	go func() {
 		<-stopCh
-		c.conn.Close()
+		conn.Close()
 	}()
 	return nil
 }

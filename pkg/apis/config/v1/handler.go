@@ -19,6 +19,7 @@
 package v1
 
 import (
+	"fmt"
 	"net/http"
 
 	"k8s.io/component-base/version"
@@ -40,18 +41,34 @@ import (
 	"github.com/emicklei/go-restful"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
+	"github.com/kubeclipper/kubeclipper/pkg/platformstatus"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 )
 
 type handler struct {
 	platformOperator platform.Operator
 	serverConfig     *serverconfig.Config
+	statusProvider   platformstatus.Provider
 }
 
-func newHandler(operator platform.Operator, config *serverconfig.Config) *handler {
+func newHandler(operator platform.Operator, config *serverconfig.Config, statusProvider platformstatus.Provider) *handler {
 	return &handler{
 		platformOperator: operator,
 		serverConfig:     config,
+		statusProvider:   statusProvider,
+	}
+}
+
+func (h *handler) GetPlatformStatus(request *restful.Request, response *restful.Response) {
+	if h.statusProvider == nil {
+		restplus.HandleInternalError(response, request, fmt.Errorf("platform status provider is not configured"))
+		return
+	}
+	if err := response.WriteHeaderAndEntity(
+		http.StatusOK,
+		h.statusProvider.PlatformStatus(request.Request.Context()),
+	); err != nil {
+		restplus.HandleInternalError(response, request, err)
 	}
 }
 

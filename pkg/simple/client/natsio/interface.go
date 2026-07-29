@@ -40,6 +40,7 @@ type ReplyHandler func(msg *nats.Msg) error
 type TimeoutHandler func(msg *Msg) error
 
 type Interface interface {
+	Health(ctx context.Context) error
 	SetDisconnectErrHandler(handler nats.ConnErrHandler)
 	SetReconnectHandler(handler nats.ConnHandler)
 	SetErrorHandler(handler nats.ErrHandler)

@@ -19,6 +19,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -28,7 +29,14 @@ import (
 func main() {
 	cmds := app.NewKubeClipperCommand(os.Stdin, os.Stdout, os.Stderr)
 	if err := cmds.Execute(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		code := 1
+		var exitError interface{ ExitCode() int }
+		if errors.As(err, &exitError) {
+			code = exitError.ExitCode()
+		}
+		if err.Error() != "" {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(code)
 	}
 }

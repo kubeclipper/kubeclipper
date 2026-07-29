@@ -62,6 +62,23 @@ func (mr *MockInterfaceMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockInterface)(nil).Close))
 }
 
+// Health mocks base method.
+func (m *MockInterface) Health(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Health", ctx)
+	ret0, ok := ret[0].(error)
+	if !ok {
+		return nil
+	}
+	return ret0
+}
+
+// Health indicates an expected call of Health.
+func (mr *MockInterfaceMockRecorder) Health(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Health", reflect.TypeOf((*MockInterface)(nil).Health), ctx)
+}
+
 // InitConn mocks base method.
 func (m *MockInterface) InitConn(stopCh <-chan struct{}) error {
 	m.ctrl.T.Helper()
