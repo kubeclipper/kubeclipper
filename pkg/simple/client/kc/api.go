@@ -35,6 +35,7 @@ import (
 )
 
 const (
+	healthzPath          = "/healthz"
 	ListNodesPath        = "/api/core.kubeclipper.io/v1/nodes"
 	clustersPath         = "/api/core.kubeclipper.io/v1/clusters"
 	clustersCertPath     = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
@@ -57,6 +58,13 @@ const (
 	operationPath = "/api/core.kubeclipper.io/v1/operations"
 	LogStreamPath = "/api/core.kubeclipper.io/v1/logs"
 )
+
+// Healthz checks whether the configured API server is live.
+func (cli *Client) Healthz(ctx context.Context) error {
+	serverResp, err := cli.get(ctx, healthzPath, nil, nil)
+	defer ensureReaderClosed(serverResp)
+	return err
+}
 
 func (cli *Client) PlatformStatus(ctx context.Context) (*platformstatus.PlatformStatus, error) {
 	serverResp, err := cli.get(ctx, platformStatusPath, nil, nil)

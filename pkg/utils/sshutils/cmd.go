@@ -20,6 +20,7 @@ package sshutils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -65,10 +66,16 @@ func CmdToString(name string, arg ...string) (Result, error) {
 }
 
 func RunCmdAsSSH(cmdStr string) (Result, error) {
+	return RunCmdAsSSHContext(context.Background(), cmdStr)
+}
+
+// RunCmdAsSSHContext runs a local shell command and stops it when the context is canceled.
+func RunCmdAsSSHContext(ctx context.Context, cmdStr string) (Result, error) {
 	var ret Result
 
 	user := Whoami()
-	ec := exec.Command("sh", []string{"-c", cmdStr}...)
+	// #nosec G204 -- this helper intentionally executes the command supplied by its caller.
+	ec := exec.CommandContext(ctx, "sh", []string{"-c", cmdStr}...)
 	ec.Stdin = os.Stdin
 	var bout, berr bytes.Buffer
 	ec.Stdout, ec.Stderr = &bout, &berr
@@ -82,6 +89,9 @@ func RunCmdAsSSH(cmdStr string) (Result, error) {
 		Stderr:   berr.String(),
 	}
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ret, ctxErr
+		}
 		ok, exitCode := ExtraExitCode(err)
 		if !ok {
 			return ret, err

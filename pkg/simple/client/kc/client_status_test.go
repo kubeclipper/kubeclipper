@@ -44,3 +44,21 @@ func TestPlatformStatusRejectsInvalidResponse(t *testing.T) {
 		t.Fatalf("expected invalid response error, got %v", err)
 	}
 }
+
+func TestHealthz(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != healthzPath {
+			t.Fatalf("request path = %q, want %q", request.URL.Path, healthzPath)
+		}
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client, err := NewClientWithOpts(WithEndpoint(server.URL), WithHTTPClient(server.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.Healthz(context.Background()); err != nil {
+		t.Fatalf("healthz: %v", err)
+	}
+}

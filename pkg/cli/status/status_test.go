@@ -56,6 +56,29 @@ func TestPrintTable(t *testing.T) {
 	}
 }
 
+func TestPrintTerminalTableUsesStatusColors(t *testing.T) {
+	var output bytes.Buffer
+	if err := printTerminalTable(&output, testStatus(), statusOutputStyle{enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		"KubeClipper Platform Status",
+		"\x1b[1;33m! Degraded",
+		"\x1b[1;32m✓ Healthy",
+		"7/8 agents running",
+	} {
+		if !strings.Contains(output.String(), expected) {
+			t.Errorf("terminal output does not contain %q:\n%s", expected, output.String())
+		}
+	}
+}
+
+func TestPadRightUsesDisplayCharacters(t *testing.T) {
+	if got, want := padRight("✓ Healthy", statusColumnWidth), "✓ Healthy   "; got != want {
+		t.Fatalf("padded status = %q, want %q", got, want)
+	}
+}
+
 func TestPrintJSONPreservesChecks(t *testing.T) {
 	var output bytes.Buffer
 	if err := printStatus(&output, testStatus(), "json"); err != nil {

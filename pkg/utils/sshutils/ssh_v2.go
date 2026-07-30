@@ -20,6 +20,7 @@ package sshutils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -93,6 +94,11 @@ type SSHRunCmd func(sshConfig *SSH, host, cmd string) (Result, error)
 
 // SSHCmdWithSudo  try to run cmd with sudo.
 func SSHCmdWithSudo(sshConfig *SSH, host, cmd string) (Result, error) {
+	return SSHCmdWithSudoContext(context.Background(), sshConfig, host, cmd)
+}
+
+// SSHCmdWithSudoContext runs a command with sudo and cancels the SSH session with the context.
+func SSHCmdWithSudoContext(ctx context.Context, sshConfig *SSH, host, cmd string) (Result, error) {
 	var (
 		sudoCmd = cmd
 		err     error
@@ -109,19 +115,24 @@ func SSHCmdWithSudo(sshConfig *SSH, host, cmd string) (Result, error) {
 			return result, err
 		}
 	}
-	return SSHCmd(sshConfig, host, sudoCmd)
+	return SSHCmdContext(ctx, sshConfig, host, sudoCmd)
 }
 
 // SSHCmd synchronously SSHs to a node running on provider and runs cmd. If there
 // is no error performing the SSH, the stdout, stderr, and exit code are
 // returned.
 func SSHCmd(sshConfig *SSH, host, cmd string) (Result, error) {
+	return SSHCmdContext(context.Background(), sshConfig, host, cmd)
+}
+
+// SSHCmdContext synchronously runs a remote command and closes the SSH connection on cancellation.
+func SSHCmdContext(ctx context.Context, sshConfig *SSH, host, cmd string) (Result, error) {
 	// if caller don't provide enough config for run ssh cmd，change to run cmd by os.exec on localhost.
 	// only for aio deploy now.
 	if SSHToCmd(sshConfig, host) {
-		return RunCmdAsSSH(cmd)
+		return RunCmdAsSSHContext(ctx, cmd)
 	}
-	stdout, stderr, code, err := runSSHCommand(sshConfig, host, cmd)
+	stdout, stderr, code, err := runSSHCommandContext(ctx, sshConfig, host, cmd)
 	result := Result{
 		User:     sshConfig.User,
 		Host:     host,
@@ -140,17 +151,34 @@ func SSHCmd(sshConfig *SSH, host, cmd string) (Result, error) {
 	return result, result.error()
 }
 
-// runSSHCommand returns the stdout, stderr, and exit code from running cmd on
+// runSSHCommandContext returns the stdout, stderr, and exit code from running cmd on
 // host as specific user, along with any SSH-level error.
-func runSSHCommand(sshConfig *SSH, host, cmd string) (stdout, stderr string, exitcode int, err error) {
+func runSSHCommandContext(
+	ctx context.Context,
+	sshConfig *SSH,
+	host, cmd string,
+) (stdout, stderr string, exitcode int, err error) {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return "", "", 0, ctxErr
+	}
 	pCmd := printCmd(sshConfig.Password, cmd)
 	client, err := sshConfig.NewClient(host)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", "", 0, ctxErr
+		}
 		return "", "", 0, err
 	}
 	defer client.Close()
+	stopCancel := context.AfterFunc(ctx, func() {
+		_ = client.Close()
+	})
+	defer stopCancel()
 	session, err := client.NewSession()
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", "", 0, ctxErr
+		}
 		return "", "", 0, err
 	}
 	defer session.Close()
@@ -159,6 +187,9 @@ func runSSHCommand(sshConfig *SSH, host, cmd string) (stdout, stderr string, exi
 	var bout, berr bytes.Buffer
 	session.Stdout, session.Stderr = &bout, &berr
 	if err = session.Run(cmd); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return bout.String(), berr.String(), exitcode, ctxErr
+		}
 		// Check whether the command failed to run or didn't complete.
 		if exiterr, ok := err.(*ssh.ExitError); ok {
 			// If we got an ExitError and the exit code is nonzero, we'll
