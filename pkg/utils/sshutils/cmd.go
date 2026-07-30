@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"syscall"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
@@ -76,6 +77,17 @@ func RunCmdAsSSHContext(ctx context.Context, cmdStr string) (Result, error) {
 	user := Whoami()
 	// #nosec G204 -- this helper intentionally executes the command supplied by its caller.
 	ec := exec.CommandContext(ctx, "sh", []string{"-c", cmdStr}...)
+	// A shell may leave child processes holding stdout and stderr open after it is
+	// killed. Put the command in its own process group so cancellation terminates
+	// the complete command tree and ec.Run can return promptly.
+	ec.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	ec.Cancel = func() error {
+		err := syscall.Kill(-ec.Process.Pid, syscall.SIGKILL)
+		if err == syscall.ESRCH {
+			return os.ErrProcessDone
+		}
+		return err
+	}
 	ec.Stdin = os.Stdin
 	var bout, berr bytes.Buffer
 	ec.Stdout, ec.Stderr = &bout, &berr
