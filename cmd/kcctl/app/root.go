@@ -22,6 +22,7 @@ import (
 	"io"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/cluster"
+	doctorcmd "github.com/kubeclipper/kubeclipper/pkg/cli/doctor"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/set"
 	statuscmd "github.com/kubeclipper/kubeclipper/pkg/cli/status"
@@ -102,6 +103,7 @@ func NewKubeClipperCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(set.NewCmdSet(ioStreams))
 	cmds.AddCommand(operation.NewCmdOperation(ioStreams))
 	cmds.AddCommand(statuscmd.NewCmdStatus(ioStreams))
+	cmds.AddCommand(doctorcmd.NewCmdDoctor(ioStreams))
 
 	return cmds
 }

@@ -19,10 +19,26 @@
 package sshutils
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSSHCmdWithSudoContextCancelsLocalCommand(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	startedAt := time.Now()
+	_, err := SSHCmdWithSudoContext(ctx, nil, "", "sleep 30")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error = %v, want context.DeadlineExceeded", err)
+	}
+	if elapsed := time.Since(startedAt); elapsed > time.Second {
+		t.Fatalf("command cancellation took %s", elapsed)
+	}
+}
 
 func TestSSHCmd(t *testing.T) {
 	defer func() {

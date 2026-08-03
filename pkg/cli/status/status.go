@@ -21,10 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"sigs.k8s.io/yaml"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
@@ -32,7 +36,12 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
-const defaultTimeout = 10 * time.Second
+const (
+	defaultTimeout       = 10 * time.Second
+	componentColumnWidth = 14
+	statusColumnWidth    = 12
+	labelWidth           = 8
+)
 
 type ExitError struct {
 	code int
@@ -148,6 +157,14 @@ func printStatus(out io.Writer, result *platformstatus.PlatformStatus, output st
 }
 
 func printTable(out io.Writer, result *platformstatus.PlatformStatus) error {
+	style := newStatusOutputStyle(out)
+	if style.enabled {
+		return printTerminalTable(out, result, style)
+	}
+	return printPlainTable(out, result)
+}
+
+func printPlainTable(out io.Writer, result *platformstatus.PlatformStatus) error {
 	if _, err := fmt.Fprintf(out, "KubeClipper Platform Status: %s\n", result.Status); err != nil {
 		return err
 	}
@@ -161,4 +178,101 @@ func printTable(out io.Writer, result *platformstatus.PlatformStatus) error {
 	}
 	table.Render()
 	return nil
+}
+
+func printTerminalTable(out io.Writer, result *platformstatus.PlatformStatus, style statusOutputStyle) error {
+	if _, err := fmt.Fprintln(out, style.title("KubeClipper Platform Status")); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "\n%s  %s\n",
+		style.label("Overall"), style.status(result.Status, statusMarker(result.Status)+" "+string(result.Status))); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "%s  %s\n\n",
+		style.label("Checked"), result.CheckedAt.Local().Format(time.RFC3339)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "%s  %s  %s\n",
+		style.heading(padRight("COMPONENT", componentColumnWidth)),
+		style.heading(padRight("STATUS", statusColumnWidth)),
+		style.heading("DETAILS")); err != nil {
+		return err
+	}
+	for _, component := range result.Components {
+		status := statusMarker(component.Status) + " " + string(component.Status)
+		if _, err := fmt.Fprintf(out, "%s  %s  %s\n",
+			padRight(component.Name, componentColumnWidth),
+			style.status(component.Status, padRight(status, statusColumnWidth)),
+			component.Message); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func statusMarker(status platformstatus.Status) string {
+	switch status {
+	case platformstatus.Healthy:
+		return "✓"
+	case platformstatus.Degraded:
+		return "!"
+	case platformstatus.Unhealthy:
+		return "✗"
+	default:
+		return "?"
+	}
+}
+
+func padRight(value string, width int) string {
+	displayWidth := utf8.RuneCountInString(value)
+	if displayWidth >= width {
+		return value
+	}
+	return value + strings.Repeat(" ", width-displayWidth)
+}
+
+type statusOutputStyle struct {
+	enabled bool
+}
+
+func newStatusOutputStyle(out io.Writer) statusOutputStyle {
+	file, terminal := out.(*os.File)
+	_, noColor := os.LookupEnv("NO_COLOR")
+	return statusOutputStyle{
+		enabled: terminal && term.IsTerminal(int(file.Fd())) && !noColor && os.Getenv("TERM") != "dumb",
+	}
+}
+
+func (s statusOutputStyle) title(value string) string {
+	return s.wrap("1;36", value)
+}
+
+func (s statusOutputStyle) heading(value string) string {
+	return s.wrap("2", value)
+}
+
+func (s statusOutputStyle) label(value string) string {
+	return s.wrap("1", padRight(value, labelWidth))
+}
+
+func (s statusOutputStyle) status(status platformstatus.Status, value string) string {
+	code := "35"
+	switch status {
+	case platformstatus.Healthy:
+		code = "1;32"
+	case platformstatus.Degraded:
+		code = "1;33"
+	case platformstatus.Unhealthy:
+		code = "1;31"
+	case platformstatus.Skipped:
+		code = "2"
+	}
+	return s.wrap(code, value)
+}
+
+func (s statusOutputStyle) wrap(code, value string) string {
+	if !s.enabled {
+		return value
+	}
+	return "\x1b[" + code + "m" + value + "\x1b[0m"
 }
