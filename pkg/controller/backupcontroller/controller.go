@@ -144,7 +144,8 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 	}
 
 	// when the backup is creating and operation is successful, set the backup status to available
-	if b.Status.ClusterBackupStatus == v1.ClusterBackupCreating && o != nil && o.Status.Phase == operations.OperationSucceeded && o.Spec.Action == v1.OperationBackupCluster {
+	if b.Status.ClusterBackupStatus == v1.ClusterBackupCreating && o != nil && o.Status.Phase == operations.OperationSucceeded &&
+		o.Spec.Action == v1.OperationBackupCluster {
 		checkFile := k8s.CheckFile{}
 		tasks, err := r.OperationStore.ListTasksByOperationUID(ctx, o.UID, "")
 		if err != nil {
@@ -174,7 +175,8 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 	}
 
 	// when the backup is restoring and operation is successful, set the backup status to available
-	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring && o != nil && o.Status.Phase == operations.OperationSucceeded && o.Spec.Action == v1.OperationRecoverCluster {
+	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring && o != nil && o.Status.Phase == operations.OperationSucceeded &&
+		o.Spec.Action == v1.OperationRecoverCluster {
 		b.Status.ClusterBackupStatus = v1.ClusterBackupAvailable
 		_, err := r.BackupWriter.UpdateBackup(context.TODO(), b)
 		if err != nil {

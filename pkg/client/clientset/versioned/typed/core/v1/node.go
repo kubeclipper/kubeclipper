@@ -48,7 +48,14 @@ type NodesInterface interface {
 
 func (c *nodes) UpdateStatus(ctx context.Context, node *corev1.Node, opts v1.UpdateOptions) (result *corev1.Node, err error) {
 	result = &corev1.Node{}
-	err = c.client.Put().Resource("nodes").Name(node.Name).SubResource("status").VersionedParams(&opts, scheme.ParameterCodec).Body(node).Do(ctx).Into(result)
+	err = c.client.Put().
+		Resource("nodes").
+		Name(node.Name).
+		SubResource("status").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(node).
+		Do(ctx).
+		Into(result)
 	return
 }
 

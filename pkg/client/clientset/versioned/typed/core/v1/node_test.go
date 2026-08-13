@@ -61,7 +61,9 @@ func TestNodeCreateAndUpdateStatus(t *testing.T) {
 			t.Errorf("decode node: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(&node)
+		if err := json.NewEncoder(w).Encode(&node); err != nil {
+			t.Errorf("encode node: %v", err)
+		}
 	}))
 	defer server.Close()
 

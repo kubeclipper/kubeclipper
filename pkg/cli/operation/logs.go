@@ -189,10 +189,13 @@ func (o *LogsOptions) runSingleOperation() error {
 		if err != nil {
 			return fmt.Errorf("list tasks for operation %s: %w", o.OperationID, err)
 		}
-		for _, step := range steps {
-			for _, task := range tasksForStep(taskList.Items, step.ID) {
+		for stepIndex := range steps {
+			step := &steps[stepIndex]
+			tasks := tasksForStep(taskList.Items, step.ID)
+			for taskIndex := range tasks {
+				task := &tasks[taskIndex]
 				if !seenTasks[task.Name] {
-					printTaskTitle(o.Out, &task)
+					printTaskTitle(o.Out, task)
 					seenTasks[task.Name] = true
 				}
 				if o.Summary {
@@ -265,7 +268,14 @@ func printTaskTitle(w io.Writer, task *operationsv1alpha1.OperationTask) {
 
 	var title string
 	if timeStr != "" {
-		title = fmt.Sprintf(" Step: %s Node: %s Attempt: %d %s %s ", task.Spec.StepID, task.Spec.NodeRef.Name, task.Spec.Attempt, statusText, timeStr)
+		title = fmt.Sprintf(
+			" Step: %s Node: %s Attempt: %d %s %s ",
+			task.Spec.StepID,
+			task.Spec.NodeRef.Name,
+			task.Spec.Attempt,
+			statusText,
+			timeStr,
+		)
 	} else {
 		title = fmt.Sprintf(" Step: %s Node: %s Attempt: %d %s ", task.Spec.StepID, task.Spec.NodeRef.Name, task.Spec.Attempt, statusText)
 	}

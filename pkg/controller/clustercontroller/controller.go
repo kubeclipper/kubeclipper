@@ -599,7 +599,12 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			// restore and assemble the cluster metadata, passing it through
 			extraMeta, err := r.assembleClusterExtraMetadata(ctx, clu)
 			if err != nil {
-				log.Error("get cluster extra metadata failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				log.Error(
+					"get cluster extra metadata failed",
+					zap.String("cluster", c.Name),
+					zap.String("operation-id", pendingOperation.OperationID),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -609,14 +614,28 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			// build the operation structure based on the type of operation
 			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil, r.ClusterOperator)
 			if err != nil {
-				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				log.Error(
+					"create operation struct failed",
+					zap.String("cluster", c.Name),
+					zap.String("operation-id", pendingOperation.OperationID),
+					zap.Error(err),
+				)
 				continue
 			}
 
-			log.Debugf("create operation struct successful", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID))
+			log.Debugf(
+				"create operation struct successful",
+				zap.String("cluster", c.Name),
+				zap.String("operation-id", pendingOperation.OperationID),
+			)
 			_, err = operationv2builder.CreateFromCore(ctx, r.OperationStore, r.ClusterOperator, clu, newOperation)
 			if err != nil {
-				log.Error("create operation failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				log.Error(
+					"create operation failed",
+					zap.String("cluster", c.Name),
+					zap.String("operation-id", pendingOperation.OperationID),
+					zap.Error(err),
+				)
 				continue
 			}
 		} else if op.Status.Phase == operationsv1alpha1.OperationPending || op.Status.Phase == operationsv1alpha1.OperationRunning {

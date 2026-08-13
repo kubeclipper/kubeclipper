@@ -73,7 +73,6 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
-	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	apirequest "github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
@@ -112,25 +111,30 @@ var (
 )
 
 func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator, leaseOperator lease.Operator,
-	operationV2Store operationv2store.Store, platform platform.Operator, coreOperator core.Operator,
+	operationV2Store operationv2store.Store, platformOperator platform.Operator, coreOperator core.Operator,
 	tokenOperator auth.TokenManagementInterface) *handler {
 	return &handler{
 		genericConfig:    conf,
 		clusterOperator:  clusterOperator,
 		operationV2Store: operationV2Store,
-		platformOperator: platform,
+		platformOperator: platformOperator,
 		leaseOperator:    leaseOperator,
 		coreOperator:     coreOperator,
 		tokenOperator:    tokenOperator,
 	}
 }
 
-func (h *handler) createOperationV2(ctx context.Context, cluster *v1.Cluster, plan *v1.Operation) (*operationsv1alpha1.Operation, error) {
-	converted, err := operationv2builder.FromCoreOperation(ctx, plan, cluster, h.clusterOperator)
+func (h *handler) createOperationV2(
+	ctx context.Context,
+	clusterObject *v1.Cluster,
+	plan *v1.Operation,
+) error {
+	converted, err := operationv2builder.FromCoreOperation(ctx, plan, clusterObject, h.clusterOperator)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return h.operationV2Store.CreateOperation(ctx, converted)
+	_, err = h.operationV2Store.CreateOperation(ctx, converted)
+	return err
 }
 
 func (h *handler) ListClusters(request *restful.Request, response *restful.Response) {
@@ -394,7 +398,7 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		_, err = h.createOperationV2(request.Request.Context(), c, op)
+		err = h.createOperationV2(request.Request.Context(), c, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -476,7 +480,7 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
-		_, err = h.createOperationV2(context.TODO(), &c, op)
+		err = h.createOperationV2(context.TODO(), &c, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -586,7 +590,7 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 	op.Status.Status = v1.OperationStatusRunning
 	c.Status.Phase = v1.ClusterUpdating
 	if !dryRun {
-		_, err = h.createOperationV2(ctx, c, op)
+		err = h.createOperationV2(ctx, c, op)
 		if err != nil {
 			restplus.HandleBadRequest(response, request, err)
 			return
@@ -624,7 +628,9 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 	} else {
 		if len(clu.KubeConfig) > 0 {
 			kubeConfigData = clu.KubeConfig
-			_, _ = response.Write(kubeConfigData)
+			if _, err := response.Write(kubeConfigData); err != nil {
+				return
+			}
 			return
 		}
 		extraMeta, err := h.getClusterMetadata(ctx, clu, false)
@@ -653,7 +659,9 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	_, _ = response.Write(kubeConfigData)
+	if _, err := response.Write(kubeConfigData); err != nil {
+		return
+	}
 }
 
 func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string) ([]byte, error) {
@@ -743,7 +751,9 @@ func (h *handler) CreateNode(request *restful.Request, response *restful.Respons
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	_ = response.WriteHeaderAndEntity(http.StatusCreated, created)
+	if err := response.WriteHeaderAndEntity(http.StatusCreated, created); err != nil {
+		return
+	}
 }
 
 func (h *handler) UpdateNodeStatus(request *restful.Request, response *restful.Response) {
@@ -779,7 +789,9 @@ func (h *handler) UpdateNodeStatus(request *restful.Request, response *restful.R
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, updated)
+	if err := response.WriteHeaderAndEntity(http.StatusOK, updated); err != nil {
+		return
+	}
 }
 
 func (h *handler) DescribeNode(request *restful.Request, response *restful.Response) {
@@ -1307,7 +1319,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		if _, err = h.createOperationV2(context.TODO(), c, op); err != nil {
+		if err = h.createOperationV2(context.TODO(), c, op); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -1389,7 +1401,7 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		if _, err = h.createOperationV2(context.TODO(), c, op); err != nil {
+		if err = h.createOperationV2(context.TODO(), c, op); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -1540,7 +1552,7 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 	}
 
 	if !dryRun {
-		_, err := h.createOperationV2(context.TODO(), c, o)
+		err := h.createOperationV2(context.TODO(), c, o)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1645,7 +1657,7 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 			return
 		}
 
-		_, err = h.createOperationV2(context.TODO(), clu, op)
+		err = h.createOperationV2(context.TODO(), clu, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1745,7 +1757,7 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 	op.Labels[common.LabelUpgradeVersion] = body.Version
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
-		_, err = h.createOperationV2(context.TODO(), clu, op)
+		err = h.createOperationV2(context.TODO(), clu, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return

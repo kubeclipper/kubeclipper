@@ -56,7 +56,7 @@ var (
 	reqDeleteClusters, _ = http.NewRequest("DELETE", "/api/core.kubeclipper.io/v1/clusters/cluster1", nil)
 
 	// operation api
-	reqListOperations, _ = http.NewRequest("GET", "/api/operations.kubeclipper.io/v1alpha1/operations", nil)
+	reqListOperations = mustNewRequest("GET", "/api/operations.kubeclipper.io/v1alpha1/operations")
 
 	// node api
 	reqListNodes, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/nodes", nil)
@@ -90,6 +90,14 @@ var (
 	reqChangeAdminPassword, _          = http.NewRequest("PUT", "/api/iam.kubeclipper.io/v1/users/admin/password", nil)
 	reqChangeClusterManagerPassword, _ = http.NewRequest("PUT", "/api/iam.kubeclipper.io/v1/users/clustermanager/password", nil)
 )
+
+func mustNewRequest(method, target string) *http.Request {
+	httpRequest, err := http.NewRequestWithContext(context.Background(), method, target, http.NoBody)
+	if err != nil {
+		panic(err)
+	}
+	return httpRequest
+}
 
 var (
 	userAdmin = &user.DefaultInfo{

@@ -19,63 +19,64 @@
 package operationv2
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 func NewOperationStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (rest.StandardStorage, error) {
 	strategy := newOperationStrategy(scheme)
-	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &operations.Operation{} },
-		NewListFunc:              func() runtime.Object { return &operations.OperationList{} },
-		DefaultQualifiedResource: operations.Resource(operations.ResourceOperations),
-		CreateStrategy:           strategy,
-		UpdateStrategy:           strategy,
-		DeleteStrategy:           strategy,
-		TableConvertor:           rest.NewDefaultTableConvertor(operations.Resource(operations.ResourceOperations)),
-		Storage:                  genericregistry.DryRunnableStorage{},
-	}
-	if err := store.CompleteWithOptions(&generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: attrsForOperation}); err != nil {
-		return nil, err
-	}
-	return store, nil
+	return newStorage(
+		optsGetter, operations.ResourceOperations, &operations.Operation{}, &operations.OperationList{}, strategy, attrsForOperation,
+	)
 }
 
 func NewTaskStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (rest.StandardStorage, error) {
 	strategy := newTaskStrategy(scheme)
-	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &operations.OperationTask{} },
-		NewListFunc:              func() runtime.Object { return &operations.OperationTaskList{} },
-		DefaultQualifiedResource: operations.Resource(operations.ResourceTasks),
-		CreateStrategy:           strategy,
-		UpdateStrategy:           strategy,
-		DeleteStrategy:           strategy,
-		TableConvertor:           rest.NewDefaultTableConvertor(operations.Resource(operations.ResourceTasks)),
-		Storage:                  genericregistry.DryRunnableStorage{},
-	}
-	if err := store.CompleteWithOptions(&generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: attrsForTask}); err != nil {
-		return nil, err
-	}
-	return store, nil
+	return newStorage(
+		optsGetter, operations.ResourceTasks, &operations.OperationTask{}, &operations.OperationTaskList{}, strategy, attrsForTask,
+	)
 }
 
 func NewLockStorage(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (rest.StandardStorage, error) {
 	strategy := newLockStrategy(scheme)
+	return newStorage(
+		optsGetter, operations.ResourceLocks, &operations.ExecutionLock{}, &operations.ExecutionLockList{}, strategy, attrsForLock,
+	)
+}
+
+func newStorage(
+	optsGetter generic.RESTOptionsGetter,
+	resourceName string,
+	object, list runtime.Object,
+	strategy rest.RESTCreateStrategy,
+	attrs storage.AttrFunc,
+) (rest.StandardStorage, error) {
+	updateStrategy, ok := strategy.(rest.RESTUpdateStrategy)
+	if !ok {
+		return nil, fmt.Errorf("storage strategy must support update")
+	}
+	deleteStrategy, ok := strategy.(rest.RESTDeleteStrategy)
+	if !ok {
+		return nil, fmt.Errorf("storage strategy must support delete")
+	}
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &operations.ExecutionLock{} },
-		NewListFunc:              func() runtime.Object { return &operations.ExecutionLockList{} },
-		DefaultQualifiedResource: operations.Resource(operations.ResourceLocks),
+		NewFunc:                  func() runtime.Object { return object.DeepCopyObject() },
+		NewListFunc:              func() runtime.Object { return list.DeepCopyObject() },
+		DefaultQualifiedResource: operations.Resource(resourceName),
 		CreateStrategy:           strategy,
-		UpdateStrategy:           strategy,
-		DeleteStrategy:           strategy,
-		TableConvertor:           rest.NewDefaultTableConvertor(operations.Resource(operations.ResourceLocks)),
+		UpdateStrategy:           updateStrategy,
+		DeleteStrategy:           deleteStrategy,
+		TableConvertor:           rest.NewDefaultTableConvertor(operations.Resource(resourceName)),
 		Storage:                  genericregistry.DryRunnableStorage{},
 	}
-	if err := store.CompleteWithOptions(&generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: attrsForLock}); err != nil {
+	if err := store.CompleteWithOptions(&generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: attrs}); err != nil {
 		return nil, err
 	}
 	return store, nil

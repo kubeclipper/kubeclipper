@@ -11,6 +11,11 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
+const (
+	initialLogWidth  = 80
+	initialLogHeight = 24
+)
+
 // Model is the top-level Bubble Tea model for the TUI log viewer.
 type Model struct {
 	client      *kc.Client
@@ -37,13 +42,13 @@ func NewModel(client *kc.Client, clusterName string, operations []operationsv1al
 
 // NewModelWithSingleOp creates a model that skips the list and goes directly
 // to the log view for a single operation.
-func NewModelWithSingleOp(client *kc.Client, clusterName string, op operationsv1alpha1.Operation) Model {
+func NewModelWithSingleOp(client *kc.Client, clusterName string, op *operationsv1alpha1.Operation) Model {
 	return Model{
 		client:      client,
 		clusterName: clusterName,
-		operations:  []operationsv1alpha1.Operation{op},
+		operations:  []operationsv1alpha1.Operation{*op},
 		currentView: viewLog,
-		logModel:    NewLogModel(client, &op, 80, 24), // will be resized by WindowSizeMsg
+		logModel:    NewLogModel(client, op, initialLogWidth, initialLogHeight), // will be resized by WindowSizeMsg
 		ready:       false,
 	}
 }
@@ -131,7 +136,7 @@ func RunTUI(client *kc.Client, clusterName string, in io.Reader, out io.Writer) 
 
 	var model Model
 	if len(operations) == 1 {
-		model = NewModelWithSingleOp(client, clusterName, operations[0])
+		model = NewModelWithSingleOp(client, clusterName, &operations[0])
 	} else {
 		model = NewModel(client, clusterName, operations)
 	}

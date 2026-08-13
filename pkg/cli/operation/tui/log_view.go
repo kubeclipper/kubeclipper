@@ -57,14 +57,15 @@ type LogModel struct {
 	height     int
 }
 
-const followTickInterval = 2 * time.Second
+const (
+	followTickInterval = 2 * time.Second
+	minLogPanelWidth   = 10
+)
 
 func NewLogModel(client *kc.Client, op *operationsv1alpha1.Operation, width, height int) LogModel {
 	stepPanelWidth := width * 35 / 100
 	logPanelWidth := width - stepPanelWidth - 2
-	if logPanelWidth < 10 {
-		logPanelWidth = 10
-	}
+	logPanelWidth = max(minLogPanelWidth, logPanelWidth)
 	return LogModel{
 		client: client, operation: op, steps: buildStepEntries(op, nil),
 		lastOffset: make(map[string]int64), viewport: viewport.New(logPanelWidth, height-3),
@@ -78,7 +79,8 @@ func buildStepEntries(op *operationsv1alpha1.Operation, tasks []operationsv1alph
 		byStep[tasks[i].Spec.StepID] = append(byStep[tasks[i].Spec.StepID], tasks[i])
 	}
 	entries := make([]StepEntry, 0, len(op.Spec.Steps))
-	for _, step := range op.Spec.Steps {
+	for stepIndex := range op.Spec.Steps {
+		step := &op.Spec.Steps[stepIndex]
 		stepTasks := byStep[step.ID]
 		sort.SliceStable(stepTasks, func(i, j int) bool {
 			if stepTasks[i].Spec.RetryGeneration != stepTasks[j].Spec.RetryGeneration {
@@ -100,7 +102,16 @@ func buildStepEntries(op *operationsv1alpha1.Operation, tasks []operationsv1alph
 				}
 				duration = d.String()
 			}
-			entry.Tasks = append(entry.Tasks, TaskEntry{Name: task.Name, Node: task.Spec.NodeRef.Name, Attempt: task.Spec.Attempt, Status: string(task.Status.Phase), Duration: duration})
+			entry.Tasks = append(
+				entry.Tasks,
+				TaskEntry{
+					Name:     task.Name,
+					Node:     task.Spec.NodeRef.Name,
+					Attempt:  task.Spec.Attempt,
+					Status:   string(task.Status.Phase),
+					Duration: duration,
+				},
+			)
 		}
 		entry.Status = aggregateStepPhase(step, stepTasks, op.Status.Phase)
 		entries = append(entries, entry)
@@ -108,7 +119,19 @@ func buildStepEntries(op *operationsv1alpha1.Operation, tasks []operationsv1alph
 	return entries
 }
 
-func aggregateStepPhase(step operationsv1alpha1.OperationStep, tasks []operationsv1alpha1.OperationTask, operationPhase operationsv1alpha1.OperationPhase) string {
+func aggregateStepPhase(
+	step *operationsv1alpha1.OperationStep,
+	tasks []operationsv1alpha1.OperationTask,
+	operationPhase operationsv1alpha1.OperationPhase,
+) string {
+	effective := effectiveTasksByNode(tasks)
+	if len(step.Targets) == 0 {
+		return missingStepPhase(operationPhase)
+	}
+	return aggregateTargetPhases(step, effective, operationPhase)
+}
+
+func effectiveTasksByNode(tasks []operationsv1alpha1.OperationTask) map[string]*operationsv1alpha1.OperationTask {
 	effective := make(map[string]*operationsv1alpha1.OperationTask)
 	for i := range tasks {
 		task := &tasks[i]
@@ -120,9 +143,14 @@ func aggregateStepPhase(step operationsv1alpha1.OperationStep, tasks []operation
 			effective[key] = task
 		}
 	}
-	if len(step.Targets) == 0 {
-		return missingStepPhase(operationPhase)
-	}
+	return effective
+}
+
+func aggregateTargetPhases(
+	step *operationsv1alpha1.OperationStep,
+	effective map[string]*operationsv1alpha1.OperationTask,
+	operationPhase operationsv1alpha1.OperationPhase,
+) string {
 	allSucceeded := true
 	phase := operationsv1alpha1.TaskPending
 	for _, target := range step.Targets {
@@ -158,14 +186,14 @@ func missingStepPhase(operationPhase operationsv1alpha1.OperationPhase) string {
 	return string(operationsv1alpha1.TaskPending)
 }
 
-func (m LogModel) currentTask() *TaskEntry {
+func (m *LogModel) currentTask() *TaskEntry {
 	if m.cursor >= len(m.steps) || len(m.steps[m.cursor].Tasks) == 0 {
 		return nil
 	}
 	return &m.steps[m.cursor].Tasks[len(m.steps[m.cursor].Tasks)-1]
 }
 
-func (m LogModel) fetchCurrentLogCmd() tea.Cmd {
+func (m *LogModel) fetchCurrentLogCmd() tea.Cmd {
 	task := m.currentTask()
 	if task == nil {
 		return func() tea.Msg { return logFetchedMsg{content: "(no Task has been created for this step)\n"} }
@@ -202,14 +230,14 @@ func (m LogModel) fetchOperationStatusCmd() tea.Cmd {
 	}
 }
 
-func (m LogModel) Init() tea.Cmd { return m.fetchOperationStatusCmd() }
+func (m *LogModel) Init() tea.Cmd { return m.fetchOperationStatusCmd() }
 
 func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.viewport.Width = maxInt(10, m.width-m.width*35/100-2)
+		m.viewport.Width = maxInt(minLogPanelWidth, m.width-m.width*35/100-2)
 		m.viewport.Height = m.height - 3
 	case logFetchedMsg:
 		if msg.content != "" {
@@ -233,7 +261,7 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 			if m.cursor >= len(m.steps) {
 				m.cursor = maxInt(0, len(m.steps)-1)
 			}
-			if len(m.rawContent) == 0 {
+			if m.rawContent == "" {
 				cmds = append(cmds, m.fetchCurrentLogCmd())
 			}
 			if msg.operation.Status.Phase.IsTerminal() {
@@ -287,7 +315,7 @@ func (m LogModel) View() string {
 		return "No steps in this operation."
 	}
 	stepPanelWidth := m.width * 35 / 100
-	logPanelWidth := maxInt(10, m.width-stepPanelWidth-2)
+	logPanelWidth := maxInt(minLogPanelWidth, m.width-stepPanelWidth-2)
 	var left strings.Builder
 	left.WriteString(HeaderStyle.Render("Steps and Tasks"))
 	left.WriteString("\n")
@@ -310,12 +338,18 @@ func (m LogModel) View() string {
 			left.WriteString("\n")
 		}
 	}
-	combined := lipgloss.JoinHorizontal(lipgloss.Top, StepPanelStyle.Width(stepPanelWidth).Render(left.String()), LogPanelStyle.Width(logPanelWidth).Render(m.viewport.View()))
+	combined := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		StepPanelStyle.Width(stepPanelWidth).Render(left.String()),
+		LogPanelStyle.Width(logPanelWidth).Render(m.viewport.View()),
+	)
 	follow := "off"
 	if m.followMode {
 		follow = "on"
 	}
-	return combined + "\n" + HelpStyle.Render(fmt.Sprintf("up/k: up  down/j: down  pgup/pgdn: scroll  f: follow[%s]  b: back  q: quit", follow))
+	return combined + "\n" + HelpStyle.Render(
+		fmt.Sprintf("up/k: up  down/j: down  pgup/pgdn: scroll  f: follow[%s]  b: back  q: quit", follow),
+	)
 }
 
 func stepStatusMark(status string) string {

@@ -81,7 +81,7 @@ func (o *TerminateOptions) RunTerminate() error {
 	}
 
 	if op.Status.Phase != operationsv1alpha1.OperationPending && op.Status.Phase != operationsv1alpha1.OperationRunning {
-		return fmt.Errorf("operation cannot be cancelled from phase %s", op.Status.Phase)
+		return fmt.Errorf("operation cannot be canceled from phase %s", op.Status.Phase)
 	}
 
 	if _, err := o.Client.CancelOperation(ctx, op); err != nil {

@@ -46,22 +46,46 @@ import (
 type Store interface {
 	GetOperation(ctx context.Context, name, resourceVersion string) (*operations.Operation, error)
 	CreateOperation(ctx context.Context, op *operations.Operation) (*operations.Operation, error)
-	ListOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (*operations.OperationList, error)
-	WatchOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (watch.Interface, error)
+	ListOperationsWithOptions(ctx context.Context, options *metav1.ListOptions) (*operations.OperationList, error)
+	WatchOperationsWithOptions(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error)
 	ListOperations(ctx context.Context, targetUID types.UID, resourceVersion string) (*operations.OperationList, error)
 	WatchOperations(ctx context.Context, resourceVersion string) (watch.Interface, error)
-	UpdateOperationStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationStatus) (*operations.Operation, error)
-	UpdateOperationControl(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.OperationSpec) error) (*operations.Operation, error)
+	UpdateOperationStatus(
+		ctx context.Context,
+		name string,
+		uid types.UID,
+		resourceVersion string,
+		status *operations.OperationStatus,
+	) (*operations.Operation, error)
+	UpdateOperationControl(
+		ctx context.Context,
+		name string,
+		uid types.UID,
+		resourceVersion string,
+		mutate func(*operations.OperationSpec) error,
+	) (*operations.Operation, error)
 
 	GetTask(ctx context.Context, name, resourceVersion string) (*operations.OperationTask, error)
 	CreateTask(ctx context.Context, task *operations.OperationTask) (*operations.OperationTask, error)
-	ListTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (*operations.OperationTaskList, error)
-	WatchTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (watch.Interface, error)
+	ListTasksWithOptions(ctx context.Context, nodeName string, options *metav1.ListOptions) (*operations.OperationTaskList, error)
+	WatchTasksWithOptions(ctx context.Context, nodeName string, options *metav1.ListOptions) (watch.Interface, error)
 	ListTasksByOperationUID(ctx context.Context, operationUID types.UID, resourceVersion string) (*operations.OperationTaskList, error)
 	ListTasksByNode(ctx context.Context, nodeName, resourceVersion string) (*operations.OperationTaskList, error)
 	WatchTasks(ctx context.Context, nodeName, resourceVersion string) (watch.Interface, error)
-	UpdateTaskStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationTaskStatus) (*operations.OperationTask, error)
-	CancelPendingTask(ctx context.Context, name string, uid types.UID, resourceVersion string, reason operations.TaskResultReason) (*operations.OperationTask, error)
+	UpdateTaskStatus(
+		ctx context.Context,
+		name string,
+		uid types.UID,
+		resourceVersion string,
+		status operations.OperationTaskStatus,
+	) (*operations.OperationTask, error)
+	CancelPendingTask(
+		ctx context.Context,
+		name string,
+		uid types.UID,
+		resourceVersion string,
+		reason operations.TaskResultReason,
+	) (*operations.OperationTask, error)
 	TimeoutRunningTask(ctx context.Context, name string, uid types.UID, resourceVersion string) (*operations.OperationTask, error)
 
 	AcquireLock(ctx context.Context, lock *operations.ExecutionLock) (*operations.ExecutionLock, bool, error)
@@ -131,11 +155,14 @@ func (s *store) ListOperations(ctx context.Context, targetUID types.UID, resourc
 	if targetUID != "" {
 		options.FieldSelector = fields.OneTermEqualSelector("spec.targetRef.uid", string(targetUID)).String()
 	}
-	return s.ListOperationsWithOptions(ctx, options)
+	return s.ListOperationsWithOptions(ctx, &options)
 }
 
-func (s *store) ListOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (*operations.OperationList, error) {
-	internal, err := internalListOptions(options)
+func (s *store) ListOperationsWithOptions(ctx context.Context, options *metav1.ListOptions) (*operations.OperationList, error) {
+	if options == nil {
+		options = &metav1.ListOptions{}
+	}
+	internal, err := internalListOptions(*options)
 	if err != nil {
 		return nil, err
 	}
@@ -151,18 +178,27 @@ func (s *store) ListOperationsWithOptions(ctx context.Context, options metav1.Li
 }
 
 func (s *store) WatchOperations(ctx context.Context, resourceVersion string) (watch.Interface, error) {
-	return s.WatchOperationsWithOptions(ctx, metav1.ListOptions{ResourceVersion: resourceVersion})
+	return s.WatchOperationsWithOptions(ctx, &metav1.ListOptions{ResourceVersion: resourceVersion})
 }
 
-func (s *store) WatchOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
-	internal, err := internalListOptions(options)
+func (s *store) WatchOperationsWithOptions(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
+	if options == nil {
+		options = &metav1.ListOptions{}
+	}
+	internal, err := internalListOptions(*options)
 	if err != nil {
 		return nil, err
 	}
 	return s.operations.Watch(withNamespace(ctx), internal)
 }
 
-func (s *store) UpdateOperationStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationStatus) (*operations.Operation, error) {
+func (s *store) UpdateOperationStatus(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	status *operations.OperationStatus,
+) (*operations.Operation, error) {
 	if err := validateStatusMessage(status.Message); err != nil {
 		return nil, err
 	}
@@ -189,7 +225,13 @@ func (s *store) UpdateOperationStatus(ctx context.Context, name string, uid type
 	})
 }
 
-func (s *store) UpdateOperationControl(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.OperationSpec) error) (*operations.Operation, error) {
+func (s *store) UpdateOperationControl(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	mutate func(*operations.OperationSpec) error,
+) (*operations.Operation, error) {
 	return s.updateOperation(ctx, name, uid, resourceVersion, func(op *operations.Operation) error {
 		if mutate == nil {
 			return fmt.Errorf("control mutator is required")
@@ -198,7 +240,13 @@ func (s *store) UpdateOperationControl(ctx context.Context, name string, uid typ
 	})
 }
 
-func (s *store) updateOperation(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.Operation) error) (*operations.Operation, error) {
+func (s *store) updateOperation(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	mutate func(*operations.Operation) error,
+) (*operations.Operation, error) {
 	obj, err := s.operations.Get(withNamespace(ctx), name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -208,17 +256,33 @@ func (s *store) updateOperation(ctx context.Context, name string, uid types.UID,
 		return nil, fmt.Errorf("operation storage returned %T", obj)
 	}
 	if uid != "" && op.UID != uid {
-		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceOperations), name, fmt.Errorf("operation UID does not match"))
+		return nil, apierrors.NewConflict(
+			operations.Resource(operations.ResourceOperations),
+			name,
+			fmt.Errorf("operation UID does not match"),
+		)
 	}
 	if resourceVersion != "" && op.ResourceVersion != resourceVersion {
-		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceOperations), name, fmt.Errorf("resourceVersion does not match"))
+		return nil, apierrors.NewConflict(
+			operations.Resource(operations.ResourceOperations),
+			name,
+			fmt.Errorf("resourceVersion does not match"),
+		)
 	}
-	copy := op.DeepCopy()
-	if err := mutate(copy); err != nil {
-		return nil, apierrors.NewBadRequest(err.Error())
+	updatedOperation := op.DeepCopy()
+	if mutateErr := mutate(updatedOperation); mutateErr != nil {
+		return nil, apierrors.NewBadRequest(mutateErr.Error())
 	}
-	copy.ResourceVersion = op.ResourceVersion
-	updated, _, err := s.operations.Update(withNamespace(ctx), name, rest.DefaultUpdatedObjectInfo(copy), nil, nil, false, &metav1.UpdateOptions{})
+	updatedOperation.ResourceVersion = op.ResourceVersion
+	updated, _, err := s.operations.Update(
+		withNamespace(ctx),
+		name,
+		rest.DefaultUpdatedObjectInfo(updatedOperation),
+		nil,
+		nil,
+		false,
+		&metav1.UpdateOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -253,16 +317,34 @@ func (s *store) CreateTask(ctx context.Context, task *operations.OperationTask) 
 	return result, nil
 }
 
-func (s *store) ListTasksByOperationUID(ctx context.Context, operationUID types.UID, resourceVersion string) (*operations.OperationTaskList, error) {
-	return s.ListTasksWithOptions(ctx, "", metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.operationRef.uid", string(operationUID)).String(), ResourceVersion: resourceVersion})
+func (s *store) ListTasksByOperationUID(
+	ctx context.Context,
+	operationUID types.UID,
+	resourceVersion string,
+) (*operations.OperationTaskList, error) {
+	return s.ListTasksWithOptions(
+		ctx,
+		"",
+		&metav1.ListOptions{
+			FieldSelector:   fields.OneTermEqualSelector("spec.operationRef.uid", string(operationUID)).String(),
+			ResourceVersion: resourceVersion,
+		},
+	)
 }
 
 func (s *store) ListTasksByNode(ctx context.Context, nodeName, resourceVersion string) (*operations.OperationTaskList, error) {
-	return s.ListTasksWithOptions(ctx, nodeName, metav1.ListOptions{ResourceVersion: resourceVersion})
+	return s.ListTasksWithOptions(ctx, nodeName, &metav1.ListOptions{ResourceVersion: resourceVersion})
 }
 
-func (s *store) ListTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (*operations.OperationTaskList, error) {
-	internal, err := internalListOptions(options)
+func (s *store) ListTasksWithOptions(
+	ctx context.Context,
+	nodeName string,
+	options *metav1.ListOptions,
+) (*operations.OperationTaskList, error) {
+	if options == nil {
+		options = &metav1.ListOptions{}
+	}
+	internal, err := internalListOptions(*options)
 	if err != nil {
 		return nil, err
 	}
@@ -281,11 +363,14 @@ func (s *store) ListTasksWithOptions(ctx context.Context, nodeName string, optio
 }
 
 func (s *store) WatchTasks(ctx context.Context, nodeName, resourceVersion string) (watch.Interface, error) {
-	return s.WatchTasksWithOptions(ctx, nodeName, metav1.ListOptions{ResourceVersion: resourceVersion})
+	return s.WatchTasksWithOptions(ctx, nodeName, &metav1.ListOptions{ResourceVersion: resourceVersion})
 }
 
-func (s *store) WatchTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (watch.Interface, error) {
-	internal, err := internalListOptions(options)
+func (s *store) WatchTasksWithOptions(ctx context.Context, nodeName string, options *metav1.ListOptions) (watch.Interface, error) {
+	if options == nil {
+		options = &metav1.ListOptions{}
+	}
+	internal, err := internalListOptions(*options)
 	if err != nil {
 		return nil, err
 	}
@@ -295,8 +380,14 @@ func (s *store) WatchTasksWithOptions(ctx context.Context, nodeName string, opti
 	return s.tasks.Watch(withNamespace(ctx), internal)
 }
 
-func (s *store) UpdateTaskStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationTaskStatus) (*operations.OperationTask, error) {
-	if err := validation.ValidateTaskResult(status.Result); err != nil {
+func (s *store) UpdateTaskStatus(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	status operations.OperationTaskStatus,
+) (*operations.OperationTask, error) {
+	if err := validateTaskStatus(status); err != nil {
 		return nil, err
 	}
 	obj, err := s.tasks.Get(withNamespace(ctx), name, &metav1.GetOptions{})
@@ -313,29 +404,28 @@ func (s *store) UpdateTaskStatus(ctx context.Context, name string, uid types.UID
 	if resourceVersion != "" && task.ResourceVersion != resourceVersion {
 		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("resourceVersion does not match"))
 	}
-	if err := validation.ValidateTaskPhaseTransition(task.Status.Phase, status.Phase); err != nil {
-		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, err)
+	if transitionErr := validateAgentTaskTransition(task, status); transitionErr != nil {
+		return nil, transitionErr
 	}
-	if status.Phase == operations.TaskCancelled || (task.Status.Phase == operations.TaskPending && status.Phase != operations.TaskPending && status.Phase != operations.TaskRunning) {
-		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("agent cannot transition %s task to %s", task.Status.Phase, status.Phase))
-	}
-	if status.Phase == operations.TaskSucceeded && status.Result != nil && status.Result.Reason != "" {
-		return nil, apierrors.NewBadRequest("Succeeded task must not have a result reason")
-	}
-	if status.Phase != operations.TaskSucceeded && status.Result != nil && len(status.Result.Outputs) > 0 {
-		return nil, apierrors.NewBadRequest("outputs are only allowed on Succeeded tasks")
-	}
-	copy := task.DeepCopy()
-	copy.Status = *status.DeepCopy()
+	updatedTask := task.DeepCopy()
+	updatedTask.Status = *status.DeepCopy()
 	now := metav1.NewTime(s.now())
-	if copy.Status.Phase == operations.TaskRunning && copy.Status.StartedAt == nil {
-		copy.Status.StartedAt = &now
+	if updatedTask.Status.Phase == operations.TaskRunning && updatedTask.Status.StartedAt == nil {
+		updatedTask.Status.StartedAt = &now
 	}
-	if copy.Status.Phase.IsTerminal() && copy.Status.FinishedAt == nil {
-		copy.Status.FinishedAt = &now
+	if updatedTask.Status.Phase.IsTerminal() && updatedTask.Status.FinishedAt == nil {
+		updatedTask.Status.FinishedAt = &now
 	}
-	copy.ResourceVersion = task.ResourceVersion
-	updated, _, err := s.tasks.Update(withNamespace(ctx), name, rest.DefaultUpdatedObjectInfo(copy), nil, nil, false, &metav1.UpdateOptions{})
+	updatedTask.ResourceVersion = task.ResourceVersion
+	updated, _, err := s.tasks.Update(
+		withNamespace(ctx),
+		name,
+		rest.DefaultUpdatedObjectInfo(updatedTask),
+		nil,
+		nil,
+		false,
+		&metav1.UpdateOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -346,18 +436,75 @@ func (s *store) UpdateTaskStatus(ctx context.Context, name string, uid types.UID
 	return result, nil
 }
 
-func (s *store) CancelPendingTask(ctx context.Context, name string, uid types.UID, resourceVersion string, reason operations.TaskResultReason) (*operations.OperationTask, error) {
+func validateTaskStatus(status operations.OperationTaskStatus) error {
+	if err := validation.ValidateTaskResult(status.Result); err != nil {
+		return err
+	}
+	if status.Phase == operations.TaskSucceeded && status.Result != nil && status.Result.Reason != "" {
+		return apierrors.NewBadRequest("Succeeded task must not have a result reason")
+	}
+	if status.Phase != operations.TaskSucceeded && status.Result != nil && len(status.Result.Outputs) > 0 {
+		return apierrors.NewBadRequest("outputs are only allowed on Succeeded tasks")
+	}
+	return nil
+}
+
+func validateAgentTaskTransition(task *operations.OperationTask, status operations.OperationTaskStatus) error {
+	if err := validation.ValidateTaskPhaseTransition(task.Status.Phase, status.Phase); err != nil {
+		return apierrors.NewConflict(operations.Resource(operations.ResourceTasks), task.Name, err)
+	}
+	if status.Phase == operations.TaskCancelled ||
+		(task.Status.Phase == operations.TaskPending && status.Phase != operations.TaskPending && status.Phase != operations.TaskRunning) {
+		return apierrors.NewConflict(
+			operations.Resource(operations.ResourceTasks), task.Name,
+			fmt.Errorf("agent cannot transition %s task to %s", task.Status.Phase, status.Phase),
+		)
+	}
+	return nil
+}
+
+func (s *store) CancelPendingTask(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	reason operations.TaskResultReason,
+) (*operations.OperationTask, error) {
 	return s.updateTaskTerminal(ctx, name, uid, resourceVersion, operations.TaskPending, operations.TaskCancelled, reason)
 }
 
-func (s *store) TimeoutRunningTask(ctx context.Context, name string, uid types.UID, resourceVersion string) (*operations.OperationTask, error) {
-	return s.updateTaskTerminal(ctx, name, uid, resourceVersion, operations.TaskRunning, operations.TaskTimedOut, operations.TaskReasonDeadlineExceeded)
+func (s *store) TimeoutRunningTask(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+) (*operations.OperationTask, error) {
+	return s.updateTaskTerminal(
+		ctx,
+		name,
+		uid,
+		resourceVersion,
+		operations.TaskRunning,
+		operations.TaskTimedOut,
+		operations.TaskReasonDeadlineExceeded,
+	)
 }
 
-func (s *store) updateTaskTerminal(ctx context.Context, name string, uid types.UID, resourceVersion string, expected, phase operations.TaskPhase, reason operations.TaskResultReason) (*operations.OperationTask, error) {
+func (s *store) updateTaskTerminal(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	expected, phase operations.TaskPhase,
+	reason operations.TaskResultReason,
+) (*operations.OperationTask, error) {
 	return s.updateTask(ctx, name, uid, resourceVersion, func(task *operations.OperationTask) error {
 		if task.Status.Phase != expected {
-			return apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("task is %s, expected %s", task.Status.Phase, expected))
+			return apierrors.NewConflict(
+				operations.Resource(operations.ResourceTasks),
+				name,
+				fmt.Errorf("task is %s, expected %s", task.Status.Phase, expected),
+			)
 		}
 		task.Status.Phase = phase
 		task.Status.Result = &operations.TaskResult{Reason: reason}
@@ -365,7 +512,13 @@ func (s *store) updateTaskTerminal(ctx context.Context, name string, uid types.U
 	})
 }
 
-func (s *store) updateTask(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.OperationTask) error) (*operations.OperationTask, error) {
+func (s *store) updateTask(
+	ctx context.Context,
+	name string,
+	uid types.UID,
+	resourceVersion string,
+	mutate func(*operations.OperationTask) error,
+) (*operations.OperationTask, error) {
 	obj, err := s.tasks.Get(withNamespace(ctx), name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -380,16 +533,24 @@ func (s *store) updateTask(ctx context.Context, name string, uid types.UID, reso
 	if resourceVersion != "" && task.ResourceVersion != resourceVersion {
 		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("resourceVersion does not match"))
 	}
-	copy := task.DeepCopy()
-	if err := mutate(copy); err != nil {
-		return nil, err
+	updatedTask := task.DeepCopy()
+	if mutateErr := mutate(updatedTask); mutateErr != nil {
+		return nil, mutateErr
 	}
-	if copy.Status.Phase.IsTerminal() && copy.Status.FinishedAt == nil {
+	if updatedTask.Status.Phase.IsTerminal() && updatedTask.Status.FinishedAt == nil {
 		now := metav1.NewTime(s.now())
-		copy.Status.FinishedAt = &now
+		updatedTask.Status.FinishedAt = &now
 	}
-	copy.ResourceVersion = task.ResourceVersion
-	updated, _, err := s.tasks.Update(withNamespace(ctx), name, rest.DefaultUpdatedObjectInfo(copy), nil, nil, false, &metav1.UpdateOptions{})
+	updatedTask.ResourceVersion = task.ResourceVersion
+	updated, _, err := s.tasks.Update(
+		withNamespace(ctx),
+		name,
+		rest.DefaultUpdatedObjectInfo(updatedTask),
+		nil,
+		nil,
+		false,
+		&metav1.UpdateOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}

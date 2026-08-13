@@ -346,7 +346,15 @@ func (s *ControllerManager) renewReadinessLease(ctx context.Context) error {
 	durationSeconds := int32(readinessLeaseTimeout / time.Second)
 	item, err := s.leaseOperator.GetLeaseWithNamespaceEx(ctx, readinessLeaseName, resourceLockNS, "0")
 	if apierrors.IsNotFound(err) {
-		item = &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{Name: readinessLeaseName, Namespace: resourceLockNS}, Spec: coordinationv1.LeaseSpec{HolderIdentity: &s.identity, LeaseDurationSeconds: &durationSeconds, AcquireTime: &now, RenewTime: &now}}
+		item = &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{Name: readinessLeaseName, Namespace: resourceLockNS},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       &s.identity,
+				LeaseDurationSeconds: &durationSeconds,
+				AcquireTime:          &now,
+				RenewTime:            &now,
+			},
+		}
 		_, err = s.leaseOperator.CreateLease(ctx, item)
 		return err
 	}

@@ -199,11 +199,17 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "Kc agent region and ips.")
 	cmd.Flags().StringArrayVar(&o.fips, "float-ip", o.fips, "Kc agent ip and float ip.")
-	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterMaxTries, "authenticate-rate-limiter-max-retries", o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterMaxTries, "maximum number of retry times within the valid period")
-	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", o.deployConfig.AuthenticationOpts.AuthenticateRateLimiterDuration, "specifies the lock duration of the user")
-	cmd.Flags().DurationVar(&o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period", o.deployConfig.AuthenticationOpts.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")
-	cmd.Flags().IntVar(&o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries", o.deployConfig.AuthenticationOpts.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
-	cmd.Flags().StringVar(&o.deployConfig.AuthenticationOpts.InitialPassword, "initial-password", o.deployConfig.AuthenticationOpts.InitialPassword, "admin user password")
+	auth := o.deployConfig.AuthenticationOpts
+	flags := cmd.Flags()
+	flags.IntVar(&auth.AuthenticateRateLimiterMaxTries, "authenticate-rate-limiter-max-retries", auth.AuthenticateRateLimiterMaxTries,
+		"maximum number of retry times within the valid period")
+	flags.DurationVar(&auth.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", auth.AuthenticateRateLimiterDuration,
+		"specifies the lock duration of the user")
+	flags.DurationVar(&auth.LoginHistoryRetentionPeriod, "login-history-retention-period", auth.LoginHistoryRetentionPeriod,
+		"login-history-retention-period defines how long login history should be kept.")
+	flags.IntVar(&auth.LoginHistoryMaximumEntries, "login-history-maximum-entries", auth.LoginHistoryMaximumEntries,
+		"login-history-maximum-entries defines how many entries of login history should be kept.")
+	flags.StringVar(&auth.InitialPassword, "initial-password", auth.InitialPassword, "admin user password")
 	o.deployConfig.AddFlags(cmd.Flags())
 	o.deployConfig.AuditOpts.AddFlags(cmd.Flags())
 
@@ -268,7 +274,7 @@ func (d *DeployOptions) Complete() error {
 
 func (d *DeployOptions) ValidateArgs() error {
 	if !d.deployConfig.TLS {
-		return fmt.Errorf("Operation v2 requires TLS because kc-agent communicates with kc-server over mTLS")
+		return fmt.Errorf("operation v2 requires TLS because kc-agent communicates with kc-server over mTLS")
 	}
 	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
 		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
@@ -639,7 +645,13 @@ func (d *DeployOptions) generateAndSendCerts() error {
 
 	kcctlCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
 	kcctlCommonNameUsages[options.AdminKcctlCert] = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-	kcctlCert := clientCertList(options.DefaultKcctlPKIPath, options.Ca, append(altNames, d.deployConfig.Agents.ListIP()...), []string{user.KCCTL}, kcctlCommonNameUsages)
+	kcctlCert := clientCertList(
+		options.DefaultKcctlPKIPath,
+		options.Ca,
+		append(altNames, d.deployConfig.Agents.ListIP()...),
+		[]string{user.KCCTL},
+		kcctlCommonNameUsages,
+	)
 	certs = append(certs, kcctlCert...)
 	for agentIP, metadata := range d.deployConfig.Agents {
 		altNames := certutils.AltNames{DNSNames: map[string]string{metadata.AgentID: metadata.AgentID}, IPs: map[string]net.IP{}}
@@ -727,7 +739,7 @@ func (d *DeployOptions) generateAndSendCerts() error {
 		return err
 	}
 	for agentIP, cert := range agentCerts {
-		if err := d.sendAgentIdentity(agentIP, cert, cas[0]); err != nil {
+		if err := d.sendAgentIdentity(agentIP, &cert, &cas[0]); err != nil {
 			return err
 		}
 	}
@@ -773,12 +785,20 @@ func (d *DeployOptions) getEtcdTemplateContent(ip string) string {
 	var data = make(map[string]interface{})
 	data["NodeName"] = d.servers[ip]
 	data["AdvertiseAddress"] = fmt.Sprintf("%s:%d", ip, d.deployConfig.EtcdConfig.ClientPort)
-	data["ServerCertPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.crt", options.EtcdServer))
+	data["ServerCertPath"] = filepath.Join(
+		options.DefaultKcServerConfigPath,
+		options.DefaultEtcdPKIPath,
+		fmt.Sprintf("%s.crt", options.EtcdServer),
+	)
 	data["DataDIR"] = d.deployConfig.EtcdConfig.DataDir
 	data["PeerAddress"] = fmt.Sprintf("%s:%d", ip, d.deployConfig.EtcdConfig.PeerPort)
 	data["InitialCluster"] = strings.Join(initialCluster, ",")
 	data["ClusterToken"] = "kc-etcd-cluster"
-	data["ServerCertKeyPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.key", options.EtcdServer))
+	data["ServerCertKeyPath"] = filepath.Join(
+		options.DefaultKcServerConfigPath,
+		options.DefaultEtcdPKIPath,
+		fmt.Sprintf("%s.key", options.EtcdServer),
+	)
 	if isFloatIP {
 		// if user specify a float ip,we replace to listen 0.0.0.0
 		data["PeerURLs"] = fmt.Sprintf("https://0.0.0.0:%d", d.deployConfig.EtcdConfig.PeerPort)
@@ -788,8 +808,16 @@ func (d *DeployOptions) getEtcdTemplateContent(ip string) string {
 		data["PeerURLs"] = fmt.Sprintf("https://%s:%d", ip, d.deployConfig.EtcdConfig.PeerPort)
 	}
 	data["MetricsURLs"] = fmt.Sprintf("http://127.0.0.1:%d", d.deployConfig.EtcdConfig.MetricsPort)
-	data["PeerCertPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.crt", options.EtcdPeer))
-	data["PeerCertKeyPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultEtcdPKIPath, fmt.Sprintf("%s.key", options.EtcdPeer))
+	data["PeerCertPath"] = filepath.Join(
+		options.DefaultKcServerConfigPath,
+		options.DefaultEtcdPKIPath,
+		fmt.Sprintf("%s.crt", options.EtcdPeer),
+	)
+	data["PeerCertKeyPath"] = filepath.Join(
+		options.DefaultKcServerConfigPath,
+		options.DefaultEtcdPKIPath,
+		fmt.Sprintf("%s.key", options.EtcdPeer),
+	)
 	data["CaPath"] = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultCaPath, fmt.Sprintf("%s.crt", options.Ca))
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, data); err != nil {
@@ -948,7 +976,7 @@ func (d *DeployOptions) deployKcAgent() {
 	}
 }
 
-func (d *DeployOptions) sendAgentIdentity(agentIP string, cert, ca certutils.Config) error {
+func (d *DeployOptions) sendAgentIdentity(agentIP string, cert, ca *certutils.Config) error {
 	destination := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath)
 	for _, source := range []string{path.Join(cert.Path, cert.BaseName+".crt"), path.Join(cert.Path, cert.BaseName+".key"), path.Join(ca.Path, ca.BaseName+".crt")} {
 		if err := utils.SendPackageV2(d.deployConfig.SSHConfig, source, []string{agentIP}, destination, nil, nil); err != nil {
@@ -1047,8 +1075,18 @@ func (d *DeployOptions) uploadConfig() {
 		},
 		AuthInfos: map[string]*config.AuthInfo{
 			"kcctl-admin": {
-				ClientCertificate: path.Join(homedir.HomeDir(), options.DefaultPath, options.DefaultKcctlPKIPath, options.AdminKcctlCert+".crt"),
-				ClientKey:         path.Join(homedir.HomeDir(), options.DefaultPath, options.DefaultKcctlPKIPath, options.AdminKcctlCert+".key"),
+				ClientCertificate: path.Join(
+					homedir.HomeDir(),
+					options.DefaultPath,
+					options.DefaultKcctlPKIPath,
+					options.AdminKcctlCert+".crt",
+				),
+				ClientKey: path.Join(
+					homedir.HomeDir(),
+					options.DefaultPath,
+					options.DefaultKcctlPKIPath,
+					options.AdminKcctlCert+".key",
+				),
 			},
 		},
 		CurrentContext: fmt.Sprintf("%s@default-cert", "kcctl-admin"),
@@ -1074,7 +1112,11 @@ func (d *DeployOptions) uploadConfig() {
 }
 
 func (d *DeployOptions) sendDefaultAdminConf() error {
-	afterHook := fmt.Sprintf("mv %s %s/admin.conf", path.Join(options.DefaultKcServerConfigPath, options.DefaultConfig), options.DefaultKcServerConfigPath)
+	afterHook := fmt.Sprintf(
+		"mv %s %s/admin.conf",
+		path.Join(options.DefaultKcServerConfigPath, options.DefaultConfig),
+		options.DefaultKcServerConfigPath,
+	)
 	err := utils.SendPackage(d.deployConfig.SSHConfig,
 		options.DefaultConfigPath,
 		d.deployConfig.ServerIPs,

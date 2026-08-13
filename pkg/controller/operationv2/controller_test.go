@@ -145,10 +145,10 @@ func TestMissingStepOutputFailsWithoutCreatingTask(t *testing.T) {
 		Payload: runtime.RawExtension{Raw: []byte(`{}`)},
 		Inputs:  []operations.StepInput{{Field: "token", FromStepID: "token", FromNodeUID: "node-1", OutputKey: "missing"}},
 	}
-	op := runningOperation("install", "op-1", firstStep, secondStep)
+	op := runningOperation("install", firstStep, secondStep)
 	store.addOperation(op)
 	store.addOwnedLock(op)
-	completed := testTask(op, &firstStep, firstStep.Targets[0], 0, 0, operations.TaskSucceeded)
+	completed := testTask(op, &firstStep, firstStep.Targets[0], operations.TaskSucceeded)
 	completed.Status.Result = &operations.TaskResult{Outputs: map[string]string{"another": "value"}}
 	store.addTask(completed)
 	r := &OperationReconciler{Store: store, Now: func() time.Time { return testNow }}
@@ -166,10 +166,10 @@ func TestMissingStepOutputFailsWithoutCreatingTask(t *testing.T) {
 func TestAutomaticRetryCreatesNewTaskAttempt(t *testing.T) {
 	store := newFakeStore()
 	step := oneStep("install", 1, "node-1")
-	op := runningOperation("install", "op-1", step)
+	op := runningOperation("install", step)
 	store.addOperation(op)
 	store.addOwnedLock(op)
-	failed := testTask(op, &step, step.Targets[0], 0, 0, operations.TaskFailed)
+	failed := testTask(op, &step, step.Targets[0], operations.TaskFailed)
 	started := metav1.NewTime(testNow)
 	failed.Status.StartedAt = &started
 	store.addTask(failed)
@@ -198,12 +198,12 @@ func TestAutomaticRetryCreatesNewTaskAttempt(t *testing.T) {
 func TestCancellationDoesNotStopRunningTask(t *testing.T) {
 	store := newFakeStore()
 	step := oneStep("install", 0, "node-1", "node-2")
-	op := runningOperation("install", "op-1", step)
+	op := runningOperation("install", step)
 	op.Spec.DesiredState = operations.OperationDesiredStateCancelled
 	store.addOperation(op)
 	store.addOwnedLock(op)
-	running := testTask(op, &step, step.Targets[0], 0, 0, operations.TaskRunning)
-	pending := testTask(op, &step, step.Targets[1], 0, 0, operations.TaskPending)
+	running := testTask(op, &step, step.Targets[0], operations.TaskRunning)
+	pending := testTask(op, &step, step.Targets[1], operations.TaskPending)
 	store.addTask(running)
 	store.addTask(pending)
 	r := &OperationReconciler{Store: store, Now: func() time.Time { return testNow }}
@@ -213,24 +213,24 @@ func TestCancellationDoesNotStopRunningTask(t *testing.T) {
 		t.Fatalf("running task was changed to %s", got)
 	}
 	if got := store.task(pending.Name).Status.Phase; got != operations.TaskCancelled {
-		t.Fatalf("pending sibling phase=%s, want Cancelled", got)
+		t.Fatalf("pending sibling phase=%s, want Canceled", got)
 	}
 	store.setTaskTerminal(running.Name, operations.TaskSucceeded, nil)
 	reconcileOK(t, r, op.Name)
 	if got := store.operation(op.Name).Status.Phase; got != operations.OperationCancelled {
-		t.Fatalf("operation phase=%s, want Cancelled", got)
+		t.Fatalf("operation phase=%s, want Canceled", got)
 	}
 }
 
 func TestDeadlineTimesOutRunningTaskAfterGrace(t *testing.T) {
 	store := newFakeStore()
 	step := oneStep("restore", 0, "node-1")
-	op := runningOperation("restore", "op-1", step)
+	op := runningOperation("restore", step)
 	deadline := metav1.NewTime(testNow)
 	op.Status.Deadline = &deadline
 	store.addOperation(op)
 	store.addOwnedLock(op)
-	task := testTask(op, &step, step.Targets[0], 0, 0, operations.TaskRunning)
+	task := testTask(op, &step, step.Targets[0], operations.TaskRunning)
 	store.addTask(task)
 	now := testNow.Add(operations.ServerTerminationGrace - time.Second)
 	r := &OperationReconciler{Store: store, Now: func() time.Time { return now }}
@@ -253,19 +253,20 @@ func TestDeadlineTimesOutRunningTaskAfterGrace(t *testing.T) {
 func TestHumanRetryOnlyRunsUnsuccessfulNode(t *testing.T) {
 	store := newFakeStore()
 	step := oneStep("join", 0, "node-1", "node-2")
-	op := runningOperation("join", "op-1", step)
+	op := runningOperation("join", step)
 	op.Status.Phase = operations.OperationFailed
 	op.Status.ObservedRetryGeneration = 0
 	op.Spec.RetryGeneration = 1
 	store.addOperation(op)
-	succeeded := testTask(op, &step, step.Targets[0], 0, 0, operations.TaskSucceeded)
-	failed := testTask(op, &step, step.Targets[1], 0, 0, operations.TaskFailed)
+	succeeded := testTask(op, &step, step.Targets[0], operations.TaskSucceeded)
+	failed := testTask(op, &step, step.Targets[1], operations.TaskFailed)
 	store.addTask(succeeded)
 	store.addTask(failed)
 	r := &OperationReconciler{Store: store, Now: func() time.Time { return testNow.Add(time.Minute) }}
 
 	reconcileOK(t, r, op.Name) // Reopen as Pending.
-	if reopened := store.operation(op.Name); reopened.Status.Phase != operations.OperationPending || reopened.Status.ObservedRetryGeneration != 1 {
+	if reopened := store.operation(op.Name); reopened.Status.Phase != operations.OperationPending ||
+		reopened.Status.ObservedRetryGeneration != 1 {
 		t.Fatalf("retry reopen status=%#v, want Pending generation 1", reopened.Status)
 	}
 	reconcileOK(t, r, op.Name) // Start the new generation and deadline.
@@ -316,7 +317,13 @@ func oneStep(id string, retryLimit int32, nodes ...string) operations.OperationS
 	for _, node := range nodes {
 		targets = append(targets, operations.NodeReference{Name: node, UID: types.UID(node)})
 	}
-	return operations.OperationStep{ID: id, Executor: "noop", RetryLimit: retryLimit, Targets: targets, Payload: runtime.RawExtension{Raw: []byte(`{}`)}}
+	return operations.OperationStep{
+		ID:         id,
+		Executor:   "noop",
+		RetryLimit: retryLimit,
+		Targets:    targets,
+		Payload:    runtime.RawExtension{Raw: []byte(`{}`)},
+	}
 }
 
 func testOperation(name string, uid types.UID, created time.Time, steps ...operations.OperationStep) *operations.Operation {
@@ -333,22 +340,33 @@ func testOperation(name string, uid types.UID, created time.Time, steps ...opera
 	}
 }
 
-func runningOperation(name string, uid types.UID, steps ...operations.OperationStep) *operations.Operation {
-	op := testOperation(name, uid, testNow, steps...)
+func runningOperation(name string, steps ...operations.OperationStep) *operations.Operation {
+	op := testOperation(name, "op-1", testNow, steps...)
 	deadline := metav1.NewTime(testNow.Add(time.Hour))
 	started := metav1.NewTime(testNow.Add(-time.Minute))
 	op.Status = operations.OperationStatus{Phase: operations.OperationRunning, Deadline: &deadline, StartedAt: &started}
 	return op
 }
 
-func testTask(op *operations.Operation, step *operations.OperationStep, node operations.NodeReference, generation int64, attempt int32, phase operations.TaskPhase) *operations.OperationTask {
+func testTask(
+	op *operations.Operation,
+	step *operations.OperationStep,
+	node operations.NodeReference,
+	phase operations.TaskPhase,
+) *operations.OperationTask {
+	const generation int64 = 0
+	const attempt int32 = 0
 	deadline := op.Status.Deadline
 	if deadline == nil {
 		value := metav1.NewTime(testNow.Add(time.Hour))
 		deadline = &value
 	}
 	return &operations.OperationTask{
-		ObjectMeta: metav1.ObjectMeta{Name: TaskName(op.UID, generation, step.ID, node.UID, attempt), UID: types.UID(fmt.Sprintf("task-%s-%d", node.UID, attempt)), CreationTimestamp: metav1.NewTime(testNow.Add(time.Duration(attempt) * time.Second))},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              TaskName(op.UID, generation, step.ID, node.UID, attempt),
+			UID:               types.UID(fmt.Sprintf("task-%s-%d", node.UID, attempt)),
+			CreationTimestamp: metav1.NewTime(testNow.Add(time.Duration(attempt) * time.Second)),
+		},
 		Spec: operations.OperationTaskSpec{
 			OperationRef: operations.ObjectReference{Kind: operations.KindOperation, Name: op.Name, UID: op.UID},
 			StepID:       step.ID, NodeRef: node, RetryGeneration: generation, Attempt: attempt,
@@ -366,7 +384,12 @@ type fakeStore struct {
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{operations: map[string]*operations.Operation{}, tasks: map[string]*operations.OperationTask{}, locks: map[string]*operations.ExecutionLock{}, nextRV: 1}
+	return &fakeStore{
+		operations: map[string]*operations.Operation{},
+		tasks:      map[string]*operations.OperationTask{},
+		locks:      map[string]*operations.ExecutionLock{},
+		nextRV:     1,
+	}
 }
 
 func (f *fakeStore) rv() string {
@@ -376,25 +399,28 @@ func (f *fakeStore) rv() string {
 }
 
 func (f *fakeStore) addOperation(op *operations.Operation) {
-	copy := op.DeepCopy()
-	copy.ResourceVersion = f.rv()
-	f.operations[copy.Name] = copy
+	operationCopy := op.DeepCopy()
+	operationCopy.ResourceVersion = f.rv()
+	f.operations[operationCopy.Name] = operationCopy
 }
 
 func (f *fakeStore) addTask(task *operations.OperationTask) {
-	copy := task.DeepCopy()
-	copy.ResourceVersion = f.rv()
-	if copy.UID == "" {
-		copy.UID = types.UID(copy.Name + "-uid")
+	taskCopy := task.DeepCopy()
+	taskCopy.ResourceVersion = f.rv()
+	if taskCopy.UID == "" {
+		taskCopy.UID = types.UID(taskCopy.Name + "-uid")
 	}
-	f.tasks[copy.Name] = copy
+	f.tasks[taskCopy.Name] = taskCopy
 }
 
 func (f *fakeStore) addOwnedLock(op *operations.Operation) {
 	name := LockName(op.Spec.TargetRef.Kind, op.Spec.TargetRef.UID)
 	f.locks[name] = &operations.ExecutionLock{
 		ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(name + "-uid"), ResourceVersion: f.rv()},
-		Spec:       operations.ExecutionLockSpec{TargetRef: op.Spec.TargetRef, HolderRef: operations.ObjectReference{Kind: operations.KindOperation, Name: op.Name, UID: op.UID}},
+		Spec: operations.ExecutionLockSpec{
+			TargetRef: op.Spec.TargetRef,
+			HolderRef: operations.ObjectReference{Kind: operations.KindOperation, Name: op.Name, UID: op.UID},
+		},
 	}
 }
 
@@ -417,7 +443,13 @@ func (f *fakeStore) ListOperations(_ context.Context, targetUID types.UID, _ str
 	return result, nil
 }
 
-func (f *fakeStore) UpdateOperationStatus(_ context.Context, name string, uid types.UID, rv string, status operations.OperationStatus) (*operations.Operation, error) {
+func (f *fakeStore) UpdateOperationStatus(
+	_ context.Context,
+	name string,
+	uid types.UID,
+	rv string,
+	status *operations.OperationStatus,
+) (*operations.Operation, error) {
 	op, exists := f.operations[name]
 	if !exists {
 		return nil, apierrors.NewNotFound(operations.Resource(operations.ResourceOperations), name)
@@ -442,13 +474,13 @@ func (f *fakeStore) CreateTask(_ context.Context, task *operations.OperationTask
 	if _, exists := f.tasks[task.Name]; exists {
 		return nil, apierrors.NewAlreadyExists(operations.Resource(operations.ResourceTasks), task.Name)
 	}
-	copy := task.DeepCopy()
-	copy.UID = types.UID(copy.Name + "-uid")
-	copy.ResourceVersion = f.rv()
-	copy.CreationTimestamp = metav1.NewTime(testNow.Add(time.Duration(f.nextRV) * time.Second))
-	copy.Status.Phase = operations.TaskPending
-	f.tasks[copy.Name] = copy
-	return copy.DeepCopy(), nil
+	taskCopy := task.DeepCopy()
+	taskCopy.UID = types.UID(taskCopy.Name + "-uid")
+	taskCopy.ResourceVersion = f.rv()
+	taskCopy.CreationTimestamp = metav1.NewTime(testNow.Add(time.Duration(f.nextRV) * time.Second))
+	taskCopy.Status.Phase = operations.TaskPending
+	f.tasks[taskCopy.Name] = taskCopy
+	return taskCopy.DeepCopy(), nil
 }
 
 func (f *fakeStore) ListTasksByOperationUID(_ context.Context, operationUID types.UID, _ string) (*operations.OperationTaskList, error) {
@@ -461,7 +493,13 @@ func (f *fakeStore) ListTasksByOperationUID(_ context.Context, operationUID type
 	return result, nil
 }
 
-func (f *fakeStore) CancelPendingTask(_ context.Context, name string, uid types.UID, rv string, reason operations.TaskResultReason) (*operations.OperationTask, error) {
+func (f *fakeStore) CancelPendingTask(
+	_ context.Context,
+	name string,
+	uid types.UID,
+	rv string,
+	reason operations.TaskResultReason,
+) (*operations.OperationTask, error) {
 	task := f.tasks[name]
 	if task == nil || task.UID != uid || task.ResourceVersion != rv || task.Status.Phase != operations.TaskPending {
 		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("task changed"))
@@ -542,6 +580,11 @@ func (f *fakeStore) setTaskTerminal(name string, phase operations.TaskPhase, out
 	task := f.tasks[name]
 	started := metav1.NewTime(testNow)
 	finished := metav1.NewTime(testNow.Add(time.Second))
-	task.Status = operations.OperationTaskStatus{Phase: phase, StartedAt: &started, FinishedAt: &finished, Result: &operations.TaskResult{Outputs: outputs}}
+	task.Status = operations.OperationTaskStatus{
+		Phase:      phase,
+		StartedAt:  &started,
+		FinishedAt: &finished,
+		Result:     &operations.TaskResult{Outputs: outputs},
+	}
 	task.ResourceVersion = f.rv()
 }

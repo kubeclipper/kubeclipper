@@ -167,15 +167,35 @@ func latestFailure(facts *stepFacts) bool {
 	return false
 }
 
-func nextAttempt(step *operations.OperationStep, nodeUID types.UID, tasks []*operations.OperationTask, retryGeneration int64) (int32, bool) {
-	if nodeSucceeded(tasks) {
+func nextAttempt(
+	step *operations.OperationStep,
+	tasks []*operations.OperationTask,
+	retryGeneration int64,
+) (int32, bool) {
+	if nodeSucceeded(tasks) || hasActiveTask(tasks) {
 		return 0, false
 	}
-	var next int32
 	if len(tasks) == 0 {
-		return next, true
+		return 0, true
 	}
-	baseGeneration := tasks[0].Spec.RetryGeneration
+	baseGeneration, next := taskGenerationAndNextAttempt(tasks)
+	if retryGeneration != baseGeneration {
+		return retryGenerationAttempt(tasks, retryGeneration, baseGeneration, next)
+	}
+	return next, executedAttempts(tasks, baseGeneration) < 1+step.RetryLimit
+}
+
+func hasActiveTask(tasks []*operations.OperationTask) bool {
+	for _, task := range tasks {
+		if task.Status.Phase == operations.TaskPending || task.Status.Phase == operations.TaskRunning {
+			return true
+		}
+	}
+	return false
+}
+
+func taskGenerationAndNextAttempt(tasks []*operations.OperationTask) (baseGeneration int64, next int32) {
+	baseGeneration = tasks[0].Spec.RetryGeneration
 	for _, task := range tasks {
 		if task.Spec.RetryGeneration < baseGeneration {
 			baseGeneration = task.Spec.RetryGeneration
@@ -183,26 +203,26 @@ func nextAttempt(step *operations.OperationStep, nodeUID types.UID, tasks []*ope
 		if task.Spec.Attempt >= next {
 			next = task.Spec.Attempt + 1
 		}
-		if task.Status.Phase == operations.TaskPending || task.Status.Phase == operations.TaskRunning {
-			return 0, false
-		}
 	}
+	return baseGeneration, next
+}
 
-	if retryGeneration > baseGeneration {
-		for _, task := range tasks {
-			if task.Spec.RetryGeneration == retryGeneration {
-				return 0, false
-			}
-		}
-		return next, true
-	}
+func retryGenerationAttempt(tasks []*operations.OperationTask, retryGeneration, baseGeneration int64, next int32) (int32, bool) {
 	if retryGeneration < baseGeneration {
 		return 0, false
 	}
+	for _, task := range tasks {
+		if task.Spec.RetryGeneration == retryGeneration {
+			return 0, false
+		}
+	}
+	return next, true
+}
 
+func executedAttempts(tasks []*operations.OperationTask, generation int64) int32 {
 	var executed int32
 	for _, task := range tasks {
-		if task.Spec.RetryGeneration != baseGeneration {
+		if task.Spec.RetryGeneration != generation {
 			continue
 		}
 		if task.Status.StartedAt != nil || task.Status.Phase == operations.TaskRunning ||
@@ -211,7 +231,7 @@ func nextAttempt(step *operations.OperationStep, nodeUID types.UID, tasks []*ope
 			executed++
 		}
 	}
-	return next, executed < 1+step.RetryLimit
+	return executed
 }
 
 func materializePayload(step *operations.OperationStep, tasks []operations.OperationTask) (runtime.RawExtension, error) {
@@ -231,12 +251,18 @@ func materializePayload(step *operations.OperationStep, tasks []operations.Opera
 		var matches []*operations.OperationTask
 		for index := range tasks {
 			task := &tasks[index]
-			if task.Spec.StepID == input.FromStepID && task.Spec.NodeRef.UID == input.FromNodeUID && task.Status.Phase == operations.TaskSucceeded {
+			if task.Spec.StepID == input.FromStepID && task.Spec.NodeRef.UID == input.FromNodeUID &&
+				task.Status.Phase == operations.TaskSucceeded {
 				matches = append(matches, task)
 			}
 		}
 		if len(matches) != 1 || matches[0].Status.Result == nil {
-			return runtime.RawExtension{}, fmt.Errorf("input %q for step %q has %d successful source tasks", input.Field, step.ID, len(matches))
+			return runtime.RawExtension{}, fmt.Errorf(
+				"input %q for step %q has %d successful source tasks",
+				input.Field,
+				step.ID,
+				len(matches),
+			)
 		}
 		value, exists := matches[0].Status.Result.Outputs[input.OutputKey]
 		if !exists {
@@ -294,7 +320,7 @@ func isLatestOperation(op *operations.Operation, operationsList []operations.Ope
 	return true
 }
 
-func taskSpecEqual(left, right operations.OperationTaskSpec) bool {
+func taskSpecEqual(left, right *operations.OperationTaskSpec) bool {
 	return apiequality.Semantic.DeepEqual(left, right)
 }
 

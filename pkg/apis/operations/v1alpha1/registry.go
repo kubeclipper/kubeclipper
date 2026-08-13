@@ -32,7 +32,12 @@ import (
 
 const operationTag = "Operation-v2"
 
-func AddToContainer(container *restful.Container, store operationv2.Store, clusterReader cluster.OperatorReader, caFile, certFile, keyFile string) error {
+func AddToContainer(
+	container *restful.Container,
+	store operationv2.Store,
+	clusterReader cluster.OperatorReader,
+	caFile, certFile, keyFile string,
+) error {
 	logClient, err := newLogClient(caFile, certFile, keyFile)
 	if err != nil {
 		return err
@@ -72,7 +77,7 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), operations.OperationTask{}))
 	ws.Route(ws.GET("/operationtasks/{name}/logs").To(h.getTaskLogs).
 		Metadata(restfulspec.KeyOpenAPITags, []string{operationTag}).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), map[string]interface{}{}))
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), map[string]any{}))
 	ws.Route(ws.PUT("/operationtasks/{name}/status").To(h.updateTaskStatus).
 		Metadata(restfulspec.KeyOpenAPITags, []string{operationTag}).
 		Reads(operations.OperationTask{}).

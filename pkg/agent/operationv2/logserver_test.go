@@ -17,6 +17,7 @@
 package operationv2
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -31,19 +32,19 @@ import (
 
 type staticLogs struct{}
 
-func (staticLogs) GetStepLogContent(opID, stepID string, offset int64, length int) ([]byte, int64, int64, error) {
-	content := []byte("task log")
+func (staticLogs) GetStepLogContent(_, _ string, _ int64, _ int) (content []byte, delivered, size int64, err error) {
+	content = []byte("task log")
 	return content, int64(len(content)), int64(len(content)), nil
 }
 
 type missingLogs struct{}
 
-func (missingLogs) GetStepLogContent(string, string, int64, int) ([]byte, int64, int64, error) {
+func (missingLogs) GetStepLogContent(string, string, int64, int) (content []byte, delivered, size int64, err error) {
 	return nil, 0, 0, os.ErrNotExist
 }
 
-func verifiedRequest(method, target, commonName string) *http.Request {
-	request := httptest.NewRequest(method, target, nil)
+func verifiedRequest(target, commonName string) *http.Request {
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodGet, target, http.NoBody)
 	certificate := &x509.Certificate{Subject: pkix.Name{CommonName: commonName}}
 	request.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{certificate},
@@ -55,13 +56,13 @@ func verifiedRequest(method, target, commonName string) *http.Request {
 func TestLogHandlerRequiresServerIdentity(t *testing.T) {
 	handler := &LogHandler{Logs: staticLogs{}}
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/tasks/task-uid/logs", nil))
+	handler.ServeHTTP(response, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/tasks/task-uid/logs", http.NoBody))
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 	}
 
 	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, verifiedRequest(http.MethodGet, "/v1/tasks/task-uid/logs", "another-client"))
+	handler.ServeHTTP(response, verifiedRequest("/v1/tasks/task-uid/logs", "another-client"))
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 	}
@@ -70,7 +71,7 @@ func TestLogHandlerRequiresServerIdentity(t *testing.T) {
 func TestLogHandlerReadsByTaskUID(t *testing.T) {
 	handler := &LogHandler{Logs: staticLogs{}}
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, verifiedRequest(http.MethodGet, "/v1/tasks/task-uid/logs?offset=0&limit=128", DefaultServerClientIdentity))
+	handler.ServeHTTP(response, verifiedRequest("/v1/tasks/task-uid/logs?offset=0&limit=128", DefaultServerClientIdentity))
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
@@ -86,7 +87,7 @@ func TestLogHandlerReadsByTaskUID(t *testing.T) {
 func TestLogHandlerReturnsEmptyResponseForTaskWithoutLog(t *testing.T) {
 	handler := &LogHandler{Logs: missingLogs{}}
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, verifiedRequest(http.MethodGet, "/v1/tasks/task-uid/logs", DefaultServerClientIdentity))
+	handler.ServeHTTP(response, verifiedRequest("/v1/tasks/task-uid/logs", DefaultServerClientIdentity))
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 	}
@@ -107,7 +108,7 @@ func TestLogHandlerRejectsTraversalAndOversizedReads(t *testing.T) {
 		"/v1/tasks/task-uid/logs?limit=1048577",
 	} {
 		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, verifiedRequest(http.MethodGet, target, DefaultServerClientIdentity))
+		handler.ServeHTTP(response, verifiedRequest(target, DefaultServerClientIdentity))
 		if response.Code == http.StatusOK {
 			t.Fatalf("unsafe request %q was accepted", target)
 		}

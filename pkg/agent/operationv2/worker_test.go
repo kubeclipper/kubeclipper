@@ -52,20 +52,19 @@ func (f *fakeTaskClient) Get(context.Context, string, metav1.GetOptions) (*opera
 	return f.task.DeepCopy(), nil
 }
 
-func (f *fakeTaskClient) List(context.Context, metav1.ListOptions) (*operations.OperationTaskList, error) {
+func (f *fakeTaskClient) List(context.Context, *metav1.ListOptions) (*operations.OperationTaskList, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return &operations.OperationTaskList{Items: []operations.OperationTask{*f.task.DeepCopy()}}, nil
 }
 
-func (f *fakeTaskClient) Watch(context.Context, metav1.ListOptions) (watch.Interface, error) {
+func (*fakeTaskClient) Watch(context.Context, *metav1.ListOptions) (watch.Interface, error) {
 	return watch.NewEmptyWatch(), nil
 }
 
 func (f *fakeTaskClient) UpdateStatus(
 	_ context.Context,
 	task *operations.OperationTask,
-	_ metav1.UpdateOptions, //nolint:gocritic // TaskClient follows the Kubernetes client signature.
 ) (*operations.OperationTask, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

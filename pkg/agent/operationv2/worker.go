@@ -47,9 +47,9 @@ const (
 
 type TaskClient interface {
 	Get(context.Context, string, metav1.GetOptions) (*operations.OperationTask, error)
-	List(context.Context, metav1.ListOptions) (*operations.OperationTaskList, error)
-	Watch(context.Context, metav1.ListOptions) (watch.Interface, error)
-	UpdateStatus(context.Context, *operations.OperationTask, metav1.UpdateOptions) (*operations.OperationTask, error)
+	List(context.Context, *metav1.ListOptions) (*operations.OperationTaskList, error)
+	Watch(context.Context, *metav1.ListOptions) (watch.Interface, error)
+	UpdateStatus(context.Context, *operations.OperationTask) (*operations.OperationTask, error)
 }
 
 type TaskLog interface {
@@ -106,11 +106,11 @@ func NewWorker(opts *WorkerOptions) (*Worker, error) {
 	w.informer = cache.NewSharedIndexInformer(&cache.ListWatch{
 		ListFunc: func(listOptions metav1.ListOptions) (runtime.Object, error) {
 			listOptions.FieldSelector = selector
-			return w.client.List(context.Background(), listOptions)
+			return w.client.List(context.Background(), &listOptions)
 		},
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
 			listOptions.FieldSelector = selector
-			return w.client.Watch(context.Background(), listOptions)
+			return w.client.Watch(context.Background(), &listOptions)
 		},
 	}, &operations.OperationTask{}, 0, cache.Indexers{})
 	if _, err := w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -211,9 +211,9 @@ func (w *Worker) sync(ctx context.Context) error {
 		return nil
 	}
 	if live.Status.Phase == operations.TaskPending {
-		copy := live.DeepCopy()
-		copy.Status = operations.OperationTaskStatus{Phase: operations.TaskRunning}
-		live, err = w.client.UpdateStatus(ctx, copy, metav1.UpdateOptions{})
+		runningTask := live.DeepCopy()
+		runningTask.Status = operations.OperationTaskStatus{Phase: operations.TaskRunning}
+		live, err = w.client.UpdateStatus(ctx, runningTask)
 		if err != nil {
 			return err
 		}
@@ -307,7 +307,7 @@ func (w *Worker) finish(
 	updatedTask := task.DeepCopy()
 	updatedTask.Status.Phase = phase
 	updatedTask.Status.Result = &result
-	_, err := w.client.UpdateStatus(ctx, updatedTask, metav1.UpdateOptions{})
+	_, err := w.client.UpdateStatus(ctx, updatedTask)
 	if err != nil {
 		latest, getErr := w.client.Get(context.Background(), task.Name, metav1.GetOptions{})
 		if getErr == nil && latest.UID == task.UID && latest.Status.Phase.IsTerminal() {

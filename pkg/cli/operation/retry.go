@@ -33,7 +33,7 @@ func NewRetryOptions(streams options.IOStreams) *RetryOptions {
 const retryLong = `
   Retry a failed operation.
 
-  Failed, TimedOut, and Cancelled operations can be retried.`
+  Failed, TimedOut, and Canceled operations can be retried.`
 
 const retryExample = `
   # Retry a failed operation

@@ -17,12 +17,42 @@ func testOperationAndTasks() (*operationsv1alpha1.Operation, []operationsv1alpha
 	finished := metav1.NewTime(started.Add(2 * time.Minute))
 	op := &operationsv1alpha1.Operation{
 		ObjectMeta: metav1.ObjectMeta{Name: "op-1", UID: "op-uid", CreationTimestamp: started},
-		Spec:       operationsv1alpha1.OperationSpec{Action: "InstallCluster", TargetRef: operationsv1alpha1.ObjectReference{Name: "cluster-a"}, Steps: []operationsv1alpha1.OperationStep{{ID: "join", Targets: []operationsv1alpha1.NodeReference{{Name: "node-a", UID: "node-uid"}}}}},
-		Status:     operationsv1alpha1.OperationStatus{Phase: operationsv1alpha1.OperationSucceeded},
+		Spec: operationsv1alpha1.OperationSpec{
+			Action:    "InstallCluster",
+			TargetRef: operationsv1alpha1.ObjectReference{Name: "cluster-a"},
+			Steps: []operationsv1alpha1.OperationStep{
+				{ID: "join", Targets: []operationsv1alpha1.NodeReference{{Name: "node-a", UID: "node-uid"}}},
+			},
+		},
+		Status: operationsv1alpha1.OperationStatus{Phase: operationsv1alpha1.OperationSucceeded},
 	}
 	tasks := []operationsv1alpha1.OperationTask{
-		{ObjectMeta: metav1.ObjectMeta{Name: "attempt-0"}, Spec: operationsv1alpha1.OperationTaskSpec{StepID: "join", NodeRef: operationsv1alpha1.NodeReference{Name: "node-a", UID: "node-uid"}, Attempt: 0}, Status: operationsv1alpha1.OperationTaskStatus{Phase: operationsv1alpha1.TaskFailed, StartedAt: &started, FinishedAt: &finished}},
-		{ObjectMeta: metav1.ObjectMeta{Name: "attempt-1"}, Spec: operationsv1alpha1.OperationTaskSpec{StepID: "join", NodeRef: operationsv1alpha1.NodeReference{Name: "node-a", UID: "node-uid"}, Attempt: 1}, Status: operationsv1alpha1.OperationTaskStatus{Phase: operationsv1alpha1.TaskSucceeded, StartedAt: &started, FinishedAt: &finished}},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "attempt-0"},
+			Spec: operationsv1alpha1.OperationTaskSpec{
+				StepID:  "join",
+				NodeRef: operationsv1alpha1.NodeReference{Name: "node-a", UID: "node-uid"},
+				Attempt: 0,
+			},
+			Status: operationsv1alpha1.OperationTaskStatus{
+				Phase:      operationsv1alpha1.TaskFailed,
+				StartedAt:  &started,
+				FinishedAt: &finished,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "attempt-1"},
+			Spec: operationsv1alpha1.OperationTaskSpec{
+				StepID:  "join",
+				NodeRef: operationsv1alpha1.NodeReference{Name: "node-a", UID: "node-uid"},
+				Attempt: 1,
+			},
+			Status: operationsv1alpha1.OperationTaskStatus{
+				Phase:      operationsv1alpha1.TaskSucceeded,
+				StartedAt:  &started,
+				FinishedAt: &finished,
+			},
+		},
 	}
 	return op, tasks
 }
@@ -49,7 +79,7 @@ func TestRenderOperationUsesTaskExecutionFacts(t *testing.T) {
 func TestRenderCancelledOperationMarksUncreatedStepsCancelled(t *testing.T) {
 	started := metav1.NewTime(time.Date(2026, 8, 7, 10, 0, 0, 0, time.UTC))
 	op := &operationsv1alpha1.Operation{
-		ObjectMeta: metav1.ObjectMeta{Name: "op-cancelled", CreationTimestamp: started},
+		ObjectMeta: metav1.ObjectMeta{Name: "op-canceled", CreationTimestamp: started},
 		Spec: operationsv1alpha1.OperationSpec{Steps: []operationsv1alpha1.OperationStep{{
 			ID: "not-started", Targets: []operationsv1alpha1.NodeReference{{Name: "node-a", UID: "node-uid"}},
 		}}},
@@ -58,8 +88,8 @@ func TestRenderCancelledOperationMarksUncreatedStepsCancelled(t *testing.T) {
 
 	var output bytes.Buffer
 	renderOperation(&output, op, nil)
-	if !strings.Contains(output.String(), "Step: not-started [Cancelled]") || !strings.Contains(output.String(), "Cancelled node-a") {
-		t.Fatalf("cancelled operation rendered uncreated step incorrectly:\n%s", output.String())
+	if !strings.Contains(output.String(), "Step: not-started [Canceled]") || !strings.Contains(output.String(), "Canceled node-a") {
+		t.Fatalf("canceled operation rendered uncreated step incorrectly:\n%s", output.String())
 	}
 }
 

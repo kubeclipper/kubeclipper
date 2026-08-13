@@ -30,7 +30,9 @@ func TestGetOperationTaskLogUsesV2TaskEndpoint(t *testing.T) {
 	var request *http.Request
 	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		request = r
-		_ = json.NewEncoder(w).Encode(oplog.LogContentResponse{Content: "log", DeliverySize: 3, LogSize: 3})
+		if err := json.NewEncoder(w).Encode(oplog.LogContentResponse{Content: "log", DeliverySize: 3, LogSize: 3}); err != nil {
+			t.Errorf("encode log response: %v", err)
+		}
 	})
 	got, err := client.GetOperationTaskLog(context.Background(), "task-a", 17)
 	if err != nil {
@@ -51,7 +53,9 @@ func TestListOperationTasksFiltersByOperationUID(t *testing.T) {
 	var request *http.Request
 	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		request = r
-		_ = json.NewEncoder(w).Encode(&operationsv1alpha1.OperationTaskList{})
+		if err := json.NewEncoder(w).Encode(&operationsv1alpha1.OperationTaskList{}); err != nil {
+			t.Errorf("encode task list: %v", err)
+		}
 	})
 	if _, err := client.ListOperationTasks(context.Background(), "operation-uid"); err != nil {
 		t.Fatal(err)
@@ -71,7 +75,9 @@ func TestOperationControlUsesCASPreconditions(t *testing.T) {
 				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 					t.Error(err)
 				}
-				_ = json.NewEncoder(w).Encode(&operationsv1alpha1.Operation{ObjectMeta: metav1.ObjectMeta{Name: "op"}})
+				if err := json.NewEncoder(w).Encode(&operationsv1alpha1.Operation{ObjectMeta: metav1.ObjectMeta{Name: "op"}}); err != nil {
+					t.Errorf("encode operation: %v", err)
+				}
 			})
 			op := &operationsv1alpha1.Operation{ObjectMeta: metav1.ObjectMeta{Name: "op", UID: types.UID("uid"), ResourceVersion: "42"}}
 			var err error

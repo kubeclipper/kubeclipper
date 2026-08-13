@@ -27,6 +27,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 
 	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
@@ -36,6 +37,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 )
 
@@ -44,6 +46,31 @@ type Server struct {
 	logServer *operationv2.LogServer
 	client    clientset.Interface
 	Config    *config.Config
+}
+
+type taskStatusClient interface {
+	Get(context.Context, string, metav1.GetOptions) (*operations.OperationTask, error)
+	List(context.Context, metav1.ListOptions) (*operations.OperationTaskList, error)
+	Watch(context.Context, metav1.ListOptions) (watch.Interface, error)
+	UpdateStatus(context.Context, *operations.OperationTask, metav1.UpdateOptions) (*operations.OperationTask, error)
+}
+
+type taskClientAdapter struct{ client taskStatusClient }
+
+func (a taskClientAdapter) Get(ctx context.Context, name string, options metav1.GetOptions) (*operations.OperationTask, error) {
+	return a.client.Get(ctx, name, options)
+}
+
+func (a taskClientAdapter) List(ctx context.Context, options *metav1.ListOptions) (*operations.OperationTaskList, error) {
+	return a.client.List(ctx, *options)
+}
+
+func (a taskClientAdapter) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
+	return a.client.Watch(ctx, *options)
+}
+
+func (a taskClientAdapter) UpdateStatus(ctx context.Context, task *operations.OperationTask) (*operations.OperationTask, error) {
+	return a.client.UpdateStatus(ctx, task, metav1.UpdateOptions{})
 }
 
 const nodeStatusUpdateTimeout = 30 * time.Second
@@ -94,13 +121,13 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	}
 	s.worker, err = operationv2.NewWorker(&operationv2.WorkerOptions{
 		AgentID: s.Config.AgentID, NodeUID: node.UID,
-		Client: client.OperationsV1alpha1().OperationTasks(), Registry: registry, OpLog: opLog,
+		Client: taskClientAdapter{client: client.OperationsV1alpha1().OperationTasks()}, Registry: registry, OpLog: opLog,
 	})
 	if err != nil {
 		return err
 	}
-	if err := s.worker.PrepareRun(stopCh); err != nil {
-		return err
+	if prepareErr := s.worker.PrepareRun(stopCh); prepareErr != nil {
+		return prepareErr
 	}
 	s.logServer, err = operationv2.NewLogServer(&operationv2.LogServerOptions{
 		Address: s.Config.APIServer.LogAddress, TLSCertFile: s.Config.APIServer.CertFile,

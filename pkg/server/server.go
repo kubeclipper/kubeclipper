@@ -462,7 +462,11 @@ func (s *APIServer) migrateUser(operator iam.Operator) error {
 	return nil
 }
 
-func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informers.SharedInformerFactory, storageFactory registry.SharedStorageFactory) error {
+func (s *APIServer) SetupController(
+	mgr manager.Manager,
+	informerFactory informers.SharedInformerFactory,
+	storageFactory registry.SharedStorageFactory,
+) error {
 	var err error
 	clusterOperator := cluster.NewClusterOperator(storageFactory.Clusters(),
 		storageFactory.Nodes(),

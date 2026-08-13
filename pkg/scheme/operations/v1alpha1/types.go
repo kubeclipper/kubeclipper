@@ -68,7 +68,7 @@ type OperationDesiredState string
 
 const (
 	OperationDesiredStateActive    OperationDesiredState = "Active"
-	OperationDesiredStateCancelled OperationDesiredState = "Cancelled"
+	OperationDesiredStateCancelled OperationDesiredState = "Canceled"
 )
 
 type OperationPhase string
@@ -79,7 +79,7 @@ const (
 	OperationSucceeded OperationPhase = "Succeeded"
 	OperationFailed    OperationPhase = "Failed"
 	OperationTimedOut  OperationPhase = "TimedOut"
-	OperationCancelled OperationPhase = "Cancelled"
+	OperationCancelled OperationPhase = "Canceled"
 )
 
 func (p OperationPhase) IsTerminal() bool {
@@ -162,7 +162,7 @@ const (
 	TaskSucceeded TaskPhase = "Succeeded"
 	TaskFailed    TaskPhase = "Failed"
 	TaskTimedOut  TaskPhase = "TimedOut"
-	TaskCancelled TaskPhase = "Cancelled"
+	TaskCancelled TaskPhase = "Canceled"
 )
 
 func (p TaskPhase) IsTerminal() bool {

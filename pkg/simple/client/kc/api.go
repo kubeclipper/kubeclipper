@@ -385,7 +385,11 @@ func (cli *Client) GetComponentMeta(ctx context.Context, query url.Values) (*Com
 	return &v, err
 }
 
-func (cli *Client) InstallOrUninstallComponent(ctx context.Context, cluName string, component *corev1.PatchComponents) (*ClustersList, error) {
+func (cli *Client) InstallOrUninstallComponent(
+	ctx context.Context,
+	cluName string,
+	component *corev1.PatchComponents,
+) (*ClustersList, error) {
 	url := fmt.Sprintf(componentPath, cluName)
 	resp, err := cli.patch(ctx, url, nil, component, nil)
 	defer ensureReaderClosed(resp)
@@ -694,21 +698,21 @@ func (cli *Client) GetOperationTaskLog(ctx context.Context, taskName string, off
 
 // RetryOperation retries an eligible terminal operation using CAS preconditions.
 func (cli *Client) RetryOperation(ctx context.Context, op *operationsv1alpha1.Operation) (*operationsv1alpha1.Operation, error) {
-	request := &operationsv1alpha1.OperationControlRequest{UID: op.UID, ResourceVersion: op.ResourceVersion}
-	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/retry", operationPath, op.Name), nil, request, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer ensureReaderClosed(serverResp)
-	updated := &operationsv1alpha1.Operation{}
-	err = json.NewDecoder(serverResp.body).Decode(updated)
-	return updated, err
+	return cli.controlOperation(ctx, op, "retry")
 }
 
 // CancelOperation requests cancellation without interrupting an already running Task.
 func (cli *Client) CancelOperation(ctx context.Context, op *operationsv1alpha1.Operation) (*operationsv1alpha1.Operation, error) {
+	return cli.controlOperation(ctx, op, "cancel")
+}
+
+func (cli *Client) controlOperation(
+	ctx context.Context,
+	op *operationsv1alpha1.Operation,
+	action string,
+) (*operationsv1alpha1.Operation, error) {
 	request := &operationsv1alpha1.OperationControlRequest{UID: op.UID, ResourceVersion: op.ResourceVersion}
-	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/cancel", operationPath, op.Name), nil, request, nil)
+	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, op.Name, action), nil, request, nil)
 	if err != nil {
 		return nil, err
 	}

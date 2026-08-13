@@ -43,7 +43,7 @@ func (r *BusinessReconciler) Reconcile(ctx context.Context, request ctrl.Request
 		return ctrl.Result{}, err
 	}
 	if clusterObject.UID != op.Spec.TargetRef.UID {
-		return ctrl.Result{}, fmt.Errorf("Operation %q target Cluster UID changed", op.Name)
+		return ctrl.Result{}, fmt.Errorf("operation %q target Cluster UID changed", op.Name)
 	}
 	if op.Spec.Action == corev1.OperationDeleteCluster && op.Status.Phase == operations.OperationSucceeded {
 		return ctrl.Result{}, r.Clusters.DeleteCluster(ctx, clusterObject.Name)
@@ -52,7 +52,8 @@ func (r *BusinessReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	if op.Status.Phase == operations.OperationSucceeded {
 		desired = corev1.ClusterRunning
 	}
-	if clusterObject.Status.Phase == desired && !(op.Spec.Action == corev1.OperationUpgradeCluster && op.Status.Phase == operations.OperationSucceeded) {
+	if clusterObject.Status.Phase == desired &&
+		(op.Spec.Action != corev1.OperationUpgradeCluster || op.Status.Phase != operations.OperationSucceeded) {
 		return ctrl.Result{}, nil
 	}
 	clusterObject = clusterObject.DeepCopy()
@@ -82,16 +83,17 @@ func failedClusterPhase(action string) corev1.ClusterPhase {
 func (r *BusinessReconciler) SetupWithManager(mgr manager.Manager, factory informers.SharedInformerFactory) error {
 	informer := factory.Operations().V1alpha1().Operations()
 	informer.Informer()
-	controller, err := controller.NewUnmanaged("operation-v2-business", controller.Options{
+	managedController, err := controller.NewUnmanaged("operation-v2-business", controller.Options{
 		MaxConcurrentReconciles: 2, Reconciler: r,
 		Log: mgr.GetLogger().WithName("operation-v2-business-controller"), RecoverPanic: true,
 	})
 	if err != nil {
 		return err
 	}
-	if err := controller.Watch(source.NewKindWithCache(&operations.Operation{}, factory), &handler.EnqueueRequestForObject{}); err != nil {
+	operationSource := source.NewKindWithCache(&operations.Operation{}, factory)
+	if err := managedController.Watch(operationSource, &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
-	mgr.AddRunnable(controller)
+	mgr.AddRunnable(managedController)
 	return nil
 }

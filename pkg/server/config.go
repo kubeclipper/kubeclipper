@@ -33,6 +33,13 @@ type GlobalRoleBindingList []iamv1.GlobalRoleBinding
 
 type UserList []iamv1.User
 
+const (
+	clusterPluginsResource   = "clusters/plugins"
+	clusterNodesResource     = "clusters/nodes"
+	operationsAPIGroup       = "operations.kubeclipper.io"
+	agentOperationV2RoleName = "kubeclipper-agent-operation-v2"
+)
+
 func (receiver *GlobalRoleList) Diff(diffList *iamv1.GlobalRoleList) GlobalRoleList {
 	result := make(map[string]iamv1.GlobalRole)
 	for _, v := range diffList.Items {
@@ -567,8 +574,16 @@ var Roles = GlobalRoleList{
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters/plugins", "clusters/join", "clusters/nodes", "clusters/backups", "clusters/cronbackups", "clusters/certification", "clusters/kubeconfig"},
-				Verbs:     []string{"*"},
+				Resources: []string{
+					clusterPluginsResource,
+					"clusters/join",
+					clusterNodesResource,
+					"clusters/backups",
+					"clusters/cronbackups",
+					"clusters/certification",
+					"clusters/kubeconfig",
+				},
+				Verbs: []string{"*"},
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
@@ -603,12 +618,12 @@ var Roles = GlobalRoleList{
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "nodes", "regions", "clusters/plugins", "clusters/nodes"},
+				Resources: []string{"clusters", "nodes", "regions", clusterPluginsResource, clusterNodesResource},
 				Verbs:     []string{"update", "patch"},
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters/plugins", "clusters/nodes"},
+				Resources: []string{clusterPluginsResource, clusterNodesResource},
 				Verbs:     []string{"*"},
 			},
 		},
@@ -969,16 +984,16 @@ var Roles = GlobalRoleList{
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions"},
+				Resources: []string{"clusters", clusterNodesResource, clusterPluginsResource, "nodes", "regions"},
 				Verbs:     []string{"*"},
 			},
 			{
-				APIGroups: []string{"operations.kubeclipper.io"},
+				APIGroups: []string{operationsAPIGroup},
 				Resources: []string{"operations", "operationtasks", "operationtasks/logs"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
-				APIGroups: []string{"operations.kubeclipper.io"},
+				APIGroups: []string{operationsAPIGroup},
 				Resources: []string{"operations", "operations/cancel", "operations/retry"},
 				Verbs:     []string{"create", "update", "patch"},
 			},
@@ -987,15 +1002,27 @@ var Roles = GlobalRoleList{
 	{
 		TypeMeta: metav1.TypeMeta{Kind: iamv1.KindGlobalRole, APIVersion: iamv1.SchemeGroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "kubeclipper-agent-operation-v2",
+			Name:        agentOperationV2RoleName,
 			Labels:      map[string]string{"kubeclipper.io/hidden": "true"},
 			Annotations: map[string]string{"kubeclipper.io/internal": "true"},
 		},
 		Rules: []rbacv1.PolicyRule{
-			{APIGroups: []string{"operations.kubeclipper.io"}, Resources: []string{"operationtasks"}, Verbs: []string{"get", "list", "watch"}},
-			{APIGroups: []string{"operations.kubeclipper.io"}, Resources: []string{"operationtasks/status"}, Verbs: []string{"update"}},
-			{APIGroups: []string{"core.kubeclipper.io"}, Resources: []string{"nodes", "nodes/status"}, Verbs: []string{"get", "create", "update", "patch"}},
-			{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, Verbs: []string{"get", "create", "update", "patch"}},
+			{
+				APIGroups: []string{operationsAPIGroup},
+				Resources: []string{"operationtasks"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{APIGroups: []string{operationsAPIGroup}, Resources: []string{"operationtasks/status"}, Verbs: []string{"update"}},
+			{
+				APIGroups: []string{"core.kubeclipper.io"},
+				Resources: []string{"nodes", "nodes/status"},
+				Verbs:     []string{"get", "create", "update", "patch"},
+			},
+			{
+				APIGroups: []string{"coordination.k8s.io"},
+				Resources: []string{"leases"},
+				Verbs:     []string{"get", "create", "update", "patch"},
+			},
 		},
 	},
 }
@@ -1084,10 +1111,13 @@ var RoleBindings = GlobalRoleBindingList{
 		},
 	},
 	{
-		TypeMeta:   metav1.TypeMeta{Kind: "GlobalRoleBinding", APIVersion: iamv1.SchemeGroupVersion.String()},
-		ObjectMeta: metav1.ObjectMeta{Name: "kubeclipper-agent-operation-v2", Annotations: map[string]string{"kubeclipper.io/internal": "true"}},
-		RoleRef:    rbacv1.RoleRef{APIGroup: "iam.kubeclipper.io", Kind: "GlobalRole", Name: "kubeclipper-agent-operation-v2"},
-		Subjects:   []rbacv1.Subject{{APIGroup: "rbac.authorization.k8s.io", Kind: "Group", Name: "system:kc-agents"}},
+		TypeMeta: metav1.TypeMeta{Kind: "GlobalRoleBinding", APIVersion: iamv1.SchemeGroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        agentOperationV2RoleName,
+			Annotations: map[string]string{"kubeclipper.io/internal": "true"},
+		},
+		RoleRef:  rbacv1.RoleRef{APIGroup: "iam.kubeclipper.io", Kind: "GlobalRole", Name: agentOperationV2RoleName},
+		Subjects: []rbacv1.Subject{{APIGroup: "rbac.authorization.k8s.io", Kind: "Group", Name: "system:kc-agents"}},
 	},
 }
 

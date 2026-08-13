@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -82,7 +83,9 @@ func (h *handler) createOperation(req *restful.Request, resp *restful.Response) 
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusCreated, created)
+	if err := resp.WriteHeaderAndEntity(http.StatusCreated, created); err != nil {
+		return
+	}
 }
 
 func (h *handler) validateTargetRefs(req *restful.Request, op *operations.Operation) error {
@@ -97,8 +100,8 @@ func (h *handler) validateTargetRefs(req *restful.Request, op *operations.Operat
 		return apierrors.NewConflict(corev1.Resource("clusters"), clusterObj.Name, fmt.Errorf("cluster UID does not match"))
 	}
 	nodes := make(map[string]operations.NodeReference)
-	for _, step := range op.Spec.Steps {
-		for _, node := range step.Targets {
+	for stepIndex := range op.Spec.Steps {
+		for _, node := range op.Spec.Steps[stepIndex].Targets {
 			nodes[node.Name] = node
 		}
 	}
@@ -120,7 +123,9 @@ func (h *handler) getOperation(req *restful.Request, resp *restful.Response) {
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, op)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, op); err != nil {
+		return
+	}
 }
 
 func (h *handler) listOperations(req *restful.Request, resp *restful.Response) {
@@ -130,20 +135,22 @@ func (h *handler) listOperations(req *restful.Request, resp *restful.Response) {
 		return
 	}
 	if options.Watch {
-		watcher, err := h.store.WatchOperationsWithOptions(req.Request.Context(), options)
-		if err != nil {
-			writeError(resp, err)
+		watcher, watchErr := h.store.WatchOperationsWithOptions(req.Request.Context(), &options)
+		if watchErr != nil {
+			writeError(resp, watchErr)
 			return
 		}
 		restplus.ServeWatch(watcher, operations.SchemeGroupVersion.WithKind(operations.KindOperation), req, resp, watchTimeout(options))
 		return
 	}
-	list, err := h.store.ListOperationsWithOptions(req.Request.Context(), options)
+	list, err := h.store.ListOperationsWithOptions(req.Request.Context(), &options)
 	if err != nil {
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, list)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, list); err != nil {
+		return
+	}
 }
 
 func (h *handler) cancelOperation(req *restful.Request, resp *restful.Response) {
@@ -161,22 +168,30 @@ func (h *handler) cancelOperation(req *restful.Request, resp *restful.Response) 
 		return
 	}
 	if op.Status.Phase != operations.OperationPending && op.Status.Phase != operations.OperationRunning {
-		writeError(resp, apierrors.NewBadRequest("only Pending or Running operations may be cancelled"))
+		writeError(resp, apierrors.NewBadRequest("only Pending or Running operations may be canceled"))
 		return
 	}
 	if op.Spec.DesiredState != operations.OperationDesiredStateActive {
-		writeError(resp, conflictOperation(op.Name, "operation is already cancelled"))
+		writeError(resp, conflictOperation(op.Name, "operation is already canceled"))
 		return
 	}
-	updated, err := h.store.UpdateOperationControl(req.Request.Context(), op.Name, op.UID, preconditions.ResourceVersion, func(spec *operations.OperationSpec) error {
-		spec.DesiredState = operations.OperationDesiredStateCancelled
-		return nil
-	})
+	updated, err := h.store.UpdateOperationControl(
+		req.Request.Context(),
+		op.Name,
+		op.UID,
+		preconditions.ResourceVersion,
+		func(spec *operations.OperationSpec) error {
+			spec.DesiredState = operations.OperationDesiredStateCancelled
+			return nil
+		},
+	)
 	if err != nil {
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, updated)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, updated); err != nil {
+		return
+	}
 }
 
 func (h *handler) retryOperation(req *restful.Request, resp *restful.Response) {
@@ -193,8 +208,9 @@ func (h *handler) retryOperation(req *restful.Request, resp *restful.Response) {
 		writeError(resp, conflictOperation(op.Name, "operation UID does not match"))
 		return
 	}
-	if op.Status.Phase != operations.OperationFailed && op.Status.Phase != operations.OperationTimedOut && op.Status.Phase != operations.OperationCancelled {
-		writeError(resp, apierrors.NewBadRequest("only Failed, TimedOut or Cancelled operations may be retried"))
+	if op.Status.Phase != operations.OperationFailed && op.Status.Phase != operations.OperationTimedOut &&
+		op.Status.Phase != operations.OperationCancelled {
+		writeError(resp, apierrors.NewBadRequest("only Failed, TimedOut or Canceled operations may be retried"))
 		return
 	}
 	tasks, err := h.store.ListTasksByOperationUID(req.Request.Context(), op.UID, "")
@@ -229,16 +245,24 @@ func (h *handler) retryOperation(req *restful.Request, resp *restful.Response) {
 		writeError(resp, conflictOperation(op.Name, "only the latest operation for a target may be retried"))
 		return
 	}
-	updated, err := h.store.UpdateOperationControl(req.Request.Context(), op.Name, op.UID, preconditions.ResourceVersion, func(spec *operations.OperationSpec) error {
-		spec.DesiredState = operations.OperationDesiredStateActive
-		spec.RetryGeneration++
-		return nil
-	})
+	updated, err := h.store.UpdateOperationControl(
+		req.Request.Context(),
+		op.Name,
+		op.UID,
+		preconditions.ResourceVersion,
+		func(spec *operations.OperationSpec) error {
+			spec.DesiredState = operations.OperationDesiredStateActive
+			spec.RetryGeneration++
+			return nil
+		},
+	)
 	if err != nil {
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, updated)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, updated); err != nil {
+		return
+	}
 }
 
 func (h *handler) listTasks(req *restful.Request, resp *restful.Response) {
@@ -249,20 +273,22 @@ func (h *handler) listTasks(req *restful.Request, resp *restful.Response) {
 	}
 	agentID, isAgent := agentIDFromRequest(req)
 	if options.Watch {
-		watcher, err := h.store.WatchTasksWithOptions(req.Request.Context(), conditionalAgentID(agentID, isAgent), options)
-		if err != nil {
-			writeError(resp, err)
+		watcher, watchErr := h.store.WatchTasksWithOptions(req.Request.Context(), conditionalAgentID(agentID, isAgent), &options)
+		if watchErr != nil {
+			writeError(resp, watchErr)
 			return
 		}
 		restplus.ServeWatch(watcher, operations.SchemeGroupVersion.WithKind(operations.KindOperationTask), req, resp, watchTimeout(options))
 		return
 	}
-	list, err := h.store.ListTasksWithOptions(req.Request.Context(), conditionalAgentID(agentID, isAgent), options)
+	list, err := h.store.ListTasksWithOptions(req.Request.Context(), conditionalAgentID(agentID, isAgent), &options)
 	if err != nil {
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, list)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, list); err != nil {
+		return
+	}
 }
 
 func (h *handler) getTask(req *restful.Request, resp *restful.Response) {
@@ -272,10 +298,15 @@ func (h *handler) getTask(req *restful.Request, resp *restful.Response) {
 		return
 	}
 	if agentID, isAgent := agentIDFromRequest(req); isAgent && task.Spec.NodeRef.Name != agentID {
-		writeError(resp, apierrors.NewForbidden(operations.Resource(operations.ResourceTasks), task.Name, fmt.Errorf("task belongs to another agent")))
+		writeError(
+			resp,
+			apierrors.NewForbidden(operations.Resource(operations.ResourceTasks), task.Name, fmt.Errorf("task belongs to another agent")),
+		)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, task)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, task); err != nil {
+		return
+	}
 }
 
 func (h *handler) getTaskLogs(req *restful.Request, resp *restful.Response) {
@@ -290,14 +321,26 @@ func (h *handler) getTaskLogs(req *restful.Request, resp *restful.Response) {
 		return
 	}
 	if node.UID != task.Spec.NodeRef.UID || node.Status.Ipv4DefaultIP == "" {
-		writeError(resp, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), task.Name, fmt.Errorf("Task Node identity or management IP is unavailable")))
+		writeError(
+			resp,
+			apierrors.NewConflict(
+				operations.Resource(operations.ResourceTasks),
+				task.Name,
+				fmt.Errorf("task Node identity or management IP is unavailable"),
+			),
+		)
 		return
 	}
 	query := url.Values{}
 	query.Set("offset", req.QueryParameter("offset"))
 	query.Set("limit", req.QueryParameter("limit"))
-	endpoint := fmt.Sprintf("https://%s:10260/v1/tasks/%s/logs?%s", node.Status.Ipv4DefaultIP, url.PathEscape(string(task.UID)), query.Encode())
-	request, err := http.NewRequestWithContext(req.Request.Context(), http.MethodGet, endpoint, nil)
+	endpoint := fmt.Sprintf(
+		"https://%s:10260/v1/tasks/%s/logs?%s",
+		node.Status.Ipv4DefaultIP,
+		url.PathEscape(string(task.UID)),
+		query.Encode(),
+	)
+	request, err := http.NewRequestWithContext(req.Request.Context(), http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		writeError(resp, apierrors.NewInternalError(err))
 		return
@@ -327,7 +370,9 @@ func (h *handler) getTaskLogs(req *restful.Request, resp *restful.Response) {
 	}
 	resp.Header().Set("Content-Type", upstream.Header.Get("Content-Type"))
 	resp.WriteHeader(upstream.StatusCode)
-	_, _ = resp.Write(body)
+	if _, err := resp.Write(body); err != nil {
+		return
+	}
 }
 
 func newLogClient(caFile, certFile, keyFile string) (*http.Client, error) {
@@ -351,7 +396,14 @@ func newLogClient(caFile, certFile, keyFile string) (*http.Client, error) {
 func (h *handler) updateTaskStatus(req *restful.Request, resp *restful.Response) {
 	agentID, ok := agentIDFromRequest(req)
 	if !ok {
-		writeError(resp, apierrors.NewForbidden(operations.Resource(operations.ResourceTasks), req.PathParameter("name"), fmt.Errorf("agent certificate is required")))
+		writeError(
+			resp,
+			apierrors.NewForbidden(
+				operations.Resource(operations.ResourceTasks),
+				req.PathParameter("name"),
+				fmt.Errorf("agent certificate is required"),
+			),
+		)
 		return
 	}
 	incoming := &operations.OperationTask{}
@@ -369,7 +421,14 @@ func (h *handler) updateTaskStatus(req *restful.Request, resp *restful.Response)
 		return
 	}
 	if current.Spec.NodeRef.Name != agentID {
-		writeError(resp, apierrors.NewForbidden(operations.Resource(operations.ResourceTasks), current.Name, fmt.Errorf("task belongs to another agent")))
+		writeError(
+			resp,
+			apierrors.NewForbidden(
+				operations.Resource(operations.ResourceTasks),
+				current.Name,
+				fmt.Errorf("task belongs to another agent"),
+			),
+		)
 		return
 	}
 	if incoming.UID == "" || incoming.ResourceVersion == "" {
@@ -381,7 +440,9 @@ func (h *handler) updateTaskStatus(req *restful.Request, resp *restful.Response)
 		writeError(resp, err)
 		return
 	}
-	_ = resp.WriteHeaderAndEntity(http.StatusOK, updated)
+	if err := resp.WriteHeaderAndEntity(http.StatusOK, updated); err != nil {
+		return
+	}
 }
 
 func readControlRequest(req *restful.Request, resp *restful.Response) (operations.OperationControlRequest, bool) {
@@ -450,12 +511,7 @@ func agentIDFromRequest(req *restful.Request) (string, bool) {
 }
 
 func hasGroup(user userapi.Info, wanted string) bool {
-	for _, group := range user.GetGroups() {
-		if group == wanted {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(user.GetGroups(), wanted)
 }
 
 func conditionalAgentID(id string, ok bool) string {
@@ -477,5 +533,7 @@ func writeError(resp *restful.Response, err error) {
 	if status.Code == 0 {
 		status.Code = http.StatusInternalServerError
 	}
-	_ = resp.WriteHeaderAndEntity(int(status.Code), &status)
+	if err := resp.WriteHeaderAndEntity(int(status.Code), &status); err != nil {
+		return
+	}
 }

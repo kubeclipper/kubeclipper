@@ -124,10 +124,10 @@ type JoinOptions struct {
 }
 
 type JoinConfig struct {
-	Agents       options.Agents `json:"agents,omitempty" yaml:"agents,omitempty"`
-	IPDetect     string         `json:"ipDetect,omitempty" yaml:"ipDetect,omitempty"`
+	Agents       options.Agents `json:"agents,omitempty"       yaml:"agents,omitempty"`
+	IPDetect     string         `json:"ipDetect,omitempty"     yaml:"ipDetect,omitempty"`
 	NodeIPDetect string         `json:"nodeIPDetect,omitempty" yaml:"nodeIPDetect,omitempty"`
-	SSHConfig    *sshutils.SSH  `json:"ssh,omitempty" yaml:"ssh,omitempty"`
+	SSHConfig    *sshutils.SSH  `json:"ssh,omitempty"          yaml:"ssh,omitempty"`
 }
 
 func NewJoinOptions(streams options.IOStreams) *JoinOptions {
@@ -159,8 +159,14 @@ func NewCmdJoin(streams options.IOStreams) *cobra.Command {
 		},
 	}
 	o.cliOpts.AddFlags(cmd.Flags())
-	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, fmt.Sprintf("Kc agent node ip detect method. Used to route between nodes. \n%s", options.IPDetectDescription))
-	cmd.Flags().StringVar(&o.nodeIPDetect, "node-ip-detect", o.nodeIPDetect, fmt.Sprintf("Kc agent node ip detect method. Used for routing between nodes in the kubernetes cluster. If not specified, ip-detect is inherited. \n%s", options.IPDetectDescription))
+	ipDetectDescription := fmt.Sprintf("Kc agent node ip detect method. Used to route between nodes. \n%s", options.IPDetectDescription)
+	cmd.Flags().StringVar(&o.ipDetect, "ip-detect", o.ipDetect, ipDetectDescription)
+	nodeIPDetectDescription := fmt.Sprintf(
+		"Kc agent node ip detect method. Used for routing between nodes in the kubernetes cluster. "+
+			"If not specified, ip-detect is inherited. \n%s",
+		options.IPDetectDescription,
+	)
+	cmd.Flags().StringVar(&o.nodeIPDetect, "node-ip-detect", o.nodeIPDetect, nodeIPDetectDescription)
 	cmd.Flags().StringArrayVar(&o.agents, "agent", o.agents, "join agent node.")
 	cmd.Flags().StringArrayVar(&o.floatIPs, "float-ip", o.floatIPs, "Kc agent ip and float ip.")
 	cmd.Flags().StringVar(&o.Pkg, "pkg", o.Pkg, "Package resource url (path or http url). Default is inherited from the deploy config.")

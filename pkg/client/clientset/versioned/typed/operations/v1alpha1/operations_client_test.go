@@ -37,14 +37,14 @@ import (
 func TestPublicInterfacesMatchRegisteredRoutes(t *testing.T) {
 	t.Parallel()
 
-	operationInterface := reflect.TypeOf((*OperationInterface)(nil)).Elem()
+	operationInterface := reflect.TypeFor[OperationInterface]()
 	for _, method := range []string{"Update", "UpdateStatus", "Delete", "DeleteCollection", "Patch"} {
 		if _, found := operationInterface.MethodByName(method); found {
 			t.Errorf("OperationInterface exposes unregistered method %s", method)
 		}
 	}
 
-	taskInterface := reflect.TypeOf((*OperationTaskInterface)(nil)).Elem()
+	taskInterface := reflect.TypeFor[OperationTaskInterface]()
 	for _, method := range []string{"Create", "Update", "Delete", "DeleteCollection", "Patch"} {
 		if _, found := taskInterface.MethodByName(method); found {
 			t.Errorf("OperationTaskInterface exposes unregistered method %s", method)
@@ -73,10 +73,12 @@ func TestOperationTaskListUsesOperationsAPIPathAndListOptions(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(&operationsv1alpha1.OperationTaskList{
+		if err := json.NewEncoder(w).Encode(&operationsv1alpha1.OperationTaskList{
 			TypeMeta: metav1.TypeMeta{APIVersion: operationsv1alpha1.SchemeGroupVersion.String(), Kind: operationsv1alpha1.KindOperationTask + "List"},
 			ListMeta: metav1.ListMeta{ResourceVersion: "43"},
-		})
+		}); err != nil {
+			t.Errorf("encode task list: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -120,12 +122,15 @@ func TestOperationTaskUpdateStatusUsesStatusSubresource(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Errorf("decode request: %v", err)
 		}
-		if request.UID != task.UID || request.ResourceVersion != task.ResourceVersion || request.Status.Phase != operationsv1alpha1.TaskRunning {
+		if request.UID != task.UID || request.ResourceVersion != task.ResourceVersion ||
+			request.Status.Phase != operationsv1alpha1.TaskRunning {
 			t.Errorf("status request lost CAS identity or status: %#v", request)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(task)
+		if err := json.NewEncoder(w).Encode(task); err != nil {
+			t.Errorf("encode task: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -156,10 +161,12 @@ func TestOperationControlUsesNamedSubresourceAndCASBody(t *testing.T) {
 			t.Errorf("control request lost CAS preconditions: %#v", request)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(&operationsv1alpha1.Operation{
+		if err := json.NewEncoder(w).Encode(&operationsv1alpha1.Operation{
 			TypeMeta:   metav1.TypeMeta{APIVersion: operationsv1alpha1.SchemeGroupVersion.String(), Kind: operationsv1alpha1.KindOperation},
 			ObjectMeta: metav1.ObjectMeta{Name: "op-a", UID: types.UID("op-uid"), ResourceVersion: "10"},
-		})
+		}); err != nil {
+			t.Errorf("encode operation: %v", err)
+		}
 	}))
 	defer server.Close()
 

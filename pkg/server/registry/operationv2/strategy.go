@@ -59,7 +59,10 @@ func (operationStrategy) AllowUnconditionalUpdate() bool { return false }
 func (operationStrategy) Canonicalize(runtime.Object)    {}
 
 func (operationStrategy) PrepareForCreate(_ context.Context, obj runtime.Object) {
-	op := obj.(*operations.Operation)
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return
+	}
 	op.Status = operations.OperationStatus{Phase: operations.OperationPending}
 	if op.Spec.Timeout.Duration == 0 {
 		op.Spec.Timeout.Duration = operations.DefaultOperationTimeout
@@ -71,8 +74,14 @@ func (operationStrategy) PrepareForCreate(_ context.Context, obj runtime.Object)
 }
 
 func (operationStrategy) PrepareForUpdate(_ context.Context, obj, old runtime.Object) {
-	op := obj.(*operations.Operation)
-	oldOp := old.(*operations.Operation)
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return
+	}
+	oldOp, ok := old.(*operations.Operation)
+	if !ok {
+		return
+	}
 	// Status is updated through OperationStore; ordinary REST updates may only
 	// change the two explicitly controlled spec fields.
 	op.Spec.TargetRef = oldOp.Spec.TargetRef
@@ -84,12 +93,22 @@ func (operationStrategy) PrepareForUpdate(_ context.Context, obj, old runtime.Ob
 }
 
 func (operationStrategy) Validate(_ context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateOperation(obj.(*operations.Operation))
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("operation"), obj, "expected Operation")}
+	}
+	return validation.ValidateOperation(op)
 }
 
 func (operationStrategy) ValidateUpdate(_ context.Context, obj, old runtime.Object) field.ErrorList {
-	op := obj.(*operations.Operation)
-	oldOp := old.(*operations.Operation)
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("operation"), obj, "expected Operation")}
+	}
+	oldOp, ok := old.(*operations.Operation)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("operation"), old, "expected Operation")}
+	}
 	var errs field.ErrorList
 	if !equality.Semantic.DeepEqual(op.Spec.TargetRef, oldOp.Spec.TargetRef) ||
 		op.Spec.Action != oldOp.Spec.Action ||
@@ -133,25 +152,44 @@ func (taskStrategy) AllowUnconditionalUpdate() bool { return false }
 func (taskStrategy) Canonicalize(runtime.Object)    {}
 
 func (taskStrategy) PrepareForCreate(_ context.Context, obj runtime.Object) {
-	task := obj.(*operations.OperationTask)
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return
+	}
 	task.Status = operations.OperationTaskStatus{Phase: operations.TaskPending}
 	task.TypeMeta = metav1TypeMeta(operations.KindOperationTask)
 }
 
 func (taskStrategy) PrepareForUpdate(_ context.Context, obj, old runtime.Object) {
-	task := obj.(*operations.OperationTask)
-	oldTask := old.(*operations.OperationTask)
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return
+	}
+	oldTask, ok := old.(*operations.OperationTask)
+	if !ok {
+		return
+	}
 	task.Spec = oldTask.Spec
 	task.TypeMeta = oldTask.TypeMeta
 }
 
 func (taskStrategy) Validate(_ context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateTask(obj.(*operations.OperationTask))
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("task"), obj, "expected OperationTask")}
+	}
+	return validation.ValidateTask(task)
 }
 
 func (taskStrategy) ValidateUpdate(_ context.Context, obj, old runtime.Object) field.ErrorList {
-	task := obj.(*operations.OperationTask)
-	oldTask := old.(*operations.OperationTask)
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("task"), obj, "expected OperationTask")}
+	}
+	oldTask, ok := old.(*operations.OperationTask)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("task"), old, "expected OperationTask")}
+	}
 	var errs field.ErrorList
 	if !equality.Semantic.DeepEqual(task.Spec, oldTask.Spec) {
 		errs = append(errs, field.Forbidden(field.NewPath("spec"), "task spec is immutable"))
@@ -187,16 +225,29 @@ func (lockStrategy) AllowCreateOnUpdate() bool      { return false }
 func (lockStrategy) AllowUnconditionalUpdate() bool { return false }
 func (lockStrategy) Canonicalize(runtime.Object)    {}
 func (lockStrategy) PrepareForCreate(_ context.Context, obj runtime.Object) {
-	obj.(*operations.ExecutionLock).TypeMeta = metav1TypeMeta(operations.KindExecutionLock)
+	lock, ok := obj.(*operations.ExecutionLock)
+	if !ok {
+		return
+	}
+	lock.TypeMeta = metav1TypeMeta(operations.KindExecutionLock)
 }
 func (lockStrategy) PrepareForUpdate(_ context.Context, obj, old runtime.Object) {
-	lock := obj.(*operations.ExecutionLock)
-	oldLock := old.(*operations.ExecutionLock)
+	lock, ok := obj.(*operations.ExecutionLock)
+	if !ok {
+		return
+	}
+	oldLock, ok := old.(*operations.ExecutionLock)
+	if !ok {
+		return
+	}
 	lock.Spec = oldLock.Spec
 	lock.TypeMeta = oldLock.TypeMeta
 }
 func (lockStrategy) Validate(_ context.Context, obj runtime.Object) field.ErrorList {
-	lock := obj.(*operations.ExecutionLock)
+	lock, ok := obj.(*operations.ExecutionLock)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("lock"), obj, "expected ExecutionLock")}
+	}
 	var errs field.ErrorList
 	if lock.Name == "" {
 		errs = append(errs, field.Required(field.NewPath("metadata", "name"), "lock name is required"))
@@ -212,7 +263,15 @@ func (lockStrategy) Validate(_ context.Context, obj runtime.Object) field.ErrorL
 	return errs
 }
 func (lockStrategy) ValidateUpdate(_ context.Context, obj, old runtime.Object) field.ErrorList {
-	if !equality.Semantic.DeepEqual(obj.(*operations.ExecutionLock).Spec, old.(*operations.ExecutionLock).Spec) {
+	lock, ok := obj.(*operations.ExecutionLock)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("lock"), obj, "expected ExecutionLock")}
+	}
+	oldLock, ok := old.(*operations.ExecutionLock)
+	if !ok {
+		return field.ErrorList{field.Invalid(field.NewPath("lock"), old, "expected ExecutionLock")}
+	}
+	if !equality.Semantic.DeepEqual(lock.Spec, oldLock.Spec) {
 		return field.ErrorList{field.Forbidden(field.NewPath("spec"), "execution lock is immutable")}
 	}
 	return nil

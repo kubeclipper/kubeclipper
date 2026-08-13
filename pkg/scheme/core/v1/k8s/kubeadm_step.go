@@ -35,11 +35,12 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -54,7 +55,16 @@ const (
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
 	//KubeCertsCluVersion the version that kubeadm certs command appears
-	KubeCertsCluVersion = "1.20"
+	KubeCertsCluVersion        = "1.20"
+	bashCommand                = "bash"
+	binBashCommand             = "/bin/bash"
+	shellCommandFlag           = "-c"
+	restartControlPlaneCommand = "mv /etc/kubernetes/manifests/etcd.yaml " +
+		"/etc/kubernetes/manifests/kube-apiserver.yaml " +
+		"/etc/kubernetes/manifests/kube-controller-manager.yaml " +
+		"/etc/kubernetes/manifests/kube-scheduler.yaml /tmp/.k8s/config && sleep 20"
+	getKubeadmConfigCommand = "mkdir -p /tmp/.k8s && kubectl -n kube-system get configmap kubeadm-config " +
+		"-o jsonpath='{.data.ClusterConfiguration}' > /tmp/.k8s/kubeadm-new.yaml"
 )
 
 type Runnable v1.Cluster
@@ -704,8 +714,12 @@ func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNo
 				Action:     v1.ActionUninstall,
 				Commands: []v1.Command{
 					{
-						Type:         v1.CommandShell,
-						ShellCommand: []string{"bash", "-c", "if ip link show kube-ipvs0 >/dev/null 2>&1; then ip link delete kube-ipvs0; fi"},
+						Type: v1.CommandShell,
+						ShellCommand: []string{
+							bashCommand,
+							shellCommandFlag,
+							"if ip link show kube-ipvs0 >/dev/null 2>&1; then ip link delete kube-ipvs0; fi",
+						},
 					},
 				},
 			},
@@ -725,7 +739,7 @@ func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNo
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X"},
+					ShellCommand: []string{bashCommand, shellCommandFlag, "iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X"},
 				},
 			},
 		},
@@ -777,8 +791,12 @@ func (stepper *Certification) InstallSteps(clu *v1.Cluster, nodes []v1.StepNode)
 			},
 			Commands: []v1.Command{
 				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "mv /etc/kubernetes/manifests/etcd.yaml /etc/kubernetes/manifests/kube-apiserver.yaml /etc/kubernetes/manifests/kube-controller-manager.yaml /etc/kubernetes/manifests/kube-scheduler.yaml /tmp/.k8s/config && sleep 20"},
+					Type: v1.CommandShell,
+					ShellCommand: []string{
+						bashCommand,
+						shellCommandFlag,
+						restartControlPlaneCommand,
+					},
 				},
 			},
 			AfterRunCommands: []v1.Command{
@@ -881,7 +899,7 @@ func EnvSetupSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 		Commands: []v1.Command{
 			{
 				Type:         v1.CommandShell,
-				ShellCommand: []string{"/bin/bash", "-c", nodeScript},
+				ShellCommand: []string{binBashCommand, shellCommandFlag, nodeScript},
 			},
 		},
 	})
@@ -896,17 +914,29 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 		hostname := metadata.GetMasterHostname(v.ID)
 		if len(v.Taints) == 0 {
 			shellCommand = append(shellCommand, v1.Command{
-				Type:         v1.CommandShell,
-				ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl taint node %s node-role.kubernetes.io/master- || true", hostname)},
+				Type: v1.CommandShell,
+				ShellCommand: []string{
+					binBashCommand,
+					shellCommandFlag,
+					fmt.Sprintf("kubectl taint node %s node-role.kubernetes.io/master- || true", hostname),
+				},
 			}, v1.Command{
-				Type:         v1.CommandShell,
-				ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl taint node %s node-role.kubernetes.io/control-plane- || true", hostname)},
+				Type: v1.CommandShell,
+				ShellCommand: []string{
+					binBashCommand,
+					shellCommandFlag,
+					fmt.Sprintf("kubectl taint node %s node-role.kubernetes.io/control-plane- || true", hostname),
+				},
 			})
 		} else {
 			for _, t := range v.Taints {
 				shellCommand = append(shellCommand, v1.Command{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl taint node %s %s=%s:%s || true", hostname, t.Key, t.Value, t.Effect)},
+					Type: v1.CommandShell,
+					ShellCommand: []string{
+						binBashCommand,
+						shellCommandFlag,
+						fmt.Sprintf("kubectl taint node %s %s=%s:%s || true", hostname, t.Key, t.Value, t.Effect),
+					},
 				})
 			}
 		}
@@ -914,7 +944,7 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 			for key, value := range v.Labels {
 				shellCommand = append(shellCommand, v1.Command{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl label node %s %s=%s", hostname, key, value)},
+					ShellCommand: []string{binBashCommand, shellCommandFlag, fmt.Sprintf("kubectl label node %s %s=%s", hostname, key, value)},
 				})
 			}
 		}
@@ -926,7 +956,7 @@ func PatchTaintAndLabelStep(master, workers v1.WorkerNodeList, metadata *compone
 			for key, value := range v.Labels {
 				shellCommand = append(shellCommand, v1.Command{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"/bin/bash", "-c", fmt.Sprintf("kubectl label node %s %s=%s", hostname, key, value)},
+					ShellCommand: []string{binBashCommand, shellCommandFlag, fmt.Sprintf("kubectl label node %s %s=%s", hostname, key, value)},
 				})
 			}
 		}
@@ -977,7 +1007,7 @@ func KubeadmReset(nodes []v1.StepNode) ([]v1.Step, error) {
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "if command -v kubeadm >/dev/null 2>&1; then kubeadm reset -f; fi"},
+					ShellCommand: []string{bashCommand, shellCommandFlag, "if command -v kubeadm >/dev/null 2>&1; then kubeadm reset -f; fi"},
 				},
 			},
 		},
@@ -1028,7 +1058,7 @@ func Clear(c *v1.Cluster, metadata *component.ExtraMetadata) ([]v1.Step, error) 
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", fmt.Sprintf("sed -i '/%s/d' /etc/hosts", apiServerDomain)},
+					ShellCommand: []string{bashCommand, shellCommandFlag, fmt.Sprintf("sed -i '/%s/d' /etc/hosts", apiServerDomain)},
 				},
 			},
 		})
@@ -1064,7 +1094,7 @@ func RemoveHostname(c *v1.Cluster, nodes []v1.StepNode) ([]v1.Step, error) {
 		Commands: []v1.Command{
 			{
 				Type: v1.CommandShell,
-				ShellCommand: []string{"bash", "-c", fmt.Sprintf("sed -i -e '/%s/d' /etc/hosts",
+				ShellCommand: []string{bashCommand, shellCommandFlag, fmt.Sprintf("sed -i -e '/%s/d' /etc/hosts",
 					apiServerDomain)},
 			},
 		},
@@ -1143,8 +1173,12 @@ func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step,
 			RetryTimes: 1,
 			Commands: []v1.Command{
 				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "mkdir -p /tmp/.k8s && kubectl -n kube-system get configmap kubeadm-config -o jsonpath='{.data.ClusterConfiguration}' > /tmp/.k8s/kubeadm-new.yaml"},
+					Type: v1.CommandShell,
+					ShellCommand: []string{
+						bashCommand,
+						shellCommandFlag,
+						getKubeadmConfigCommand,
+					},
 				},
 			},
 		},
@@ -1158,8 +1192,13 @@ func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step,
 			RetryTimes: 1,
 			Commands: []v1.Command{
 				{
-					Type:          v1.CommandCustom,
-					Identity:      fmt.Sprintf(component.RegisterTemplateKeyFormat, kubeadmConfigUpdaterName, kubeadmConfigUpdaterVersion, component.TypeStep),
+					Type: v1.CommandCustom,
+					Identity: fmt.Sprintf(
+						component.RegisterTemplateKeyFormat,
+						kubeadmConfigUpdaterName,
+						kubeadmConfigUpdaterVersion,
+						component.TypeStep,
+					),
 					CustomCommand: stepData,
 				},
 			},
@@ -1181,7 +1220,7 @@ func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step,
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "mv -f /etc/kubernetes/pki/apiserver.{crt,key} /tmp/.k8s/pki/ || true"},
+					ShellCommand: []string{bashCommand, shellCommandFlag, "mv -f /etc/kubernetes/pki/apiserver.{crt,key} /tmp/.k8s/pki/ || true"},
 				},
 			},
 		},
@@ -1216,8 +1255,12 @@ func (stepper *SAN) InstallSteps(nodes []v1.StepNode, sans []string) ([]v1.Step,
 			},
 			Commands: []v1.Command{
 				{
-					Type:         v1.CommandShell,
-					ShellCommand: []string{"bash", "-c", "mv -f /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/.k8s/config && sleep 20"},
+					Type: v1.CommandShell,
+					ShellCommand: []string{
+						bashCommand,
+						shellCommandFlag,
+						"mv -f /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/.k8s/config && sleep 20",
+					},
 				},
 			},
 			AfterRunCommands: []v1.Command{
@@ -1287,7 +1330,12 @@ func (d *KubeadmConfigUpdater) Install(ctx context.Context, opts component.Optio
 	logger.Infof("unmarshal config file: %s with v1.beta4 failed: %v, try to use v1 version", d.ConfigFile, v2Err)
 	var config ClusterConfiguration
 	if err = yaml.Unmarshal(buf, &config); err != nil {
-		return nil, fmt.Errorf("unmarshal config file: %s failed: v1.beta4 error: %v, v1 error: %w, all version failed", d.ConfigFile, v2Err, err)
+		return nil, fmt.Errorf(
+			"unmarshal config file: %s failed: v1.beta4 error: %w, v1 error: %w, all version failed",
+			d.ConfigFile,
+			v2Err,
+			err,
+		)
 	}
 	config.APIServer.CertSANs = sets.NewString(d.SANs...).List()
 	marshal, err := yaml.Marshal(config)

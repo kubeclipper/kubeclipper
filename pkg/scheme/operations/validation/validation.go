@@ -49,13 +49,26 @@ func ValidateOperation(op *operations.Operation) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "action"), "action is required"))
 	}
 	if op.Spec.DesiredState != operations.OperationDesiredStateActive {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "desiredState"), op.Spec.DesiredState, "new operations must be Active"))
+		allErrs = append(
+			allErrs,
+			field.Invalid(field.NewPath("spec", "desiredState"), op.Spec.DesiredState, "new operations must be Active"),
+		)
 	}
 	if op.Spec.RetryGeneration != 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "retryGeneration"), op.Spec.RetryGeneration, "new operations must start at generation 0"))
+		allErrs = append(
+			allErrs,
+			field.Invalid(field.NewPath("spec", "retryGeneration"), op.Spec.RetryGeneration, "new operations must start at generation 0"),
+		)
 	}
 	if op.Spec.Timeout.Duration < operations.MinOperationTimeout || op.Spec.Timeout.Duration > operations.MaxOperationTimeout {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "timeout"), op.Spec.Timeout.Duration, fmt.Sprintf("must be between %s and %s", operations.MinOperationTimeout, operations.MaxOperationTimeout)))
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				field.NewPath("spec", "timeout"),
+				op.Spec.Timeout.Duration,
+				fmt.Sprintf("must be between %s and %s", operations.MinOperationTimeout, operations.MaxOperationTimeout),
+			),
+		)
 	}
 	if len(op.Spec.Steps) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "steps"), "at least one step is required"))
@@ -99,7 +112,10 @@ func ValidateOperation(op *operations.Operation) field.ErrorList {
 			}
 		}
 		if step.RetryLimit < 0 || step.RetryLimit > operations.MaxRetryLimit {
-			allErrs = append(allErrs, field.Invalid(path.Child("retryLimit"), step.RetryLimit, fmt.Sprintf("must be between 0 and %d", operations.MaxRetryLimit)))
+			allErrs = append(
+				allErrs,
+				field.Invalid(path.Child("retryLimit"), step.RetryLimit, fmt.Sprintf("must be between 0 and %d", operations.MaxRetryLimit)),
+			)
 		}
 		for j := range step.Inputs {
 			input := step.Inputs[j]
@@ -139,13 +155,19 @@ func ValidateTask(task *operations.OperationTask) field.ErrorList {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "executor"), "executor is required"))
 	}
 	if task.Spec.RetryGeneration < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "retryGeneration"), task.Spec.RetryGeneration, "must not be negative"))
+		allErrs = append(
+			allErrs,
+			field.Invalid(field.NewPath("spec", "retryGeneration"), task.Spec.RetryGeneration, "must not be negative"),
+		)
 	}
 	if task.Spec.Attempt < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "attempt"), task.Spec.Attempt, "must not be negative"))
 	}
 	if len(task.Spec.Payload.Raw) > operations.MaxStepPayloadSize {
-		allErrs = append(allErrs, field.TooLong(field.NewPath("spec", "payload"), len(task.Spec.Payload.Raw), operations.MaxStepPayloadSize))
+		allErrs = append(
+			allErrs,
+			field.TooLong(field.NewPath("spec", "payload"), len(task.Spec.Payload.Raw), operations.MaxStepPayloadSize),
+		)
 	}
 	if size, err := json.Marshal(task); err == nil && len(size) > operations.MaxTaskSize {
 		allErrs = append(allErrs, field.TooLong(field.NewPath("task"), len(size), operations.MaxTaskSize))
@@ -162,7 +184,7 @@ func ValidateTaskResult(result *operations.TaskResult) error {
 	}
 	var total int
 	for key, value := range result.Outputs {
-		if len(key) == 0 || len(key) > operations.MaxOutputKeySize {
+		if key == "" || len(key) > operations.MaxOutputKeySize {
 			return fmt.Errorf("task output key must be between 1 and %d bytes", operations.MaxOutputKeySize)
 		}
 		if len(value) > operations.MaxOutputValueSize {
@@ -177,53 +199,52 @@ func ValidateTaskResult(result *operations.TaskResult) error {
 }
 
 func ValidateTaskPhaseTransition(oldPhase, newPhase operations.TaskPhase) error {
-	if oldPhase.IsTerminal() {
-		if oldPhase != newPhase {
-			return fmt.Errorf("terminal task phase %q is immutable", oldPhase)
-		}
-		return nil
-	}
-	switch oldPhase {
-	case "":
-		if newPhase != operations.TaskPending {
-			return fmt.Errorf("new task must start Pending")
-		}
-	case operations.TaskPending:
-		if newPhase != operations.TaskPending && newPhase != operations.TaskRunning && newPhase != operations.TaskCancelled {
-			return fmt.Errorf("Pending task cannot transition to %q", newPhase)
-		}
-	case operations.TaskRunning:
-		if newPhase != operations.TaskRunning && !newPhase.IsTerminal() {
-			return fmt.Errorf("Running task cannot transition to %q", newPhase)
-		}
-	default:
-		return fmt.Errorf("unknown old task phase %q", oldPhase)
-	}
-	return nil
+	return validatePhaseTransition(&phaseTransition{
+		old: string(oldPhase), new: string(newPhase), pending: string(operations.TaskPending), running: string(operations.TaskRunning),
+		canceled: string(operations.TaskCancelled), terminal: oldPhase.IsTerminal(), newTerminal: newPhase.IsTerminal(), resource: "task",
+	})
 }
 
 func ValidateOperationPhaseTransition(oldPhase, newPhase operations.OperationPhase) error {
-	if oldPhase.IsTerminal() {
-		if oldPhase != newPhase {
-			return fmt.Errorf("terminal operation phase %q is immutable", oldPhase)
+	return validatePhaseTransition(&phaseTransition{
+		old:         string(oldPhase),
+		new:         string(newPhase),
+		pending:     string(operations.OperationPending),
+		running:     string(operations.OperationRunning),
+		canceled:    string(operations.OperationCancelled),
+		terminal:    oldPhase.IsTerminal(),
+		newTerminal: newPhase.IsTerminal(),
+		resource:    "operation",
+	})
+}
+
+type phaseTransition struct {
+	old, new, pending, running, canceled, resource string
+	terminal, newTerminal                          bool
+}
+
+func validatePhaseTransition(transition *phaseTransition) error {
+	if transition.terminal {
+		if transition.old != transition.new {
+			return fmt.Errorf("terminal %s phase %q is immutable", transition.resource, transition.old)
 		}
 		return nil
 	}
-	switch oldPhase {
+	switch transition.old {
 	case "":
-		if newPhase != operations.OperationPending {
-			return fmt.Errorf("new operation must start Pending")
+		if transition.new != transition.pending {
+			return fmt.Errorf("new %s must start Pending", transition.resource)
 		}
-	case operations.OperationPending:
-		if newPhase != operations.OperationPending && newPhase != operations.OperationRunning && newPhase != operations.OperationCancelled {
-			return fmt.Errorf("Pending operation cannot transition to %q", newPhase)
+	case transition.pending:
+		if transition.new != transition.pending && transition.new != transition.running && transition.new != transition.canceled {
+			return fmt.Errorf("pending %s cannot transition to %q", transition.resource, transition.new)
 		}
-	case operations.OperationRunning:
-		if newPhase != operations.OperationRunning && !newPhase.IsTerminal() {
-			return fmt.Errorf("Running operation cannot transition to %q", newPhase)
+	case transition.running:
+		if transition.new != transition.running && !transition.newTerminal {
+			return fmt.Errorf("running %s cannot transition to %q", transition.resource, transition.new)
 		}
 	default:
-		return fmt.Errorf("unknown old operation phase %q", oldPhase)
+		return fmt.Errorf("unknown old %s phase %q", transition.resource, transition.old)
 	}
 	return nil
 }

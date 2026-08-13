@@ -32,9 +32,10 @@ func calculateDuration(startAt, endAt *metav1.Time) time.Duration {
 
 func tasksByExecution(tasks []operationsv1alpha1.OperationTask) map[string][]operationsv1alpha1.OperationTask {
 	grouped := make(map[string][]operationsv1alpha1.OperationTask)
-	for _, task := range tasks {
+	for taskIndex := range tasks {
+		task := &tasks[taskIndex]
 		key := task.Spec.StepID + "|" + string(task.Spec.NodeRef.UID)
-		grouped[key] = append(grouped[key], task)
+		grouped[key] = append(grouped[key], *task)
 	}
 	for key := range grouped {
 		sort.SliceStable(grouped[key], func(i, j int) bool {
@@ -48,7 +49,11 @@ func tasksByExecution(tasks []operationsv1alpha1.OperationTask) map[string][]ope
 	return grouped
 }
 
-func effectiveTask(grouped map[string][]operationsv1alpha1.OperationTask, stepID string, nodeUID types.UID) *operationsv1alpha1.OperationTask {
+func effectiveTask(
+	grouped map[string][]operationsv1alpha1.OperationTask,
+	stepID string,
+	nodeUID types.UID,
+) *operationsv1alpha1.OperationTask {
 	tasks := grouped[stepID+"|"+string(nodeUID)]
 	for i := range tasks {
 		if tasks[i].Status.Phase == operationsv1alpha1.TaskSucceeded {
@@ -61,7 +66,11 @@ func effectiveTask(grouped map[string][]operationsv1alpha1.OperationTask, stepID
 	return &tasks[0]
 }
 
-func stepStatus(step operationsv1alpha1.OperationStep, grouped map[string][]operationsv1alpha1.OperationTask, operationPhase operationsv1alpha1.OperationPhase) string {
+func stepStatus(
+	step *operationsv1alpha1.OperationStep,
+	grouped map[string][]operationsv1alpha1.OperationTask,
+	operationPhase operationsv1alpha1.OperationPhase,
+) string {
 	if len(step.Targets) == 0 {
 		return missingTaskPhase(operationPhase)
 	}

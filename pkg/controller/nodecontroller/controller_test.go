@@ -31,16 +31,16 @@ import (
 
 type missingClusterLister struct{}
 
-func (missingClusterLister) List(selector labels.Selector) ([]*corev1.Cluster, error) {
+func (missingClusterLister) List(_ labels.Selector) ([]*corev1.Cluster, error) {
 	return nil, nil
 }
 
 type clusterLister struct{ cluster *corev1.Cluster }
 
-func (l clusterLister) List(selector labels.Selector) ([]*corev1.Cluster, error) {
+func (l clusterLister) List(_ labels.Selector) ([]*corev1.Cluster, error) {
 	return []*corev1.Cluster{l.cluster}, nil
 }
-func (l clusterLister) Get(name string) (*corev1.Cluster, error) { return l.cluster, nil }
+func (l clusterLister) Get(_ string) (*corev1.Cluster, error) { return l.cluster, nil }
 func (missingClusterLister) Get(name string) (*corev1.Cluster, error) {
 	return nil, errors.NewNotFound(schema.GroupResource{Group: corev1.GroupName, Resource: "clusters"}, name)
 }
@@ -52,11 +52,11 @@ func (w *recordingNodeWriter) UpdateNode(_ context.Context, node *corev1.Node) (
 	return node, nil
 }
 
-func (w *recordingNodeWriter) CreateNode(_ context.Context, node *corev1.Node) (*corev1.Node, error) {
+func (*recordingNodeWriter) CreateNode(_ context.Context, _ *corev1.Node) (*corev1.Node, error) {
 	panic("unexpected call")
 }
 
-func (w *recordingNodeWriter) DeleteNode(context.Context, string) error {
+func (*recordingNodeWriter) DeleteNode(context.Context, string) error {
 	panic("unexpected call")
 }
 

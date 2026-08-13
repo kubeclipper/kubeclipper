@@ -104,7 +104,8 @@ func renderOperation(w io.Writer, op *operationsv1alpha1.Operation, tasks []oper
 	fmt.Fprintf(w, "\n")
 
 	// Per-step breakdown
-	for _, step := range op.Spec.Steps {
+	for stepIndex := range op.Spec.Steps {
+		step := &op.Spec.Steps[stepIndex]
 		startTime := stepStartTime(step.ID, tasks)
 		currentStepStatus := stepStatus(step, grouped, op.Status.Phase)
 
@@ -163,7 +164,7 @@ func statusColor(status string) *color.Color {
 		return color.New(color.FgRed, color.Bold)
 	case "Running":
 		return color.New(color.FgYellow, color.Bold)
-	case "Cancelled":
+	case "Canceled":
 		return color.New(color.FgMagenta, color.Bold)
 	case "Pending", "unknown":
 		return color.New(color.FgCyan)
