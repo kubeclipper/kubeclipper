@@ -65,7 +65,7 @@ func (f *fakeTaskClient) Watch(context.Context, metav1.ListOptions) (watch.Inter
 func (f *fakeTaskClient) UpdateStatus(
 	_ context.Context,
 	task *operations.OperationTask,
-	_ metav1.UpdateOptions,
+	_ metav1.UpdateOptions, //nolint:gocritic // TaskClient follows the Kubernetes client signature.
 ) (*operations.OperationTask, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
