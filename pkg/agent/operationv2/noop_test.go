@@ -5,8 +5,9 @@ import (
 	"context"
 	"testing"
 
-	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 func TestNoopExecutor(t *testing.T) {

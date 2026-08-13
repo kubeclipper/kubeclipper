@@ -20,10 +20,11 @@
 package v1alpha1
 
 import (
+	rest "k8s.io/client-go/rest"
+
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientrest"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/scheme"
 	v1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
-	rest "k8s.io/client-go/rest"
 )
 
 type OperationsV1alpha1Interface interface {
