@@ -471,7 +471,12 @@ func (c *JoinOptions) sendCerts(ip, agentID string) error {
 		return err
 	}
 	destination := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath)
-	for _, source := range []string{filepath.Join(caPath, options.Ca+".crt"), filepath.Join(certConfig.Path, "agent.crt"), filepath.Join(certConfig.Path, "agent.key")} {
+	sources := []string{
+		filepath.Join(caPath, options.Ca+".crt"),
+		filepath.Join(certConfig.Path, "agent.crt"),
+		filepath.Join(certConfig.Path, "agent.key"),
+	}
+	for _, source := range sources {
 		if err := utils.SendPackageV2(c.sshConfig, source, []string{ip}, destination, nil, nil); err != nil {
 			return err
 		}

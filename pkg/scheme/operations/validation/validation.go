@@ -34,17 +34,31 @@ import (
 )
 
 func ValidateOperation(op *operations.Operation) field.ErrorList {
-	allErrs := field.ErrorList{}
 	if op == nil {
-		return append(allErrs, field.Required(field.NewPath("operation"), "must not be nil"))
+		return field.ErrorList{field.Required(field.NewPath("operation"), "must not be nil")}
 	}
+	allErrs := validateOperationMetadata(op)
+	allErrs = append(allErrs, validateOperationSpec(op)...)
+	allErrs = append(allErrs, validateOperationSteps(op.Spec.Steps)...)
+	if size, err := json.Marshal(op); err == nil && len(size) > operations.MaxOperationSize {
+		allErrs = append(allErrs, field.TooLong(field.NewPath("operation"), len(size), operations.MaxOperationSize))
+	}
+	return allErrs
+}
+
+func validateOperationMetadata(op *operations.Operation) field.ErrorList {
+	allErrs := field.ErrorList{}
 	if op.Name == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("metadata", "name"), "stable name is required"))
 	}
 	if op.GenerateName != "" {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "generateName"), "generateName is not supported"))
 	}
-	allErrs = append(allErrs, validateReference(op.Spec.TargetRef, field.NewPath("spec", "targetRef"))...)
+	return allErrs
+}
+
+func validateOperationSpec(op *operations.Operation) field.ErrorList {
+	allErrs := validateReference(op.Spec.TargetRef, field.NewPath("spec", "targetRef"))
 	if op.Spec.Action == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "action"), "action is required"))
 	}
@@ -76,61 +90,87 @@ func ValidateOperation(op *operations.Operation) field.ErrorList {
 	if len(op.Spec.Steps) > operations.MaxSteps {
 		allErrs = append(allErrs, field.TooMany(field.NewPath("spec", "steps"), len(op.Spec.Steps), operations.MaxSteps))
 	}
-	seenSteps := make(map[string]int, len(op.Spec.Steps))
-	for i := range op.Spec.Steps {
-		step := &op.Spec.Steps[i]
+	return allErrs
+}
+
+func validateOperationSteps(steps []operations.OperationStep) field.ErrorList {
+	allErrs := field.ErrorList{}
+	seenSteps := make(map[string]int, len(steps))
+	for i := range steps {
+		step := &steps[i]
 		path := field.NewPath("spec", "steps").Index(i)
-		if step.ID == "" {
-			allErrs = append(allErrs, field.Required(path.Child("id"), "step id is required"))
-		} else if previous, ok := seenSteps[step.ID]; ok {
-			allErrs = append(allErrs, field.Duplicate(path.Child("id"), fmt.Sprintf("also used at index %d", previous)))
-		} else {
-			seenSteps[step.ID] = i
+		allErrs = append(allErrs, validateStep(step, path, i, seenSteps)...)
+	}
+	return allErrs
+}
+
+func validateStep(step *operations.OperationStep, path *field.Path, index int, seenSteps map[string]int) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if step.ID == "" {
+		allErrs = append(allErrs, field.Required(path.Child("id"), "step id is required"))
+	} else if previous, ok := seenSteps[step.ID]; ok {
+		allErrs = append(allErrs, field.Duplicate(path.Child("id"), fmt.Sprintf("also used at index %d", previous)))
+	} else {
+		seenSteps[step.ID] = index
+	}
+	if step.Executor == "" {
+		allErrs = append(allErrs, field.Required(path.Child("executor"), "executor is required"))
+	}
+	if len(step.Payload.Raw) > operations.MaxStepPayloadSize {
+		allErrs = append(allErrs, field.TooLong(path.Child("payload"), len(step.Payload.Raw), operations.MaxStepPayloadSize))
+	}
+	if len(step.Targets) == 0 {
+		allErrs = append(allErrs, field.Required(path.Child("targets"), "at least one target is required"))
+	}
+	if len(step.Targets) > operations.MaxTargetsPerStep {
+		allErrs = append(allErrs, field.TooMany(path.Child("targets"), len(step.Targets), operations.MaxTargetsPerStep))
+	}
+	allErrs = append(allErrs, validateStepTargets(step.Targets, path.Child("targets"))...)
+	if step.RetryLimit < 0 || step.RetryLimit > operations.MaxRetryLimit {
+		allErrs = append(
+			allErrs,
+			field.Invalid(path.Child("retryLimit"), step.RetryLimit, fmt.Sprintf("must be between 0 and %d", operations.MaxRetryLimit)),
+		)
+	}
+	allErrs = append(allErrs, validateStepInputs(step.Inputs, path.Child("inputs"), index, seenSteps)...)
+	return allErrs
+}
+
+func validateStepInputs(
+	inputs []operations.StepInput,
+	path *field.Path,
+	stepIndex int,
+	seenSteps map[string]int,
+) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for index := range inputs {
+		input := inputs[index]
+		inputPath := path.Index(index)
+		if input.Field == "" || input.FromStepID == "" || input.FromNodeUID == "" || input.OutputKey == "" {
+			allErrs = append(allErrs, field.Required(inputPath, "field, fromStepID, fromNodeUID and outputKey are required"))
 		}
-		if step.Executor == "" {
-			allErrs = append(allErrs, field.Required(path.Child("executor"), "executor is required"))
-		}
-		if len(step.Payload.Raw) > operations.MaxStepPayloadSize {
-			allErrs = append(allErrs, field.TooLong(path.Child("payload"), len(step.Payload.Raw), operations.MaxStepPayloadSize))
-		}
-		if len(step.Targets) == 0 {
-			allErrs = append(allErrs, field.Required(path.Child("targets"), "at least one target is required"))
-		}
-		if len(step.Targets) > operations.MaxTargetsPerStep {
-			allErrs = append(allErrs, field.TooMany(path.Child("targets"), len(step.Targets), operations.MaxTargetsPerStep))
-		}
-		seenNodes := make(map[string]struct{}, len(step.Targets))
-		for j := range step.Targets {
-			targetPath := path.Child("targets").Index(j)
-			allErrs = append(allErrs, validateNodeReference(step.Targets[j], targetPath)...)
-			key := string(step.Targets[j].UID)
-			if key != "" {
-				if _, ok := seenNodes[key]; ok {
-					allErrs = append(allErrs, field.Duplicate(targetPath, "node UID is duplicated in this step"))
-				}
-				seenNodes[key] = struct{}{}
-			}
-		}
-		if step.RetryLimit < 0 || step.RetryLimit > operations.MaxRetryLimit {
-			allErrs = append(
-				allErrs,
-				field.Invalid(path.Child("retryLimit"), step.RetryLimit, fmt.Sprintf("must be between 0 and %d", operations.MaxRetryLimit)),
-			)
-		}
-		for j := range step.Inputs {
-			input := step.Inputs[j]
-			inputPath := path.Child("inputs").Index(j)
-			if input.Field == "" || input.FromStepID == "" || input.FromNodeUID == "" || input.OutputKey == "" {
-				allErrs = append(allErrs, field.Required(inputPath, "field, fromStepID, fromNodeUID and outputKey are required"))
-			}
-			fromIndex, ok := seenSteps[input.FromStepID]
-			if !ok || fromIndex >= i {
-				allErrs = append(allErrs, field.Invalid(inputPath.Child("fromStepID"), input.FromStepID, "must reference an earlier step"))
-			}
+		fromIndex, ok := seenSteps[input.FromStepID]
+		if !ok || fromIndex >= stepIndex {
+			allErrs = append(allErrs, field.Invalid(inputPath.Child("fromStepID"), input.FromStepID, "must reference an earlier step"))
 		}
 	}
-	if size, err := json.Marshal(op); err == nil && len(size) > operations.MaxOperationSize {
-		allErrs = append(allErrs, field.TooLong(field.NewPath("operation"), len(size), operations.MaxOperationSize))
+	return allErrs
+}
+
+func validateStepTargets(targets []operations.NodeReference, path *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	seenNodes := make(map[string]struct{}, len(targets))
+	for index := range targets {
+		targetPath := path.Index(index)
+		allErrs = append(allErrs, validateNodeReference(targets[index], targetPath)...)
+		key := string(targets[index].UID)
+		if key == "" {
+			continue
+		}
+		if _, ok := seenNodes[key]; ok {
+			allErrs = append(allErrs, field.Duplicate(targetPath, "node UID is duplicated in this step"))
+		}
+		seenNodes[key] = struct{}{}
 	}
 	return allErrs
 }

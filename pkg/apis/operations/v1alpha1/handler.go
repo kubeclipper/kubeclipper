@@ -19,6 +19,7 @@
 package v1alpha1
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -140,7 +141,7 @@ func (h *handler) listOperations(req *restful.Request, resp *restful.Response) {
 			writeError(resp, watchErr)
 			return
 		}
-		restplus.ServeWatch(watcher, operations.SchemeGroupVersion.WithKind(operations.KindOperation), req, resp, watchTimeout(options))
+		restplus.ServeWatch(watcher, operations.SchemeGroupVersion.WithKind(operations.KindOperation), req, resp, watchTimeout(&options))
 		return
 	}
 	list, err := h.store.ListOperationsWithOptions(req.Request.Context(), &options)
@@ -199,50 +200,9 @@ func (h *handler) retryOperation(req *restful.Request, resp *restful.Response) {
 	if !ok {
 		return
 	}
-	op, err := h.store.GetOperation(req.Request.Context(), req.PathParameter("name"), "")
+	op, err := h.loadRetryableOperation(req, preconditions)
 	if err != nil {
 		writeError(resp, err)
-		return
-	}
-	if op.UID != preconditions.UID {
-		writeError(resp, conflictOperation(op.Name, "operation UID does not match"))
-		return
-	}
-	if op.Status.Phase != operations.OperationFailed && op.Status.Phase != operations.OperationTimedOut &&
-		op.Status.Phase != operations.OperationCancelled {
-		writeError(resp, apierrors.NewBadRequest("only Failed, TimedOut or Canceled operations may be retried"))
-		return
-	}
-	tasks, err := h.store.ListTasksByOperationUID(req.Request.Context(), op.UID, "")
-	if err != nil {
-		writeError(resp, err)
-		return
-	}
-	for i := range tasks.Items {
-		if !tasks.Items[i].Status.Phase.IsTerminal() {
-			writeError(resp, conflictOperation(op.Name, "operation still has active tasks"))
-			return
-		}
-	}
-	operationsForTarget, err := h.store.ListOperations(req.Request.Context(), op.Spec.TargetRef.UID, "")
-	if err != nil {
-		writeError(resp, err)
-		return
-	}
-	sort.Slice(operationsForTarget.Items, func(i, j int) bool {
-		left, right := operationsForTarget.Items[i], operationsForTarget.Items[j]
-		if left.CreationTimestamp.Equal(&right.CreationTimestamp) {
-			leftRevision, leftErr := strconv.ParseUint(left.ResourceVersion, 10, 64)
-			rightRevision, rightErr := strconv.ParseUint(right.ResourceVersion, 10, 64)
-			if leftErr == nil && rightErr == nil && leftRevision != rightRevision {
-				return leftRevision < rightRevision
-			}
-			return string(left.UID) < string(right.UID)
-		}
-		return left.CreationTimestamp.Before(&right.CreationTimestamp)
-	})
-	if len(operationsForTarget.Items) == 0 || operationsForTarget.Items[len(operationsForTarget.Items)-1].UID != op.UID {
-		writeError(resp, conflictOperation(op.Name, "only the latest operation for a target may be retried"))
 		return
 	}
 	updated, err := h.store.UpdateOperationControl(
@@ -265,6 +225,70 @@ func (h *handler) retryOperation(req *restful.Request, resp *restful.Response) {
 	}
 }
 
+func (h *handler) loadRetryableOperation(
+	req *restful.Request,
+	preconditions operations.OperationControlRequest,
+) (*operations.Operation, error) {
+	op, err := h.store.GetOperation(req.Request.Context(), req.PathParameter("name"), "")
+	if err != nil {
+		return nil, err
+	}
+	if op.UID != preconditions.UID {
+		return nil, conflictOperation(op.Name, "operation UID does not match")
+	}
+	if !retryablePhase(op.Status.Phase) {
+		return nil, apierrors.NewBadRequest("only Failed, TimedOut or Canceled operations may be retried")
+	}
+	if err := h.ensureTasksTerminal(req.Request.Context(), op); err != nil {
+		return nil, err
+	}
+	if err := h.ensureLatestOperation(req.Request.Context(), op); err != nil {
+		return nil, err
+	}
+	return op, nil
+}
+
+func retryablePhase(phase operations.OperationPhase) bool {
+	return phase == operations.OperationFailed || phase == operations.OperationTimedOut || phase == operations.OperationCancelled
+}
+
+func (h *handler) ensureTasksTerminal(ctx context.Context, op *operations.Operation) error {
+	tasks, err := h.store.ListTasksByOperationUID(ctx, op.UID, "")
+	if err != nil {
+		return err
+	}
+	for i := range tasks.Items {
+		if !tasks.Items[i].Status.Phase.IsTerminal() {
+			return conflictOperation(op.Name, "operation still has active tasks")
+		}
+	}
+	return nil
+}
+
+func (h *handler) ensureLatestOperation(ctx context.Context, op *operations.Operation) error {
+	operationList, err := h.store.ListOperations(ctx, op.Spec.TargetRef.UID, "")
+	if err != nil {
+		return err
+	}
+	sort.Slice(operationList.Items, func(i, j int) bool { return operationLess(&operationList.Items[i], &operationList.Items[j]) })
+	if len(operationList.Items) == 0 || operationList.Items[len(operationList.Items)-1].UID != op.UID {
+		return conflictOperation(op.Name, "only the latest operation for a target may be retried")
+	}
+	return nil
+}
+
+func operationLess(left, right *operations.Operation) bool {
+	if !left.CreationTimestamp.Equal(&right.CreationTimestamp) {
+		return left.CreationTimestamp.Before(&right.CreationTimestamp)
+	}
+	leftRevision, leftErr := strconv.ParseUint(left.ResourceVersion, 10, 64)
+	rightRevision, rightErr := strconv.ParseUint(right.ResourceVersion, 10, 64)
+	if leftErr == nil && rightErr == nil && leftRevision != rightRevision {
+		return leftRevision < rightRevision
+	}
+	return string(left.UID) < string(right.UID)
+}
+
 func (h *handler) listTasks(req *restful.Request, resp *restful.Response) {
 	options, err := parseListOptions(req)
 	if err != nil {
@@ -278,7 +302,7 @@ func (h *handler) listTasks(req *restful.Request, resp *restful.Response) {
 			writeError(resp, watchErr)
 			return
 		}
-		restplus.ServeWatch(watcher, operations.SchemeGroupVersion.WithKind(operations.KindOperationTask), req, resp, watchTimeout(options))
+		restplus.ServeWatch(watcher, operations.SchemeGroupVersion.WithKind(operations.KindOperationTask), req, resp, watchTimeout(&options))
 		return
 	}
 	list, err := h.store.ListTasksWithOptions(req.Request.Context(), conditionalAgentID(agentID, isAgent), &options)
@@ -494,8 +518,8 @@ func parseListOptions(req *restful.Request) (metav1.ListOptions, error) {
 	return options, nil
 }
 
-func watchTimeout(options metav1.ListOptions) time.Duration {
-	if options.TimeoutSeconds != nil {
+func watchTimeout(options *metav1.ListOptions) time.Duration {
+	if options != nil && options.TimeoutSeconds != nil {
 		return time.Duration(*options.TimeoutSeconds) * time.Second
 	}
 	return defaultWatchTimeout

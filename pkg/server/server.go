@@ -294,10 +294,10 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	if err = operationsv1alpha1.AddToContainer(s.container, s.operationV2Store, clusterOperator,
+	if setupErr := operationsv1alpha1.AddToContainer(s.container, s.operationV2Store, clusterOperator,
 		s.Config.GenericServerRunOptions.CACertFile, s.Config.GenericServerRunOptions.TLSCertFile,
-		s.Config.GenericServerRunOptions.TLSPrivateKey); err != nil {
-		return err
+		s.Config.GenericServerRunOptions.TLSPrivateKey); setupErr != nil {
+		return setupErr
 	}
 
 	platformOperator := platform.NewPlatformOperator(s.storageFactory.PlatformSettings(), s.storageFactory.Events())
@@ -353,9 +353,9 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	s.Services = append(s.Services, ctrl)
 	s.controllerManager = ctrl
 
-	if err = corev1.AddToContainer(s.container, clusterOperator, s.operationV2Store, platformOperator,
-		leaseOperator, coreOperator, tokenOperator, s.Config.GenericServerRunOptions); err != nil {
-		return err
+	if setupErr := corev1.AddToContainer(s.container, clusterOperator, s.operationV2Store, platformOperator,
+		leaseOperator, coreOperator, tokenOperator, s.Config.GenericServerRunOptions); setupErr != nil {
+		return setupErr
 	}
 	if err = proxy.AddToContainer(s.container, clusterOperator); err != nil {
 		return err
@@ -483,15 +483,15 @@ func (s *APIServer) SetupController(
 	coreOperator := core.NewOperator(storageFactory.ConfigMaps())
 	iamOperator := iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(), storageFactory.GlobalRoleBindings(),
 		storageFactory.Tokens(), storageFactory.LoginRecords())
-	if err = (&operationv2controller.OperationReconciler{
+	if setupErr := (&operationv2controller.OperationReconciler{
 		Store: s.operationV2Store,
-	}).SetupWithManager(mgr, informerFactory); err != nil {
-		return err
+	}).SetupWithManager(mgr, informerFactory); setupErr != nil {
+		return setupErr
 	}
-	if err = (&operationv2controller.BusinessReconciler{
+	if setupErr := (&operationv2controller.BusinessReconciler{
 		Operations: informerFactory.Operations().V1alpha1().Operations().Lister(), Clusters: clusterOperator,
-	}).SetupWithManager(mgr, informerFactory); err != nil {
-		return err
+	}).SetupWithManager(mgr, informerFactory); setupErr != nil {
+		return setupErr
 	}
 	if err = (&regioncontroller.RegionReconciler{
 		NodeLister:   informerFactory.Core().V1().Nodes().Lister(),
@@ -522,12 +522,12 @@ func (s *APIServer) SetupController(
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
-	if err = (&nodecontroller.NodeReconciler{
+	if setupErr := (&nodecontroller.NodeReconciler{
 		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
 		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
 		NodeWriter:    clusterOperator,
-	}).SetupWithManager(mgr, informerFactory); err != nil {
-		return err
+	}).SetupWithManager(mgr, informerFactory); setupErr != nil {
+		return setupErr
 	}
 	if err = (&cronbackupcontroller.CronBackupReconciler{
 		ClusterLister:     informerFactory.Core().V1().Clusters().Lister(),

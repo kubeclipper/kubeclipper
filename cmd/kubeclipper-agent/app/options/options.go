@@ -50,7 +50,12 @@ func (s *AgentOptions) Validate() []error {
 	if s.APIServer == nil || s.APIServer.Endpoint == "" {
 		errors = append(errors, fmt.Errorf("apiServer.endpoint is required"))
 	} else {
-		for name, path := range map[string]string{"apiServer.caFile": s.APIServer.CAFile, "apiServer.certFile": s.APIServer.CertFile, "apiServer.keyFile": s.APIServer.KeyFile} {
+		certificateFiles := map[string]string{
+			"apiServer.caFile":   s.APIServer.CAFile,
+			"apiServer.certFile": s.APIServer.CertFile,
+			"apiServer.keyFile":  s.APIServer.KeyFile,
+		}
+		for name, path := range certificateFiles {
 			if path == "" {
 				errors = append(errors, fmt.Errorf("%s is required", name))
 			} else if _, err := os.Stat(path); err != nil {

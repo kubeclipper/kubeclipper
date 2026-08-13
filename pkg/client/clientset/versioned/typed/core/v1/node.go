@@ -39,29 +39,35 @@ type NodesGetter interface {
 }
 
 type NodesInterface interface {
-	Create(ctx context.Context, node *corev1.Node, opts v1.CreateOptions) (*corev1.Node, error)
-	UpdateStatus(ctx context.Context, node *corev1.Node, opts v1.UpdateOptions) (*corev1.Node, error)
+	Create(ctx context.Context, node *corev1.Node, opts *v1.CreateOptions) (*corev1.Node, error)
+	UpdateStatus(ctx context.Context, node *corev1.Node, opts *v1.UpdateOptions) (*corev1.Node, error)
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*corev1.Node, error)
 	List(ctx context.Context, opts v1.ListOptions) (*corev1.NodeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 }
 
-func (c *nodes) UpdateStatus(ctx context.Context, node *corev1.Node, opts v1.UpdateOptions) (result *corev1.Node, err error) {
+func (c *nodes) UpdateStatus(ctx context.Context, node *corev1.Node, opts *v1.UpdateOptions) (result *corev1.Node, err error) {
+	if opts == nil {
+		opts = &v1.UpdateOptions{}
+	}
 	result = &corev1.Node{}
 	err = c.client.Put().
 		Resource("nodes").
 		Name(node.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(opts, scheme.ParameterCodec).
 		Body(node).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-func (c *nodes) Create(ctx context.Context, node *corev1.Node, opts v1.CreateOptions) (result *corev1.Node, err error) {
+func (c *nodes) Create(ctx context.Context, node *corev1.Node, opts *v1.CreateOptions) (result *corev1.Node, err error) {
+	if opts == nil {
+		opts = &v1.CreateOptions{}
+	}
 	result = &corev1.Node{}
-	err = c.client.Post().Resource("nodes").VersionedParams(&opts, scheme.ParameterCodec).Body(node).Do(ctx).Into(result)
+	err = c.client.Post().Resource("nodes").VersionedParams(opts, scheme.ParameterCodec).Body(node).Do(ctx).Into(result)
 	return
 }
 

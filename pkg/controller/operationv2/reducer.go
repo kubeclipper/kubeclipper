@@ -41,46 +41,74 @@ func validateAndCurrentStep(op *operations.Operation, tasks []operations.Operati
 	if op == nil {
 		return nil, false, fmt.Errorf("operation is nil")
 	}
-	steps := make(map[string]int, len(op.Spec.Steps))
-	targets := make(map[string]map[types.UID]operations.NodeReference, len(op.Spec.Steps))
+	steps, targets, err := indexOperationPlan(op)
+	if err != nil {
+		return nil, false, err
+	}
+	byStep, err := indexAndValidateTasks(op, tasks, steps, targets)
+	if err != nil {
+		return nil, false, err
+	}
+	return currentStepFacts(op, byStep)
+}
+
+func indexOperationPlan(
+	op *operations.Operation,
+) (steps map[string]int, targets map[string]map[types.UID]operations.NodeReference, err error) {
+	steps = make(map[string]int, len(op.Spec.Steps))
+	targets = make(map[string]map[types.UID]operations.NodeReference, len(op.Spec.Steps))
 	for index := range op.Spec.Steps {
 		step := &op.Spec.Steps[index]
 		if _, exists := steps[step.ID]; exists {
-			return nil, false, fmt.Errorf("duplicate step %q", step.ID)
+			return nil, nil, fmt.Errorf("duplicate step %q", step.ID)
 		}
 		steps[step.ID] = index
 		targets[step.ID] = make(map[types.UID]operations.NodeReference, len(step.Targets))
 		for _, target := range step.Targets {
 			if _, exists := targets[step.ID][target.UID]; exists {
-				return nil, false, fmt.Errorf("duplicate node UID %q in step %q", target.UID, step.ID)
+				return nil, nil, fmt.Errorf("duplicate node UID %q in step %q", target.UID, step.ID)
 			}
 			targets[step.ID][target.UID] = target
 		}
 	}
+	return steps, targets, nil
+}
 
+func indexAndValidateTasks(
+	op *operations.Operation,
+	tasks []operations.OperationTask,
+	steps map[string]int,
+	targets map[string]map[types.UID]operations.NodeReference,
+) (map[string][]*operations.OperationTask, error) {
 	byStep := make(map[string][]*operations.OperationTask, len(op.Spec.Steps))
 	for index := range tasks {
 		task := &tasks[index]
 		if task.Spec.OperationRef.Name != op.Name || task.Spec.OperationRef.UID != op.UID {
-			return nil, false, fmt.Errorf("task %q refers to another operation", task.Name)
+			return nil, fmt.Errorf("task %q refers to another operation", task.Name)
 		}
 		stepIndex, exists := steps[task.Spec.StepID]
 		if !exists {
-			return nil, false, fmt.Errorf("task %q refers to unknown step %q", task.Name, task.Spec.StepID)
+			return nil, fmt.Errorf("task %q refers to unknown step %q", task.Name, task.Spec.StepID)
 		}
 		target, exists := targets[task.Spec.StepID][task.Spec.NodeRef.UID]
 		if !exists || target.Name != task.Spec.NodeRef.Name {
-			return nil, false, fmt.Errorf("task %q refers to an unknown node in step %q", task.Name, task.Spec.StepID)
+			return nil, fmt.Errorf("task %q refers to an unknown node in step %q", task.Name, task.Spec.StepID)
 		}
 		if task.Spec.RetryGeneration > op.Spec.RetryGeneration {
-			return nil, false, fmt.Errorf("task %q has future retry generation %d", task.Name, task.Spec.RetryGeneration)
+			return nil, fmt.Errorf("task %q has future retry generation %d", task.Name, task.Spec.RetryGeneration)
 		}
 		if task.Spec.Executor != op.Spec.Steps[stepIndex].Executor {
-			return nil, false, fmt.Errorf("task %q executor differs from its immutable plan", task.Name)
+			return nil, fmt.Errorf("task %q executor differs from its immutable plan", task.Name)
 		}
 		byStep[task.Spec.StepID] = append(byStep[task.Spec.StepID], task)
 	}
+	return byStep, nil
+}
 
+func currentStepFacts(
+	op *operations.Operation,
+	byStep map[string][]*operations.OperationTask,
+) (*stepFacts, bool, error) {
 	for stepIndex := range op.Spec.Steps {
 		step := &op.Spec.Steps[stepIndex]
 		facts := &stepFacts{
@@ -106,15 +134,26 @@ func validateAndCurrentStep(op *operations.Operation, tasks []operations.Operati
 			}
 		}
 		if len(facts.Incomplete) != 0 {
-			for later := stepIndex + 1; later < len(op.Spec.Steps); later++ {
-				if len(byStep[op.Spec.Steps[later].ID]) != 0 {
-					return nil, false, fmt.Errorf("tasks for step %q exist before step %q completed", op.Spec.Steps[later].ID, step.ID)
-				}
+			if err := validateLaterStepsEmpty(op, byStep, stepIndex); err != nil {
+				return nil, false, err
 			}
 			return facts, false, nil
 		}
 	}
 	return nil, true, nil
+}
+
+func validateLaterStepsEmpty(op *operations.Operation, byStep map[string][]*operations.OperationTask, current int) error {
+	for later := current + 1; later < len(op.Spec.Steps); later++ {
+		if len(byStep[op.Spec.Steps[later].ID]) != 0 {
+			return fmt.Errorf(
+				"tasks for step %q exist before step %q completed",
+				op.Spec.Steps[later].ID,
+				op.Spec.Steps[current].ID,
+			)
+		}
+	}
+	return nil
 }
 
 func nodeSucceeded(tasks []*operations.OperationTask) bool {

@@ -101,9 +101,11 @@ func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informer
 		handler.EnqueueRequestsFromMapFunc(r.findRegistryCluster)); err != nil {
 		return err
 	}
-	if err = c.Watch(source.NewKindWithCache(&operationsv1alpha1.Operation{}, cache),
-		handler.EnqueueRequestsFromMapFunc(findOperationCluster)); err != nil {
-		return err
+	if watchErr := c.Watch(
+		source.NewKindWithCache(&operationsv1alpha1.Operation{}, cache),
+		handler.EnqueueRequestsFromMapFunc(findOperationCluster),
+	); watchErr != nil {
+		return watchErr
 	}
 
 	r.mgr = mgr

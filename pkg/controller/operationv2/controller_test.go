@@ -525,11 +525,11 @@ func (f *fakeStore) AcquireLock(_ context.Context, lock *operations.ExecutionLoc
 	if existing, exists := f.locks[lock.Name]; exists {
 		return existing.DeepCopy(), false, nil
 	}
-	copy := lock.DeepCopy()
-	copy.UID = types.UID(copy.Name + "-uid")
-	copy.ResourceVersion = f.rv()
-	f.locks[copy.Name] = copy
-	return copy.DeepCopy(), true, nil
+	lockCopy := lock.DeepCopy()
+	lockCopy.UID = types.UID(lockCopy.Name + "-uid")
+	lockCopy.ResourceVersion = f.rv()
+	f.locks[lockCopy.Name] = lockCopy
+	return lockCopy.DeepCopy(), true, nil
 }
 
 func (f *fakeStore) GetLock(_ context.Context, name, _ string) (*operations.ExecutionLock, error) {

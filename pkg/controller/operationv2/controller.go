@@ -65,28 +65,40 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 	if r.Store == nil {
 		return reconcile.Result{}, fmt.Errorf("operation v2 store is required")
 	}
-	now := time.Now
-	if r.Now != nil {
-		now = r.Now
-	}
-
-	op, err := r.Store.GetOperation(ctx, req.Name, "")
+	op, tasks, err := r.loadOperation(ctx, req.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
 	}
+	return r.reconcileOperation(ctx, op, tasks)
+}
+
+func (r *OperationReconciler) loadOperation(
+	ctx context.Context,
+	name string,
+) (*operations.Operation, []operations.OperationTask, error) {
+	op, err := r.Store.GetOperation(ctx, name, "")
+	if err != nil {
+		return nil, nil, err
+	}
 	taskList, err := r.Store.ListTasksByOperationUID(ctx, op.UID, "")
 	if err != nil {
-		return reconcile.Result{}, err
+		return nil, nil, err
 	}
+	return op, taskList.Items, nil
+}
 
+func (r *OperationReconciler) reconcileOperation(
+	ctx context.Context,
+	op *operations.Operation,
+	tasks []operations.OperationTask,
+) (reconcile.Result, error) {
 	retryRequested := op.Spec.RetryGeneration > op.Status.ObservedRetryGeneration
 	if op.Status.Phase.IsTerminal() && !retryRequested {
-		return r.releaseTerminalLock(ctx, op, taskList.Items)
+		return r.releaseTerminalLock(ctx, op, tasks)
 	}
-
 	targetOperations, err := r.Store.ListOperations(ctx, op.Spec.TargetRef.UID, "")
 	if err != nil {
 		return reconcile.Result{}, err
@@ -98,11 +110,7 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 		return reconcile.Result{RequeueAfter: defaultWaitRequeue}, nil
 	}
 
-	// A never-started canceled operation has no side effects and does not need
-	// to acquire the target lock merely to record cancellation.
-	if op.Status.Phase == operations.OperationPending &&
-		op.Spec.DesiredState == operations.OperationDesiredStateCancelled &&
-		len(taskList.Items) == 0 {
+	if operationCanceledBeforeStart(op, tasks) {
 		return r.finish(
 			ctx,
 			op,
@@ -121,21 +129,47 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 		return reconcile.Result{RequeueAfter: defaultWaitRequeue}, nil
 	}
 	if retryRequested {
-		// The latest-operation check and lock Create affect different etcd
-		// keys. Recheck after acquiring the lock so a concurrently persisted
-		// newer Operation cannot be missed by a stale first list.
-		latest, listErr := r.Store.ListOperations(ctx, op.Spec.TargetRef.UID, "")
-		if listErr != nil {
-			return reconcile.Result{}, listErr
+		latest, latestErr := r.retryStillLatest(ctx, op, lock)
+		if latestErr != nil {
+			return reconcile.Result{}, latestErr
 		}
-		if !isLatestOperation(op, latest.Items) {
-			if releaseErr := r.Store.ReleaseLock(ctx, lock.Name, lock.UID, op.UID); releaseErr != nil {
-				return reconcile.Result{}, releaseErr
-			}
+		if !latest {
 			return r.skipRetry(ctx, op)
 		}
 	}
+	return r.reconcileLockedOperation(ctx, op, lock, tasks, retryRequested)
+}
 
+func operationCanceledBeforeStart(op *operations.Operation, tasks []operations.OperationTask) bool {
+	return op.Status.Phase == operations.OperationPending &&
+		op.Spec.DesiredState == operations.OperationDesiredStateCancelled && len(tasks) == 0
+}
+
+func (r *OperationReconciler) retryStillLatest(
+	ctx context.Context,
+	op *operations.Operation,
+	lock *operations.ExecutionLock,
+) (bool, error) {
+	latest, err := r.Store.ListOperations(ctx, op.Spec.TargetRef.UID, "")
+	if err != nil {
+		return false, err
+	}
+	if isLatestOperation(op, latest.Items) {
+		return true, nil
+	}
+	if err := r.Store.ReleaseLock(ctx, lock.Name, lock.UID, op.UID); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (r *OperationReconciler) reconcileLockedOperation(
+	ctx context.Context,
+	op *operations.Operation,
+	lock *operations.ExecutionLock,
+	tasks []operations.OperationTask,
+	retryRequested bool,
+) (reconcile.Result, error) {
 	if retryRequested {
 		// A retry opens a new execution generation without rewriting any old
 		// Task. Persist Pending first; the next reconcile acquires/adopts the
@@ -145,41 +179,48 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 			Phase:                   operations.OperationPending,
 			ObservedRetryGeneration: op.Spec.RetryGeneration,
 		}
-		_, err = r.Store.UpdateOperationStatus(ctx, op.Name, op.UID, op.ResourceVersion, &status)
+		_, err := r.Store.UpdateOperationStatus(ctx, op.Name, op.UID, op.ResourceVersion, &status)
 		return resultForConflict(err)
 	}
 	if op.Status.Phase == operations.OperationPending {
-		startedAt := now()
+		startedAt := r.now()
 		status := operations.OperationStatus{
 			Phase:                   operations.OperationRunning,
 			ObservedRetryGeneration: op.Spec.RetryGeneration,
 			StartedAt:               timePointer(startedAt),
 			Deadline:                timePointer(startedAt.Add(op.Spec.Timeout.Duration)),
 		}
-		_, err = r.Store.UpdateOperationStatus(ctx, op.Name, op.UID, op.ResourceVersion, &status)
+		_, err := r.Store.UpdateOperationStatus(ctx, op.Name, op.UID, op.ResourceVersion, &status)
 		return resultForConflict(err)
 	}
 	if op.Status.Phase != operations.OperationRunning {
 		return reconcile.Result{}, fmt.Errorf("operation %q has non-runnable phase %q", op.Name, op.Status.Phase)
 	}
 	if op.Status.Deadline == nil {
-		return r.failInvalidFacts(ctx, op, lock, taskList.Items, fmt.Errorf("running operation has no deadline"))
+		return r.failInvalidFacts(ctx, op, lock, tasks, fmt.Errorf("running operation has no deadline"))
 	}
-
-	if deadlineExpired(op, now()) {
-		return r.reconcileDeadline(ctx, op, lock, taskList.Items, now())
+	if deadlineExpired(op, r.now()) {
+		return r.reconcileDeadline(ctx, op, lock, tasks, r.now())
 	}
+	return r.reconcileRunningOperation(ctx, op, lock, tasks)
+}
 
-	facts, complete, factsErr := validateAndCurrentStep(op, taskList.Items)
+func (r *OperationReconciler) reconcileRunningOperation(
+	ctx context.Context,
+	op *operations.Operation,
+	lock *operations.ExecutionLock,
+	tasks []operations.OperationTask,
+) (reconcile.Result, error) {
+	facts, complete, factsErr := validateAndCurrentStep(op, tasks)
 	if factsErr != nil {
-		return r.failInvalidFacts(ctx, op, lock, taskList.Items, factsErr)
+		return r.failInvalidFacts(ctx, op, lock, tasks, factsErr)
 	}
 	if complete {
 		return r.finish(ctx, op, lock, operations.OperationSucceeded, "", "")
 	}
 
 	if op.Spec.DesiredState == operations.OperationDesiredStateCancelled {
-		return r.reconcileCancellation(ctx, op, lock, taskList.Items)
+		return r.reconcileCancellation(ctx, op, lock, tasks)
 	}
 
 	if latestFailure(facts) {
@@ -194,14 +235,13 @@ func (r *OperationReconciler) Reconcile(ctx context.Context, req reconcile.Reque
 
 	pending, running := activeTaskPointers(facts.Tasks)
 	if len(pending)+len(running) != 0 {
-		return reconcile.Result{RequeueAfter: untilDeadline(op, now())}, nil
+		return reconcile.Result{RequeueAfter: untilDeadline(op, r.now())}, nil
 	}
-
-	created, eligible, err := r.createAttempts(ctx, op, facts, taskList.Items)
+	created, eligible, err := r.createAttempts(ctx, op, facts, tasks)
 	if err != nil {
 		var invalidFacts *invalidExecutionFactsError
 		if errors.As(err, &invalidFacts) {
-			return r.failInvalidFacts(ctx, op, lock, taskList.Items, invalidFacts)
+			return r.failInvalidFacts(ctx, op, lock, tasks, invalidFacts)
 		}
 		return reconcile.Result{}, err
 	}

@@ -162,7 +162,7 @@ func (s *store) ListOperationsWithOptions(ctx context.Context, options *metav1.L
 	if options == nil {
 		options = &metav1.ListOptions{}
 	}
-	internal, err := internalListOptions(*options)
+	internal, err := internalListOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (s *store) WatchOperationsWithOptions(ctx context.Context, options *metav1.
 	if options == nil {
 		options = &metav1.ListOptions{}
 	}
-	internal, err := internalListOptions(*options)
+	internal, err := internalListOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (s *store) ListTasksWithOptions(
 	if options == nil {
 		options = &metav1.ListOptions{}
 	}
-	internal, err := internalListOptions(*options)
+	internal, err := internalListOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,7 @@ func (s *store) WatchTasksWithOptions(ctx context.Context, nodeName string, opti
 	if options == nil {
 		options = &metav1.ListOptions{}
 	}
-	internal, err := internalListOptions(*options)
+	internal, err := internalListOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +629,10 @@ func validateStatusMessage(message string) error {
 	return nil
 }
 
-func internalListOptions(options metav1.ListOptions) (*metainternalversion.ListOptions, error) {
+func internalListOptions(options *metav1.ListOptions) (*metainternalversion.ListOptions, error) {
+	if options == nil {
+		options = &metav1.ListOptions{}
+	}
 	labelSelector, err := labels.Parse(options.LabelSelector)
 	if err != nil {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid labelSelector: %v", err))

@@ -85,8 +85,11 @@ func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, cache informers
 	if err = c.Watch(source.NewKindWithCache(&v1.Backup{}, cache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
-	if err = c.Watch(source.NewKindWithCache(&operations.Operation{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsForOperation)); err != nil {
-		return err
+	if watchErr := c.Watch(
+		source.NewKindWithCache(&operations.Operation{}, cache),
+		handler.EnqueueRequestsFromMapFunc(r.findObjectsForOperation),
+	); watchErr != nil {
+		return watchErr
 	}
 	mgr.AddRunnable(c)
 	return nil

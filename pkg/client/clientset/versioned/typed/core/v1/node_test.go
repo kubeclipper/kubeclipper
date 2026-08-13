@@ -75,11 +75,11 @@ func TestNodeCreateAndUpdateStatus(t *testing.T) {
 		TypeMeta:   metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "Node"},
 		ObjectMeta: metav1.ObjectMeta{Name: "agent-a"},
 	}
-	created, err := client.Nodes().Create(context.Background(), node, metav1.CreateOptions{})
+	created, err := client.Nodes().Create(context.Background(), node, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if _, err := client.Nodes().UpdateStatus(context.Background(), created, metav1.UpdateOptions{}); err != nil {
+	if _, err := client.Nodes().UpdateStatus(context.Background(), created, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("UpdateStatus() error = %v", err)
 	}
 	if requests != 2 {

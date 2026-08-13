@@ -99,7 +99,7 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	s.client = client
 	node, err := client.CoreV1().Nodes().Get(context.Background(), s.Config.AgentID, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) && s.Config.RegisterNode {
-		node, err = client.CoreV1().Nodes().Create(context.Background(), s.initialNode(), metav1.CreateOptions{})
+		node, err = client.CoreV1().Nodes().Create(context.Background(), s.initialNode(), &metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			node, err = client.CoreV1().Nodes().Get(context.Background(), s.Config.AgentID, metav1.GetOptions{})
 		}
@@ -224,6 +224,6 @@ func (s *Server) updateNodeStatus() error {
 		LastHeartbeatTime: now, LastTransitionTime: transition, Reason: "AgentReady",
 	}}
 	node.Status = observed
-	_, err = s.client.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+	_, err = s.client.CoreV1().Nodes().UpdateStatus(ctx, node, &metav1.UpdateOptions{})
 	return err
 }

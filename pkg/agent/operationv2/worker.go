@@ -182,6 +182,25 @@ func (w *Worker) processNext(stopCh <-chan struct{}) bool {
 }
 
 func (w *Worker) sync(ctx context.Context) error {
+	selected, err := selectTask(w.eligibleTasks())
+	if err != nil || selected == nil {
+		return err
+	}
+	live, err := w.getLiveTask(ctx, selected)
+	if err != nil || live == nil {
+		return err
+	}
+	live, err = w.startPendingTask(ctx, live)
+	if err != nil {
+		return err
+	}
+	if live.Status.Phase != operations.TaskRunning {
+		return fmt.Errorf("task %q has unsupported active phase %q", live.Name, live.Status.Phase)
+	}
+	return w.execute(ctx, live)
+}
+
+func (w *Worker) eligibleTasks() []*operations.OperationTask {
 	objects := w.informer.GetStore().List()
 	tasks := make([]*operations.OperationTask, 0, len(objects))
 	for _, object := range objects {
@@ -191,37 +210,34 @@ func (w *Worker) sync(ctx context.Context) error {
 		}
 		tasks = append(tasks, task)
 	}
-	selected, err := selectTask(tasks)
-	if err != nil || selected == nil {
-		return err
-	}
+	return tasks
+}
 
+func (w *Worker) getLiveTask(ctx context.Context, selected *operations.OperationTask) (*operations.OperationTask, error) {
 	live, err := w.client.Get(ctx, selected.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil
+			return nil, nil
 		}
-		return err
+		return nil, err
 	}
 	if live.UID != selected.UID || live.Spec.NodeRef.Name != w.agentID || live.Spec.NodeRef.UID != w.nodeUID {
-		return fmt.Errorf("task %q identity changed during dispatch", selected.Name)
+		return nil, fmt.Errorf("task %q identity changed during dispatch", selected.Name)
 	}
 	if live.Status.Phase.IsTerminal() {
 		w.queue.Add(syncKey)
-		return nil
+		return nil, nil
 	}
+	return live, nil
+}
+
+func (w *Worker) startPendingTask(ctx context.Context, live *operations.OperationTask) (*operations.OperationTask, error) {
 	if live.Status.Phase == operations.TaskPending {
 		runningTask := live.DeepCopy()
 		runningTask.Status = operations.OperationTaskStatus{Phase: operations.TaskRunning}
-		live, err = w.client.UpdateStatus(ctx, runningTask)
-		if err != nil {
-			return err
-		}
+		return w.client.UpdateStatus(ctx, runningTask)
 	}
-	if live.Status.Phase != operations.TaskRunning {
-		return fmt.Errorf("task %q has unsupported active phase %q", live.Name, live.Status.Phase)
-	}
-	return w.execute(ctx, live)
+	return live, nil
 }
 
 func selectTask(tasks []*operations.OperationTask) (*operations.OperationTask, error) {

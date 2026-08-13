@@ -738,7 +738,8 @@ func (d *DeployOptions) generateAndSendCerts() error {
 	if err := d.sendCertAndKey(etcdCert, options.DefaultEtcdPKIPath); err != nil {
 		return err
 	}
-	for agentIP, cert := range agentCerts {
+	for agentIP := range agentCerts {
+		cert := agentCerts[agentIP]
 		if err := d.sendAgentIdentity(agentIP, &cert, &cas[0]); err != nil {
 			return err
 		}
@@ -978,7 +979,12 @@ func (d *DeployOptions) deployKcAgent() {
 
 func (d *DeployOptions) sendAgentIdentity(agentIP string, cert, ca *certutils.Config) error {
 	destination := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath)
-	for _, source := range []string{path.Join(cert.Path, cert.BaseName+".crt"), path.Join(cert.Path, cert.BaseName+".key"), path.Join(ca.Path, ca.BaseName+".crt")} {
+	sources := []string{
+		path.Join(cert.Path, cert.BaseName+".crt"),
+		path.Join(cert.Path, cert.BaseName+".key"),
+		path.Join(ca.Path, ca.BaseName+".crt"),
+	}
+	for _, source := range sources {
 		if err := utils.SendPackageV2(d.deployConfig.SSHConfig, source, []string{agentIP}, destination, nil, nil); err != nil {
 			return err
 		}
