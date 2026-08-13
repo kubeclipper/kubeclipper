@@ -19,12 +19,28 @@
 package deploy
 
 import (
+	"crypto/x509"
 	"testing"
 
 	"github.com/google/uuid"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 )
+
+func TestKcServerCertificateUsesAuthenticatedServerIdentity(t *testing.T) {
+	certs := kcServerCertList([]string{options.KCServerAltName}, map[string][]x509.ExtKeyUsage{
+		options.KCServer: {x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+	})
+	if len(certs) != 1 {
+		t.Fatalf("expected one kc-server certificate, got %d", len(certs))
+	}
+	if certs[0].BaseName != options.KCServer {
+		t.Fatalf("certificate file basename = %q, want %q", certs[0].BaseName, options.KCServer)
+	}
+	if certs[0].CommonName != kcServerClientIdentity {
+		t.Fatalf("certificate common name = %q, want %q", certs[0].CommonName, kcServerClientIdentity)
+	}
+}
 
 func TestDeployOptions_getEtcdTemplateContent(t *testing.T) {
 	d := NewDeployOptions(options.IOStreams{})

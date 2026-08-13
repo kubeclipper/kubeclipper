@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +30,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
+	operationslister "github.com/kubeclipper/kubeclipper/pkg/client/lister/operations/v1alpha1"
 	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/controller"
@@ -40,15 +40,18 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/source"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
+	operationv2store "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 type BackupReconciler struct {
 	ClusterLister   listerv1.ClusterLister
 	BackupLister    listerv1.BackupLister
-	OperationLister listerv1.OperationLister
+	OperationLister operationslister.OperationLister
+	OperationStore  operationv2store.Store
 	BackupWriter    cluster.BackupWriter
 }
 
@@ -82,7 +85,7 @@ func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, cache informers
 	if err = c.Watch(source.NewKindWithCache(&v1.Backup{}, cache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
-	if err = c.Watch(source.NewKindWithCache(&v1.Operation{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsForOperation)); err != nil {
+	if err = c.Watch(source.NewKindWithCache(&operations.Operation{}, cache), handler.EnqueueRequestsFromMapFunc(r.findObjectsForOperation)); err != nil {
 		return err
 	}
 	mgr.AddRunnable(c)
@@ -122,20 +125,8 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 		return nil
 	}
 
-	// when the action of creating backup is timed out, set the cluster status to running, and the backup status to error
-	if b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
-		timeout := checkBackupTimeout(log, b)
-		if timeout {
-			b.Status.ClusterBackupStatus = v1.ClusterBackupError
-			_, err := r.BackupWriter.UpdateBackup(context.TODO(), b)
-			if err != nil {
-				log.Warnf("backup(%s) sync status failed: %s", b.Name, err.Error())
-			}
-		}
-	}
-
 	// when the operation status is running and the action is backup cluster, set the backup status to creating
-	if o != nil && o.Status.Status == v1.OperationStatusRunning && o.Labels[common.LabelOperationAction] == v1.OperationBackupCluster {
+	if o != nil && o.Status.Phase == operations.OperationRunning && o.Spec.Action == v1.OperationBackupCluster {
 		b.Status.ClusterBackupStatus = v1.ClusterBackupCreating
 		_, err := r.BackupWriter.UpdateBackup(context.TODO(), b)
 		if err != nil {
@@ -144,7 +135,7 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 	}
 
 	// when the operation status is running and the action is recovery cluster, set the backup status to restoring
-	if o != nil && o.Status.Status == v1.OperationStatusRunning && o.Labels[common.LabelOperationAction] == v1.OperationRecoverCluster {
+	if o != nil && o.Status.Phase == operations.OperationRunning && o.Spec.Action == v1.OperationRecoverCluster {
 		b.Status.ClusterBackupStatus = v1.ClusterBackupRestoring
 		_, err := r.BackupWriter.UpdateBackup(context.TODO(), b)
 		if err != nil {
@@ -153,14 +144,19 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 	}
 
 	// when the backup is creating and operation is successful, set the backup status to available
-	if b.Status.ClusterBackupStatus == v1.ClusterBackupCreating && o != nil && o.Status.Status == v1.OperationStatusSuccessful && o.Labels[common.LabelOperationAction] == v1.OperationBackupCluster {
+	if b.Status.ClusterBackupStatus == v1.ClusterBackupCreating && o != nil && o.Status.Phase == operations.OperationSucceeded && o.Spec.Action == v1.OperationBackupCluster {
 		checkFile := k8s.CheckFile{}
-		if o.Status.Conditions != nil {
-			if o.Status.Conditions[0].Status != nil {
-				err := json.Unmarshal(o.Status.Conditions[0].Status[0].Response, &checkFile)
-				if err != nil {
-					log.Errorf("get backup file size and md5 value failed: %s", err.Error())
-				}
+		tasks, err := r.OperationStore.ListTasksByOperationUID(ctx, o.UID, "")
+		if err != nil {
+			return err
+		}
+		for i := range tasks.Items {
+			if tasks.Items[i].Status.Result == nil {
+				continue
+			}
+			response := tasks.Items[i].Status.Result.Outputs["response"]
+			if response != "" && json.Unmarshal([]byte(response), &checkFile) == nil && checkFile.BackupFileMD5 != "" {
+				break
 			}
 		}
 		if checkFile.BackupFileSize != int64(0) && checkFile.BackupFileMD5 != "" {
@@ -171,14 +167,14 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 			return fmt.Errorf("backup file size is %d, and backup md5 is %s", checkFile.BackupFileSize, checkFile.BackupFileMD5)
 		}
 		b.Status.ClusterBackupStatus = v1.ClusterBackupAvailable
-		_, err := r.BackupWriter.UpdateBackup(context.TODO(), b)
+		_, err = r.BackupWriter.UpdateBackup(context.TODO(), b)
 		if err != nil {
 			log.Warnf("backup(%s) sync status failed: %s", b.Name, err.Error())
 		}
 	}
 
 	// when the backup is restoring and operation is successful, set the backup status to available
-	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring && o != nil && o.Status.Status == v1.OperationStatusSuccessful && o.Labels[common.LabelOperationAction] == v1.OperationRecoverCluster {
+	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring && o != nil && o.Status.Phase == operations.OperationSucceeded && o.Spec.Action == v1.OperationRecoverCluster {
 		b.Status.ClusterBackupStatus = v1.ClusterBackupAvailable
 		_, err := r.BackupWriter.UpdateBackup(context.TODO(), b)
 		if err != nil {
@@ -187,7 +183,7 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 	}
 
 	// when the operation status is failed, set the backup status to error
-	if o != nil && o.Status.Status == v1.OperationStatusFailed {
+	if o != nil && o.Status.Phase.IsTerminal() && o.Status.Phase != operations.OperationSucceeded {
 		if c.Status.Phase == v1.ClusterRestoreFailed {
 			b.Status.ClusterBackupStatus = v1.ClusterBackupAvailable
 		} else {
@@ -219,20 +215,4 @@ func (r *BackupReconciler) findObjectsForOperation(clu client.Object) []reconcil
 		}
 	}
 	return requests
-}
-
-func checkBackupTimeout(log logger.Logging, b *v1.Backup) bool {
-	if b.Labels[common.LabelTimeoutSeconds] == "" {
-		log.Warn("unexpected error, backup should always has a timeout label. will be considered as timeout")
-		return true
-	}
-
-	createTime := b.CreationTimestamp
-	nowTime := time.Now()
-	subTime := nowTime.Sub(createTime.Time)
-
-	log.Debugf("timeout value: %s, create time: %s, current time: %s, sub time is %s",
-		b.Labels[common.LabelTimeoutSeconds], createTime.String(), nowTime.String(), subTime.String())
-
-	return subTime.Seconds() > float64(v1.DefaultBackupTimeoutSec)
 }

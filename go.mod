@@ -14,7 +14,6 @@ require (
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/emicklei/go-restful v2.9.6+incompatible
 	github.com/emicklei/go-restful-openapi v0.0.0-00010101000000-000000000000
-	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/fatih/color v1.7.0
 	github.com/go-logr/zapr v1.2.3
 	github.com/go-openapi/loads v0.19.5
@@ -30,8 +29,6 @@ require (
 	github.com/minio/minio-go/v7 v7.0.94
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/moby/ipvs v1.1.0
-	github.com/nats-io/nats-server/v2 v2.4.0
-	github.com/nats-io/nats.go v1.12.0
 	github.com/nicksnyder/go-i18n/v2 v2.6.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/ginkgo v1.16.5
@@ -68,7 +65,6 @@ require (
 	k8s.io/client-go v0.26.4
 	k8s.io/component-base v0.26.4
 	k8s.io/klog/v2 v2.100.1
-	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -115,6 +111,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -164,7 +161,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/crc64nvme v1.0.1 // indirect
-	github.com/minio/highwayhash v1.0.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -180,9 +176,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/nats-io/jwt/v2 v2.0.3 // indirect
-	github.com/nats-io/nkeys v0.3.0 // indirect
-	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onsi/ginkgo/v2 v2.6.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -245,6 +238,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/kms v0.26.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
+	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.36 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
@@ -274,8 +268,6 @@ replace (
 	github.com/golang/mock => github.com/golang/mock v1.5.0
 	github.com/google/uuid => github.com/google/uuid v1.1.2
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.1.12
-	github.com/nats-io/nats-server/v2 => github.com/nats-io/nats-server/v2 v2.4.0
-	github.com/nats-io/nats.go => github.com/nats-io/nats.go v1.12.0
 	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.5
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1

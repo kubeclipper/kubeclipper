@@ -1,0 +1,495 @@
+/*
+ *
+ *  * Copyright 2026 KubeClipper Authors.
+ *  *
+ *  * Licensed under the Apache License, Version 2.0 (the "License");
+ *  * you may not use this file except in compliance with the License.
+ *  * You may obtain a copy of the License at
+ *  *
+ *  *     http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
+ *
+ */
+
+// Package operationv2 is the only persistence boundary used by the v2
+// controller and its API subresources.  Keeping CAS and transition checks in
+// one place prevents an HTTP handler and a reconcile loop from implementing
+// subtly different state machines.
+package operationv2
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
+
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
+	validation "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/validation"
+)
+
+type Store interface {
+	GetOperation(ctx context.Context, name, resourceVersion string) (*operations.Operation, error)
+	CreateOperation(ctx context.Context, op *operations.Operation) (*operations.Operation, error)
+	ListOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (*operations.OperationList, error)
+	WatchOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (watch.Interface, error)
+	ListOperations(ctx context.Context, targetUID types.UID, resourceVersion string) (*operations.OperationList, error)
+	WatchOperations(ctx context.Context, resourceVersion string) (watch.Interface, error)
+	UpdateOperationStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationStatus) (*operations.Operation, error)
+	UpdateOperationControl(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.OperationSpec) error) (*operations.Operation, error)
+
+	GetTask(ctx context.Context, name, resourceVersion string) (*operations.OperationTask, error)
+	CreateTask(ctx context.Context, task *operations.OperationTask) (*operations.OperationTask, error)
+	ListTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (*operations.OperationTaskList, error)
+	WatchTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (watch.Interface, error)
+	ListTasksByOperationUID(ctx context.Context, operationUID types.UID, resourceVersion string) (*operations.OperationTaskList, error)
+	ListTasksByNode(ctx context.Context, nodeName, resourceVersion string) (*operations.OperationTaskList, error)
+	WatchTasks(ctx context.Context, nodeName, resourceVersion string) (watch.Interface, error)
+	UpdateTaskStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationTaskStatus) (*operations.OperationTask, error)
+	CancelPendingTask(ctx context.Context, name string, uid types.UID, resourceVersion string, reason operations.TaskResultReason) (*operations.OperationTask, error)
+	TimeoutRunningTask(ctx context.Context, name string, uid types.UID, resourceVersion string) (*operations.OperationTask, error)
+
+	AcquireLock(ctx context.Context, lock *operations.ExecutionLock) (*operations.ExecutionLock, bool, error)
+	GetLock(ctx context.Context, name, resourceVersion string) (*operations.ExecutionLock, error)
+	ReleaseLock(ctx context.Context, name string, lockUID, holderUID types.UID) error
+}
+
+type StoreOptions struct {
+	Operations rest.StandardStorage
+	Tasks      rest.StandardStorage
+	Locks      rest.StandardStorage
+	Now        func() time.Time
+}
+
+type store struct {
+	operations rest.StandardStorage
+	tasks      rest.StandardStorage
+	locks      rest.StandardStorage
+	now        func() time.Time
+}
+
+var _ Store = (*store)(nil)
+
+func NewStore(opts StoreOptions) (Store, error) {
+	if opts.Operations == nil || opts.Tasks == nil || opts.Locks == nil {
+		return nil, fmt.Errorf("all Operation v2 storages are required")
+	}
+	if opts.Now == nil {
+		opts.Now = time.Now
+	}
+	return &store{operations: opts.Operations, tasks: opts.Tasks, locks: opts.Locks, now: opts.Now}, nil
+}
+
+func withNamespace(ctx context.Context) context.Context {
+	return genericapirequest.WithNamespace(ctx, metav1.NamespaceNone)
+}
+
+func (s *store) GetOperation(ctx context.Context, name, resourceVersion string) (*operations.Operation, error) {
+	obj, err := s.operations.Get(withNamespace(ctx), name, &metav1.GetOptions{ResourceVersion: resourceVersion})
+	if err != nil {
+		return nil, err
+	}
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", obj)
+	}
+	return op, nil
+}
+
+func (s *store) CreateOperation(ctx context.Context, op *operations.Operation) (*operations.Operation, error) {
+	if op == nil {
+		return nil, fmt.Errorf("operation is nil")
+	}
+	obj, err := s.operations.Create(withNamespace(ctx), op, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	result, ok := obj.(*operations.Operation)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", obj)
+	}
+	return result, nil
+}
+
+func (s *store) ListOperations(ctx context.Context, targetUID types.UID, resourceVersion string) (*operations.OperationList, error) {
+	options := metav1.ListOptions{ResourceVersion: resourceVersion}
+	if targetUID != "" {
+		options.FieldSelector = fields.OneTermEqualSelector("spec.targetRef.uid", string(targetUID)).String()
+	}
+	return s.ListOperationsWithOptions(ctx, options)
+}
+
+func (s *store) ListOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (*operations.OperationList, error) {
+	internal, err := internalListOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := s.operations.List(withNamespace(ctx), internal)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := obj.(*operations.OperationList)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", obj)
+	}
+	return list, nil
+}
+
+func (s *store) WatchOperations(ctx context.Context, resourceVersion string) (watch.Interface, error) {
+	return s.WatchOperationsWithOptions(ctx, metav1.ListOptions{ResourceVersion: resourceVersion})
+}
+
+func (s *store) WatchOperationsWithOptions(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+	internal, err := internalListOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	return s.operations.Watch(withNamespace(ctx), internal)
+}
+
+func (s *store) UpdateOperationStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationStatus) (*operations.Operation, error) {
+	if err := validateStatusMessage(status.Message); err != nil {
+		return nil, err
+	}
+	return s.updateOperation(ctx, name, uid, resourceVersion, func(op *operations.Operation) error {
+		if err := validation.ValidateOperationPhaseTransition(op.Status.Phase, status.Phase); err != nil {
+			isRetryReopen := op.Status.Phase != operations.OperationSucceeded && op.Status.Phase.IsTerminal() &&
+				status.Phase == operations.OperationPending &&
+				op.Spec.DesiredState == operations.OperationDesiredStateActive &&
+				op.Spec.RetryGeneration > op.Status.ObservedRetryGeneration &&
+				status.ObservedRetryGeneration == op.Spec.RetryGeneration
+			if !isRetryReopen {
+				return err
+			}
+		}
+		op.Status = *status.DeepCopy()
+		now := metav1.NewTime(s.now())
+		if op.Status.Phase == operations.OperationRunning && op.Status.StartedAt == nil {
+			op.Status.StartedAt = &now
+		}
+		if op.Status.Phase.IsTerminal() && op.Status.FinishedAt == nil {
+			op.Status.FinishedAt = &now
+		}
+		return nil
+	})
+}
+
+func (s *store) UpdateOperationControl(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.OperationSpec) error) (*operations.Operation, error) {
+	return s.updateOperation(ctx, name, uid, resourceVersion, func(op *operations.Operation) error {
+		if mutate == nil {
+			return fmt.Errorf("control mutator is required")
+		}
+		return mutate(&op.Spec)
+	})
+}
+
+func (s *store) updateOperation(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.Operation) error) (*operations.Operation, error) {
+	obj, err := s.operations.Get(withNamespace(ctx), name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", obj)
+	}
+	if uid != "" && op.UID != uid {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceOperations), name, fmt.Errorf("operation UID does not match"))
+	}
+	if resourceVersion != "" && op.ResourceVersion != resourceVersion {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceOperations), name, fmt.Errorf("resourceVersion does not match"))
+	}
+	copy := op.DeepCopy()
+	if err := mutate(copy); err != nil {
+		return nil, apierrors.NewBadRequest(err.Error())
+	}
+	copy.ResourceVersion = op.ResourceVersion
+	updated, _, err := s.operations.Update(withNamespace(ctx), name, rest.DefaultUpdatedObjectInfo(copy), nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	result, ok := updated.(*operations.Operation)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", updated)
+	}
+	return result, nil
+}
+
+func (s *store) GetTask(ctx context.Context, name, resourceVersion string) (*operations.OperationTask, error) {
+	obj, err := s.tasks.Get(withNamespace(ctx), name, &metav1.GetOptions{ResourceVersion: resourceVersion})
+	if err != nil {
+		return nil, err
+	}
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	return task, nil
+}
+
+func (s *store) CreateTask(ctx context.Context, task *operations.OperationTask) (*operations.OperationTask, error) {
+	obj, err := s.tasks.Create(withNamespace(ctx), task, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	result, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	return result, nil
+}
+
+func (s *store) ListTasksByOperationUID(ctx context.Context, operationUID types.UID, resourceVersion string) (*operations.OperationTaskList, error) {
+	return s.ListTasksWithOptions(ctx, "", metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.operationRef.uid", string(operationUID)).String(), ResourceVersion: resourceVersion})
+}
+
+func (s *store) ListTasksByNode(ctx context.Context, nodeName, resourceVersion string) (*operations.OperationTaskList, error) {
+	return s.ListTasksWithOptions(ctx, nodeName, metav1.ListOptions{ResourceVersion: resourceVersion})
+}
+
+func (s *store) ListTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (*operations.OperationTaskList, error) {
+	internal, err := internalListOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	if nodeName != "" {
+		internal.FieldSelector = fields.OneTermEqualSelector("spec.nodeRef.name", nodeName)
+	}
+	obj, err := s.tasks.List(withNamespace(ctx), internal)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := obj.(*operations.OperationTaskList)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	return list, nil
+}
+
+func (s *store) WatchTasks(ctx context.Context, nodeName, resourceVersion string) (watch.Interface, error) {
+	return s.WatchTasksWithOptions(ctx, nodeName, metav1.ListOptions{ResourceVersion: resourceVersion})
+}
+
+func (s *store) WatchTasksWithOptions(ctx context.Context, nodeName string, options metav1.ListOptions) (watch.Interface, error) {
+	internal, err := internalListOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	if nodeName != "" {
+		internal.FieldSelector = fields.OneTermEqualSelector("spec.nodeRef.name", nodeName)
+	}
+	return s.tasks.Watch(withNamespace(ctx), internal)
+}
+
+func (s *store) UpdateTaskStatus(ctx context.Context, name string, uid types.UID, resourceVersion string, status operations.OperationTaskStatus) (*operations.OperationTask, error) {
+	if err := validation.ValidateTaskResult(status.Result); err != nil {
+		return nil, err
+	}
+	obj, err := s.tasks.Get(withNamespace(ctx), name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	if uid != "" && task.UID != uid {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("task UID does not match"))
+	}
+	if resourceVersion != "" && task.ResourceVersion != resourceVersion {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("resourceVersion does not match"))
+	}
+	if err := validation.ValidateTaskPhaseTransition(task.Status.Phase, status.Phase); err != nil {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, err)
+	}
+	if status.Phase == operations.TaskCancelled || (task.Status.Phase == operations.TaskPending && status.Phase != operations.TaskPending && status.Phase != operations.TaskRunning) {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("agent cannot transition %s task to %s", task.Status.Phase, status.Phase))
+	}
+	if status.Phase == operations.TaskSucceeded && status.Result != nil && status.Result.Reason != "" {
+		return nil, apierrors.NewBadRequest("Succeeded task must not have a result reason")
+	}
+	if status.Phase != operations.TaskSucceeded && status.Result != nil && len(status.Result.Outputs) > 0 {
+		return nil, apierrors.NewBadRequest("outputs are only allowed on Succeeded tasks")
+	}
+	copy := task.DeepCopy()
+	copy.Status = *status.DeepCopy()
+	now := metav1.NewTime(s.now())
+	if copy.Status.Phase == operations.TaskRunning && copy.Status.StartedAt == nil {
+		copy.Status.StartedAt = &now
+	}
+	if copy.Status.Phase.IsTerminal() && copy.Status.FinishedAt == nil {
+		copy.Status.FinishedAt = &now
+	}
+	copy.ResourceVersion = task.ResourceVersion
+	updated, _, err := s.tasks.Update(withNamespace(ctx), name, rest.DefaultUpdatedObjectInfo(copy), nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	result, ok := updated.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", updated)
+	}
+	return result, nil
+}
+
+func (s *store) CancelPendingTask(ctx context.Context, name string, uid types.UID, resourceVersion string, reason operations.TaskResultReason) (*operations.OperationTask, error) {
+	return s.updateTaskTerminal(ctx, name, uid, resourceVersion, operations.TaskPending, operations.TaskCancelled, reason)
+}
+
+func (s *store) TimeoutRunningTask(ctx context.Context, name string, uid types.UID, resourceVersion string) (*operations.OperationTask, error) {
+	return s.updateTaskTerminal(ctx, name, uid, resourceVersion, operations.TaskRunning, operations.TaskTimedOut, operations.TaskReasonDeadlineExceeded)
+}
+
+func (s *store) updateTaskTerminal(ctx context.Context, name string, uid types.UID, resourceVersion string, expected, phase operations.TaskPhase, reason operations.TaskResultReason) (*operations.OperationTask, error) {
+	return s.updateTask(ctx, name, uid, resourceVersion, func(task *operations.OperationTask) error {
+		if task.Status.Phase != expected {
+			return apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("task is %s, expected %s", task.Status.Phase, expected))
+		}
+		task.Status.Phase = phase
+		task.Status.Result = &operations.TaskResult{Reason: reason}
+		return nil
+	})
+}
+
+func (s *store) updateTask(ctx context.Context, name string, uid types.UID, resourceVersion string, mutate func(*operations.OperationTask) error) (*operations.OperationTask, error) {
+	obj, err := s.tasks.Get(withNamespace(ctx), name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	if uid != "" && task.UID != uid {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("task UID does not match"))
+	}
+	if resourceVersion != "" && task.ResourceVersion != resourceVersion {
+		return nil, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), name, fmt.Errorf("resourceVersion does not match"))
+	}
+	copy := task.DeepCopy()
+	if err := mutate(copy); err != nil {
+		return nil, err
+	}
+	if copy.Status.Phase.IsTerminal() && copy.Status.FinishedAt == nil {
+		now := metav1.NewTime(s.now())
+		copy.Status.FinishedAt = &now
+	}
+	copy.ResourceVersion = task.ResourceVersion
+	updated, _, err := s.tasks.Update(withNamespace(ctx), name, rest.DefaultUpdatedObjectInfo(copy), nil, nil, false, &metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	result, ok := updated.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", updated)
+	}
+	return result, nil
+}
+
+func (s *store) AcquireLock(ctx context.Context, lock *operations.ExecutionLock) (*operations.ExecutionLock, bool, error) {
+	obj, err := s.locks.Create(withNamespace(ctx), lock, nil, &metav1.CreateOptions{})
+	if err == nil {
+		result, ok := obj.(*operations.ExecutionLock)
+		if !ok {
+			return nil, false, fmt.Errorf("lock storage returned %T", obj)
+		}
+		return result, true, nil
+	}
+	if !apierrors.IsAlreadyExists(err) {
+		return nil, false, err
+	}
+	// Create is the atomic ownership decision. The follow-up read must be
+	// consistent: RV=0 may return a deleted predecessor from the watch cache
+	// and make a former holder look current after the lock was recreated.
+	existing, getErr := s.GetLock(ctx, lock.Name, "")
+	if getErr != nil {
+		// A predecessor may release the lock between Create's AlreadyExists
+		// result and this read. Treat that narrow race as contention; the
+		// controller will retry acquisition from durable state.
+		if apierrors.IsNotFound(getErr) {
+			return nil, false, nil
+		}
+		return nil, false, getErr
+	}
+	return existing, false, nil
+}
+
+func (s *store) GetLock(ctx context.Context, name, resourceVersion string) (*operations.ExecutionLock, error) {
+	obj, err := s.locks.Get(withNamespace(ctx), name, &metav1.GetOptions{ResourceVersion: resourceVersion})
+	if err != nil {
+		return nil, err
+	}
+	lock, ok := obj.(*operations.ExecutionLock)
+	if !ok {
+		return nil, fmt.Errorf("lock storage returned %T", obj)
+	}
+	return lock, nil
+}
+
+func (s *store) ReleaseLock(ctx context.Context, name string, lockUID, holderUID types.UID) error {
+	lock, err := s.GetLock(ctx, name, "")
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if lock.UID != lockUID || lock.Spec.HolderRef.UID != holderUID {
+		return apierrors.NewConflict(operations.Resource(operations.ResourceLocks), name, fmt.Errorf("lock holder or UID changed"))
+	}
+	uid := lock.UID
+	_, _, err = s.locks.Delete(withNamespace(ctx), name, func(_ context.Context, _ runtime.Object) error {
+		return nil
+	}, &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+func validateStatusMessage(message string) error {
+	if len(message) > operations.MaxMessageSize {
+		return fmt.Errorf("status message exceeds %d bytes", operations.MaxMessageSize)
+	}
+	return nil
+}
+
+func internalListOptions(options metav1.ListOptions) (*metainternalversion.ListOptions, error) {
+	labelSelector, err := labels.Parse(options.LabelSelector)
+	if err != nil {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid labelSelector: %v", err))
+	}
+	fieldSelector, err := fields.ParseSelector(options.FieldSelector)
+	if err != nil {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid fieldSelector: %v", err))
+	}
+	internal := &metainternalversion.ListOptions{
+		LabelSelector:        labelSelector,
+		FieldSelector:        fieldSelector,
+		Watch:                options.Watch,
+		AllowWatchBookmarks:  options.AllowWatchBookmarks,
+		ResourceVersion:      options.ResourceVersion,
+		ResourceVersionMatch: options.ResourceVersionMatch,
+		TimeoutSeconds:       options.TimeoutSeconds,
+		Limit:                options.Limit,
+		Continue:             options.Continue,
+	}
+	if errs := metainternalvalidation.ValidateListOptions(internal); len(errs) != 0 {
+		return nil, apierrors.NewBadRequest(errs.ToAggregate().Error())
+	}
+	return internal, nil
+}

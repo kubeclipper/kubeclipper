@@ -74,7 +74,7 @@ func (r *ClusterReconciler) convertNodes(ctx context.Context, nodes v1.WorkerNod
 			IPv4:     n.Status.Ipv4DefaultIP,
 			NodeIPv4: n.Status.NodeIpv4DefaultIP,
 			Region:   n.Labels[common.LabelTopologyRegion],
-			Hostname: n.Labels[common.LabelHostname],
+			Hostname: n.Status.NodeInfo.Hostname,
 			Role:     n.Labels[common.LabelNodeRole],
 		}
 		_, item.Disable = n.Labels[common.LabelNodeDisable]

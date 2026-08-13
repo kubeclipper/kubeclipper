@@ -78,8 +78,9 @@ import (
 )
 
 const (
-	deployExamplePkg = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
-	longDescription  = `
+	deployExamplePkg       = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
+	kcServerClientIdentity = "system:kc-server"
+	longDescription        = `
   Deploy Kubeclipper Platform from deploy-config.yaml or cmd flags.
 
   Kubeclipper Platform must have one kc-server node at lease, kc-server use etcd as db backend.
@@ -253,15 +254,6 @@ func (d *DeployOptions) Complete() error {
 		Insert(d.deployConfig.Agents.ListIP()...).
 		List()
 
-	if !d.deployConfig.MQ.External {
-		d.deployConfig.MQ.IPs = d.deployConfig.ServerIPs // internal mq use server ips as mq ips
-		if d.deployConfig.MQ.TLS {                       // fill default tls file path
-			d.deployConfig.MQ.CA = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultCaPath, fmt.Sprintf("%s.crt", options.Ca))
-			d.deployConfig.MQ.ClientCert = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultNatsPKIPath, fmt.Sprintf("%s.crt", options.NatsIOClient))
-			d.deployConfig.MQ.ClientKey = filepath.Join(options.DefaultKcServerConfigPath, options.DefaultNatsPKIPath, fmt.Sprintf("%s.key", options.NatsIOClient))
-		}
-	}
-
 	if d.deployConfig.NodeIPDetect == "" {
 		logger.Infof("node-ip-detect inherits from ip-detect: %s", d.deployConfig.IPDetect)
 		d.deployConfig.NodeIPDetect = d.deployConfig.IPDetect
@@ -275,6 +267,9 @@ func (d *DeployOptions) Complete() error {
 }
 
 func (d *DeployOptions) ValidateArgs() error {
+	if !d.deployConfig.TLS {
+		return fmt.Errorf("Operation v2 requires TLS because kc-agent communicates with kc-server over mTLS")
+	}
 	if errs := d.deployConfig.AuditOpts.Validate(); len(errs) != 0 {
 		return fmt.Errorf("%d errors in audit occured: %v", len(errs), errs)
 	}
@@ -303,26 +298,16 @@ func (d *DeployOptions) ValidateArgs() error {
 	if len(d.deployConfig.ServerIPs)%2 == 0 {
 		return fmt.Errorf("the number of servers must be odd")
 	}
-	if d.deployConfig.MQ.External {
-		if len(d.deployConfig.MQ.IPs) == 0 {
-			return fmt.Errorf("the ips of the external mq cannot be empty")
-		}
-		if d.deployConfig.MQ.Port == 0 {
-			return fmt.Errorf("the port of the external mq cannot be empty")
-		}
-		if d.deployConfig.MQ.TLS {
-			if d.deployConfig.MQ.CA == "" || d.deployConfig.MQ.ClientCert == "" || d.deployConfig.MQ.ClientKey == "" {
-				return fmt.Errorf("mq tls: the mq-external-ca/mq-external-cert/mq-external-key of the external mq cannot be empty")
-			}
-			if !(filepath.IsAbs(d.deployConfig.MQ.CA) || filepath.IsAbs(d.deployConfig.MQ.ClientCert) || filepath.IsAbs(d.deployConfig.MQ.ClientKey)) {
-				return fmt.Errorf("mq tls: ca/cert/key file must be an absolute path")
-			}
-		}
-	}
 	return nil
 }
 
 func (d *DeployOptions) preRun() {
+	for agent, metadata := range d.deployConfig.Agents {
+		if metadata.AgentID == "" {
+			metadata.AgentID = uuid.New().String()
+			d.deployConfig.Agents[agent] = metadata
+		}
+	}
 	for _, sip := range d.deployConfig.ServerIPs {
 		hostname, err := sshutils.GetRemoteHostName(d.deployConfig.SSHConfig, sip)
 		if err != nil {
@@ -332,10 +317,6 @@ func (d *DeployOptions) preRun() {
 	}
 	res, _ := password.Generate(24, 5, 0, false, true)
 	d.deployConfig.JWTSecret = res
-	if !d.deployConfig.MQ.External {
-		res, _ = password.Generate(24, 0, 0, false, true)
-		d.deployConfig.MQ.Secret = res
-	}
 	d.dumpConfig()
 }
 
@@ -557,19 +538,6 @@ func (d *DeployOptions) precheckPorts() bool {
 		{d.deployConfig.StaticServerPort, "kc-server-static"},
 		{d.deployConfig.ConsolePort, "kc-console"},
 	}
-	if !d.deployConfig.MQ.External {
-		serverPorts = append(serverPorts,
-			struct {
-				port int
-				name string
-			}{d.deployConfig.MQ.Port, "kc-mq"},
-			struct {
-				port int
-				name string
-			}{d.deployConfig.MQ.ClusterPort, "kc-mq-cluster"},
-		)
-	}
-
 	for _, p := range serverPorts {
 		if !d.precheckService(
 			fmt.Sprintf("PORT-%d(%s)", p.port, p.name),
@@ -667,11 +635,26 @@ func (d *DeployOptions) generateAndSendCerts() error {
 	}
 	cas := caList()
 	certs := make([]certutils.Config, 0)
+	agentCerts := make(map[string]certutils.Config, len(d.deployConfig.Agents))
 
 	kcctlCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
 	kcctlCommonNameUsages[options.AdminKcctlCert] = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
 	kcctlCert := clientCertList(options.DefaultKcctlPKIPath, options.Ca, append(altNames, d.deployConfig.Agents.ListIP()...), []string{user.KCCTL}, kcctlCommonNameUsages)
 	certs = append(certs, kcctlCert...)
+	for agentIP, metadata := range d.deployConfig.Agents {
+		altNames := certutils.AltNames{DNSNames: map[string]string{metadata.AgentID: metadata.AgentID}, IPs: map[string]net.IP{}}
+		if ip := net.ParseIP(agentIP); ip != nil {
+			altNames.IPs[ip.String()] = ip
+		}
+		cert := certutils.Config{
+			Path: filepath.Join(options.HomeDIR, options.DefaultPath, "pki", "agents", metadata.AgentID), BaseName: "agent",
+			CAName: options.Ca, CommonName: "system:kc-agent:" + metadata.AgentID,
+			Organization: []string{"system:kc-agents"}, Year: 100, AltNames: altNames,
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		}
+		agentCerts[agentIP] = cert
+		certs = append(certs, cert)
+	}
 
 	etcdCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
 	etcdCommonNameUsages[options.EtcdServer] = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
@@ -682,22 +665,14 @@ func (d *DeployOptions) generateAndSendCerts() error {
 	etcdCert := certList(options.DefaultEtcdPKIPath, options.Ca, append(altNames, d.deployConfig.ServerIPs...), etcdCommonNameUsages)
 	certs = append(certs, etcdCert...)
 
-	var natsCert []certutils.Config
-	if !d.deployConfig.MQ.External && d.deployConfig.MQ.TLS {
-		natsCommonNameUsages := make(map[string][]x509.ExtKeyUsage)
-		natsCommonNameUsages[options.NatsIOClient] = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
-		natsCommonNameUsages[options.NatsIOServer] = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
-		natsCert = certList(options.DefaultNatsPKIPath, options.Ca, append(altNames, d.deployConfig.ServerIPs...), natsCommonNameUsages)
-		certs = append(certs, natsCert...)
-	}
 	var kcCerts []certutils.Config
 	if d.deployConfig.TLS {
 		nameUsages := map[string][]x509.ExtKeyUsage{
-			options.KCServer: {x509.ExtKeyUsageServerAuth},
+			options.KCServer: {x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		}
 		names := append(altNames, d.deployConfig.ServerIPs...)
 		names = append(names, options.KCServerAltName)
-		kcCerts = certList(options.DefaultKCPKIPath, options.Ca, names, nameUsages)
+		kcCerts = kcServerCertList(names, nameUsages)
 		certs = append(certs, kcCerts...)
 	}
 
@@ -751,47 +726,12 @@ func (d *DeployOptions) generateAndSendCerts() error {
 	if err := d.sendCertAndKey(etcdCert, options.DefaultEtcdPKIPath); err != nil {
 		return err
 	}
-
-	if d.deployConfig.MQ.TLS {
-		if !d.deployConfig.MQ.External {
-			err := d.sendCertAndKey(natsCert, options.DefaultNatsPKIPath)
-			if err != nil {
-				return err
-			}
-			if err := d.sendAgentCertAndKey(cas, options.DefaultCaPath); err != nil {
-				return err
-			}
-			err = d.sendAgentCertAndKey(natsCert, options.DefaultNatsPKIPath)
-			if err != nil {
-				return err
-			}
-		} else {
-			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.CA,
-				d.deployConfig.ServerIPs, filepath.Dir(d.deployConfig.MQ.CA), nil, nil); err != nil {
-				return err
-			}
-			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.ClientCert,
-				d.deployConfig.ServerIPs, filepath.Dir(d.deployConfig.MQ.ClientCert), nil, nil); err != nil {
-				return err
-			}
-			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.ClientKey,
-				d.deployConfig.ServerIPs, filepath.Dir(d.deployConfig.MQ.ClientKey), nil, nil); err != nil {
-				return err
-			}
-			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.CA,
-				d.deployConfig.Agents.ListIP(), filepath.Dir(d.deployConfig.MQ.CA), nil, nil); err != nil {
-				return err
-			}
-			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.ClientCert,
-				d.deployConfig.Agents.ListIP(), filepath.Dir(d.deployConfig.MQ.ClientCert), nil, nil); err != nil {
-				return err
-			}
-			if err := utils.SendPackageV2(d.deployConfig.SSHConfig, d.deployConfig.MQ.ClientKey,
-				d.deployConfig.Agents.ListIP(), filepath.Dir(d.deployConfig.MQ.ClientKey), nil, nil); err != nil {
-				return err
-			}
+	for agentIP, cert := range agentCerts {
+		if err := d.sendAgentIdentity(agentIP, cert, cas[0]); err != nil {
+			return err
 		}
 	}
+
 	if d.deployConfig.TLS {
 		err := d.sendConsoleCert(cas, options.DefaultCaPath)
 		if err != nil {
@@ -986,8 +926,6 @@ func (d *DeployOptions) deployKcConsole() {
 func (d *DeployOptions) deployKcAgent() {
 	for agent := range d.deployConfig.Agents {
 		metadata := d.deployConfig.Agents[agent]
-		metadata.AgentID = uuid.New().String()
-		d.deployConfig.Agents[agent] = metadata
 		agentConfig, err := d.deployConfig.GetKcAgentConfigTemplateContent(metadata)
 		if err != nil {
 			logger.Fatal(err)
@@ -1008,6 +946,16 @@ func (d *DeployOptions) deployKcAgent() {
 			}
 		}
 	}
+}
+
+func (d *DeployOptions) sendAgentIdentity(agentIP string, cert, ca certutils.Config) error {
+	destination := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath)
+	for _, source := range []string{path.Join(cert.Path, cert.BaseName+".crt"), path.Join(cert.Path, cert.BaseName+".key"), path.Join(ca.Path, ca.BaseName+".crt")} {
+		if err := utils.SendPackageV2(d.deployConfig.SSHConfig, source, []string{agentIP}, destination, nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *DeployOptions) removeTempFile() {
@@ -1248,39 +1196,6 @@ func uploadCerts(client *kc.Client) {
 	}
 	createOrUpdateConfigMap(client, etcdcm)
 
-	natsPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultNatsPKIPath)
-	natsservercert, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.crt", natsPath))
-	if err != nil {
-		logger.Fatal(err)
-	}
-	natsserverkey, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-server.key", natsPath))
-	if err != nil {
-		logger.Fatal(err)
-	}
-	natsclientcert, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.crt", natsPath))
-	if err != nil {
-		logger.Fatal(err)
-	}
-	natsclientkey, err := os.ReadFile(fmt.Sprintf("%s/kc-server-nats-client.key", natsPath))
-	if err != nil {
-		logger.Fatal(err)
-	}
-	natscm := &v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       v1.KindConfigMap,
-			APIVersion: v1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: constatns.KcNatsCertsConfigMapName,
-		},
-		Data: map[string]string{
-			"kc-server-nats-server.crt": base64.StdEncoding.EncodeToString(natsservercert),
-			"kc-server-nats-server.key": base64.StdEncoding.EncodeToString(natsserverkey),
-			"kc-server-nats-client.crt": base64.StdEncoding.EncodeToString(natsclientcert),
-			"kc-server-nats-client.key": base64.StdEncoding.EncodeToString(natsclientkey),
-		},
-	}
-	createOrUpdateConfigMap(client, natscm)
 }
 
 func caList() []certutils.Config {
@@ -1332,6 +1247,16 @@ func certList(pki, caName string, altNames []string, commonNameUsage map[string]
 		certConfig = append(certConfig, conf)
 	}
 	return certConfig
+}
+
+func kcServerCertList(altNames []string, commonNameUsage map[string][]x509.ExtKeyUsage) []certutils.Config {
+	certs := certList(options.DefaultKCPKIPath, options.Ca, altNames, commonNameUsage)
+	for i := range certs {
+		if certs[i].BaseName == options.KCServer {
+			certs[i].CommonName = kcServerClientIdentity
+		}
+	}
+	return certs
 }
 
 func clientCertList(pki, caName string, altNames, organization []string, commonNameUsage map[string][]x509.ExtKeyUsage) []certutils.Config {

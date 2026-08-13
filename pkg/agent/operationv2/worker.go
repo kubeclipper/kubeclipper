@@ -1,0 +1,319 @@
+/*
+ * Copyright 2026 KubeClipper Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package operationv2
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"sort"
+	"sync"
+	"time"
+
+	"golang.org/x/sys/unix"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
+
+	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
+)
+
+const syncKey = "tasks"
+
+type TaskClient interface {
+	Get(context.Context, string, metav1.GetOptions) (*operations.OperationTask, error)
+	List(context.Context, metav1.ListOptions) (*operations.OperationTaskList, error)
+	Watch(context.Context, metav1.ListOptions) (watch.Interface, error)
+	UpdateStatus(context.Context, *operations.OperationTask, metav1.UpdateOptions) (*operations.OperationTask, error)
+}
+
+type TaskLog interface {
+	CreateOperationDir(string) error
+	CreateStepLogFile(string, string) (*os.File, error)
+}
+
+type WorkerOptions struct {
+	AgentID  string
+	NodeUID  types.UID
+	Client   TaskClient
+	Registry *Registry
+	OpLog    TaskLog
+	LockFile string
+}
+
+type Worker struct {
+	agentID  string
+	nodeUID  types.UID
+	client   TaskClient
+	registry *Registry
+	oplog    TaskLog
+	lockPath string
+
+	informer cache.SharedIndexInformer
+	queue    workqueue.RateLimitingInterface
+	lockFile *os.File
+	close    sync.Once
+}
+
+func NewWorker(opts WorkerOptions) (*Worker, error) {
+	if opts.AgentID == "" || opts.NodeUID == "" {
+		return nil, fmt.Errorf("agent ID and Node UID are required")
+	}
+	if opts.Client == nil || opts.Registry == nil || opts.OpLog == nil {
+		return nil, fmt.Errorf("task client, executor registry, and operation log are required")
+	}
+	if opts.LockFile == "" {
+		opts.LockFile = "/run/kubeclipper-agent-operation-v2.lock"
+	}
+	w := &Worker{
+		agentID:  opts.AgentID,
+		nodeUID:  opts.NodeUID,
+		client:   opts.Client,
+		registry: opts.Registry,
+		oplog:    opts.OpLog,
+		lockPath: opts.LockFile,
+		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "operation-v2-agent"),
+	}
+	selector := fields.OneTermEqualSelector("spec.nodeRef.name", opts.AgentID).String()
+	w.informer = cache.NewSharedIndexInformer(&cache.ListWatch{
+		ListFunc: func(listOptions metav1.ListOptions) (runtime.Object, error) {
+			listOptions.FieldSelector = selector
+			return w.client.List(context.Background(), listOptions)
+		},
+		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
+			listOptions.FieldSelector = selector
+			return w.client.Watch(context.Background(), listOptions)
+		},
+	}, &operations.OperationTask{}, 0, cache.Indexers{})
+	w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(interface{}) { w.queue.Add(syncKey) },
+		UpdateFunc: func(interface{}, interface{}) { w.queue.Add(syncKey) },
+		DeleteFunc: func(interface{}) { w.queue.Add(syncKey) },
+	})
+	return w, nil
+}
+
+func (w *Worker) PrepareRun(<-chan struct{}) error {
+	lockFile, err := os.OpenFile(w.lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return fmt.Errorf("open agent singleton lock: %w", err)
+	}
+	if err := unix.Flock(int(lockFile.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		_ = lockFile.Close()
+		return fmt.Errorf("another Operation v2 worker is active: %w", err)
+	}
+	w.lockFile = lockFile
+	return nil
+}
+
+func (w *Worker) Run(stopCh <-chan struct{}) error {
+	go w.informer.Run(stopCh)
+	if !cache.WaitForCacheSync(stopCh, w.informer.HasSynced) {
+		return fmt.Errorf("OperationTask informer stopped before initial List completed")
+	}
+	w.queue.Add(syncKey)
+	go func() {
+		for w.processNext(stopCh) {
+		}
+	}()
+	return nil
+}
+
+func (w *Worker) Close() {
+	w.close.Do(func() {
+		w.queue.ShutDown()
+		if w.lockFile != nil {
+			_ = unix.Flock(int(w.lockFile.Fd()), unix.LOCK_UN)
+			_ = w.lockFile.Close()
+		}
+	})
+}
+
+func (w *Worker) processNext(stopCh <-chan struct{}) bool {
+	item, shutdown := w.queue.Get()
+	if shutdown {
+		return false
+	}
+	defer w.queue.Done(item)
+	select {
+	case <-stopCh:
+		return false
+	default:
+	}
+	if err := w.sync(context.Background()); err != nil {
+		logger.Errorf("Operation v2 agent sync failed: %v", err)
+		w.queue.AddRateLimited(syncKey)
+		return true
+	}
+	w.queue.Forget(item)
+	return true
+}
+
+func (w *Worker) sync(ctx context.Context) error {
+	objects := w.informer.GetStore().List()
+	tasks := make([]*operations.OperationTask, 0, len(objects))
+	for _, object := range objects {
+		task, ok := object.(*operations.OperationTask)
+		if !ok || task.Spec.NodeRef.Name != w.agentID || task.Spec.NodeRef.UID != w.nodeUID || task.Status.Phase.IsTerminal() {
+			continue
+		}
+		tasks = append(tasks, task)
+	}
+	selected, err := selectTask(tasks)
+	if err != nil || selected == nil {
+		return err
+	}
+
+	live, err := w.client.Get(ctx, selected.Name, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if live.UID != selected.UID || live.Spec.NodeRef.Name != w.agentID || live.Spec.NodeRef.UID != w.nodeUID {
+		return fmt.Errorf("task %q identity changed during dispatch", selected.Name)
+	}
+	if live.Status.Phase.IsTerminal() {
+		w.queue.Add(syncKey)
+		return nil
+	}
+	if live.Status.Phase == operations.TaskPending {
+		copy := live.DeepCopy()
+		copy.Status = operations.OperationTaskStatus{Phase: operations.TaskRunning}
+		live, err = w.client.UpdateStatus(ctx, copy, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	if live.Status.Phase != operations.TaskRunning {
+		return fmt.Errorf("task %q has unsupported active phase %q", live.Name, live.Status.Phase)
+	}
+	return w.execute(ctx, live)
+}
+
+func selectTask(tasks []*operations.OperationTask) (*operations.OperationTask, error) {
+	running := make([]*operations.OperationTask, 0, 1)
+	pending := make([]*operations.OperationTask, 0, len(tasks))
+	for _, task := range tasks {
+		switch task.Status.Phase {
+		case operations.TaskRunning:
+			running = append(running, task)
+		case "", operations.TaskPending:
+			pending = append(pending, task)
+		}
+	}
+	if len(running) > 1 {
+		return nil, fmt.Errorf("found %d Running tasks for one agent; refusing concurrent execution", len(running))
+	}
+	if len(running) == 1 {
+		return running[0], nil
+	}
+	if len(pending) == 0 {
+		return nil, nil
+	}
+	sort.Slice(pending, func(i, j int) bool {
+		if pending[i].CreationTimestamp.Equal(&pending[j].CreationTimestamp) {
+			return string(pending[i].UID) < string(pending[j].UID)
+		}
+		return pending[i].CreationTimestamp.Before(&pending[j].CreationTimestamp)
+	})
+	return pending[0], nil
+}
+
+func (w *Worker) execute(parent context.Context, task *operations.OperationTask) error {
+	executor, ok := w.registry.Get(task.Spec.Executor)
+	if !ok {
+		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
+			Reason:  operations.TaskReasonExecutionFailed,
+			Message: fmt.Sprintf("executor %q is not registered", task.Spec.Executor),
+		})
+	}
+	if err := w.oplog.CreateOperationDir(string(task.UID)); err != nil {
+		logger.Errorf("create Task log directory for %s: %v", task.Name, err)
+	}
+	logWriter, err := w.oplog.CreateStepLogFile(string(task.UID), "task")
+	if err != nil {
+		logger.Errorf("open Task log for %s: %v", task.Name, err)
+		logWriter = nil
+	}
+	if logWriter != nil {
+		defer logWriter.Close()
+		_, _ = fmt.Fprintf(logWriter, "\n--- reconcile %s ---\n", time.Now().UTC().Format(time.RFC3339))
+	}
+	var writer io.Writer = io.Discard
+	if logWriter != nil {
+		writer = logWriter
+	}
+
+	ctx, cancel := context.WithDeadline(parent, task.Spec.Deadline.Time)
+	defer cancel()
+	result, reconcileErr := executor.Reconcile(ctx, task.DeepCopy(), writer)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(reconcileErr, context.DeadlineExceeded) {
+		return w.finish(context.Background(), task, operations.TaskTimedOut, operations.TaskResult{
+			Reason:  operations.TaskReasonDeadlineExceeded,
+			Message: "task deadline exceeded",
+		})
+	}
+	if reconcileErr != nil {
+		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
+			Reason:  operations.TaskReasonExecutionFailed,
+			Message: boundedMessage(reconcileErr.Error()),
+		})
+	}
+	result.Reason = ""
+	result.Message = boundedMessage(result.Message)
+	return w.finish(parent, task, operations.TaskSucceeded, result)
+}
+
+func (w *Worker) finish(ctx context.Context, task *operations.OperationTask, phase operations.TaskPhase, result operations.TaskResult) error {
+	copy := task.DeepCopy()
+	copy.Status.Phase = phase
+	copy.Status.Result = &result
+	_, err := w.client.UpdateStatus(ctx, copy, metav1.UpdateOptions{})
+	if err != nil {
+		latest, getErr := w.client.Get(context.Background(), task.Name, metav1.GetOptions{})
+		if getErr == nil && latest.UID == task.UID && latest.Status.Phase.IsTerminal() {
+			w.queue.Add(syncKey)
+			return nil
+		}
+		return err
+	}
+	w.queue.Add(syncKey)
+	return nil
+}
+
+func boundedMessage(message string) string {
+	if len(message) <= operations.MaxMessageSize {
+		return message
+	}
+	return message[:operations.MaxMessageSize]
+}
+
+var _ interface {
+	PrepareRun(<-chan struct{}) error
+	Run(<-chan struct{}) error
+	Close()
+} = (*Worker)(nil)

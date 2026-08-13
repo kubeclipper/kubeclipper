@@ -1,0 +1,179 @@
+/*
+ * Copyright 2026 KubeClipper Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package operationv2
+
+import (
+	"context"
+	"errors"
+	"io"
+	"sync"
+	"testing"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+
+	"github.com/kubeclipper/kubeclipper/pkg/oplog"
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
+)
+
+type executorFunc func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error)
+
+func (f executorFunc) Reconcile(ctx context.Context, task *operations.OperationTask, log io.Writer) (operations.TaskResult, error) {
+	return f(ctx, task, log)
+}
+
+type fakeTaskClient struct {
+	mu                   sync.Mutex
+	task                 *operations.OperationTask
+	phases               []operations.TaskPhase
+	loseTerminalResponse bool
+}
+
+func (f *fakeTaskClient) Get(context.Context, string, metav1.GetOptions) (*operations.OperationTask, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.task.DeepCopy(), nil
+}
+
+func (f *fakeTaskClient) List(context.Context, metav1.ListOptions) (*operations.OperationTaskList, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return &operations.OperationTaskList{Items: []operations.OperationTask{*f.task.DeepCopy()}}, nil
+}
+
+func (f *fakeTaskClient) Watch(context.Context, metav1.ListOptions) (watch.Interface, error) {
+	return watch.NewEmptyWatch(), nil
+}
+
+func (f *fakeTaskClient) UpdateStatus(_ context.Context, task *operations.OperationTask, _ metav1.UpdateOptions) (*operations.OperationTask, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if task.UID != f.task.UID || task.ResourceVersion != f.task.ResourceVersion {
+		return nil, errors.New("conflict")
+	}
+	f.task.Status = *task.Status.DeepCopy()
+	f.phases = append(f.phases, task.Status.Phase)
+	f.task.ResourceVersion = string(rune(f.task.ResourceVersion[0] + 1))
+	updated := f.task.DeepCopy()
+	if f.loseTerminalResponse && task.Status.Phase.IsTerminal() {
+		return nil, errors.New("response lost")
+	}
+	return updated, nil
+}
+
+func newTestTask(phase operations.TaskPhase) *operations.OperationTask {
+	return &operations.OperationTask{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "task-1",
+			UID:               types.UID("task-uid"),
+			ResourceVersion:   "1",
+			CreationTimestamp: metav1.NewTime(time.Unix(1, 0)),
+		},
+		Spec: operations.OperationTaskSpec{
+			NodeRef:  operations.NodeReference{Name: "agent-1", UID: types.UID("node-uid")},
+			Executor: "test/v1",
+			Payload:  runtime.RawExtension{Raw: []byte(`{}`)},
+			Deadline: metav1.NewTime(time.Now().Add(time.Minute)),
+		},
+		Status: operations.OperationTaskStatus{Phase: phase},
+	}
+}
+
+func newTestWorker(t *testing.T, client *fakeTaskClient, executor Executor) *Worker {
+	t.Helper()
+	registry := NewRegistry()
+	if err := registry.Register("test/v1", executor); err != nil {
+		t.Fatal(err)
+	}
+	logStore, err := oplog.NewOperationLog(&oplog.Options{Dir: t.TempDir(), SingleThreshold: oplog.DefaultThreshold})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worker, err := NewWorker(WorkerOptions{
+		AgentID:  "agent-1",
+		NodeUID:  types.UID("node-uid"),
+		Client:   client,
+		Registry: registry,
+		OpLog:    logStore,
+		LockFile: t.TempDir() + "/worker.lock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.informer.GetStore().Add(client.task.DeepCopy()); err != nil {
+		t.Fatal(err)
+	}
+	return worker
+}
+
+func TestWorkerClaimsAndCompletesTask(t *testing.T) {
+	client := &fakeTaskClient{task: newTestTask(operations.TaskPending)}
+	worker := newTestWorker(t, client, executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
+		return operations.TaskResult{Outputs: map[string]string{"token": "small-value"}}, nil
+	}))
+
+	if err := worker.sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := client.phases, []operations.TaskPhase{operations.TaskRunning, operations.TaskSucceeded}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("unexpected phase updates: %#v", got)
+	}
+	if client.task.Status.Result.Outputs["token"] != "small-value" {
+		t.Fatalf("output was not persisted: %#v", client.task.Status.Result)
+	}
+}
+
+func TestWorkerAcceptsPersistedTerminalAfterLostResponse(t *testing.T) {
+	client := &fakeTaskClient{task: newTestTask(operations.TaskRunning), loseTerminalResponse: true}
+	worker := newTestWorker(t, client, executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
+		return operations.TaskResult{}, nil
+	}))
+
+	if err := worker.sync(context.Background()); err != nil {
+		t.Fatalf("persisted terminal status should make a lost response successful: %v", err)
+	}
+	if client.task.Status.Phase != operations.TaskSucceeded {
+		t.Fatalf("task phase = %s, want Succeeded", client.task.Status.Phase)
+	}
+}
+
+func TestSelectTaskFailsClosedWithMultipleRunning(t *testing.T) {
+	first := newTestTask(operations.TaskRunning)
+	second := newTestTask(operations.TaskRunning)
+	second.Name = "task-2"
+	second.UID = types.UID("task-uid-2")
+	if _, err := selectTask([]*operations.OperationTask{first, second}); err == nil {
+		t.Fatal("multiple Running tasks were accepted")
+	}
+}
+
+func TestSelectTaskResumesRunningBeforePending(t *testing.T) {
+	pending := newTestTask(operations.TaskPending)
+	running := newTestTask(operations.TaskRunning)
+	running.Name = "running"
+	running.UID = types.UID("running")
+	selected, err := selectTask([]*operations.OperationTask{pending, running})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected.UID != running.UID {
+		t.Fatalf("selected %s, want Running task %s", selected.UID, running.UID)
+	}
+}

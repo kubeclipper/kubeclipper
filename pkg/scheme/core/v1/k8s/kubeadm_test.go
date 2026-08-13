@@ -27,6 +27,40 @@ import (
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
 
+func TestKubeadmResetIsSafeWhenKubeadmIsAbsent(t *testing.T) {
+	steps, err := KubeadmReset([]v1.StepNode{{ID: "node-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 1 || len(steps[0].Commands) != 1 {
+		t.Fatalf("unexpected reset plan: %#v", steps)
+	}
+	command := steps[0].Commands[0]
+	if command.Type != v1.CommandShell || len(command.ShellCommand) != 3 {
+		t.Fatalf("unexpected reset command: %#v", command)
+	}
+	if !strings.Contains(command.ShellCommand[2], "command -v kubeadm") {
+		t.Fatalf("reset command does not guard missing kubeadm: %q", command.ShellCommand[2])
+	}
+}
+
+func TestRemoveDummyInterfaceIsSafeWhenInterfaceIsAbsent(t *testing.T) {
+	steps, err := (&Health{}).UninstallSteps(&v1.Networking{ProxyMode: "ipvs"}, v1.StepNode{ID: "node-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 2 || len(steps[1].Commands) != 1 {
+		t.Fatalf("unexpected IPVS cleanup plan: %#v", steps)
+	}
+	command := steps[1].Commands[0]
+	if command.Type != v1.CommandShell || len(command.ShellCommand) != 3 {
+		t.Fatalf("unexpected dummy interface cleanup command: %#v", command)
+	}
+	if !strings.Contains(command.ShellCommand[2], "ip link show kube-ipvs0") {
+		t.Fatalf("dummy interface cleanup does not guard absent interface: %q", command.ShellCommand[2])
+	}
+}
+
 func Test_kubectlTerminal_renderTo(t *testing.T) {
 	c := &KubectlTerminal{
 		// ImageRegistryAddr: "192.168.234.130:5000",

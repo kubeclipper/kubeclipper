@@ -29,7 +29,6 @@ const (
 
 	KcCertsConfigMapName     = "kc-ca"
 	KcEtcdCertsConfigMapName = "kc-etcd"
-	KcNatsCertsConfigMapName = "kc-nats"
 )
 
 const (

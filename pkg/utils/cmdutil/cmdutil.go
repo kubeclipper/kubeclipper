@@ -66,28 +66,7 @@ func RunCmdWithContext(ctx context.Context, dryRun bool, command string, args ..
 	}
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	//// set Setpgid=true to create new process group.
-	//ec.Cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	//// kill all child process after context is done.
-	//go func() {
-	//	select {
-	//	case <-ctx.Done():
-	//		// Send signal iff the process is in execution state
-	//		if ec.Cmd.Process == nil {
-	//			logger.Debug("the current command is not running", zap.String("cmd", ec.String()))
-	//			return
-	//		}
-	//		// If pid is less than -1, then sig is sent to every process in the process group whose ID is -pid.
-	//		// https://man7.org/linux/man-pages/man2/kill.2.html
-	//		err = syscall.Kill(-ec.Cmd.Process.Pid, syscall.SIGKILL)
-	//		if err != nil {
-	//			logger.Error("kill child process error", zap.String("cmd", ec.String()))
-	//			return
-	//		}
-	//		logger.Debug("run command timeout,killed all child process", zap.String("cmd", ec.String()))
-	//	case <-doneCh:
-	//	}
-	//}()
+	configureProcessGroup(ec.Cmd, doneCh)
 	if err = ec.Run(); err != nil {
 		// e.g. run command failed(exit status 1): ${raw_std_error}
 		logger.Errorf("run command failed(%v): %s", err, ec.StdErr(), zap.String("cmd", ec.String()))

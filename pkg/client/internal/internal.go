@@ -24,12 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers/internalinterfaces"
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientset"
 )
 
 type NewInformerFunc func(clientset.Interface, time.Duration) cache.SharedIndexInformer
+
+type TweakListOptionsFunc = internalinterfaces.TweakListOptionsFunc
 
 type SharedInformerFactory interface {
 	Start(stopCh <-chan struct{})

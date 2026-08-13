@@ -117,7 +117,7 @@ ExecStart=/usr/local/bin/etcd --name {{.NodeName}} \
 --snapshot-count=5000 \
 --trusted-ca-file={{.CaPath}}
 ExecReload=/bin/kill -HUP
-KillMode=process
+KillMode=control-group
 
 [Install]
 WantedBy=multi-user.target`
@@ -152,7 +152,7 @@ RestartSec=5s
 TimeoutStartSec=0
 ExecStart=/usr/local/bin/kubeclipper-agent serve
 ExecReload=/bin/kill -HUP
-KillMode=process
+KillMode=control-group
 
 [Install]
 WantedBy=multi-user.target`
@@ -237,45 +237,6 @@ etcd:
   enableWatchCache: true
   defaultWatchCacheSize: 100
   #watchCacheSizes
-mq:
-  external: {{.MQExternal}}
-  client:
-    serverAddress:
-    {{range .MQServerEndpoints -}}
-    - {{.}}
-    {{end -}}
-    subjectSuffix: kubeclipper
-    queueGroupName: status-report-queue
-    nodeReportSubject: status-report-subj
-    timeOutSeconds: 10
-    reconnectInterval: 2s
-    maxReconnect: 600
-    pingInterval: 2m
-    maxPingsOut: 2
-{{- if .MQTLS}}
-    tls: {{.MQTLS}}
-    tlsCaPath: {{.MQCaPath}}
-    tlsCertPath: {{.MQClientCertPath}}
-    tlsKeyPath: {{.MQClientKeyPath}}
-{{- end }}
-{{- if not .MQExternal }}
-  server:
-    host: {{.MQServerAddress}}
-    port: {{.MQServerPort}}
-    cluster:
-      host: {{.MQServerAddress}}
-      port: {{.MQClusterPort}}
-      leaderHost: {{.LeaderHost}}
-{{- if .MQTLS}}
-    tls: {{.MQTLS}}
-    tlsCaPath: {{.MQCaPath}}
-    tlsCertPath: {{.MQServerCertPath}}
-    tlsKeyPath: {{.MQServerKeyPath}}
-{{- end }}
-{{- end }}
-  auth:
-    username: {{.MQUser}}
-    password: {{.MQAuthToken}}
 `
 
 const KcAgentConfigTmpl = `agentID: {{.AgentID}}
@@ -302,29 +263,13 @@ log:
   maxAge: 30
   compress: false
   useLocalTime: true
-mq:
-  client:
-    serverAddress:
-    {{range .MQServerEndpoints -}}
-    - {{.}}
-    {{end -}}
-    subjectSuffix: kubeclipper
-    queueGroupName: status-report-queue
-    nodeReportSubject: status-report-subj
-    timeOutSeconds: 10
-    reconnectInterval: 2s
-    maxReconnect: 600
-    pingInterval: 2m
-    maxPingsOut: 2
-{{- if .MQTLS}}
-    tls: {{.MQTLS}}
-    tlsCaPath: {{.MQCaPath}}
-    tlsCertPath: {{.MQClientCertPath}}
-    tlsKeyPath: {{.MQClientKeyPath}}
-{{- end }}
-  auth:
-    username: admin
-    password: {{.MQAuthToken}}
+apiServer:
+  endpoint: {{.APIServerEndpoint}}
+  caFile: {{.APIServerCAFile}}
+  certFile: {{.AgentCertFile}}
+  keyFile: {{.AgentKeyFile}}
+  serverName: server.kubeclipper.io
+  logAddress: ":10260"
 oplog:
   dir: {{.OpLogDir}}
   singleThreshold: {{.OpLogThreshold}}

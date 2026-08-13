@@ -27,6 +27,7 @@ import (
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -305,8 +306,8 @@ func (n *TemplateList) TablePrint() ([]string, [][]string) {
 var _ printer.ResourcePrinter = (*OperationList)(nil)
 
 type OperationList struct {
-	Items      []v1.Operation `json:"items" description:"paging data"`
-	TotalCount int            `json:"totalCount,omitempty" description:"total count"`
+	Items      []operationsv1alpha1.Operation `json:"items" description:"paging data"`
+	TotalCount int                            `json:"totalCount,omitempty" description:"total count"`
 }
 
 func (n *OperationList) JSONPrint() ([]byte, error) {
@@ -329,12 +330,12 @@ func (n *OperationList) TablePrint() ([]string, [][]string) {
 	var data [][]string
 	for _, op := range n.Items {
 		id := op.ObjectMeta.Name
-		cluster := op.ObjectMeta.Labels[common.LabelClusterName]
-		name := op.ObjectMeta.Labels[common.LabelOperationAction]
-		status := string(op.Status.Status)
+		cluster := op.Spec.TargetRef.Name
+		name := op.Spec.Action
+		status := string(op.Status.Phase)
 		sponsor := op.ObjectMeta.Labels[common.LabelOperationSponsor]
 		created := op.ObjectMeta.CreationTimestamp.Time.Format("2006-01-02 15:04:05")
-		steps := fmt.Sprintf("%d", len(op.Steps))
+		steps := fmt.Sprintf("%d", len(op.Spec.Steps))
 		data = append(data, []string{id, cluster, name, status, sponsor, created, steps})
 	}
 	return title, data

@@ -19,6 +19,9 @@
 package options
 
 import (
+	"fmt"
+	"os"
+
 	cliflag "k8s.io/component-base/cli/flag"
 
 	"github.com/kubeclipper/kubeclipper/pkg/agent"
@@ -44,6 +47,17 @@ func (s *AgentOptions) Validate() []error {
 	errors = append(errors, s.LogOptions.Validate()...)
 	errors = append(errors, s.OpLogOptions.Validate()...)
 	errors = append(errors, s.ImageProxyOptions.Validate()...)
+	if s.APIServer == nil || s.APIServer.Endpoint == "" {
+		errors = append(errors, fmt.Errorf("apiServer.endpoint is required"))
+	} else {
+		for name, path := range map[string]string{"apiServer.caFile": s.APIServer.CAFile, "apiServer.certFile": s.APIServer.CertFile, "apiServer.keyFile": s.APIServer.KeyFile} {
+			if path == "" {
+				errors = append(errors, fmt.Errorf("%s is required", name))
+			} else if _, err := os.Stat(path); err != nil {
+				errors = append(errors, fmt.Errorf("%s: %w", name, err))
+			}
+		}
+	}
 	return errors
 }
 
@@ -51,7 +65,6 @@ func (s *AgentOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs := fss.FlagSet("generic")
 	s.GenericServerRunOptions.AddFlags(fs, s.GenericServerRunOptions)
 	s.LogOptions.AddFlags(fss.FlagSet("log"))
-	s.MQOptions.AddFlags(fss.FlagSet("mq"))
 	s.OpLogOptions.AddFlags(fss.FlagSet("oplog"))
 	s.ImageProxyOptions.AddFlags(fss.FlagSet("imageProxy"))
 

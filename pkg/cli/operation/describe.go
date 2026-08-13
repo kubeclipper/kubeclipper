@@ -8,12 +8,12 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
@@ -82,41 +82,41 @@ func (o *DescribeOptions) RunDescribe() error {
 	if err != nil {
 		return fmt.Errorf("operation %s not found: %w", o.OperationID, err)
 	}
-	renderOperation(o.Out, op)
+	tasks, err := o.Client.ListOperationTasks(ctx, string(op.UID))
+	if err != nil {
+		return fmt.Errorf("list tasks for operation %s: %w", o.OperationID, err)
+	}
+	renderOperation(o.Out, op, tasks.Items)
 	return nil
 }
 
 // renderOperation writes a human-readable description of an operation.
-func renderOperation(w io.Writer, op *v1.Operation) {
-	clusterName := op.Labels[common.LabelClusterName]
-	sponsor := op.Labels[common.LabelOperationSponsor]
-	action := op.Labels[common.LabelOperationAction]
+func renderOperation(w io.Writer, op *operationsv1alpha1.Operation, tasks []operationsv1alpha1.OperationTask) {
+	grouped := tasksByExecution(tasks)
 
 	// Header
 	fmt.Fprintf(w, "\n")
 	fmt.Fprintf(w, "  Name:       %s\n", op.Name)
-	fmt.Fprintf(w, "  Action:     %s\n", action)
-	fmt.Fprintf(w, "  Cluster:    %s\n", clusterName)
-	fmt.Fprintf(w, "  Sponsor:    %s\n", sponsor)
-	fmt.Fprintf(w, "  Status:     %s\n", statusColor(string(op.Status.Status)).Sprint(string(op.Status.Status)))
+	fmt.Fprintf(w, "  Action:     %s\n", op.Spec.Action)
+	fmt.Fprintf(w, "  Cluster:    %s\n", op.Spec.TargetRef.Name)
+	fmt.Fprintf(w, "  Status:     %s\n", statusColor(string(op.Status.Phase)).Sprint(string(op.Status.Phase)))
 	fmt.Fprintf(w, "  Created:    %s\n", op.CreationTimestamp.Format(timeFormat))
 	fmt.Fprintf(w, "\n")
 
 	// Per-step breakdown
-	for _, step := range op.Steps {
-		startTime := getStepStartTime(op, step.ID)
-		stepStatus := getStepStatus(op, step.ID)
+	for _, step := range op.Spec.Steps {
+		startTime := stepStartTime(step.ID, tasks)
+		currentStepStatus := stepStatus(step, grouped, op.Status.Phase)
 
 		timeStr := ""
-		if !startTime.IsZero() {
+		if startTime != nil {
 			timeStr = startTime.Format(timeFormat)
 		}
 
-		fmt.Fprintf(w, "  %s Step: %s (%s) [%s] %s\n",
+		fmt.Fprintf(w, "  %s Step: %s [%s] %s\n",
 			color.HiBlueString("─────"),
-			step.Name,
 			step.ID,
-			statusColor(stepStatus).Sprint(stepStatus),
+			statusColor(currentStepStatus).Sprint(currentStepStatus),
 			color.HiBlueString("─────"),
 		)
 		if timeStr != "" {
@@ -124,8 +124,13 @@ func renderOperation(w io.Writer, op *v1.Operation) {
 		}
 
 		// Per-node under each step
-		for _, node := range step.Nodes {
-			nodeStatus, startAt, endAt := getNodeStatusWithTime(op, step.ID, node.ID)
+		for _, node := range step.Targets {
+			task := effectiveTask(grouped, step.ID, node.UID)
+			nodeStatus := missingTaskPhase(op.Status.Phase)
+			var startAt, endAt *metav1.Time
+			if task != nil {
+				nodeStatus, startAt, endAt = string(task.Status.Phase), task.Status.StartedAt, task.Status.FinishedAt
+			}
 			duration := calculateDuration(startAt, endAt)
 
 			durationText := ""
@@ -133,75 +138,34 @@ func renderOperation(w io.Writer, op *v1.Operation) {
 				durationText = fmt.Sprintf(" [%s]", duration.Round(time.Second).String())
 			}
 
-			fmt.Fprintf(w, "    %s %s (%s) %s%s\n",
+			fmt.Fprintf(w, "    %s %s (%s)%s\n",
 				statusColor(nodeStatus).Sprint(string(nodeStatus)),
-				node.Hostname,
-				node.IPv4,
-				node.ID,
+				node.Name,
+				node.UID,
 				durationText,
 			)
 
 			// Show error details for failed nodes
-			if nodeStatus == string(v1.StepStatusFailed) {
-				reason, message := getStepNodeErrorDetail(op, step.ID, node.ID)
-				if reason != "" {
-					fmt.Fprintf(w, "      Reason:  %s\n", color.RedString(reason))
-				}
-				if message != "" {
-					fmt.Fprintf(w, "      Message: %s\n", color.RedString(message))
-				}
+			if task != nil && task.Status.Result != nil && task.Status.Result.Message != "" {
+				fmt.Fprintf(w, "      Message: %s\n", color.RedString(task.Status.Result.Message))
 			}
 		}
 		fmt.Fprintf(w, "\n")
 	}
 }
 
-// getStepStatus returns the overall status for a step based on its node statuses.
-func getStepStatus(op *v1.Operation, stepID string) string {
-	for _, cond := range op.Status.Conditions {
-		if cond.StepID == stepID {
-			for _, st := range cond.Status {
-				if st.Status == v1.StepStatusFailed {
-					return string(v1.StepStatusFailed)
-				}
-			}
-			for _, st := range cond.Status {
-				if st.Status == "" {
-					return "pending"
-				}
-			}
-			return string(v1.StepStatusSuccessful)
-		}
-	}
-	return "pending"
-}
-
-// getStepNodeErrorDetail returns reason and message for a failed node.
-func getStepNodeErrorDetail(op *v1.Operation, stepID, nodeID string) (reason string, message string) {
-	for _, cond := range op.Status.Conditions {
-		if cond.StepID == stepID {
-			for _, st := range cond.Status {
-				if st.Node == nodeID {
-					return st.Reason, st.Message
-				}
-			}
-		}
-	}
-	return "", ""
-}
-
 // statusColor returns a color func based on the status string.
 func statusColor(status string) *color.Color {
 	switch status {
-	case "successful":
+	case "Succeeded":
 		return color.New(color.FgGreen, color.Bold)
-	case "failed", "error":
+	case "Failed", "TimedOut", "error":
 		return color.New(color.FgRed, color.Bold)
-	case "running":
+	case "Running":
 		return color.New(color.FgYellow, color.Bold)
-	case "termination":
+	case "Cancelled":
 		return color.New(color.FgMagenta, color.Bold)
-	case "pending", "unknown":
+	case "Pending", "unknown":
 		return color.New(color.FgCyan)
 	default:
 		return color.New(color.FgWhite)

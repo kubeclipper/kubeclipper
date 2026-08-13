@@ -36,7 +36,6 @@ type CoreV1Interface interface {
 	ClustersGetter
 	RegionsGetter
 	LeasesGetter
-	OperationsGetter
 	BackupsGetter
 	BackupPointsGetter
 	CronBackupsGetter
@@ -75,10 +74,6 @@ func (c *CoreV1Client) Regions() RegionsInterface {
 
 func (c *CoreV1Client) Leases() LeasesInterface {
 	return newLeases(c)
-}
-
-func (c *CoreV1Client) Operations() OperationsInterface {
-	return newOperations(c)
 }
 
 func (c *CoreV1Client) Backups() BackupsInterface {

@@ -964,14 +964,38 @@ var Roles = GlobalRoleList{
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "nodes", "regions", "operations"},
+				Resources: []string{"clusters", "nodes", "regions"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 			{
 				APIGroups: []string{"core.kubeclipper.io"},
-				Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions", "operations"},
+				Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions"},
 				Verbs:     []string{"*"},
 			},
+			{
+				APIGroups: []string{"operations.kubeclipper.io"},
+				Resources: []string{"operations", "operationtasks", "operationtasks/logs"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"operations.kubeclipper.io"},
+				Resources: []string{"operations", "operations/cancel", "operations/retry"},
+				Verbs:     []string{"create", "update", "patch"},
+			},
+		},
+	},
+	{
+		TypeMeta: metav1.TypeMeta{Kind: iamv1.KindGlobalRole, APIVersion: iamv1.SchemeGroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "kubeclipper-agent-operation-v2",
+			Labels:      map[string]string{"kubeclipper.io/hidden": "true"},
+			Annotations: map[string]string{"kubeclipper.io/internal": "true"},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{APIGroups: []string{"operations.kubeclipper.io"}, Resources: []string{"operationtasks"}, Verbs: []string{"get", "list", "watch"}},
+			{APIGroups: []string{"operations.kubeclipper.io"}, Resources: []string{"operationtasks/status"}, Verbs: []string{"update"}},
+			{APIGroups: []string{"core.kubeclipper.io"}, Resources: []string{"nodes", "nodes/status"}, Verbs: []string{"get", "create", "update", "patch"}},
+			{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, Verbs: []string{"get", "create", "update", "patch"}},
 		},
 	},
 }
@@ -1058,6 +1082,12 @@ var RoleBindings = GlobalRoleBindingList{
 				Name:     "admin",
 			},
 		},
+	},
+	{
+		TypeMeta:   metav1.TypeMeta{Kind: "GlobalRoleBinding", APIVersion: iamv1.SchemeGroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{Name: "kubeclipper-agent-operation-v2", Annotations: map[string]string{"kubeclipper.io/internal": "true"}},
+		RoleRef:    rbacv1.RoleRef{APIGroup: "iam.kubeclipper.io", Kind: "GlobalRole", Name: "kubeclipper-agent-operation-v2"},
+		Subjects:   []rbacv1.Subject{{APIGroup: "rbac.authorization.k8s.io", Kind: "Group", Name: "system:kc-agents"}},
 	},
 }
 

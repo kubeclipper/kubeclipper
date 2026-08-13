@@ -26,6 +26,7 @@ import (
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 	localSchemeBuilder = runtime.SchemeBuilder{
 		corev1.AddToScheme,
 		iamv1.AddToScheme,
+		operationsv1alpha1.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 )

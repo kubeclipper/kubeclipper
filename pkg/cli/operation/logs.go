@@ -6,19 +6,19 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/operation/tui"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
@@ -171,71 +171,54 @@ func (o *LogsOptions) runSingleOperation() error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	// Track offsets for incremental reading when following
 	offsets := make(map[string]int64)
-
-	var lastStepCount int
+	seenTasks := make(map[string]bool)
 	for {
 		operation, err := o.Client.DescribeOperation(ctx, o.OperationID)
 		if err != nil {
 			printErrorLine(o.Out, "Failed to describe operation %s: %v\n", o.OperationID, err)
 			return nil
 		}
-		steps := operation.Steps
+		steps := operation.Spec.Steps
 		if len(steps) == 0 {
 			printErrorLine(o.Out, "No steps found in operation %s\n", o.OperationID)
 			return nil
 		}
 
-		for i := lastStepCount; i < len(steps); i++ {
-			step := steps[i]
-
-			// Get step start time and status
-			startTime := getStepStartTime(operation, step.ID)
-			stepStatus := getStepStatus(operation, step.ID)
-
-			// Display step header with separator
-			printStepTitle(o.Out, step.Name, step.ID, stepStatus, startTime)
-
-			for _, node := range step.Nodes {
-				// Get node status and timing
-				nodeStatus, startAt, endAt := getNodeStatusWithTime(operation, step.ID, node.ID)
-				duration := calculateDuration(startAt, endAt)
-
-				// Display node status
-				printNodeStatus(o.Out, node.Hostname, node.ID, nodeStatus, node.IPv4, duration)
-
+		taskList, err := o.Client.ListOperationTasks(ctx, string(operation.UID))
+		if err != nil {
+			return fmt.Errorf("list tasks for operation %s: %w", o.OperationID, err)
+		}
+		for _, step := range steps {
+			for _, task := range tasksForStep(taskList.Items, step.ID) {
+				if !seenTasks[task.Name] {
+					printTaskTitle(o.Out, &task)
+					seenTasks[task.Name] = true
+				}
 				if o.Summary {
 					continue
 				}
-
-				// Fetch and display logs
-				key := step.ID + "|" + node.ID
-				offset := offsets[key]
-
-				stepLog, err := o.Client.GetStepNodeLog(ctx, o.OperationID, step.ID, node.ID, offset)
-				if err != nil {
-					printErrorLine(o.ErrOut, "[step:%s][node:%s] log fetch error: %v\n", step.ID, node.ID, err)
+				offset := offsets[task.Name]
+				taskLog, logErr := o.Client.GetOperationTaskLog(ctx, task.Name, offset)
+				if logErr != nil {
+					printErrorLine(o.ErrOut, "[task:%s] log fetch error: %v\n", task.Name, logErr)
 					continue
 				}
-				if stepLog.Content != "" {
-					for _, line := range splitLines(truncateLog(stepLog.Content, o.MaxLength)) {
+				if taskLog.Content != "" {
+					for _, line := range splitLines(truncateLog(taskLog.Content, o.MaxLength)) {
 						printLogLine(o.Out, line)
 					}
-					offsets[key] = offset + int64(len(stepLog.Content))
+					offsets[task.Name] = offset + taskLog.DeliverySize
 				}
 			}
 		}
-		lastStepCount = len(steps)
 
 		if !o.Follow {
 			break
 		}
 
 		// Check if the operation has reached a terminal state
-		if operation.Status.Status == v1.OperationStatusSuccessful ||
-			operation.Status.Status == v1.OperationStatusFailed ||
-			operation.Status.Status == v1.OperationStatusTermination {
+		if operation.Status.Phase.IsTerminal() {
 			break
 		}
 
@@ -253,20 +236,38 @@ func isTTY() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-// printStepTitle prints a step header with a separator line, step name, ID, and color-coded status.
-func printStepTitle(w io.Writer, name, id, status string, startTime metav1.Time) {
-	timeStr := ""
-	if !startTime.IsZero() {
-		timeStr = startTime.Format(timeFormat)
+func tasksForStep(tasks []operationsv1alpha1.OperationTask, stepID string) []operationsv1alpha1.OperationTask {
+	result := make([]operationsv1alpha1.OperationTask, 0)
+	for i := range tasks {
+		if tasks[i].Spec.StepID == stepID {
+			result = append(result, tasks[i])
+		}
 	}
+	sort.SliceStable(result, func(i, j int) bool {
+		if result[i].Spec.RetryGeneration != result[j].Spec.RetryGeneration {
+			return result[i].Spec.RetryGeneration < result[j].Spec.RetryGeneration
+		}
+		if result[i].Spec.Attempt != result[j].Spec.Attempt {
+			return result[i].Spec.Attempt < result[j].Spec.Attempt
+		}
+		return result[i].Spec.NodeRef.Name < result[j].Spec.NodeRef.Name
+	})
+	return result
+}
 
+func printTaskTitle(w io.Writer, task *operationsv1alpha1.OperationTask) {
+	timeStr := ""
+	if task.Status.StartedAt != nil {
+		timeStr = task.Status.StartedAt.Format(timeFormat)
+	}
+	status := string(task.Status.Phase)
 	statusText := statusColor(status).Sprintf("[%s]", status)
 
 	var title string
 	if timeStr != "" {
-		title = fmt.Sprintf(" Step: %s (%s) %s %s ", name, id, statusText, timeStr)
+		title = fmt.Sprintf(" Step: %s Node: %s Attempt: %d %s %s ", task.Spec.StepID, task.Spec.NodeRef.Name, task.Spec.Attempt, statusText, timeStr)
 	} else {
-		title = fmt.Sprintf(" Step: %s (%s) %s ", name, id, statusText)
+		title = fmt.Sprintf(" Step: %s Node: %s Attempt: %d %s ", task.Spec.StepID, task.Spec.NodeRef.Name, task.Spec.Attempt, statusText)
 	}
 
 	separator := "─────"
@@ -286,22 +287,6 @@ func repeatStr(s string, n int) string {
 		result += s
 	}
 	return result
-}
-
-// printNodeStatus prints a node line with colored status and duration.
-func printNodeStatus(w io.Writer, hostname, nodeID, status, ip string, duration time.Duration) {
-	durationText := ""
-	if duration > 0 {
-		durationText = fmt.Sprintf(" [%s]", duration.Round(time.Second).String())
-	}
-
-	fmt.Fprintf(w, "  %s %s (%s) %s%s\n",
-		statusColor(status).Sprint(status),
-		hostname,
-		ip,
-		nodeID,
-		durationText,
-	)
 }
 
 // printLogLine prints a log line with 4-space indent in dark gray.

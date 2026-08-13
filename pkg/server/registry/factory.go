@@ -40,6 +40,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/scheme"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/backup"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/backuppoint"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/cluster"
@@ -49,7 +50,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/lease"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/loginrecord"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/node"
-	"github.com/kubeclipper/kubeclipper/pkg/server/registry/operation"
+	operationv2registry "github.com/kubeclipper/kubeclipper/pkg/server/registry/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/platformsetting"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/recovery"
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry/region"
@@ -65,7 +66,9 @@ type SharedStorageFactory interface {
 	GlobalRoleBindings() rest.StandardStorage
 	Leases() rest.StandardStorage
 	Nodes() rest.StandardStorage
-	Operations() rest.StandardStorage
+	OperationV2() rest.StandardStorage
+	OperationTasksV2() rest.StandardStorage
+	ExecutionLocksV2() rest.StandardStorage
 	Regions() rest.StandardStorage
 	Tokens() rest.StandardStorage
 	Users() rest.StandardStorage
@@ -137,8 +140,16 @@ func (s *sharedStorageFactory) Nodes() rest.StandardStorage {
 	return s.StorageFor(&corev1.Node{}, node.NewStorage)
 }
 
-func (s *sharedStorageFactory) Operations() rest.StandardStorage {
-	return s.StorageFor(&corev1.Operation{}, operation.NewStorage)
+func (s *sharedStorageFactory) OperationV2() rest.StandardStorage {
+	return s.StorageFor(&operationsv1alpha1.Operation{}, operationv2registry.NewOperationStorage)
+}
+
+func (s *sharedStorageFactory) OperationTasksV2() rest.StandardStorage {
+	return s.StorageFor(&operationsv1alpha1.OperationTask{}, operationv2registry.NewTaskStorage)
+}
+
+func (s *sharedStorageFactory) ExecutionLocksV2() rest.StandardStorage {
+	return s.StorageFor(&operationsv1alpha1.ExecutionLock{}, operationv2registry.NewLockStorage)
 }
 
 func (s *sharedStorageFactory) Regions() rest.StandardStorage {

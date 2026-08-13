@@ -9,7 +9,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
@@ -31,21 +31,21 @@ func NewTerminateOptions(streams options.IOStreams) *TerminateOptions {
 }
 
 const terminateLong = `
-  Terminate a running operation.
+  Cancel a pending or running operation.
 
-  Only operations in "running" status can be terminated.`
+  A Task that is already Running is allowed to finish; later Tasks are not started.`
 
 const terminateExample = `
-  # Terminate a running operation
-  kcctl operation terminate <OPERATION_ID>`
+  # Cancel an operation
+  kcctl operation cancel <OPERATION_ID>`
 
 // NewCmdTerminate creates the operation terminate subcommand.
 func NewCmdTerminate(streams options.IOStreams) *cobra.Command {
 	o := NewTerminateOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "terminate OPERATION_ID",
+		Use:                   "cancel OPERATION_ID",
 		DisableFlagsInUseLine: true,
-		Short:                 "Terminate a running operation",
+		Short:                 "Cancel an operation",
 		Long:                  terminateLong,
 		Example:               terminateExample,
 		Args:                  cobra.ExactArgs(1),
@@ -80,14 +80,14 @@ func (o *TerminateOptions) RunTerminate() error {
 		return err
 	}
 
-	if op.Status.Status != v1.OperationStatusRunning {
-		return fmt.Errorf("operation is not in running status, current status: %s", op.Status.Status)
+	if op.Status.Phase != operationsv1alpha1.OperationPending && op.Status.Phase != operationsv1alpha1.OperationRunning {
+		return fmt.Errorf("operation cannot be cancelled from phase %s", op.Status.Phase)
 	}
 
-	if err := o.Client.TerminateOperation(ctx, o.OperationID); err != nil {
+	if _, err := o.Client.CancelOperation(ctx, op); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(o.Out, "Operation %s termination requested\n", o.OperationID)
+	fmt.Fprintf(o.Out, "Operation %s cancellation requested\n", o.OperationID)
 	return nil
 }

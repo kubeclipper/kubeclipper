@@ -65,15 +65,18 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 				framework.Logf("List Cluster Operation Failed: %v", err)
 			}
 			for _, op := range opList.Items {
-				if op.Labels[common.LabelOperationAction] == "CreateCluster" {
-					for _, step := range op.Steps {
-						for _, node := range step.Nodes {
-							log, logErr := c.GetStepNodeLog(context.TODO(), op.Name, step.ID, node.ID, 0)
-							if logErr != nil {
-								framework.Logf("Print Step Log Failed: %v", logErr)
-							} else {
-								framework.Logf("step: %s-%s, logstatus: %s, log: %s", step.Name, step.ID, log.Status, log.Content)
-							}
+				if op.Spec.Action == "CreateCluster" {
+					tasks, taskErr := c.ListOperationTasks(context.TODO(), string(op.UID))
+					if taskErr != nil {
+						framework.Logf("List Operation Tasks Failed: %v", taskErr)
+						continue
+					}
+					for _, task := range tasks.Items {
+						log, logErr := c.GetOperationTaskLog(context.TODO(), task.Name, 0)
+						if logErr != nil {
+							framework.Logf("Print Task Log Failed: %v", logErr)
+						} else {
+							framework.Logf("step: %s, node: %s, attempt: %d, phase: %s, log: %s", task.Spec.StepID, task.Spec.NodeRef.Name, task.Spec.Attempt, task.Status.Phase, log.Content)
 						}
 					}
 				}

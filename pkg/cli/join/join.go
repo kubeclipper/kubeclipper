@@ -21,7 +21,9 @@ package join
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -45,6 +47,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
+	certutils "github.com/kubeclipper/kubeclipper/pkg/utils/certs"
 )
 
 const (
@@ -353,7 +356,7 @@ func (c *JoinOptions) agentNodeFiles(node string, metadata options.Metadata) err
 	if err != nil {
 		return errors.Wrap(err, "SendPackageV2")
 	}
-	err = c.sendCerts(node)
+	err = c.sendCerts(node, metadata.AgentID)
 	if err != nil {
 		return err
 	}
@@ -419,30 +422,14 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata)
 	data["NodeIPDetect"] = c.deployConfig.NodeIPDetect
 	data["AgentID"] = metadata.AgentID
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.StaticServerPort)
+	data["APIServerEndpoint"] = fmt.Sprintf("https://%s:%d", c.deployConfig.ServerIPs[0], c.deployConfig.ServerPort)
+	data["APIServerCAFile"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath, "ca.crt")
+	data["AgentCertFile"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath, "agent.crt")
+	data["AgentKeyFile"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath, "agent.key")
 	if c.deployConfig.Debug {
 		data["LogLevel"] = "debug"
 	} else {
 		data["LogLevel"] = "info"
-	}
-	var endpoint []string
-	for _, v := range c.deployConfig.MQ.IPs {
-		endpoint = append(endpoint, fmt.Sprintf("%s:%d", v, c.deployConfig.MQ.Port))
-	}
-	data["MQServerEndpoints"] = endpoint
-	data["MQExternal"] = c.deployConfig.MQ.External
-	data["MQUser"] = c.deployConfig.MQ.User
-	data["MQAuthToken"] = c.deployConfig.MQ.Secret
-	data["MQTLS"] = c.deployConfig.MQ.TLS
-	if c.deployConfig.MQ.TLS {
-		if c.deployConfig.MQ.External {
-			data["MQCaPath"] = c.deployConfig.MQ.CA
-			data["MQClientCertPath"] = c.deployConfig.MQ.ClientCert
-			data["MQClientKeyPath"] = c.deployConfig.MQ.ClientKey
-		} else {
-			data["MQCaPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultCaPath, filepath.Base(c.deployConfig.MQ.CA))
-			data["MQClientCertPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, filepath.Base(c.deployConfig.MQ.ClientCert))
-			data["MQClientKeyPath"] = filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, filepath.Base(c.deployConfig.MQ.ClientKey))
-		}
 	}
 	data["OpLogDir"] = c.deployConfig.OpLog.Dir
 	data["OpLogThreshold"] = c.deployConfig.OpLog.Threshold
@@ -454,47 +441,34 @@ func (c *JoinOptions) getKcAgentConfigTemplateContent(metadata options.Metadata)
 	return buffer.String()
 }
 
-func (c *JoinOptions) sendCerts(ip string) error {
-	// download cert from server
-	files := []string{
-		c.deployConfig.MQ.CA,
-		c.deployConfig.MQ.ClientCert,
-		c.deployConfig.MQ.ClientKey,
+func (c *JoinOptions) sendCerts(ip, agentID string) error {
+	caPath := filepath.Join(options.HomeDIR, options.DefaultPath, options.DefaultCaPath)
+	caConfig := certutils.Config{Path: caPath, BaseName: options.Ca, CommonName: options.Ca}
+	caCert, caKey, err := certutils.LoadCaCertAndKeyFromDisk(caConfig)
+	if err != nil {
+		return fmt.Errorf("load KubeClipper CA: %w", err)
 	}
-
-	for _, file := range files {
-		exist, err := sshutils.IsFileExist(file)
-		if err != nil {
-			return errors.WithMessage(err, "check file exist")
-		}
-		if !exist {
-			if err = c.sshConfig.DownloadSudo(c.deployConfig.ServerIPs[0], file, file); err != nil {
-				return errors.WithMessage(err, "download cert from server")
-			}
-		}
+	altNames := certutils.AltNames{DNSNames: map[string]string{agentID: agentID}, IPs: map[string]net.IP{}}
+	if parsed := net.ParseIP(ip); parsed != nil {
+		altNames.IPs[parsed.String()] = parsed
 	}
-
-	if c.deployConfig.MQ.TLS {
-		destCa := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultCaPath)
-		destCert := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath)
-		destKey := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath)
-		if c.deployConfig.MQ.External {
-			destCa = filepath.Dir(c.deployConfig.MQ.CA)
-			destCert = filepath.Dir(c.deployConfig.MQ.ClientCert)
-			destKey = filepath.Dir(c.deployConfig.MQ.ClientKey)
-		}
-
-		err := utils.SendPackageV2(c.sshConfig, c.deployConfig.MQ.CA, []string{ip}, destCa, nil, nil)
-		if err != nil {
-			return err
-		}
-		err = utils.SendPackageV2(c.sshConfig, c.deployConfig.MQ.ClientCert, []string{ip}, destCert, nil, nil)
-		if err != nil {
-			return err
-		}
-		err = utils.SendPackageV2(c.sshConfig, c.deployConfig.MQ.ClientKey, []string{ip}, destKey, nil, nil)
+	certConfig := certutils.Config{
+		Path: filepath.Join(options.HomeDIR, options.DefaultPath, "pki", "agents", agentID), BaseName: "agent",
+		CAName: options.Ca, CommonName: "system:kc-agent:" + agentID, Organization: []string{"system:kc-agents"},
+		Year: 100, AltNames: altNames, Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	}
+	cert, key, err := certutils.NewCaCertAndKeyFromRoot(certConfig, caCert, caKey)
+	if err != nil {
 		return err
 	}
-
+	if err := certutils.WriteCertAndKey(certConfig.Path, certConfig.BaseName, cert, key); err != nil {
+		return err
+	}
+	destination := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultAgentPKIPath)
+	for _, source := range []string{filepath.Join(caPath, options.Ca+".crt"), filepath.Join(certConfig.Path, "agent.crt"), filepath.Join(certConfig.Path, "agent.key")} {
+		if err := utils.SendPackageV2(c.sshConfig, source, []string{ip}, destination, nil, nil); err != nil {
+			return err
+		}
+	}
 	return nil
 }

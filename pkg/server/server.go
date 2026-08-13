@@ -43,6 +43,7 @@ import (
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/apis/iam/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/apis/oauth"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/apis/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/apis/proxy"
 	"github.com/kubeclipper/kubeclipper/pkg/auditing"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/auth"
@@ -63,7 +64,8 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller/clustercontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/cronbackupcontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/dnscontroller"
-	"github.com/kubeclipper/kubeclipper/pkg/controller/operationcontroller"
+	"github.com/kubeclipper/kubeclipper/pkg/controller/nodecontroller"
+	operationv2controller "github.com/kubeclipper/kubeclipper/pkg/controller/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/regioncontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller/tokencontroller"
 	"github.com/kubeclipper/kubeclipper/pkg/healthz"
@@ -72,7 +74,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/iam"
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	operationv2 "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -81,7 +83,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/server/registry"
 	"github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/service"
-	"github.com/kubeclipper/kubeclipper/pkg/service/delivery"
 	"github.com/kubeclipper/kubeclipper/pkg/service/staticresource"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/cache"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/hashutil"
@@ -108,19 +109,17 @@ type APIServer struct {
 	databaseAuditBackend  auditing.Backend
 	internalInformerUser  string
 	InternalInformerToken string
-	terminationChan       chan struct{}
 	clusterOperator       cluster.Operator
 	leaseOperator         lease.Operator
-	deliveryService       *delivery.Service
 	controllerManager     *manager.ControllerManager
 	staticResourceService *staticresource.Service
+	operationV2Store      operationv2.Store
 }
 
 func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.internalInformerUser = "system:kc-server"
 	s.InternalInformerToken = uuid.New().String()
 	s.storageFactory = registry.NewSharedStorageFactory(s.RESTOptionsGetter)
-	s.terminationChan = make(chan struct{})
 
 	var err error
 	switch s.Config.CacheOptions.CacheProvider {
@@ -282,14 +281,24 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 	coreOperator := core.NewOperator(s.storageFactory.ConfigMaps())
 	leaseOperator := lease.NewLeaseOperator(s.storageFactory.Leases())
 	s.leaseOperator = leaseOperator
-	opOperator := operation.NewOperationOperator(s.storageFactory.Operations())
 	iamOperator := iam.NewOperator(s.storageFactory.Users(), s.storageFactory.GlobalRoles(),
 		s.storageFactory.GlobalRoleBindings(), s.storageFactory.Tokens(), s.storageFactory.LoginRecords())
 	s.rbacAuthorizer = rbac.NewAuthorizer(iamOperator, clusterOperator)
 
-	deliverySvc := delivery.NewService(s.Config.MQOptions, clusterOperator, leaseOperator, opOperator, &s.terminationChan)
-	s.deliveryService = deliverySvc
-	s.Services = append(s.Services, deliverySvc)
+	var err error
+	s.operationV2Store, err = operationv2.NewStore(operationv2.StoreOptions{
+		Operations: s.storageFactory.OperationV2(),
+		Tasks:      s.storageFactory.OperationTasksV2(),
+		Locks:      s.storageFactory.ExecutionLocksV2(),
+	})
+	if err != nil {
+		return err
+	}
+	if err = operationsv1alpha1.AddToContainer(s.container, s.operationV2Store, clusterOperator,
+		s.Config.GenericServerRunOptions.CACertFile, s.Config.GenericServerRunOptions.TLSCertFile,
+		s.Config.GenericServerRunOptions.TLSPrivateKey); err != nil {
+		return err
+	}
 
 	platformOperator := platform.NewPlatformOperator(s.storageFactory.PlatformSettings(), s.storageFactory.Events())
 	if err := configv1.AddToContainer(s.container, platformOperator, s.Config, s); err != nil {
@@ -337,15 +346,15 @@ func (s *APIServer) installAPIs(stopCh <-chan struct{}) error {
 		}
 	}
 
-	ctrl, err := manager.NewControllerManager(rc, s.storageFactory, deliverySvc, &s.terminationChan, s.SetupController)
+	ctrl, err := manager.NewControllerManager(rc, s.storageFactory, s.SetupController)
 	if err != nil {
 		return err
 	}
 	s.Services = append(s.Services, ctrl)
 	s.controllerManager = ctrl
 
-	if err = corev1.AddToContainer(s.container, clusterOperator, opOperator, platformOperator,
-		leaseOperator, coreOperator, deliverySvc, tokenOperator, s.Config.GenericServerRunOptions, &s.terminationChan); err != nil {
+	if err = corev1.AddToContainer(s.container, clusterOperator, s.operationV2Store, platformOperator,
+		leaseOperator, coreOperator, tokenOperator, s.Config.GenericServerRunOptions); err != nil {
 		return err
 	}
 	if err = proxy.AddToContainer(s.container, clusterOperator); err != nil {
@@ -408,9 +417,8 @@ func ensureStatusPermission(role *v1.GlobalRole) bool {
 		return true
 	}
 	role.Rules = append(role.Rules, rbacv1.PolicyRule{
-		APIGroups: []string{configv1.GroupName},
-		Resources: []string{statusResourceName},
-		Verbs:     []string{getVerb, listVerb, watchVerb},
+		APIGroups: []string{configv1.GroupName}, Resources: []string{statusResourceName},
+		Verbs: []string{getVerb, listVerb, watchVerb},
 	})
 	return true
 }
@@ -469,9 +477,18 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		storageFactory.Registry(),
 	)
 	coreOperator := core.NewOperator(storageFactory.ConfigMaps())
-	opOperator := operation.NewOperationOperator(storageFactory.Operations())
 	iamOperator := iam.NewOperator(storageFactory.Users(), storageFactory.GlobalRoles(), storageFactory.GlobalRoleBindings(),
 		storageFactory.Tokens(), storageFactory.LoginRecords())
+	if err = (&operationv2controller.OperationReconciler{
+		Store: s.operationV2Store,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
+	if err = (&operationv2controller.BusinessReconciler{
+		Operations: informerFactory.Operations().V1alpha1().Operations().Lister(), Clusters: clusterOperator,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
 	if err = (&regioncontroller.RegionReconciler{
 		NodeLister:   informerFactory.Core().V1().Nodes().Lister(),
 		RegionLister: informerFactory.Core().V1().Regions().Lister(),
@@ -482,34 +499,40 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 	if err = (&backupcontroller.BackupReconciler{
 		ClusterLister:   informerFactory.Core().V1().Clusters().Lister(),
 		BackupLister:    informerFactory.Core().V1().Backups().Lister(),
-		OperationLister: informerFactory.Core().V1().Operations().Lister(),
+		OperationLister: informerFactory.Operations().V1alpha1().Operations().Lister(),
+		OperationStore:  s.operationV2Store,
 		BackupWriter:    clusterOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
 	if err = (&clustercontroller.ClusterReconciler{
-		CmdDelivery:         mgr.GetCmdDelivery(),
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
 		ClusterWriter:       clusterOperator,
 		ClusterOperator:     clusterOperator,
 		RegistryLister:      informerFactory.Core().V1().Registries().Lister(),
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
 		NodeWriter:          clusterOperator,
-		OperationOperator:   opOperator,
-		OperationWriter:     opOperator,
+		OperationStore:      s.operationV2Store,
 		CronBackupWriter:    clusterOperator,
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
+	if err = (&nodecontroller.NodeReconciler{
+		NodeLister:    informerFactory.Core().V1().Nodes().Lister(),
+		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
+		NodeWriter:    clusterOperator,
+	}).SetupWithManager(mgr, informerFactory); err != nil {
+		return err
+	}
 	if err = (&cronbackupcontroller.CronBackupReconciler{
-		CmdDelivery:       mgr.GetCmdDelivery(),
 		ClusterLister:     informerFactory.Core().V1().Clusters().Lister(),
 		NodeLister:        informerFactory.Core().V1().Nodes().Lister(),
 		BackupLister:      informerFactory.Core().V1().Backups().Lister(),
 		CronBackupLister:  informerFactory.Core().V1().CronBackups().Lister(),
 		BackupPointLister: informerFactory.Core().V1().BackupPoints().Lister(),
-		OperationWriter:   opOperator,
+		OperationStore:    s.operationV2Store,
+		NodeReader:        clusterOperator,
 		ClusterWriter:     clusterOperator,
 		CronBackupWriter:  clusterOperator,
 		BackupWriter:      clusterOperator,
@@ -521,16 +544,6 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		DomainLister:  informerFactory.Core().V1().Domains().Lister(),
 		DomainWriter:  clusterOperator,
 		ClusterLister: informerFactory.Core().V1().Clusters().Lister(),
-	}).SetupWithManager(mgr, informerFactory); err != nil {
-		return err
-	}
-	if err = (&operationcontroller.OperationReconciler{
-		CmdDelivery:       mgr.GetCmdDelivery(),
-		ClusterLister:     informerFactory.Core().V1().Clusters().Lister(),
-		ClusterOperator:   clusterOperator,
-		OperationLister:   informerFactory.Core().V1().Operations().Lister(),
-		OperationWriter:   opOperator,
-		OperationOperator: opOperator,
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
@@ -556,7 +569,6 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		ClusterWriter:       clusterOperator,
 		ClusterLister:       informerFactory.Core().V1().Clusters().Lister(),
 		NodeLister:          informerFactory.Core().V1().Nodes().Lister(),
-		CmdDelivery:         mgr.GetCmdDelivery(),
 		CloudProviderLister: informerFactory.Core().V1().CloudProviders().Lister(),
 	}).SetupWithManager(mgr)
 	(&controller.NodeStatusMon{
@@ -565,7 +577,7 @@ func (s *APIServer) SetupController(mgr manager.Manager, informerFactory informe
 		NodeWriter:  clusterOperator,
 	}).SetupWithManager(mgr)
 	(&controller.AuditStatusMon{
-		AuditOperator: platform.NewPlatformOperator(storageFactory.Operations(), storageFactory.Events()),
+		AuditOperator: platform.NewPlatformOperator(storageFactory.PlatformSettings(), storageFactory.Events()),
 		AuditOptions:  s.Config.AuditOptions,
 	}).SetupWithManager(mgr)
 	(&controller.IAMStatusMon{

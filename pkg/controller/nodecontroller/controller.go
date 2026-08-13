@@ -100,16 +100,24 @@ func (r *NodeReconciler) syncNodeRole(ctx context.Context, node *v1.Node) error 
 	clu, err := r.ClusterLister.Get(cluName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			delete(node.Labels, common.LabelClusterName)
-			_, err = r.NodeWriter.UpdateNode(context.TODO(), node)
-			return err
+			return r.clearClusterOwnership(ctx, node)
 		}
 		return err
 	}
-	if err = r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleMaster); err != nil {
-		return err
+	if sets.New(clu.Masters.GetNodeIDs()...).Has(node.Name) {
+		return r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleMaster)
 	}
-	return r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleWorker)
+	if sets.New(clu.Workers.GetNodeIDs()...).Has(node.Name) {
+		return r.updateNodeRoleIfNotEqual(ctx, clu, node, common.NodeRoleWorker)
+	}
+	return r.clearClusterOwnership(ctx, node)
+}
+
+func (r *NodeReconciler) clearClusterOwnership(ctx context.Context, node *v1.Node) error {
+	delete(node.Labels, common.LabelClusterName)
+	delete(node.Labels, common.LabelNodeRole)
+	_, err := r.NodeWriter.UpdateNode(ctx, node)
+	return err
 }
 
 func (r *NodeReconciler) updateNodeRoleIfNotEqual(ctx context.Context, clu *v1.Cluster, node *v1.Node, nodeRole common.NodeRole) error {

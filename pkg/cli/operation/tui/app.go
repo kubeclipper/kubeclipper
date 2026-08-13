@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
@@ -15,7 +15,7 @@ import (
 type Model struct {
 	client      *kc.Client
 	clusterName string
-	operations  []v1.Operation
+	operations  []operationsv1alpha1.Operation
 	currentView currentView
 	listModel   ListModel
 	logModel    LogModel
@@ -25,7 +25,7 @@ type Model struct {
 }
 
 // NewModel creates the main TUI model with the given operations.
-func NewModel(client *kc.Client, clusterName string, operations []v1.Operation) Model {
+func NewModel(client *kc.Client, clusterName string, operations []operationsv1alpha1.Operation) Model {
 	return Model{
 		client:      client,
 		clusterName: clusterName,
@@ -37,11 +37,11 @@ func NewModel(client *kc.Client, clusterName string, operations []v1.Operation) 
 
 // NewModelWithSingleOp creates a model that skips the list and goes directly
 // to the log view for a single operation.
-func NewModelWithSingleOp(client *kc.Client, clusterName string, op v1.Operation) Model {
+func NewModelWithSingleOp(client *kc.Client, clusterName string, op operationsv1alpha1.Operation) Model {
 	return Model{
 		client:      client,
 		clusterName: clusterName,
-		operations:  []v1.Operation{op},
+		operations:  []operationsv1alpha1.Operation{op},
 		currentView: viewLog,
 		logModel:    NewLogModel(client, &op, 80, 24), // will be resized by WindowSizeMsg
 		ready:       false,

@@ -28,14 +28,17 @@ import (
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
+	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/platformstatus"
 
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 const (
 	healthzPath          = "/healthz"
+	platformStatusPath   = "/api/config.kubeclipper.io/v1/status"
 	ListNodesPath        = "/api/core.kubeclipper.io/v1/nodes"
 	clustersPath         = "/api/core.kubeclipper.io/v1/clusters"
 	clustersCertPath     = "/api/core.kubeclipper.io/v1/clusters/%s/certification"
@@ -48,18 +51,16 @@ const (
 	publicKeyPath        = "/api/config.kubeclipper.io/v1/terminal.key"
 	versionPath          = "/version"
 	componentMetaPath    = "/api/config.kubeclipper.io/v1/componentmeta"
-	platformStatusPath   = "/api/config.kubeclipper.io/v1/status"
 	configmapPath        = "/api/core.kubeclipper.io/v1/configmaps"
 	templatePath         = "/api/core.kubeclipper.io/v1/templates"
 	registryPath         = "/api/core.kubeclipper.io/v1/registries"
 	describeRegistryPath = "/api/core.kubeclipper.io/v1/registry/%s"
 	regionPath           = "/api/core.kubeclipper.io/v1/regions"
 
-	operationPath = "/api/core.kubeclipper.io/v1/operations"
-	LogStreamPath = "/api/core.kubeclipper.io/v1/logs"
+	operationPath     = "/api/operations.kubeclipper.io/v1alpha1/operations"
+	operationTaskPath = "/api/operations.kubeclipper.io/v1alpha1/operationtasks"
 )
 
-// Healthz checks whether the configured API server is live.
 func (cli *Client) Healthz(ctx context.Context) error {
 	serverResp, err := cli.get(ctx, healthzPath, nil, nil)
 	defer ensureReaderClosed(serverResp)
@@ -187,15 +188,28 @@ func (cli *Client) ListOperation(ctx context.Context, query Queries) (*Operation
 	return &opList, err
 }
 
-func (cli *Client) DescribeOperation(ctx context.Context, name string) (*v1.Operation, error) {
+func (cli *Client) DescribeOperation(ctx context.Context, name string) (*operationsv1alpha1.Operation, error) {
 	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s", operationPath, name), nil, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
 	}
-	operation := v1.Operation{}
+	operation := operationsv1alpha1.Operation{}
 	err = json.NewDecoder(serverResp.body).Decode(&operation)
 	return &operation, err
+}
+
+func (cli *Client) ListOperationTasks(ctx context.Context, operationUID string) (*operationsv1alpha1.OperationTaskList, error) {
+	v := url.Values{}
+	v.Set("fieldSelector", fmt.Sprintf("spec.operationRef.uid=%s", operationUID))
+	serverResp, err := cli.get(ctx, operationTaskPath, v, nil)
+	defer ensureReaderClosed(serverResp)
+	if err != nil {
+		return nil, err
+	}
+	tasks := operationsv1alpha1.OperationTaskList{}
+	err = json.NewDecoder(serverResp.body).Decode(&tasks)
+	return &tasks, err
 }
 
 func (cli *Client) ListRoles(ctx context.Context, query Queries) (*RoleList, error) {
@@ -663,40 +677,43 @@ func (cli *Client) ListRegion(ctx context.Context, query Queries) (*v1.RegionLis
 }
 
 // GetStepNodeLog fetches the log for a specific operation/step/node with byte offset.
-func (cli *Client) GetStepNodeLog(ctx context.Context, operation, step, node string, offset int64) (*corev1.StepLog, error) {
+func (cli *Client) GetOperationTaskLog(ctx context.Context, taskName string, offset int64) (*oplog.LogContentResponse, error) {
 	v := url.Values{}
-	v.Set("operation", operation)
-	v.Set("step", step)
-	v.Set("node", node)
 	v.Set("offset", fmt.Sprintf("%d", offset))
-	serverResp, err := cli.get(ctx, LogStreamPath, v, nil)
+	serverResp, err := cli.get(ctx, fmt.Sprintf("%s/%s/logs", operationTaskPath, url.PathEscape(taskName)), v, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer ensureReaderClosed(serverResp)
-	var stepLog corev1.StepLog
-	if err := json.NewDecoder(serverResp.body).Decode(&stepLog); err != nil {
+	var taskLog oplog.LogContentResponse
+	if err := json.NewDecoder(serverResp.body).Decode(&taskLog); err != nil {
 		return nil, err
 	}
-	return &stepLog, nil
+	return &taskLog, nil
 }
 
-// RetryOperation retries a failed operation by its ID.
-func (cli *Client) RetryOperation(ctx context.Context, opID string) error {
-	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, opID, "retry"), nil, nil, nil)
+// RetryOperation retries an eligible terminal operation using CAS preconditions.
+func (cli *Client) RetryOperation(ctx context.Context, op *operationsv1alpha1.Operation) (*operationsv1alpha1.Operation, error) {
+	request := &operationsv1alpha1.OperationControlRequest{UID: op.UID, ResourceVersion: op.ResourceVersion}
+	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/retry", operationPath, op.Name), nil, request, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer ensureReaderClosed(serverResp)
-	return nil
+	updated := &operationsv1alpha1.Operation{}
+	err = json.NewDecoder(serverResp.body).Decode(updated)
+	return updated, err
 }
 
-// TerminateOperation terminates a running operation by its ID.
-func (cli *Client) TerminateOperation(ctx context.Context, opID string) error {
-	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/%s", operationPath, opID, "termination"), nil, nil, nil)
+// CancelOperation requests cancellation without interrupting an already running Task.
+func (cli *Client) CancelOperation(ctx context.Context, op *operationsv1alpha1.Operation) (*operationsv1alpha1.Operation, error) {
+	request := &operationsv1alpha1.OperationControlRequest{UID: op.UID, ResourceVersion: op.ResourceVersion}
+	serverResp, err := cli.post(ctx, fmt.Sprintf("%s/%s/cancel", operationPath, op.Name), nil, request, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer ensureReaderClosed(serverResp)
-	return nil
+	updated := &operationsv1alpha1.Operation{}
+	err = json.NewDecoder(serverResp.body).Decode(updated)
+	return updated, err
 }

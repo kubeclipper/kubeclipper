@@ -34,12 +34,10 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cni"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -593,35 +591,6 @@ func (stepper *ClusterNode) InitStepper(c *v1.Cluster, metadata *component.Extra
 	return stepper
 }
 
-func GetKubeConfig(ctx context.Context, name string, node component.Node, externalAddress string, deliveryCmd service.CmdDelivery) (string, error) {
-	content, err := deliveryCmd.DeliverCmd(ctx, node.ID, []string{"cat", "/etc/kubernetes/admin.conf"}, 3*time.Minute)
-	if err != nil {
-		logger.Errorf(" cat kubeConfig error: %s", err.Error())
-		return "", err
-	}
-
-	cfg, err := clientcmd.NewClientConfigFromBytes(content)
-	if err != nil {
-		return "", err
-	}
-	kubeConfig, err := cfg.RawConfig()
-	if err != nil {
-		return "", err
-	}
-
-	if externalAddress != "" {
-		kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", externalAddress)
-	} else {
-		kubeConfig.Clusters[name].Server = fmt.Sprintf("https://%s:6443", node.NodeIPv4)
-	}
-	config, err := clientcmd.Write(kubeConfig)
-	if err != nil {
-		return "", err
-	}
-
-	return string(config), nil
-}
-
 func (stepper *ClusterNode) InstallSteps(role string, nodes []v1.StepNode) ([]v1.Step, error) {
 	stepper.setRole(role)
 	bytes, err := json.Marshal(stepper)
@@ -736,7 +705,7 @@ func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNo
 				Commands: []v1.Command{
 					{
 						Type:         v1.CommandShell,
-						ShellCommand: []string{"ip", "link", "delete", "kube-ipvs0"},
+						ShellCommand: []string{"bash", "-c", "if ip link show kube-ipvs0 >/dev/null 2>&1; then ip link delete kube-ipvs0; fi"},
 					},
 				},
 			},
@@ -1008,7 +977,7 @@ func KubeadmReset(nodes []v1.StepNode) ([]v1.Step, error) {
 			Commands: []v1.Command{
 				{
 					Type:         v1.CommandShell,
-					ShellCommand: []string{"kubeadm", "reset", "-f"},
+					ShellCommand: []string{"bash", "-c", "if command -v kubeadm >/dev/null 2>&1; then kubeadm reset -f; fi"},
 				},
 			},
 		},

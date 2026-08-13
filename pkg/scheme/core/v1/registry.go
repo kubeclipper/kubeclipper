@@ -61,8 +61,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterList{},
 		&Node{},
 		&NodeList{},
-		&Operation{},
-		&OperationList{},
 		&Region{},
 		&RegionList{},
 		&PlatformSetting{},
@@ -93,5 +91,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Registry{},
 		&RegistryList{},
 	)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

@@ -26,16 +26,19 @@ import (
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/typed/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/typed/iam/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/client/clientset/versioned/typed/operations/v1alpha1"
 )
 
 type Interface interface {
 	CoreV1() corev1.CoreV1Interface
 	IamV1() iamv1.IamV1Interface
+	OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface
 }
 
 type Clientset struct {
-	corev1 *corev1.CoreV1Client
-	iamv1  *iamv1.IamV1Client
+	corev1             *corev1.CoreV1Client
+	iamv1              *iamv1.IamV1Client
+	operationsV1alpha1 *operationsv1alpha1.OperationsV1alpha1Client
 }
 
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
@@ -44,6 +47,10 @@ func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 
 func (c *Clientset) IamV1() iamv1.IamV1Interface {
 	return c.iamv1
+}
+
+func (c *Clientset) OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface {
+	return c.operationsV1alpha1
 }
 
 func NewForConfig(c *rest.Config) (*Clientset, error) {
@@ -61,6 +68,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.iamv1, err = iamv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.operationsV1alpha1, err = operationsv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}

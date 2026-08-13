@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -42,7 +41,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	agentconfig "github.com/kubeclipper/kubeclipper/pkg/agent/config"
-	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
@@ -329,11 +327,7 @@ func (r *Kubeadm) syncNode(ctx context.Context, clu *v1.Cluster) error {
 	}
 
 	for _, no := range addNodes {
-		// This function will replace the IP of the node with the ID
-		err = r.deployKCAgent(ctx, no, clu.Labels[common.LabelTopologyRegion])
-		if err != nil {
-			return errors.WithMessagef(err, "node(%s) deploy kc-agent in kc", no.ID)
-		}
+		return errors.Errorf("node(%s) is not registered; run kcctl join before adding it to a cluster", no.ID)
 	}
 	for _, no := range delNodes {
 		if _, isOriginNode := no.Annotations[common.AnnotationOriginNode]; isOriginNode {
@@ -368,112 +362,6 @@ func (r *Kubeadm) markToFree(ctx context.Context, node *v1.Node) error {
 	delete(node.Annotations, common.AnnotationOriginNode)
 	_, err := r.Operator.NodeWriter.UpdateNode(ctx, node)
 	return err
-}
-
-// This function will replace the IP of the node with the ID
-func (r *Kubeadm) deployKCAgent(ctx context.Context, node *v1.WorkerNode, region string) error {
-	ip := node.ID
-	// This function will replace the IP of the node with the ID
-	node.ID = uuid.New().String()
-	log := logger.FromContext(ctx)
-	log.Debugf("beginning deploy kc agent to node agent:%s ip:%s", node.ID, ip)
-
-	// 1.download kc-agent binary from kc-server & get certs from configmap.
-	deployConfig, err := r.getDeployConfig()
-	if err != nil {
-		return errors.WithMessage(err, "getDeployConfig")
-	}
-
-	originalID, originalRegion, active := r.agentStatus(ip)
-	if originalID != "" {
-		node.ID = originalID
-	}
-	no, nodeErr := r.Operator.NodeLister.Get(originalID)
-	if nodeErr != nil && !apimachineryErrors.IsNotFound(nodeErr) {
-		return nodeErr
-	}
-	if active && no != nil && no.Labels[common.LabelTopologyRegion] == originalRegion {
-		if !deployConfig.Agents.Exists(ip) {
-			meta := options.Metadata{
-				Region: region,
-			}
-			err = r.updateDeployConfigAgents(ip, &meta, "add")
-			if err != nil {
-				logger.Errorf("add agent ip to deploy config failed: %v", err)
-				return err
-			}
-		}
-		logger.Warnf("update deploy-config agent failed: %v", err)
-		return nil
-	}
-	// download http://192.168.10.123:8081/kc/kubeclipper-agent
-	url := fmt.Sprintf("http://%s:%v/kc", deployConfig.ServerIPs[0], deployConfig.StaticServerPort)
-	cmdList := []string{
-		"systemctl stop kc-agent || true",
-		fmt.Sprintf("curl %s/kubeclipper-agent -o /usr/local/bin/kubeclipper-agent", url),
-		"chmod +x /usr/local/bin/kubeclipper-agent",
-		fmt.Sprintf("if [[ $(which etcdctl) != which* ]]; then curl %s/etcdctl -o /usr/local/bin/etcdctl; fi", url),
-		"chmod +x /usr/local/bin/etcdctl",
-	}
-
-	for _, cmd := range cmdList {
-		ret, err := sshutils.SSHCmdWithSudo(r.ssh(), ip, cmd)
-		if err != nil {
-			return errors.WithMessagef(err, "run cmd [%s] on node [%s]", cmd, ip)
-		}
-		if err = ret.Error(); err != nil {
-			return errors.WithMessage(err, ret.String())
-		}
-	}
-
-	ca, cliCert, cliKey, err := r.gerCerts()
-	if err != nil {
-		return errors.WithMessage(err, "gerCerts from kc configmap")
-	}
-	destCa := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultCaPath, "ca.crt")
-	destCert := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, "kc-server-nats-client.crt")
-	destKey := filepath.Join(options.DefaultKcAgentConfigPath, options.DefaultNatsPKIPath, "kc-server-nats-client.key")
-	cmds := []string{
-		"mkdir -p /etc/kubeclipper-agent/pki/nats",
-		sshutils.WrapEcho(string(ca), destCa),
-		sshutils.WrapEcho(string(cliCert), destCert),
-		sshutils.WrapEcho(string(cliKey), destKey),
-	}
-
-	for _, cmd := range cmds {
-		ret, err := sshutils.SSHCmdWithSudo(r.ssh(), ip, cmd)
-		if err != nil {
-			return errors.WithMessagef(err, "run %s cmd", cmd)
-		}
-		if err = ret.Error(); err != nil {
-			return errors.WithMessage(err, ret.String())
-		}
-	}
-
-	// 2. generate kubeclipper-agent.yaml、systemd conf,then start kc-agent
-	agentConfig, err := deployConfig.GetKcAgentConfigTemplateContent(options.Metadata{Region: region, AgentID: node.ID})
-	if err != nil {
-		return errors.WithMessage(err, "GetKcAgentConfigTemplateContent")
-	}
-	cmdList = []string{
-		sshutils.WrapEcho(config.KcAgentService, "/usr/lib/systemd/system/kc-agent.service"),
-		"mkdir -pv /etc/kubeclipper-agent",
-		sshutils.WrapEcho(agentConfig, "/etc/kubeclipper-agent/kubeclipper-agent.yaml"),
-		"systemctl daemon-reload && systemctl enable kc-agent && systemctl restart kc-agent",
-	}
-	for _, cmd := range cmdList {
-		ret, err := sshutils.SSHCmdWithSudo(r.ssh(), ip, cmd)
-		if err != nil {
-			return errors.WithMessagef(err, "run %s cmd", cmd)
-		}
-		if err = ret.Error(); err != nil {
-			return errors.WithMessage(err, ret.String())
-		}
-	}
-
-	log.Debugf("deploy kc agent to node agent:%s ip:%s successfully", node.ID, ip)
-
-	return nil
 }
 
 // drainAgent remote kc-agent for node,and delete node from kc-server
@@ -515,32 +403,6 @@ func (r *Kubeadm) drainAgent(nodeIP, agentID string, ssh *sshutils.SSH) error {
 	}
 
 	return nil
-}
-
-func (r *Kubeadm) gerCerts() (ca, natsCliCert, natsCliKey []byte, err error) {
-	kcca, err := r.Operator.ConfigmapLister.Get("kc-ca")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	nats, err := r.Operator.ConfigmapLister.Get("kc-nats")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	ca, err = base64.StdEncoding.DecodeString(kcca.Data["ca.crt"])
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	natsCliCert, err = base64.StdEncoding.DecodeString(nats.Data["kc-server-nats-client.crt"])
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	natsCliKey, err = base64.StdEncoding.DecodeString(nats.Data["kc-server-nats-client.key"])
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return ca, natsCliCert, natsCliKey, nil
 }
 
 func (r *Kubeadm) getDeployConfig() (*options.DeployConfig, error) {

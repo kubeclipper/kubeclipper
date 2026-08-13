@@ -181,6 +181,19 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 			return err
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
+
+		// A successful kubeadm join only proves that the command exited cleanly.
+		// Reuse the existing health executor so AddNodes is successful only after
+		// Kubernetes observes the node and kube-system Pods as ready.
+		health := &Health{}
+		if err := health.InitStepper(metadata.KubeVersion, DefaultKubeConfigPath); err != nil {
+			return err
+		}
+		steps, err = health.InstallSteps([]v1.StepNode{masters[0]})
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps[0])
 	}
 
 	return nil
