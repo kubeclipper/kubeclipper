@@ -39,6 +39,7 @@ const (
 	DefaultAgentLogAddress      = ":10260"
 	DefaultServerClientIdentity = "system:kc-server"
 	maxLogReadSize              = 1 << 20
+	logServerShutdownTimeout    = 5 * time.Second
 )
 
 type TaskLogReader interface {
@@ -80,11 +81,13 @@ func (h *LogHandler) ServeHTTP(response http.ResponseWriter, request *http.Reque
 		}
 	}
 	response.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(response).Encode(oplog.LogContentResponse{
+	if err := json.NewEncoder(response).Encode(oplog.LogContentResponse{
 		Content:      string(content),
 		LogSize:      size,
 		DeliverySize: delivered,
-	})
+	}); err != nil {
+		logger.Errorf("write task log response: %v", err)
+	}
 }
 
 func (h *LogHandler) expectedClientCommonName() string {
@@ -147,12 +150,15 @@ type LogServer struct {
 	close    sync.Once
 }
 
-func NewLogServer(opts LogServerOptions) (*LogServer, error) {
+func NewLogServer(opts *LogServerOptions) (*LogServer, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("log server options are required")
+	}
 	if opts.Address == "" {
 		opts.Address = DefaultAgentLogAddress
 	}
 	if opts.Logs == nil || opts.TLSCertFile == "" || opts.TLSKeyFile == "" || opts.ClientCAFile == "" {
-		return nil, fmt.Errorf("Task logs, TLS certificate, key, and client CA are required")
+		return nil, fmt.Errorf("task logs, TLS certificate, key, and client CA are required")
 	}
 	certificate, err := tls.LoadX509KeyPair(opts.TLSCertFile, opts.TLSKeyFile)
 	if err != nil {
@@ -184,7 +190,7 @@ func NewLogServer(opts LogServerOptions) (*LogServer, error) {
 }
 
 func (s *LogServer) PrepareRun(<-chan struct{}) error {
-	listener, err := net.Listen("tcp", s.server.Addr)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", s.server.Addr)
 	if err != nil {
 		return err
 	}
@@ -210,8 +216,10 @@ func (s *LogServer) Run(stopCh <-chan struct{}) error {
 
 func (s *LogServer) Close() {
 	s.close.Do(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), logServerShutdownTimeout)
 		defer cancel()
-		_ = s.server.Shutdown(ctx)
+		if err := s.server.Shutdown(ctx); err != nil {
+			logger.Errorf("shutdown task log server: %v", err)
+		}
 	})
 }

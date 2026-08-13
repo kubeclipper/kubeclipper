@@ -46,6 +46,8 @@ type Server struct {
 	Config    *config.Config
 }
 
+const nodeStatusUpdateTimeout = 30 * time.Second
+
 func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	opLog, err := oplog.NewOperationLog(s.Config.OpLogOptions)
 	if err != nil {
@@ -79,18 +81,18 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 		return fmt.Errorf("get registered Node %q: %w", s.Config.AgentID, err)
 	}
 	registry := operationv2.NewRegistry()
-	if err := registry.Register(operationv2.NoopExecutorName, operationv2.NoopExecutor{}); err != nil {
-		return err
+	if registerErr := registry.Register(operationv2.NoopExecutorName, operationv2.NoopExecutor{}); registerErr != nil {
+		return registerErr
 	}
-	if err := registry.Register(operationv2.NodePreflightExecutorName, operationv2.NodePreflight{}); err != nil {
-		return err
+	if registerErr := registry.Register(operationv2.NodePreflightExecutorName, operationv2.NodePreflight{}); registerErr != nil {
+		return registerErr
 	}
-	if err := registry.Register(operationv2.CommandStepExecutorName, operationv2.CommandStepExecutor{
+	if registerErr := registry.Register(operationv2.CommandStepExecutorName, operationv2.CommandStepExecutor{
 		OpLog: opLog, RepoMirror: s.Config.ImageProxyOptions.KcImageRepoMirror,
-	}); err != nil {
-		return err
+	}); registerErr != nil {
+		return registerErr
 	}
-	s.worker, err = operationv2.NewWorker(operationv2.WorkerOptions{
+	s.worker, err = operationv2.NewWorker(&operationv2.WorkerOptions{
 		AgentID: s.Config.AgentID, NodeUID: node.UID,
 		Client: client.OperationsV1alpha1().OperationTasks(), Registry: registry, OpLog: opLog,
 	})
@@ -100,7 +102,7 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	if err := s.worker.PrepareRun(stopCh); err != nil {
 		return err
 	}
-	s.logServer, err = operationv2.NewLogServer(operationv2.LogServerOptions{
+	s.logServer, err = operationv2.NewLogServer(&operationv2.LogServerOptions{
 		Address: s.Config.APIServer.LogAddress, TLSCertFile: s.Config.APIServer.CertFile,
 		TLSKeyFile: s.Config.APIServer.KeyFile, ClientCAFile: s.Config.APIServer.CAFile,
 		ExpectedClientCommonName: operationv2.DefaultServerClientIdentity, Logs: opLog,
@@ -117,7 +119,10 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 }
 
 func (s *Server) initialNode() *corev1.Node {
-	hostname, _ := os.Hostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = s.Config.AgentID
+	}
 	node := &corev1.Node{
 		TypeMeta: metav1.TypeMeta{Kind: "Node", APIVersion: corev1.SchemeGroupVersion.String()},
 		ObjectMeta: metav1.ObjectMeta{Name: s.Config.AgentID, Labels: map[string]string{
@@ -172,7 +177,7 @@ func (s *Server) reportNodeStatus(stopCh <-chan struct{}) {
 }
 
 func (s *Server) updateNodeStatus() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), nodeStatusUpdateTimeout)
 	defer cancel()
 	node, err := s.client.CoreV1().Nodes().Get(ctx, s.Config.AgentID, metav1.GetOptions{})
 	if err != nil {

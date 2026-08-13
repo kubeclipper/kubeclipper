@@ -41,7 +41,13 @@ var (
 )
 
 func init() {
-	_ = corev1.AddToScheme(Scheme)
-	_ = iamv1.AddToScheme(Scheme)
-	_ = operationsv1alpha1.AddToScheme(Scheme)
+	if err := corev1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
+	if err := iamv1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
+	if err := operationsv1alpha1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
 }

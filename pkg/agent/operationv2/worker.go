@@ -40,7 +40,10 @@ import (
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
-const syncKey = "tasks"
+const (
+	syncKey        = "tasks"
+	workerLockMode = 0600
+)
 
 type TaskClient interface {
 	Get(context.Context, string, metav1.GetOptions) (*operations.OperationTask, error)
@@ -77,7 +80,10 @@ type Worker struct {
 	close    sync.Once
 }
 
-func NewWorker(opts WorkerOptions) (*Worker, error) {
+func NewWorker(opts *WorkerOptions) (*Worker, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("worker options are required")
+	}
 	if opts.AgentID == "" || opts.NodeUID == "" {
 		return nil, fmt.Errorf("agent ID and Node UID are required")
 	}
@@ -107,16 +113,18 @@ func NewWorker(opts WorkerOptions) (*Worker, error) {
 			return w.client.Watch(context.Background(), listOptions)
 		},
 	}, &operations.OperationTask{}, 0, cache.Indexers{})
-	w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(interface{}) { w.queue.Add(syncKey) },
-		UpdateFunc: func(interface{}, interface{}) { w.queue.Add(syncKey) },
-		DeleteFunc: func(interface{}) { w.queue.Add(syncKey) },
-	})
+	if _, err := w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(any) { w.queue.Add(syncKey) },
+		UpdateFunc: func(any, any) { w.queue.Add(syncKey) },
+		DeleteFunc: func(any) { w.queue.Add(syncKey) },
+	}); err != nil {
+		return nil, fmt.Errorf("add task event handler: %w", err)
+	}
 	return w, nil
 }
 
 func (w *Worker) PrepareRun(<-chan struct{}) error {
-	lockFile, err := os.OpenFile(w.lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	lockFile, err := os.OpenFile(w.lockPath, os.O_CREATE|os.O_RDWR, workerLockMode)
 	if err != nil {
 		return fmt.Errorf("open agent singleton lock: %w", err)
 	}
@@ -145,7 +153,9 @@ func (w *Worker) Close() {
 	w.close.Do(func() {
 		w.queue.ShutDown()
 		if w.lockFile != nil {
-			_ = unix.Flock(int(w.lockFile.Fd()), unix.LOCK_UN)
+			if err := unix.Flock(int(w.lockFile.Fd()), unix.LOCK_UN); err != nil {
+				logger.Errorf("unlock Operation v2 worker: %v", err)
+			}
 			_ = w.lockFile.Close()
 		}
 	})
@@ -263,7 +273,7 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 		defer logWriter.Close()
 		_, _ = fmt.Fprintf(logWriter, "\n--- reconcile %s ---\n", time.Now().UTC().Format(time.RFC3339))
 	}
-	var writer io.Writer = io.Discard
+	writer := io.Discard
 	if logWriter != nil {
 		writer = logWriter
 	}
@@ -288,11 +298,16 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 	return w.finish(parent, task, operations.TaskSucceeded, result)
 }
 
-func (w *Worker) finish(ctx context.Context, task *operations.OperationTask, phase operations.TaskPhase, result operations.TaskResult) error {
-	copy := task.DeepCopy()
-	copy.Status.Phase = phase
-	copy.Status.Result = &result
-	_, err := w.client.UpdateStatus(ctx, copy, metav1.UpdateOptions{})
+func (w *Worker) finish(
+	ctx context.Context,
+	task *operations.OperationTask,
+	phase operations.TaskPhase,
+	result operations.TaskResult,
+) error {
+	updatedTask := task.DeepCopy()
+	updatedTask.Status.Phase = phase
+	updatedTask.Status.Result = &result
+	_, err := w.client.UpdateStatus(ctx, updatedTask, metav1.UpdateOptions{})
 	if err != nil {
 		latest, getErr := w.client.Get(context.Background(), task.Name, metav1.GetOptions{})
 		if getErr == nil && latest.UID == task.UID && latest.Status.Phase.IsTerminal() {

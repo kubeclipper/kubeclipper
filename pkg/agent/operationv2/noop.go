@@ -10,7 +10,10 @@ import (
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
-const NoopExecutorName = "Noop/v1"
+const (
+	NoopExecutorName = "Noop/v1"
+	maxNoopOutputs   = 32
+)
 
 type NoopPayload struct {
 	Outputs map[string]string `json:"outputs,omitempty"`
@@ -30,12 +33,14 @@ func (NoopExecutor) Reconcile(_ context.Context, task *operations.OperationTask,
 	if err := validateOutputs(payload.Outputs); err != nil {
 		return operations.TaskResult{}, err
 	}
-	_, _ = io.WriteString(log, "noop completed\n")
+	if _, err := io.WriteString(log, "noop completed\n"); err != nil {
+		return operations.TaskResult{}, fmt.Errorf("write noop log: %w", err)
+	}
 	return operations.TaskResult{Outputs: payload.Outputs}, nil
 }
 
 func validateOutputs(outputs map[string]string) error {
-	if len(outputs) > 32 {
+	if len(outputs) > maxNoopOutputs {
 		return fmt.Errorf("noop outputs exceed limit")
 	}
 	for key, value := range outputs {

@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
@@ -80,7 +79,7 @@ func (operationStrategy) PrepareForUpdate(_ context.Context, obj, old runtime.Ob
 	op.Spec.Action = oldOp.Spec.Action
 	op.Spec.Timeout = oldOp.Spec.Timeout
 	op.Spec.Steps = oldOp.Spec.Steps
-	op.Status = op.Status
+	op.Status = oldOp.Status
 	op.TypeMeta = oldOp.TypeMeta
 }
 
@@ -205,7 +204,10 @@ func (lockStrategy) Validate(_ context.Context, obj runtime.Object) field.ErrorL
 	errs = append(errs, validateLockReference(lock.Spec.TargetRef, field.NewPath("spec", "targetRef"))...)
 	errs = append(errs, validateLockReference(lock.Spec.HolderRef, field.NewPath("spec", "holderRef"))...)
 	if lock.Spec.HolderRef.Kind != operations.KindOperation {
-		errs = append(errs, field.Invalid(field.NewPath("spec", "holderRef", "kind"), lock.Spec.HolderRef.Kind, "holder must be an Operation"))
+		errs = append(
+			errs,
+			field.Invalid(field.NewPath("spec", "holderRef", "kind"), lock.Spec.HolderRef.Kind, "holder must be an Operation"),
+		)
 	}
 	return errs
 }
@@ -234,7 +236,7 @@ func metav1TypeMeta(kind string) metav1.TypeMeta {
 	return metav1.TypeMeta{APIVersion: operations.SchemeGroupVersion.String(), Kind: kind}
 }
 
-func attrsForOperation(obj runtime.Object) (labels.Set, fields.Set, error) {
+func attrsForOperation(obj runtime.Object) (labelSet labels.Set, fieldSet fields.Set, err error) {
 	op, ok := obj.(*operations.Operation)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected Operation, got %T", obj)
@@ -244,7 +246,7 @@ func attrsForOperation(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return op.Labels, set, nil
 }
 
-func attrsForTask(obj runtime.Object) (labels.Set, fields.Set, error) {
+func attrsForTask(obj runtime.Object) (labelSet labels.Set, fieldSet fields.Set, err error) {
 	task, ok := obj.(*operations.OperationTask)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected OperationTask, got %T", obj)
@@ -255,7 +257,7 @@ func attrsForTask(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return task.Labels, set, nil
 }
 
-func attrsForLock(obj runtime.Object) (labels.Set, fields.Set, error) {
+func attrsForLock(obj runtime.Object) (labelSet labels.Set, fieldSet fields.Set, err error) {
 	lock, ok := obj.(*operations.ExecutionLock)
 	if !ok {
 		return nil, nil, fmt.Errorf("expected ExecutionLock, got %T", obj)
@@ -263,8 +265,4 @@ func attrsForLock(obj runtime.Object) (labels.Set, fields.Set, error) {
 	set := generic.ObjectMetaFieldsSet(&lock.ObjectMeta, false)
 	set["spec.targetRef.uid"] = string(lock.Spec.TargetRef.UID)
 	return lock.Labels, set, nil
-}
-
-func match(getAttrs storage.AttrFunc, label labels.Selector, fieldSelector fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{Label: label, Field: fieldSelector, GetAttrs: getAttrs}
 }

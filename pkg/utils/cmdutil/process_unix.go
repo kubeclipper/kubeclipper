@@ -29,7 +29,9 @@ func configureProcessGroup(command *exec.Cmd, done <-chan struct{}) {
 			select {
 			case <-done:
 			case <-timer.C:
-				_ = syscall.Kill(-pid, syscall.SIGKILL)
+				if killErr := syscall.Kill(-pid, syscall.SIGKILL); killErr != nil && !errors.Is(killErr, syscall.ESRCH) {
+					return
+				}
 			}
 		}()
 		return nil

@@ -62,7 +62,11 @@ func (f *fakeTaskClient) Watch(context.Context, metav1.ListOptions) (watch.Inter
 	return watch.NewEmptyWatch(), nil
 }
 
-func (f *fakeTaskClient) UpdateStatus(_ context.Context, task *operations.OperationTask, _ metav1.UpdateOptions) (*operations.OperationTask, error) {
+func (f *fakeTaskClient) UpdateStatus(
+	_ context.Context,
+	task *operations.OperationTask,
+	_ metav1.UpdateOptions,
+) (*operations.OperationTask, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if task.UID != f.task.UID || task.ResourceVersion != f.task.ResourceVersion {
@@ -106,7 +110,7 @@ func newTestWorker(t *testing.T, client *fakeTaskClient, executor Executor) *Wor
 	if err != nil {
 		t.Fatal(err)
 	}
-	worker, err := NewWorker(WorkerOptions{
+	worker, err := NewWorker(&WorkerOptions{
 		AgentID:  "agent-1",
 		NodeUID:  types.UID("node-uid"),
 		Client:   client,
@@ -125,14 +129,20 @@ func newTestWorker(t *testing.T, client *fakeTaskClient, executor Executor) *Wor
 
 func TestWorkerClaimsAndCompletesTask(t *testing.T) {
 	client := &fakeTaskClient{task: newTestTask(operations.TaskPending)}
-	worker := newTestWorker(t, client, executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
-		return operations.TaskResult{Outputs: map[string]string{"token": "small-value"}}, nil
-	}))
+	worker := newTestWorker(
+		t,
+		client,
+		executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
+			return operations.TaskResult{Outputs: map[string]string{"token": "small-value"}}, nil
+		}),
+	)
 
 	if err := worker.sync(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := client.phases, []operations.TaskPhase{operations.TaskRunning, operations.TaskSucceeded}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+	if got, want := client.phases, []operations.TaskPhase{operations.TaskRunning, operations.TaskSucceeded}; len(got) != len(want) ||
+		got[0] != want[0] ||
+		got[1] != want[1] {
 		t.Fatalf("unexpected phase updates: %#v", got)
 	}
 	if client.task.Status.Result.Outputs["token"] != "small-value" {
@@ -142,9 +152,13 @@ func TestWorkerClaimsAndCompletesTask(t *testing.T) {
 
 func TestWorkerAcceptsPersistedTerminalAfterLostResponse(t *testing.T) {
 	client := &fakeTaskClient{task: newTestTask(operations.TaskRunning), loseTerminalResponse: true}
-	worker := newTestWorker(t, client, executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
-		return operations.TaskResult{}, nil
-	}))
+	worker := newTestWorker(
+		t,
+		client,
+		executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
+			return operations.TaskResult{}, nil
+		}),
+	)
 
 	if err := worker.sync(context.Background()); err != nil {
 		t.Fatalf("persisted terminal status should make a lost response successful: %v", err)
