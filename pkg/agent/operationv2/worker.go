@@ -73,6 +73,8 @@ type Worker struct {
 	registry *Registry
 	oplog    TaskLog
 	lockPath string
+	runCtx   context.Context
+	cancel   context.CancelFunc
 
 	informer cache.SharedIndexInformer
 	queue    workqueue.RateLimitingInterface
@@ -93,6 +95,7 @@ func NewWorker(opts *WorkerOptions) (*Worker, error) {
 	if opts.LockFile == "" {
 		opts.LockFile = "/run/kubeclipper-agent-operation-v2.lock"
 	}
+	runCtx, cancel := context.WithCancel(context.Background())
 	w := &Worker{
 		agentID:  opts.AgentID,
 		nodeUID:  opts.NodeUID,
@@ -100,6 +103,8 @@ func NewWorker(opts *WorkerOptions) (*Worker, error) {
 		registry: opts.Registry,
 		oplog:    opts.OpLog,
 		lockPath: opts.LockFile,
+		runCtx:   runCtx,
+		cancel:   cancel,
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "operation-v2-agent"),
 	}
 	selector := fields.OneTermEqualSelector("spec.nodeRef.name", opts.AgentID).String()
@@ -151,6 +156,9 @@ func (w *Worker) Run(stopCh <-chan struct{}) error {
 
 func (w *Worker) Close() {
 	w.close.Do(func() {
+		if w.cancel != nil {
+			w.cancel()
+		}
 		w.queue.ShutDown()
 		if w.lockFile != nil {
 			if err := unix.Flock(int(w.lockFile.Fd()), unix.LOCK_UN); err != nil {
@@ -172,7 +180,7 @@ func (w *Worker) processNext(stopCh <-chan struct{}) bool {
 		return false
 	default:
 	}
-	if err := w.sync(context.Background()); err != nil {
+	if err := w.sync(w.runCtx); err != nil {
 		logger.Errorf("Operation v2 agent sync failed: %v", err)
 		w.queue.AddRateLimited(syncKey)
 		return true
@@ -297,6 +305,9 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 	ctx, cancel := context.WithDeadline(parent, task.Spec.Deadline.Time)
 	defer cancel()
 	result, reconcileErr := executor.Reconcile(ctx, task.DeepCopy(), writer)
+	if parent.Err() != nil {
+		return parent.Err()
+	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(reconcileErr, context.DeadlineExceeded) {
 		return w.finish(context.Background(), task, operations.TaskTimedOut, operations.TaskResult{
 			Reason:  operations.TaskReasonDeadlineExceeded,

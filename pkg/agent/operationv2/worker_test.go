@@ -167,6 +167,41 @@ func TestWorkerAcceptsPersistedTerminalAfterLostResponse(t *testing.T) {
 	}
 }
 
+func TestWorkerShutdownCancelsExecutorWithoutFailingTask(t *testing.T) {
+	client := &fakeTaskClient{task: newTestTask(operations.TaskRunning)}
+	started := make(chan struct{})
+	worker := newTestWorker(
+		t,
+		client,
+		executorFunc(func(ctx context.Context, _ *operations.OperationTask, _ io.Writer) (operations.TaskResult, error) {
+			close(started)
+			<-ctx.Done()
+			return operations.TaskResult{}, ctx.Err()
+		}),
+	)
+
+	result := make(chan error, 1)
+	go func() { result <- worker.sync(worker.runCtx) }()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("executor did not start")
+	}
+	worker.cancel()
+
+	if err := <-result; !errors.Is(err, context.Canceled) {
+		t.Fatalf("sync error = %v, want context.Canceled", err)
+	}
+	if got := client.task.Status.Phase; got != operations.TaskRunning {
+		t.Fatalf("task phase = %s, want Running", got)
+	}
+	for _, phase := range client.phases {
+		if phase.IsTerminal() {
+			t.Fatalf("shutdown wrote terminal phase %s", phase)
+		}
+	}
+}
+
 func TestSelectTaskFailsClosedWithMultipleRunning(t *testing.T) {
 	first := newTestTask(operations.TaskRunning)
 	second := newTestTask(operations.TaskRunning)
