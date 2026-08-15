@@ -16,25 +16,13 @@ log:
   maxAge: 30
   compress: false
   useLocalTime: true
-mq:
-  client:
-    serverAddress:
-      - 127.0.0.1:9889
-    subjectSuffix: k8s-installer
-    queueGroupName: status-report-queue
-    nodeReportSubject: status-report-subj
-    timeOutSeconds: 10
-    reconnectInterval: 2s
-    maxReconnect: 600
-    pingInterval: 2m
-    maxPingsOut: 2
-  auth:
-    mode: basic
-    username: user
-    password: password
-    tlsCertPath: ""
-    tlsKeyPath: ""
-    tlsCaPath: ""
+apiServer:
+  endpoint: https://127.0.0.1:8080
+  caFile: /etc/kubeclipper-agent/pki/ca.crt
+  certFile: /etc/kubeclipper-agent/pki/agent.crt
+  keyFile: /etc/kubeclipper-agent/pki/agent.key
+  serverName: server.kubeclipper.io
+  logAddress: ":10260"
 oplog:
   dir: ./dist/oplog
 backupStore:

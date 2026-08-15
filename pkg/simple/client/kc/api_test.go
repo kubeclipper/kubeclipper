@@ -3,165 +3,98 @@ package kc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
-	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/kubeclipper/kubeclipper/pkg/oplog"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
-func TestGetStepNodeLogURL(t *testing.T) {
-	tests := []struct {
-		name       string
-		opID       string
-		stepID     string
-		nodeID     string
-		offset     int64
-		wantPath   string
-		wantParams map[string]string
-	}{
-		{
-			name:     "basic request with zero offset",
-			opID:     "op-001",
-			stepID:   "step-1",
-			nodeID:   "node-1",
-			offset:   0,
-			wantPath: "/api/core.kubeclipper.io/v1/logs",
-			wantParams: map[string]string{
-				"operation": "op-001",
-				"step":      "step-1",
-				"node":      "node-1",
-				"offset":    "0",
-			},
-		},
-		{
-			name:     "request with non-zero offset",
-			opID:     "op-002",
-			stepID:   "step-2",
-			nodeID:   "node-2",
-			offset:   1500,
-			wantPath: "/api/core.kubeclipper.io/v1/logs",
-			wantParams: map[string]string{
-				"operation": "op-002",
-				"step":      "step-2",
-				"node":      "node-2",
-				"offset":    "1500",
-			},
-		},
+func testClient(t *testing.T, handler http.HandlerFunc) *Client {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return &Client{host: u.Host, scheme: "http", client: http.DefaultClient}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var capturedRequest *http.Request
-			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				capturedRequest = r
-				stepLog := corev1.StepLog{
-					Content:      "test log content",
-					Node:         tt.nodeID,
-					DeliverySize: 16,
-					LogSize:      16,
+func TestGetOperationTaskLogUsesV2TaskEndpoint(t *testing.T) {
+	var request *http.Request
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		request = r
+		if err := json.NewEncoder(w).Encode(oplog.LogContentResponse{Content: "log", DeliverySize: 3, LogSize: 3}); err != nil {
+			t.Errorf("encode log response: %v", err)
+		}
+	})
+	got, err := client.GetOperationTaskLog(context.Background(), "task-a", 17)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Content != "log" {
+		t.Fatalf("content = %q", got.Content)
+	}
+	if request.URL.Path != operationTaskPath+"/task-a/logs" {
+		t.Fatalf("path = %q", request.URL.Path)
+	}
+	if request.URL.Query().Get("offset") != "17" {
+		t.Fatalf("offset = %q", request.URL.Query().Get("offset"))
+	}
+}
+
+func TestListOperationTasksFiltersByOperationUID(t *testing.T) {
+	var request *http.Request
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		request = r
+		if err := json.NewEncoder(w).Encode(&operationsv1alpha1.OperationTaskList{}); err != nil {
+			t.Errorf("encode task list: %v", err)
+		}
+	})
+	if _, err := client.ListOperationTasks(context.Background(), "operation-uid"); err != nil {
+		t.Fatal(err)
+	}
+	if got := request.URL.Query().Get("fieldSelector"); got != "spec.operationRef.uid=operation-uid" {
+		t.Fatalf("fieldSelector = %q", got)
+	}
+}
+
+func TestOperationControlUsesCASPreconditions(t *testing.T) {
+	for _, subresource := range []string{"retry", "cancel"} {
+		t.Run(subresource, func(t *testing.T) {
+			var request *http.Request
+			var body operationsv1alpha1.OperationControlRequest
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				request = r
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Error(err)
 				}
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(stepLog)
-			}))
-			defer ts.Close()
-
-			u, _ := url.Parse(ts.URL)
-			cli := &Client{
-				host:   u.Host,
-				scheme: "http",
-				client: http.DefaultClient,
+				if err := json.NewEncoder(w).Encode(&operationsv1alpha1.Operation{ObjectMeta: metav1.ObjectMeta{Name: "op"}}); err != nil {
+					t.Errorf("encode operation: %v", err)
+				}
+			})
+			op := &operationsv1alpha1.Operation{ObjectMeta: metav1.ObjectMeta{Name: "op", UID: types.UID("uid"), ResourceVersion: "42"}}
+			var err error
+			if subresource == "retry" {
+				_, err = client.RetryOperation(context.Background(), op)
+			} else {
+				_, err = client.CancelOperation(context.Background(), op)
 			}
-
-			_, err := cli.GetStepNodeLog(context.Background(), tt.opID, tt.stepID, tt.nodeID, tt.offset)
 			if err != nil {
-				t.Fatalf("GetStepNodeLog() error: %v", err)
+				t.Fatal(err)
 			}
-
-			if capturedRequest == nil {
-				t.Fatal("no request captured")
+			if request.Method != http.MethodPost || request.URL.Path != operationPath+"/op/"+subresource {
+				t.Fatalf("request = %s %s", request.Method, request.URL.Path)
 			}
-
-			if capturedRequest.URL.Path != tt.wantPath {
-				t.Errorf("path = %q, want %q", capturedRequest.URL.Path, tt.wantPath)
-			}
-
-			for key, want := range tt.wantParams {
-				got := capturedRequest.URL.Query().Get(key)
-				if got != want {
-					t.Errorf("query param %q = %q, want %q", key, got, want)
-				}
+			if body.UID != "uid" || body.ResourceVersion != "42" {
+				t.Fatalf("body = %#v", body)
 			}
 		})
-	}
-}
-
-func TestRetryOperationURL(t *testing.T) {
-	var capturedRequest *http.Request
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedRequest = r
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	cli := &Client{
-		host:   u.Host,
-		scheme: "http",
-		client: http.DefaultClient,
-	}
-
-	opID := "op-retry-123"
-	err := cli.RetryOperation(context.Background(), opID)
-	if err != nil {
-		t.Fatalf("RetryOperation() error: %v", err)
-	}
-
-	if capturedRequest == nil {
-		t.Fatal("no request captured")
-	}
-
-	expectedPath := fmt.Sprintf("%s/%s/%s", operationPath, opID, "retry")
-	if capturedRequest.URL.Path != expectedPath {
-		t.Errorf("path = %q, want %q", capturedRequest.URL.Path, expectedPath)
-	}
-	if capturedRequest.Method != "POST" {
-		t.Errorf("method = %q, want POST", capturedRequest.Method)
-	}
-}
-
-func TestTerminateOperationURL(t *testing.T) {
-	var capturedRequest *http.Request
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedRequest = r
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	cli := &Client{
-		host:   u.Host,
-		scheme: "http",
-		client: http.DefaultClient,
-	}
-
-	opID := "op-term-456"
-	err := cli.TerminateOperation(context.Background(), opID)
-	if err != nil {
-		t.Fatalf("TerminateOperation() error: %v", err)
-	}
-
-	if capturedRequest == nil {
-		t.Fatal("no request captured")
-	}
-
-	expectedPath := fmt.Sprintf("%s/%s/%s", operationPath, opID, "termination")
-	if capturedRequest.URL.Path != expectedPath {
-		t.Errorf("path = %q, want %q", capturedRequest.URL.Path, expectedPath)
-	}
-	if capturedRequest.Method != "POST" {
-		t.Errorf("method = %q, want POST", capturedRequest.Method)
 	}
 }

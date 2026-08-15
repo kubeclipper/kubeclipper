@@ -29,6 +29,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 
 	apierror "github.com/kubeclipper/kubeclipper/pkg/errors"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -41,7 +42,13 @@ type clusterCondition func(clu *corev1.Cluster) (bool, error)
 type backupCondition func(backup *corev1.Backup) (bool, error)
 
 // WaitForClusterCondition waits a cluster to be matched to the given condition.
-func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, timeout time.Duration, condition clusterCondition, outLog bool) error {
+func WaitForClusterCondition(
+	c *kc.Client,
+	clusterName, conditionDesc string,
+	timeout time.Duration,
+	condition clusterCondition,
+	outLog bool,
+) error {
 	framework.Logf("Waiting up to %v for cluster %q to be %q", timeout, clusterName, conditionDesc)
 	var (
 		lastClusterError error
@@ -58,26 +65,7 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 		framework.Logf("Cluster %q: Phase=%q, Elapsed: %v",
 			clusterName, lastCluster.Status.Phase, time.Since(start))
 		if outLog {
-			q := query.New()
-			q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName)
-			opList, err := c.ListOperation(context.TODO(), kc.Queries(*q))
-			if err != nil {
-				framework.Logf("List Cluster Operation Failed: %v", err)
-			}
-			for _, op := range opList.Items {
-				if op.Labels[common.LabelOperationAction] == "CreateCluster" {
-					for _, step := range op.Steps {
-						for _, node := range step.Nodes {
-							log, logErr := c.GetStepNodeLog(context.TODO(), op.Name, step.ID, node.ID, 0)
-							if logErr != nil {
-								framework.Logf("Print Step Log Failed: %v", logErr)
-							} else {
-								framework.Logf("step: %s-%s, logstatus: %s, log: %s", step.Name, step.ID, log.Status, log.Content)
-							}
-						}
-					}
-				}
-			}
+			printClusterOperationLogs(c, clusterName)
 		}
 
 		if done, err := condition(lastCluster); done {
@@ -105,7 +93,48 @@ func WaitForClusterCondition(c *kc.Client, clusterName, conditionDesc string, ti
 	return framework.MaybeTimeoutError(err, "waiting for cluster %s to be %s", clusterName, conditionDesc)
 }
 
-func WaitForBackupCondition(c *kc.Client, clusterName, backupName, conditionDesc string, timeout time.Duration, condition backupCondition) error {
+func printClusterOperationLogs(c *kc.Client, clusterName string) {
+	q := query.New()
+	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName)
+	opList, err := c.ListOperation(context.TODO(), kc.Queries(*q))
+	if err != nil {
+		framework.Logf("List Cluster Operation Failed: %v", err)
+		return
+	}
+	for opIndex := range opList.Items {
+		op := &opList.Items[opIndex]
+		if op.Spec.Action == "CreateCluster" {
+			printOperationTaskLogs(c, op)
+		}
+	}
+}
+
+func printOperationTaskLogs(c *kc.Client, op *operationsv1alpha1.Operation) {
+	tasks, err := c.ListOperationTasks(context.TODO(), string(op.UID))
+	if err != nil {
+		framework.Logf("List Operation Tasks Failed: %v", err)
+		return
+	}
+	for taskIndex := range tasks.Items {
+		task := &tasks.Items[taskIndex]
+		log, err := c.GetOperationTaskLog(context.TODO(), task.Name, 0)
+		if err != nil {
+			framework.Logf("Print Task Log Failed: %v", err)
+			continue
+		}
+		framework.Logf(
+			"step: %s, node: %s, attempt: %d, phase: %s, log: %s",
+			task.Spec.StepID, task.Spec.NodeRef.Name, task.Spec.Attempt, task.Status.Phase, log.Content,
+		)
+	}
+}
+
+func WaitForBackupCondition(
+	c *kc.Client,
+	clusterName, backupName, conditionDesc string,
+	timeout time.Duration,
+	condition backupCondition,
+) error {
 	framework.Logf("Waiting up to %v for backup %q to be %q", timeout, backupName, conditionDesc)
 	bp := &corev1.Backup{}
 	start := time.Now()
@@ -136,20 +165,34 @@ func WaitForBackupCondition(c *kc.Client, clusterName, backupName, conditionDesc
 }
 
 func WaitForClusterRunning(c *kc.Client, clusterName string, timeout time.Duration) error {
-	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s running", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
-		return clu.Status.Phase == corev1.ClusterRunning, nil
-	}, true)
+	return WaitForClusterCondition(
+		c,
+		clusterName,
+		fmt.Sprintf("cluster %s running", clusterName),
+		timeout,
+		func(clu *corev1.Cluster) (bool, error) {
+			return clu.Status.Phase == corev1.ClusterRunning, nil
+		},
+		true,
+	)
 }
 
 func WaitForClusterHealthy(c *kc.Client, clusterName string, timeout time.Duration) error {
-	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s healthy", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
-		for _, item := range clu.Status.ComponentConditions {
-			if item.Name == "kubernetes" {
-				return item.Status == corev1.ComponentHealthy, nil
+	return WaitForClusterCondition(
+		c,
+		clusterName,
+		fmt.Sprintf("cluster %s healthy", clusterName),
+		timeout,
+		func(clu *corev1.Cluster) (bool, error) {
+			for _, item := range clu.Status.ComponentConditions {
+				if item.Name == "kubernetes" {
+					return item.Status == corev1.ComponentHealthy, nil
+				}
 			}
-		}
-		return false, nil
-	}, true)
+			return false, nil
+		},
+		true,
+	)
 }
 
 // WaitForClusterNotFound returns an error if it takes too long for the pod to fully terminate.
@@ -204,20 +247,31 @@ func WaitForComponentNotFound(c *kc.Client, clusterName string, timeout time.Dur
 		return nil
 	}
 	if framework.IsTimeout(err) && lastCluster != nil {
-		return framework.TimeoutError(fmt.Sprintf("timeout while waiting for cluster %s component to be Not Found", clusterName), lastCluster)
+		return framework.TimeoutError(
+			fmt.Sprintf("timeout while waiting for cluster %s component to be Not Found", clusterName),
+			lastCluster,
+		)
 	}
 	return framework.MaybeTimeoutError(err, "waiting for cluster %s uninstall component not found", clusterName)
 }
 
 func WaitForBackupAvailable(c *kc.Client, clusterName, backupName string, timeout time.Duration) error {
-	return WaitForBackupCondition(c, clusterName, backupName, fmt.Sprintf("backup %s available", backupName), timeout, func(backup *corev1.Backup) (bool, error) {
-		if backup.Status.ClusterBackupStatus == corev1.ClusterBackupAvailable {
-			return true, nil
-		} else if backup.Status.ClusterBackupStatus == corev1.ClusterBackupError {
-			return false, fmt.Errorf("backup %s create failed", backup.Name)
-		}
-		return false, nil
-	})
+	return WaitForBackupCondition(
+		c,
+		clusterName,
+		backupName,
+		fmt.Sprintf("backup %s available", backupName),
+		timeout,
+		func(backup *corev1.Backup) (bool, error) {
+			switch backup.Status.ClusterBackupStatus {
+			case corev1.ClusterBackupAvailable:
+				return true, nil
+			case corev1.ClusterBackupError:
+				return false, fmt.Errorf("backup %s create failed", backup.Name)
+			}
+			return false, nil
+		},
+	)
 }
 
 func WaitForBackupNotFound(c *kc.Client, clusterName, backupName string, timeout time.Duration) error {
@@ -265,27 +319,41 @@ func WaitForUpgrade(c *kc.Client, clusterName string, timeout time.Duration) err
 }
 
 func WaitForCertInit(c *kc.Client, clusterName string, timeout time.Duration) error {
-	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s cret init", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
-		for _, item := range clu.Status.Certifications {
-			if item.Name == "ca" {
-				return true, nil
+	return WaitForClusterCondition(
+		c,
+		clusterName,
+		fmt.Sprintf("cluster %s cret init", clusterName),
+		timeout,
+		func(clu *corev1.Cluster) (bool, error) {
+			for _, item := range clu.Status.Certifications {
+				if item.Name == "ca" {
+					return true, nil
+				}
 			}
-		}
-		return false, nil
-	}, true)
+			return false, nil
+		},
+		true,
+	)
 }
 
 func WaitForCertUpdated(c *kc.Client, clusterName string, latestTime metav1.Time, timeout time.Duration) error {
-	return WaitForClusterCondition(c, clusterName, fmt.Sprintf("cluster %s cert updated", clusterName), timeout, func(clu *corev1.Cluster) (bool, error) {
-		for _, item := range clu.Status.Certifications {
-			// update operation will just update non-ca cert,so we need check non-ca certification's expiration time
-			if !strings.Contains(item.Name, "ca") && item.ExpirationTime.After(latestTime.Time) {
-				framework.Logf("updated cert expiration time: %v", item.ExpirationTime.Format(time.RFC3339))
-				return true, nil
+	return WaitForClusterCondition(
+		c,
+		clusterName,
+		fmt.Sprintf("cluster %s cert updated", clusterName),
+		timeout,
+		func(clu *corev1.Cluster) (bool, error) {
+			for _, item := range clu.Status.Certifications {
+				// update operation will just update non-ca cert,so we need check non-ca certification's expiration time
+				if !strings.Contains(item.Name, "ca") && item.ExpirationTime.After(latestTime.Time) {
+					framework.Logf("updated cert expiration time: %v", item.ExpirationTime.Format(time.RFC3339))
+					return true, nil
+				}
 			}
-		}
-		return false, nil
-	}, true)
+			return false, nil
+		},
+		true,
+	)
 }
 
 func WaitForCriRegistry(c *kc.Client, clusterName string, timeout time.Duration, registries []string) error {

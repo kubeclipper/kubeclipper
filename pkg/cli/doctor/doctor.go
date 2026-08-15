@@ -74,15 +74,14 @@ type diagnosticState struct {
 }
 
 type deployConfigFile struct {
-	SSH              sshConfigFile    `json:"ssh" yaml:"ssh"`
-	Etcd             etcdConfigFile   `json:"etcd" yaml:"etcd"`
-	ServerIPs        []string         `json:"serverIPs" yaml:"serverIPs"`
-	Agents           options.Agents   `json:"agents" yaml:"agents"`
-	ServerPort       int              `json:"serverPort" yaml:"serverPort"`
-	TLS              bool             `json:"tls" yaml:"tls"`
-	StaticServerPort int              `json:"staticServerPort" yaml:"staticServerPort"`
-	StaticServerPath string           `json:"staticServerPath" yaml:"staticServerPath"`
-	MQ               messageQueueFile `json:"mq" yaml:"mq"`
+	SSH              sshConfigFile  `json:"ssh" yaml:"ssh"`
+	Etcd             etcdConfigFile `json:"etcd" yaml:"etcd"`
+	ServerIPs        []string       `json:"serverIPs" yaml:"serverIPs"`
+	Agents           options.Agents `json:"agents" yaml:"agents"`
+	ServerPort       int            `json:"serverPort" yaml:"serverPort"`
+	TLS              bool           `json:"tls" yaml:"tls"`
+	StaticServerPort int            `json:"staticServerPort" yaml:"staticServerPort"`
+	StaticServerPath string         `json:"staticServerPath" yaml:"staticServerPath"`
 }
 
 type sshConfigFile struct {
@@ -99,13 +98,6 @@ type etcdConfigFile struct {
 	PeerPort    int    `json:"peerPort" yaml:"peerPort"`
 	MetricsPort int    `json:"metricsPort" yaml:"metricsPort"`
 	DataDir     string `json:"dataDir" yaml:"dataDir"`
-}
-
-type messageQueueFile struct {
-	External    bool     `json:"external" yaml:"external"`
-	IPs         []string `json:"ips" yaml:"ips"`
-	Port        int      `json:"port" yaml:"port"`
-	ClusterPort int      `json:"clusterPort" yaml:"clusterPort"`
 }
 
 func NewCmdDoctor(streams options.IOStreams) *cobra.Command {
@@ -257,7 +249,6 @@ func loadDeployConfig(path string) (*options.DeployConfig, error) {
 		},
 		Agents: defaults.Agents, ServerPort: defaults.ServerPort, TLS: defaults.TLS,
 		StaticServerPort: defaults.StaticServerPort, StaticServerPath: defaults.StaticServerPath,
-		MQ: messageQueueFile{Port: defaults.MQ.Port, ClusterPort: defaults.MQ.ClusterPort},
 	}
 	if err := yaml.Unmarshal(data, &fileConfig); err != nil {
 		return nil, err
@@ -278,10 +269,6 @@ func loadDeployConfig(path string) (*options.DeployConfig, error) {
 	deployConfig.TLS = fileConfig.TLS
 	deployConfig.StaticServerPort = fileConfig.StaticServerPort
 	deployConfig.StaticServerPath = fileConfig.StaticServerPath
-	deployConfig.MQ = &options.MQ{
-		External: fileConfig.MQ.External, IPs: fileConfig.MQ.IPs,
-		Port: fileConfig.MQ.Port, ClusterPort: fileConfig.MQ.ClusterPort,
-	}
 	if len(deployConfig.ServerIPs) == 0 {
 		return nil, fmt.Errorf("serverIPs is empty")
 	}

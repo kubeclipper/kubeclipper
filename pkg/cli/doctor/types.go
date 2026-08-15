@@ -25,7 +25,6 @@ import (
 const (
 	platformTarget          = "platform"
 	platformStatus          = "platform-status"
-	natsConnectivity        = "nats-connectivity"
 	heartbeatCheck          = "heartbeat"
 	apiConfigCheck          = "api-config"
 	commandNotFoundExitCode = 127

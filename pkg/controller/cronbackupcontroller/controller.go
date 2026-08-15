@@ -48,11 +48,11 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/errors"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	operationv2store "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
+	operationv2builder "github.com/kubeclipper/kubeclipper/pkg/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 )
 
@@ -61,12 +61,12 @@ type CronBackupReconciler struct {
 	ClusterLister     listerv1.ClusterLister
 	NodeLister        listerv1.NodeLister
 	BackupLister      listerv1.BackupLister
-	OperationWriter   operation.Writer
+	OperationStore    operationv2store.Store
+	NodeReader        operationv2builder.NodeReader
 	BackupWriter      cluster.BackupWriter
 	BackupPointLister listerv1.BackupPointLister
 	CronBackupLister  listerv1.CronBackupLister
 	CronBackupWriter  cluster.CronBackupWriter
-	CmdDelivery       service.CmdDelivery
 	Now               func() time.Time
 }
 
@@ -345,7 +345,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 			IPv4:     no.Status.Ipv4DefaultIP,
 			NodeIPv4: no.Status.NodeIpv4DefaultIP,
 			Region:   no.Labels[common.LabelTopologyRegion],
-			Hostname: no.Labels[common.LabelHostname],
+			Hostname: no.Status.NodeInfo.Hostname,
 			Role:     no.Labels[common.LabelNodeRole],
 			//Disable:  no.Labels[common.LabelNodeDisable]
 		})
@@ -400,7 +400,7 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 
 	actBackupStep := actBackup.GetStep(v1.ActionInstall)
 	op.Steps = append(steps, actBackupStep...)
-	op, err = r.OperationWriter.CreateOperation(ctx, op)
+	_, err = operationv2builder.CreateFromCore(ctx, r.OperationStore, r.NodeReader, c, op)
 	if err != nil {
 		log.Error("Failed to create operation", zap.Error(err))
 		return err
@@ -415,11 +415,6 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 		log.Error("Failed to update cluster", zap.Error(err))
 		return err
 	}
-	// delivery the create backup operation
-	go func() {
-		err = r.CmdDelivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
-		log.Error("Failed to delivery operation", zap.Error(err))
-	}()
 	return nil
 }
 
@@ -539,17 +534,11 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 
 	actBackupStep := actBackup.GetStep(v1.ActionUninstall)
 	op.Steps = append(steps, actBackupStep...)
-	op, err = r.OperationWriter.CreateOperation(ctx, op)
+	_, err = operationv2builder.CreateFromCore(ctx, r.OperationStore, r.NodeReader, c, op)
 	if err != nil {
 		log.Error("Failed to create operation", zap.Error(err))
 		return err
 	}
-
-	// delivery the delete backup operation
-	go func() {
-		err = r.CmdDelivery.DeliverTaskOperation(ctx, op, &service.Options{DryRun: false})
-		log.Error("Failed to delivery operation", zap.Error(err))
-	}()
 	return nil
 }
 

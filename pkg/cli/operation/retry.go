@@ -9,7 +9,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/printer"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/utils"
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
@@ -33,7 +33,7 @@ func NewRetryOptions(streams options.IOStreams) *RetryOptions {
 const retryLong = `
   Retry a failed operation.
 
-  Only operations in "failed" status can be retried.`
+  Failed, TimedOut, and Canceled operations can be retried.`
 
 const retryExample = `
   # Retry a failed operation
@@ -80,11 +80,13 @@ func (o *RetryOptions) RunRetry() error {
 		return err
 	}
 
-	if op.Status.Status != v1.OperationStatusFailed {
-		return fmt.Errorf("operation is not in failed status, current status: %s", op.Status.Status)
+	if op.Status.Phase != operationsv1alpha1.OperationFailed &&
+		op.Status.Phase != operationsv1alpha1.OperationTimedOut &&
+		op.Status.Phase != operationsv1alpha1.OperationCancelled {
+		return fmt.Errorf("operation cannot be retried from phase %s", op.Status.Phase)
 	}
 
-	if err := o.Client.RetryOperation(ctx, o.OperationID); err != nil {
+	if _, err := o.Client.RetryOperation(ctx, op); err != nil {
 		return err
 	}
 

@@ -115,10 +115,10 @@ func TestAggregateServerChecks(t *testing.T) {
 		wantStatus platformstatus.Status
 		wantMsg    string
 	}{
-		{name: "healthy with skipped NATS", checks: []platformstatus.Check{
+		{name: "healthy operation API", checks: []platformstatus.Check{
 			{Name: "api", Status: platformstatus.Healthy},
 			{Name: "controller-manager", Status: platformstatus.Healthy},
-			{Name: "nats", Status: platformstatus.Skipped},
+			{Name: "operation-api", Status: platformstatus.Healthy},
 			{Name: "static-resource", Status: platformstatus.Healthy},
 		}, wantStatus: platformstatus.Healthy, wantMsg: "all server subsystems ready"},
 		{name: "static resource degraded", checks: []platformstatus.Check{
@@ -127,12 +127,12 @@ func TestAggregateServerChecks(t *testing.T) {
 		}, wantStatus: platformstatus.Degraded, wantMsg: "resource service is unavailable"},
 		{name: "core subsystem unhealthy", checks: []platformstatus.Check{
 			{Name: "api", Status: platformstatus.Healthy},
-			{Name: "nats", Status: platformstatus.Unhealthy, Message: "embedded NATS is unavailable"},
-		}, wantStatus: platformstatus.Unhealthy, wantMsg: "embedded NATS is unavailable"},
+			{Name: "operation-api", Status: platformstatus.Unhealthy, Message: "Operation API storage is unavailable"},
+		}, wantStatus: platformstatus.Unhealthy, wantMsg: "Operation API storage is unavailable"},
 		{name: "multiple failures", checks: []platformstatus.Check{
 			{Name: "api", Status: platformstatus.Healthy},
 			{Name: "controller-manager", Status: platformstatus.Unhealthy},
-			{Name: "nats", Status: platformstatus.Unhealthy},
+			{Name: "operation-api", Status: platformstatus.Unhealthy},
 			{Name: "static-resource", Status: platformstatus.Healthy},
 		}, wantStatus: platformstatus.Unhealthy, wantMsg: "2/4 subsystems unhealthy"},
 	}

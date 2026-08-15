@@ -43,10 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models"
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	operationv2 "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
 )
 
 var GroupVersion = schema.GroupVersion{Group: corev1.GroupName, Version: "v1"}
@@ -268,6 +267,13 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
+	webservice.Route(webservice.POST("/nodes").
+		To(h.CreateNode).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("Register a node.").
+		Reads(corev1.Node{}).
+		Returns(http.StatusCreated, http.StatusText(http.StatusCreated), corev1.Node{}))
+
 	webservice.Route(webservice.GET("/nodes").
 		To(h.ListNodes).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
@@ -342,6 +348,13 @@ func SetupWebService(h *handler) *restful.WebService {
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
 
+	webservice.Route(webservice.PUT("/nodes/{name}/status").
+		To(h.UpdateNodeStatus).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
+		Doc("Update node status.").
+		Reads(corev1.Node{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Node{}))
+
 	webservice.Route(webservice.PATCH("/nodes/{name}/disable").
 		To(h.DisableNode).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
@@ -371,84 +384,6 @@ func SetupWebService(h *handler) *restful.WebService {
 			DataType("string")).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil).
 		Returns(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), errors.HTTPError{}))
-
-	webservice.Route(webservice.GET("/logs").
-		To(h.GetOperationLog).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
-		Doc("Get operation log on node.").
-		Param(webservice.QueryParameter(query.ParameterNode, "node name").
-			Required(true).
-			DataFormat("node=%s")).
-		Param(webservice.QueryParameter(query.ParameterOperation, "operation id").
-			Required(true).
-			DataFormat("operation=%s")).
-		Param(webservice.QueryParameter(query.ParameterStep, "step id").
-			Required(true).
-			DataFormat("step=%s")).
-		Param(webservice.QueryParameter(query.ParameterOffset, "offset").
-			Required(false).
-			DataFormat("offset=%s")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), StepLog{}).
-		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
-
-	webservice.Route(webservice.GET("/operations").
-		To(h.ListOperations).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
-		Doc("List operations.").
-		Param(webservice.QueryParameter(query.PagingParam, "paging query, e.g. limit=100,page=1").
-			Required(false).
-			DataFormat("limit=%d,page=%d").
-			DefaultValue("limit=10,page=1")).
-		Param(webservice.QueryParameter(query.ParameterLabelSelector, "resource filter by metadata label").
-			Required(false).
-			DataFormat("labelSelector=%s=%s")).
-		Param(webservice.QueryParameter(query.ParameterFieldSelector, "resource filter by field").
-			Required(false).
-			DataFormat("fieldSelector=%s=%s")).
-		Param(webservice.QueryParameter(query.ParamReverse, "resource sort reverse or not").Required(false).
-			DataType("boolean")).
-		Param(webservice.QueryParameter(query.ParameterWatch, "watch request").Required(false).
-			DataType("boolean")).
-		Param(webservice.QueryParameter(query.ParameterTimeoutSeconds, "watch timeout seconds").
-			DataType("integer").
-			DefaultValue("60").
-			Required(false)).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.OperationList{}))
-
-	webservice.Route(webservice.GET("/operations/{name}").
-		To(h.DescribeOperation).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreNodeTag}).
-		Doc("Describe operations.").
-		Param(webservice.PathParameter(query.ParameterName, "operation name").
-			Required(true).
-			DataType("string")).
-		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
-			Required(false).
-			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Operation{}).
-		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
-
-	webservice.Route(webservice.POST("/operations/{name}/termination").
-		To(h.TerminationOperation).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
-		Doc("clusters termination operation.").
-		Param(webservice.QueryParameter(query.ParamDryRun, "dry run clusters termination operation.").
-			Required(false).DataType("boolean")).
-		Param(webservice.PathParameter(query.ParameterName, "operation name").
-			Required(true).
-			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), nil))
-
-	webservice.Route(webservice.POST("/operations/{name}/retry").
-		To(h.RetryCluster).
-		Metadata(restfulspec.KeyOpenAPITags, []string{CoreClusterTag}).
-		Doc("clusters retry operation.").
-		Param(webservice.QueryParameter(query.ParamDryRun, "dry run clusters retry operation.").
-			Required(false).DataType("boolean")).
-		Param(webservice.PathParameter(query.ParameterName, "operation name").
-			Required(true).
-			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Cluster{}))
 
 	webservice.Route(webservice.POST("/clusters/{name}/upgrade").
 		To(h.UpgradeCluster).
@@ -1180,10 +1115,10 @@ func SetupWebService(h *handler) *restful.WebService {
 }
 
 func AddToContainer(c *restful.Container, clusterOperator cluster.Operator,
-	op operation.Operator, platform platform.Operator, leaseOperator lease.Operator,
-	coreOperator core.Operator, delivery service.IDelivery, tokenOperator auth.TokenManagementInterface,
-	conf *generic.ServerRunOptions, terminationChan *chan struct{}) error {
-	h := newHandler(conf, clusterOperator, op, leaseOperator, platform, coreOperator, delivery, tokenOperator, terminationChan)
+	operationV2Store operationv2.Store, platformOperator platform.Operator, leaseOperator lease.Operator,
+	coreOperator core.Operator, tokenOperator auth.TokenManagementInterface,
+	conf *generic.ServerRunOptions) error {
+	h := newHandler(conf, clusterOperator, leaseOperator, operationV2Store, platformOperator, coreOperator, tokenOperator)
 	webservice := SetupWebService(h)
 	c.Add(webservice)
 	return nil

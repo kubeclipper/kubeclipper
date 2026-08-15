@@ -113,21 +113,6 @@ agents:
 #pkg: ` + constatns.KubeClipperReleaseBaseURL + `/v1.1.0/kc-amd64.tar.gz
 pkg: /tmp/kc-minimal.tar.gz
 
-# mq config,support internal or external mq.
-# use internal mq,kubeclipper will running mq with service,and automatic generate ips、user、secret and certs(if enable tls).
-# use external mq,you need specify ips、user、secret and certs(if enable tls).
-mq:
-  #external: false
-  #tls: true
-  ca: ""
-  clientCert: ""
-  clientKey: ""
-  ips: []
-  #port: 9889
-  #clusterPort: 9890
-  #user: admin
-  secret: ""
-
 # operation log config.
 opLog:
   #dir: /var/log/kc-agent

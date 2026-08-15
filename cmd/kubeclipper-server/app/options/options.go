@@ -36,6 +36,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/server"
 	serverconfig "github.com/kubeclipper/kubeclipper/pkg/server/config"
 )
@@ -55,7 +56,6 @@ func (s *ServerOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.GenericServerRunOptions.AddFlags(fs, s.GenericServerRunOptions)
 	s.EtcdOptions.AddFlags(fss.FlagSet("etcd"))
 	s.CacheOptions.AddFlags(fss.FlagSet("cache"))
-	s.MQOptions.AddFlags(fss.FlagSet("mq"))
 	s.LogOptions.AddFlags(fss.FlagSet("log"))
 	s.AuthenticationOptions.AddFlags(fss.FlagSet("authentication"))
 	s.AuditOptions.AddFlags(fss.FlagSet("audit"))
@@ -66,7 +66,6 @@ func (s *ServerOptions) Validate() []error {
 	var errors []error
 	errors = append(errors, s.GenericServerRunOptions.Validate()...)
 	errors = append(errors, s.EtcdOptions.Validate()...)
-	errors = append(errors, s.MQOptions.Validate()...)
 	errors = append(errors, s.LogOptions.Validate()...)
 	errors = append(errors, s.AuthenticationOptions.Validate()...)
 	errors = append(errors, s.AuditOptions.Validate()...)
@@ -112,7 +111,7 @@ func (s *ServerOptions) NewAPIServer(stopCh <-chan struct{}) (*server.APIServer,
 
 func (s *ServerOptions) CompleteEtcdOptions() *etcdRESTOptions.StorageFactoryRestOptionsFactory {
 	// grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
-	gvks := []schema.GroupVersion{corev1.SchemeGroupVersion, iamv1.SchemeGroupVersion}
+	gvks := []schema.GroupVersion{corev1.SchemeGroupVersion, iamv1.SchemeGroupVersion, operationsv1alpha1.SchemeGroupVersion}
 	c := storagebackend.NewDefaultConfig(s.EtcdOptions.Prefix, scheme.Codecs.CodecForVersions(scheme.Encoder, scheme.Codecs.UniversalDeserializer(), schema.GroupVersions(gvks), schema.GroupVersions(gvks)))
 	c.Transport.ServerList = s.EtcdOptions.ServerList
 	c.Transport.CertFile = s.EtcdOptions.CertFile

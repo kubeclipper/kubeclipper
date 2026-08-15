@@ -19,38 +19,211 @@
 package agent
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"runtime"
+	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
+
 	"github.com/kubeclipper/kubeclipper/pkg/agent/config"
+	operationv2 "github.com/kubeclipper/kubeclipper/pkg/agent/operationv2"
+	"github.com/kubeclipper/kubeclipper/pkg/client/clientset"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
-	"github.com/kubeclipper/kubeclipper/pkg/service/task"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/netutil"
 )
 
 type Server struct {
-	taskService service.Interface
-	Config      *config.Config
+	worker    *operationv2.Worker
+	logServer *operationv2.LogServer
+	client    clientset.Interface
+	Config    *config.Config
 }
+
+type taskStatusClient interface {
+	Get(context.Context, string, metav1.GetOptions) (*operations.OperationTask, error)
+	List(context.Context, metav1.ListOptions) (*operations.OperationTaskList, error)
+	Watch(context.Context, metav1.ListOptions) (watch.Interface, error)
+	UpdateStatus(context.Context, *operations.OperationTask, metav1.UpdateOptions) (*operations.OperationTask, error)
+}
+
+type taskClientAdapter struct{ client taskStatusClient }
+
+func (a taskClientAdapter) Get(ctx context.Context, name string, options metav1.GetOptions) (*operations.OperationTask, error) {
+	return a.client.Get(ctx, name, options)
+}
+
+func (a taskClientAdapter) List(ctx context.Context, options *metav1.ListOptions) (*operations.OperationTaskList, error) {
+	return a.client.List(ctx, *options)
+}
+
+func (a taskClientAdapter) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
+	return a.client.Watch(ctx, *options)
+}
+
+func (a taskClientAdapter) UpdateStatus(ctx context.Context, task *operations.OperationTask) (*operations.OperationTask, error) {
+	return a.client.UpdateStatus(ctx, task, metav1.UpdateOptions{})
+}
+
+const nodeStatusUpdateTimeout = 30 * time.Second
 
 func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	opLog, err := oplog.NewOperationLog(s.Config.OpLogOptions)
 	if err != nil {
 		return err
 	}
-	s.taskService = task.NewService(s.Config.AgentID, s.Config.Metadata.Region, s.Config.IPDetect, s.Config.NodeIPDetect, s.Config.RegisterNode, s.Config.MQOptions,
-		task.WithNodeStatusUpdateFrequency(s.Config.NodeStatusUpdateFrequency),
-		task.WithLeaseDurationSeconds(240),
-		task.WithOplog(opLog),
-		task.WithRepoMirror(s.Config.ImageProxyOptions.KcImageRepoMirror),
-	)
-	return s.taskService.PrepareRun(stopCh)
+	if s.Config.APIServer == nil {
+		return fmt.Errorf("apiServer configuration is required")
+	}
+	restConfig := &rest.Config{
+		Host: s.Config.APIServer.Endpoint,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAFile: s.Config.APIServer.CAFile, CertFile: s.Config.APIServer.CertFile,
+			KeyFile: s.Config.APIServer.KeyFile, ServerName: s.Config.APIServer.ServerName,
+		},
+		Timeout: 30 * time.Second,
+		QPS:     20, Burst: 40,
+	}
+	client, err := clientset.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("create kc-server client: %w", err)
+	}
+	s.client = client
+	node, err := client.CoreV1().Nodes().Get(context.Background(), s.Config.AgentID, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) && s.Config.RegisterNode {
+		node, err = client.CoreV1().Nodes().Create(context.Background(), s.initialNode(), &metav1.CreateOptions{})
+		if apierrors.IsAlreadyExists(err) {
+			node, err = client.CoreV1().Nodes().Get(context.Background(), s.Config.AgentID, metav1.GetOptions{})
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("get registered Node %q: %w", s.Config.AgentID, err)
+	}
+	registry := operationv2.NewRegistry()
+	if registerErr := registry.Register(operationv2.NoopExecutorName, operationv2.NoopExecutor{}); registerErr != nil {
+		return registerErr
+	}
+	if registerErr := registry.Register(operationv2.NodePreflightExecutorName, operationv2.NodePreflight{}); registerErr != nil {
+		return registerErr
+	}
+	if registerErr := registry.Register(operationv2.CommandStepExecutorName, operationv2.CommandStepExecutor{
+		OpLog: opLog, RepoMirror: s.Config.ImageProxyOptions.KcImageRepoMirror,
+	}); registerErr != nil {
+		return registerErr
+	}
+	s.worker, err = operationv2.NewWorker(&operationv2.WorkerOptions{
+		AgentID: s.Config.AgentID, NodeUID: node.UID,
+		Client: taskClientAdapter{client: client.OperationsV1alpha1().OperationTasks()}, Registry: registry, OpLog: opLog,
+	})
+	if err != nil {
+		return err
+	}
+	if prepareErr := s.worker.PrepareRun(stopCh); prepareErr != nil {
+		return prepareErr
+	}
+	s.logServer, err = operationv2.NewLogServer(&operationv2.LogServerOptions{
+		Address: s.Config.APIServer.LogAddress, TLSCertFile: s.Config.APIServer.CertFile,
+		TLSKeyFile: s.Config.APIServer.KeyFile, ClientCAFile: s.Config.APIServer.CAFile,
+		ExpectedClientCommonName: operationv2.DefaultServerClientIdentity, Logs: opLog,
+	})
+	if err != nil {
+		s.worker.Close()
+		return err
+	}
+	if err := s.logServer.PrepareRun(stopCh); err != nil {
+		s.worker.Close()
+		return err
+	}
+	return nil
+}
+
+func (s *Server) initialNode() *corev1.Node {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = s.Config.AgentID
+	}
+	node := &corev1.Node{
+		TypeMeta: metav1.TypeMeta{Kind: "Node", APIVersion: corev1.SchemeGroupVersion.String()},
+		ObjectMeta: metav1.ObjectMeta{Name: s.Config.AgentID, Labels: map[string]string{
+			common.LabelOSStable: runtime.GOOS, common.LabelArchStable: runtime.GOARCH,
+			common.LabelTopologyRegion: s.Config.Metadata.Region, common.LabelHostname: hostname,
+		}},
+		Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{Hostname: hostname, OS: runtime.GOOS, Arch: runtime.GOARCH}},
+	}
+	if ip, err := netutil.GetDefaultIP(true, s.Config.IPDetect); err == nil {
+		node.Status.Ipv4DefaultIP = ip.String()
+		node.Status.NodeIpv4DefaultIP = ip.String()
+		node.Status.Addresses = []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: ip.String()}}
+	}
+	if gateway, err := netutil.GetDefaultGateway(true); err == nil {
+		node.Status.Ipv4DefaultGw = gateway.String()
+	}
+	return node
 }
 
 func (s *Server) Run(stopCh <-chan struct{}) error {
-	if err := s.taskService.Run(stopCh); err != nil {
+	if err := s.worker.Run(stopCh); err != nil {
 		return err
 	}
+	if err := s.logServer.Run(stopCh); err != nil {
+		return err
+	}
+	go s.reportNodeStatus(stopCh)
 	<-stopCh
 	logger.Debugf("get stopCh signal, exit...")
-	s.taskService.Close()
+	s.logServer.Close()
+	s.worker.Close()
 	return nil
+}
+
+func (s *Server) reportNodeStatus(stopCh <-chan struct{}) {
+	frequency := s.Config.NodeStatusUpdateFrequency
+	if frequency <= 0 {
+		frequency = time.Minute
+	}
+	ticker := time.NewTicker(frequency)
+	defer ticker.Stop()
+	for {
+		if err := s.updateNodeStatus(); err != nil {
+			logger.Errorf("update Node status: %v", err)
+		}
+		select {
+		case <-stopCh:
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Server) updateNodeStatus() error {
+	ctx, cancel := context.WithTimeout(context.Background(), nodeStatusUpdateTimeout)
+	defer cancel()
+	node, err := s.client.CoreV1().Nodes().Get(ctx, s.Config.AgentID, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	observed := s.initialNode().Status
+	now := metav1.Now()
+	transition := now
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+			transition = condition.LastTransitionTime
+			break
+		}
+	}
+	observed.Conditions = []corev1.NodeCondition{{
+		Type: corev1.NodeReady, Status: corev1.ConditionTrue,
+		LastHeartbeatTime: now, LastTransitionTime: transition, Reason: "AgentReady",
+	}}
+	node.Status = observed
+	_, err = s.client.CoreV1().Nodes().UpdateStatus(ctx, node, &metav1.UpdateOptions{})
+	return err
 }

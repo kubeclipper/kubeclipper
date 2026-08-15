@@ -67,7 +67,7 @@ func TestPortCommandFailureIsUnhealthy(t *testing.T) {
 		command = remoteCommand
 		return sshutils.Result{ExitCode: 1, Stderr: "connection timed out"}, errors.New("exit status 1")
 	}}
-	check := runner.port("192.0.2.20", "nats-connectivity", "192.0.2.10:9889")
+	check := runner.port("192.0.2.20", "broker-connectivity", "192.0.2.10:9889")
 	if check.Status != platformstatus.Unhealthy {
 		t.Fatalf("status = %s, want %s", check.Status, platformstatus.Unhealthy)
 	}
@@ -82,7 +82,7 @@ func TestPortCommandQuotesEndpointAsArguments(t *testing.T) {
 		command = remoteCommand
 		return sshutils.Result{ExitCode: 1}, nil
 	}}
-	runner.port("192.0.2.20", "nats-connectivity", "[$(touch /tmp/unsafe)]:9889")
+	runner.port("192.0.2.20", "broker-connectivity", "[$(touch /tmp/unsafe)]:9889")
 
 	if strings.Contains(command, "/dev/tcp/$(touch") {
 		t.Fatalf("endpoint was embedded in shell program: %q", command)
@@ -149,7 +149,7 @@ func TestMergeAgentTargets(t *testing.T) {
 
 func TestSanitize(t *testing.T) {
 	input := "\x1b[31m\x1b]52;c;Y2xpcGJvYXJk\a" +
-		`password=hunter2 {"token":"abc.def"} Authorization:Bearer abc.def nats://admin:secret@example:9889 ` +
+		`password=hunter2 {"token":"abc.def"} Authorization:Bearer abc.def amqp://admin:secret@example:5672 ` +
 		"-----BEGIN PRIVATE KEY-----\nsensitive\n-----END PRIVATE KEY-----"
 	result := sanitize(input)
 	for _, secret := range []string{"hunter2", "abc.def", "admin:secret", "sensitive", "\x1b", "Y2xpcGJvYXJk"} {

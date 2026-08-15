@@ -181,6 +181,19 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 			return err
 		}
 		stepper.installSteps = append(stepper.installSteps, steps...)
+
+		// A successful kubeadm join only proves that the command exited cleanly.
+		// Reuse the existing health executor so AddNodes is successful only after
+		// Kubernetes observes the node and kube-system Pods as ready.
+		health := &Health{}
+		if healthErr := health.InitStepper(metadata.KubeVersion, DefaultKubeConfigPath); healthErr != nil {
+			return healthErr
+		}
+		steps, err = health.InstallSteps([]v1.StepNode{masters[0]})
+		if err != nil {
+			return err
+		}
+		stepper.installSteps = append(stepper.installSteps, steps[0])
 	}
 
 	return nil
@@ -417,7 +430,16 @@ func (stepper *Drain) Uninstall(ctx context.Context, opts component.Options) (by
 		return
 	}
 
-	ec, err = cmdutil.RunCmdWithContext(ctx, opts.DryRun, "kubectl", "taint", "nodes", stepper.Hostname, "NoExec=true:NoExecute", "--overwrite")
+	ec, err = cmdutil.RunCmdWithContext(
+		ctx,
+		opts.DryRun,
+		"kubectl",
+		"taint",
+		"nodes",
+		stepper.Hostname,
+		"NoExec=true:NoExecute",
+		"--overwrite",
+	)
 	if err != nil {
 		logErrMsg = "kubectl taint node error"
 		return

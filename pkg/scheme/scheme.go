@@ -21,6 +21,7 @@ package scheme
 import (
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -40,6 +41,13 @@ var (
 )
 
 func init() {
-	_ = corev1.AddToScheme(Scheme)
-	_ = iamv1.AddToScheme(Scheme)
+	if err := corev1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
+	if err := iamv1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
+	if err := operationsv1alpha1.AddToScheme(Scheme); err != nil {
+		panic(err)
+	}
 }

@@ -1,95 +1,147 @@
 package operation
 
 import (
+	"sort"
 	"time"
 	"unicode/utf8"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 const (
-	// timeFormat is the standard time format used in log output.
-	timeFormat = "2006-01-02 15:04:05"
-
-	// minDuration is the minimum duration to show (1s).
-	minDuration = time.Second
-
-	// pollInterval is how often to poll for updates when following logs.
-	pollInterval = 2 * time.Second
-
-	// defaultMaxLength is the default max log length to display.
+	timeFormat       = "2006-01-02 15:04:05"
+	minDuration      = time.Second
+	pollInterval     = 2 * time.Second
 	defaultMaxLength = 200
-
-	// truncatedSuffix is added to truncated logs.
-	truncatedSuffix = "... (truncated)"
+	truncatedSuffix  = "... (truncated)"
 )
 
-// calculateDuration calculates the duration between two times with a minimum threshold.
-func calculateDuration(startAt, endAt metav1.Time) time.Duration {
-	var duration time.Duration
-	if !startAt.IsZero() && !endAt.IsZero() {
-		duration = endAt.Time.Sub(startAt.Time)
-		if duration < minDuration {
-			duration = minDuration
-		}
+func calculateDuration(startAt, endAt *metav1.Time) time.Duration {
+	if startAt == nil || endAt == nil {
+		return 0
+	}
+	duration := endAt.Sub(startAt.Time)
+	if duration < minDuration {
+		return minDuration
 	}
 	return duration
 }
 
-// getNodeStatusWithTime returns status and time information for a node in a step.
-func getNodeStatusWithTime(op *v1.Operation, stepID, nodeID string) (status string, startAt metav1.Time, endAt metav1.Time) {
-	for _, cond := range op.Status.Conditions {
-		if cond.StepID == stepID {
-			for _, st := range cond.Status {
-				if st.Node == nodeID {
-					return string(st.Status), st.StartAt, st.EndAt
-				}
-			}
-		}
+func tasksByExecution(tasks []operationsv1alpha1.OperationTask) map[string][]operationsv1alpha1.OperationTask {
+	grouped := make(map[string][]operationsv1alpha1.OperationTask)
+	for taskIndex := range tasks {
+		task := &tasks[taskIndex]
+		key := task.Spec.StepID + "|" + string(task.Spec.NodeRef.UID)
+		grouped[key] = append(grouped[key], *task)
 	}
-	return "unknown", metav1.Time{}, metav1.Time{}
+	for key := range grouped {
+		sort.SliceStable(grouped[key], func(i, j int) bool {
+			left, right := grouped[key][i], grouped[key][j]
+			if left.Spec.RetryGeneration != right.Spec.RetryGeneration {
+				return left.Spec.RetryGeneration > right.Spec.RetryGeneration
+			}
+			return left.Spec.Attempt > right.Spec.Attempt
+		})
+	}
+	return grouped
 }
 
-// getStepStartTime returns the earliest start time from all nodes in a step.
-func getStepStartTime(op *v1.Operation, stepID string) metav1.Time {
-	var startTime metav1.Time
-	for _, cond := range op.Status.Conditions {
-		if cond.StepID == stepID {
-			for _, st := range cond.Status {
-				if startTime.IsZero() || st.StartAt.Before(&startTime) {
-					startTime = st.StartAt
-				}
-			}
+func effectiveTask(
+	grouped map[string][]operationsv1alpha1.OperationTask,
+	stepID string,
+	nodeUID types.UID,
+) *operationsv1alpha1.OperationTask {
+	tasks := grouped[stepID+"|"+string(nodeUID)]
+	for i := range tasks {
+		if tasks[i].Status.Phase == operationsv1alpha1.TaskSucceeded {
+			return &tasks[i]
 		}
 	}
-	return startTime
+	if len(tasks) == 0 {
+		return nil
+	}
+	return &tasks[0]
 }
 
-// truncateLog truncates log content if it exceeds the maximum length.
-// Uses rune-based truncation for Unicode safety.
+func stepStatus(
+	step *operationsv1alpha1.OperationStep,
+	grouped map[string][]operationsv1alpha1.OperationTask,
+	operationPhase operationsv1alpha1.OperationPhase,
+) string {
+	if len(step.Targets) == 0 {
+		return missingTaskPhase(operationPhase)
+	}
+	allSucceeded := true
+	result := operationsv1alpha1.TaskPending
+	for _, target := range step.Targets {
+		task := effectiveTask(grouped, step.ID, target.UID)
+		if task == nil {
+			if operationPhase == operationsv1alpha1.OperationCancelled {
+				return string(operationsv1alpha1.TaskCancelled)
+			}
+			allSucceeded = false
+			continue
+		}
+		switch task.Status.Phase {
+		case operationsv1alpha1.TaskFailed, operationsv1alpha1.TaskTimedOut, operationsv1alpha1.TaskCancelled:
+			return string(task.Status.Phase)
+		case operationsv1alpha1.TaskRunning:
+			allSucceeded = false
+			result = operationsv1alpha1.TaskRunning
+		case operationsv1alpha1.TaskSucceeded:
+		default:
+			allSucceeded = false
+		}
+	}
+	if allSucceeded {
+		return string(operationsv1alpha1.TaskSucceeded)
+	}
+	return string(result)
+}
+
+func missingTaskPhase(operationPhase operationsv1alpha1.OperationPhase) string {
+	if operationPhase == operationsv1alpha1.OperationCancelled {
+		return string(operationsv1alpha1.TaskCancelled)
+	}
+	return string(operationsv1alpha1.TaskPending)
+}
+
+func stepStartTime(stepID string, tasks []operationsv1alpha1.OperationTask) *metav1.Time {
+	var earliest *metav1.Time
+	for i := range tasks {
+		if tasks[i].Spec.StepID != stepID || tasks[i].Status.StartedAt == nil {
+			continue
+		}
+		if earliest == nil || tasks[i].Status.StartedAt.Before(earliest) {
+			earliest = tasks[i].Status.StartedAt.DeepCopy()
+		}
+	}
+	return earliest
+}
+
 func truncateLog(log string, maxLen int) string {
 	if maxLen <= 0 || utf8.RuneCountInString(log) <= maxLen {
 		return log
 	}
-	runes := []rune(log)
-	return string(runes[:maxLen]) + truncatedSuffix
+	return string([]rune(log)[:maxLen]) + truncatedSuffix
 }
 
-// splitLines splits a string into lines, handling both \n and \r\n.
 func splitLines(s string) []string {
 	var lines []string
 	start := 0
 	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			end := i
-			if end > start && s[end-1] == '\r' {
-				end--
-			}
-			lines = append(lines, s[start:end])
-			start = i + 1
+		if s[i] != '\n' {
+			continue
 		}
+		end := i
+		if end > start && s[end-1] == '\r' {
+			end--
+		}
+		lines = append(lines, s[start:end])
+		start = i + 1
 	}
 	if start < len(s) {
 		lines = append(lines, s[start:])

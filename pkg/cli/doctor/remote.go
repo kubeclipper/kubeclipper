@@ -44,12 +44,12 @@ var (
 	keyValueSecretPattern = regexp.MustCompile(
 		`(?i)((?:"?)(?:password|passwd|token|secret|authorization)(?:"?)[=:][[:space:]]*"?)([^",[:space:]}]+)`,
 	)
-	authorizationPattern  = regexp.MustCompile(`(?i)(authorization"?[=:][[:space:]]*)(?:bearer[[:space:]]+)?[^",;[:space:]}]+`)
-	bearerPattern         = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/-]+=*`)
-	jwtPattern            = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`)
-	natsCredentialPattern = regexp.MustCompile(`(?i)(nats://)[^@\s]+@`)
-	pemPrivateKeyPattern  = regexp.MustCompile(`(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----`)
-	interestingLogPattern = regexp.MustCompile(
+	authorizationPattern    = regexp.MustCompile(`(?i)(authorization"?[=:][[:space:]]*)(?:bearer[[:space:]]+)?[^",;[:space:]}]+`)
+	bearerPattern           = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/-]+=*`)
+	jwtPattern              = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`)
+	brokerCredentialPattern = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://)[^@\s]+@`)
+	pemPrivateKeyPattern    = regexp.MustCompile(`(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----`)
+	interestingLogPattern   = regexp.MustCompile(
 		`(?i)(error|failed|failure|fatal|panic|refused|timeout|unavailable|denied|stopp|disconnect|reconnect)`,
 	)
 )
@@ -321,7 +321,7 @@ func sanitize(value string) string {
 	value = keyValueSecretPattern.ReplaceAllString(value, "$1[REDACTED]")
 	value = bearerPattern.ReplaceAllString(value, "Bearer [REDACTED]")
 	value = jwtPattern.ReplaceAllString(value, "[REDACTED-JWT]")
-	return natsCredentialPattern.ReplaceAllString(value, "$1[REDACTED]@")
+	return brokerCredentialPattern.ReplaceAllString(value, "$1[REDACTED]@")
 }
 
 func stripTerminalControls(value string) string {

@@ -35,7 +35,7 @@ import (
 func checkKCServer(_ context.Context, state *diagnosticState) Component {
 	component := Component{Name: "kc-server"}
 	statusComponent := platformComponent(state.platform, "kc-server")
-	for _, name := range []string{"api", "controller-manager", "nats", "static-resource"} {
+	for _, name := range []string{"api", "controller-manager", "operation-api", "static-resource"} {
 		check := platformCheck(statusComponent, name)
 		if check == nil {
 			status := platformstatus.Unknown
@@ -89,12 +89,6 @@ func checkServerNode(state *diagnosticState, host string) []Check {
 		state.remote.httpHealth(host, "static-resource-health",
 			fmt.Sprintf("http://%s/healthz", endpoint(host, state.deployConfig.StaticServerPort))),
 	)
-	if state.deployConfig.MQ != nil && !state.deployConfig.MQ.External {
-		checks = append(checks,
-			state.remote.port(host, "nats-client-port", endpoint(host, state.deployConfig.MQ.Port)),
-			state.remote.port(host, "nats-cluster-port", endpoint(host, state.deployConfig.MQ.ClusterPort)),
-		)
-	}
 	for i := range checks {
 		if checks[i].Status != platformstatus.Healthy && len(checks[i].Logs) == 0 {
 			checks[i].Logs = state.remote.journal(host, "kc-server")
@@ -297,61 +291,7 @@ func checkAgent(state *diagnosticState, target agentTarget) []Check {
 	if service.Status == platformstatus.Unhealthy || service.Status == platformstatus.Unknown {
 		return checks
 	}
-	checks = append(checks, checkAgentNATS(state, target, label))
 	return checks
-}
-
-func checkAgentNATS(state *diagnosticState, target agentTarget, label string) Check {
-	if state.deployConfig.MQ == nil || state.deployConfig.MQ.External {
-		return Check{
-			Name: natsConnectivity, Target: label, Status: platformstatus.Skipped,
-			Message: "embedded NATS is not enabled",
-		}
-	}
-	mqIPs := state.deployConfig.MQ.IPs
-	if len(mqIPs) == 0 {
-		mqIPs = state.deployConfig.ServerIPs
-	}
-	connectivity := make([]Check, 0, len(mqIPs))
-	for _, server := range sortedStrings(mqIPs) {
-		check := state.remote.port(target.IP, natsConnectivity, endpoint(server, state.deployConfig.MQ.Port))
-		check.Target = label
-		connectivity = append(connectivity, check)
-	}
-	unhealthy := 0
-	unknown := 0
-	for i := range connectivity {
-		switch connectivity[i].Status {
-		case platformstatus.Unhealthy:
-			unhealthy++
-		case platformstatus.Unknown:
-			unknown++
-		}
-	}
-	if unhealthy+unknown > 0 {
-		status := platformstatus.Unknown
-		if unhealthy == len(connectivity) {
-			status = platformstatus.Unhealthy
-		} else if unhealthy > 0 {
-			status = platformstatus.Degraded
-		}
-		combined := Check{
-			Name: natsConnectivity, Target: label, Status: status,
-			Message: fmt.Sprintf("kc-agent on %s cannot verify %d/%d embedded NATS endpoints",
-				label, unhealthy+unknown, len(connectivity)),
-			Logs: state.remote.journal(target.IP, "kc-agent"),
-		}
-		for i := range connectivity {
-			combined.Evidence = append(combined.Evidence, connectivity[i].Message)
-			combined.Commands = appendUnique(combined.Commands, connectivity[i].Commands...)
-		}
-		combined.Commands = appendUnique(combined.Commands, state.remote.serviceCommands(target.IP, "kc-agent")...)
-		return combined
-	}
-	return Check{
-		Name: natsConnectivity, Target: label, Status: platformstatus.Healthy,
-		Message: fmt.Sprintf("all embedded NATS endpoints are reachable from %s", label),
-	}
 }
 
 func agentHeartbeat(target agentTarget, inventoryLoaded bool) Check {
@@ -479,8 +419,6 @@ func attachServerFailureDetails(state *diagnosticState, component *Component, se
 		switch check.Name {
 		case "controller-manager":
 			attachServerTimes(state.remote, check, servers)
-		case "nats":
-			attachNATSConnectivity(state, check, servers)
 		case "static-resource":
 			attachStaticResourceEvidence(state, check, servers)
 		}
@@ -502,23 +440,6 @@ func attachServerTimes(remote *remoteRunner, check *Check, servers []string) {
 			}
 		}
 		check.Evidence = append(check.Evidence, fmt.Sprintf("%s clock check failed", host))
-	}
-}
-
-func attachNATSConnectivity(state *diagnosticState, check *Check, servers []string) {
-	if state.deployConfig.MQ == nil || state.deployConfig.MQ.External {
-		return
-	}
-	for _, source := range servers {
-		for _, target := range servers {
-			if source == target {
-				continue
-			}
-			result := state.remote.port(source, "nats-cluster-connectivity",
-				endpoint(target, state.deployConfig.MQ.ClusterPort))
-			check.Evidence = append(check.Evidence, result.Message)
-			check.Commands = appendUnique(check.Commands, result.Commands...)
-		}
 	}
 }
 

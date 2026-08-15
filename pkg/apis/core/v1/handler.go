@@ -33,10 +33,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
 
-	"github.com/kubeclipper/kubeclipper/pkg/utils/httputil"
-
-	"k8s.io/client-go/util/retry"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -69,9 +65,9 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	"github.com/kubeclipper/kubeclipper/pkg/models/core"
 	"github.com/kubeclipper/kubeclipper/pkg/models/lease"
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	operationv2store "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/models/platform"
-	"github.com/kubeclipper/kubeclipper/pkg/oplog"
+	operationv2builder "github.com/kubeclipper/kubeclipper/pkg/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -79,7 +75,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/validation"
 	apirequest "github.com/kubeclipper/kubeclipper/pkg/server/request"
 	"github.com/kubeclipper/kubeclipper/pkg/server/restplus"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
 	bs "github.com/kubeclipper/kubeclipper/pkg/simple/backupstore"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/generic"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/certs"
@@ -97,12 +92,10 @@ type handler struct {
 	genericConfig    *generic.ServerRunOptions
 	clusterOperator  cluster.Operator
 	leaseOperator    lease.Operator
-	opOperator       operation.Operator
+	operationV2Store operationv2store.Store
 	platformOperator platform.Operator
 	coreOperator     core.Operator
-	delivery         service.IDelivery
 	tokenOperator    auth.TokenManagementInterface
-	terminationChan  *chan struct{}
 }
 
 const (
@@ -117,20 +110,31 @@ var (
 	ErrNodesRegionDifferent = errors.New("nodes belongs to different region")
 )
 
-func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator, op operation.Operator, leaseOperator lease.Operator,
-	platform platform.Operator, coreOperator core.Operator, delivery service.IDelivery,
-	tokenOperator auth.TokenManagementInterface, terminationChan *chan struct{}) *handler {
+func newHandler(conf *generic.ServerRunOptions, clusterOperator cluster.Operator, leaseOperator lease.Operator,
+	operationV2Store operationv2store.Store, platformOperator platform.Operator, coreOperator core.Operator,
+	tokenOperator auth.TokenManagementInterface) *handler {
 	return &handler{
 		genericConfig:    conf,
 		clusterOperator:  clusterOperator,
-		delivery:         delivery,
-		opOperator:       op,
-		platformOperator: platform,
+		operationV2Store: operationV2Store,
+		platformOperator: platformOperator,
 		leaseOperator:    leaseOperator,
 		coreOperator:     coreOperator,
 		tokenOperator:    tokenOperator,
-		terminationChan:  terminationChan,
 	}
+}
+
+func (h *handler) createOperationV2(
+	ctx context.Context,
+	clusterObject *v1.Cluster,
+	plan *v1.Operation,
+) error {
+	converted, err := operationv2builder.FromCoreOperation(ctx, plan, clusterObject, h.clusterOperator)
+	if err != nil {
+		return err
+	}
+	_, err = h.operationV2Store.CreateOperation(ctx, converted)
+	return err
 }
 
 func (h *handler) ListClusters(request *restful.Request, response *restful.Response) {
@@ -204,10 +208,17 @@ func (h *handler) AddOrRemoveNodes(request *restful.Request, response *restful.R
 	if pn.Operation == clusteroperation.NodesOperationRemove {
 		operationType = v1.OperationRemoveNodes
 	}
-	executable, err := clusteroperation.Executable(ctx, operationType, clu, h.opOperator)
+	operationList, err := h.operationV2Store.ListOperations(ctx, c.UID, "")
 	if err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return
+	}
+	executable := true
+	for i := range operationList.Items {
+		if operationList.Items[i].Spec.Action == operationType && !operationList.Items[i].Status.Phase.IsTerminal() {
+			executable = clusteroperation.SupportConcurrent(operationType)
+			break
+		}
 	}
 	if !executable {
 		restplus.HandleBadRequest(response, request, fmt.Errorf("%s does not support concurrent execution", operationType))
@@ -387,17 +398,12 @@ func (h *handler) DeleteCluster(request *restful.Request, response *restful.Resp
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		op, err = h.opOperator.CreateOperation(request.Request.Context(), op)
+		err = h.createOperationV2(request.Request.Context(), c, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 	}
-	go func(o *v1.Operation, opts *service.Options) {
-		if err := h.delivery.DeliverTaskOperation(context.TODO(), o, opts); err != nil {
-			logger.Error("delivery task error", zap.Error(err))
-		}
-	}(op, &service.Options{DryRun: dryRun, ForceSkipError: force})
 	response.WriteHeader(http.StatusOK)
 }
 
@@ -474,14 +480,13 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	op.Labels[common.LabelOperationSponsor] = buildOperationSponsor(h.genericConfig)
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
-		op, err = h.opOperator.CreateOperation(context.TODO(), op)
+		err = h.createOperationV2(context.TODO(), &c, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 	}
 
-	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
@@ -585,7 +590,7 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 	op.Status.Status = v1.OperationStatusRunning
 	c.Status.Phase = v1.ClusterUpdating
 	if !dryRun {
-		op, err = h.opOperator.CreateOperation(ctx, op)
+		err = h.createOperationV2(ctx, c, op)
 		if err != nil {
 			restplus.HandleBadRequest(response, request, err)
 			return
@@ -597,7 +602,6 @@ func (h *handler) UpdateClusterCertification(request *restful.Request, response 
 		}
 	}
 
-	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
 }
 
@@ -622,6 +626,13 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 			return
 		}
 	} else {
+		if len(clu.KubeConfig) > 0 {
+			kubeConfigData = clu.KubeConfig
+			if _, err := response.Write(kubeConfigData); err != nil {
+				return
+			}
+			return
+		}
 		extraMeta, err := h.getClusterMetadata(ctx, clu, false)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
@@ -642,15 +653,15 @@ func (h *handler) GetKubeConfig(request *restful.Request, response *restful.Resp
 			externalAddress = clu.Labels[common.LabelExternalIP]
 		}
 
-		kubeConfig, err := k8s.GetKubeConfig(context.TODO(), extraMeta.ClusterName, masters[0], externalAddress, h.delivery)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		kubeConfigData = []byte(kubeConfig)
+		_ = masters
+		_ = externalAddress
+		restplus.HandleInternalError(response, request, fmt.Errorf("cluster kubeconfig is not ready"))
+		return
 	}
 
-	_, _ = response.Write(kubeConfigData)
+	if _, err := response.Write(kubeConfigData); err != nil {
+		return
+	}
 }
 
 func (h *handler) getProxyKubeConfig(ctx context.Context, clusterName string) ([]byte, error) {
@@ -715,6 +726,71 @@ func (h *handler) ListNodes(request *restful.Request, response *restful.Response
 			return
 		}
 		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
+	}
+}
+
+func (h *handler) CreateNode(request *restful.Request, response *restful.Response) {
+	node := &v1.Node{}
+	if err := request.ReadEntity(node); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if node.Name == "" {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("node metadata.name is required"))
+		return
+	}
+	if requestUser, ok := apirequest.UserFrom(request.Request.Context()); ok && strings.HasPrefix(requestUser.GetName(), "system:kc-agent:") {
+		agentID := strings.TrimPrefix(requestUser.GetName(), "system:kc-agent:")
+		if node.Name != agentID {
+			restplus.HandleForbidden(response, request, fmt.Errorf("agent %q cannot register Node %q", agentID, node.Name))
+			return
+		}
+	}
+	created, err := h.clusterOperator.CreateNode(request.Request.Context(), node)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if err := response.WriteHeaderAndEntity(http.StatusCreated, created); err != nil {
+		return
+	}
+}
+
+func (h *handler) UpdateNodeStatus(request *restful.Request, response *restful.Response) {
+	name := request.PathParameter(query.ParameterName)
+	incoming := &v1.Node{}
+	if err := request.ReadEntity(incoming); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	if incoming.Name != name || incoming.ResourceVersion == "" {
+		restplus.HandleBadRequest(response, request, fmt.Errorf("node name and resourceVersion are required and must match the URL"))
+		return
+	}
+	if requestUser, ok := apirequest.UserFrom(request.Request.Context()); ok && strings.HasPrefix(requestUser.GetName(), "system:kc-agent:") {
+		agentID := strings.TrimPrefix(requestUser.GetName(), "system:kc-agent:")
+		if name != agentID {
+			restplus.HandleForbidden(response, request, fmt.Errorf("agent %q cannot update Node %q", agentID, name))
+			return
+		}
+	}
+	current, err := h.clusterOperator.GetNodeEx(request.Request.Context(), name, "")
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if current.UID != incoming.UID || current.ResourceVersion != incoming.ResourceVersion {
+		restplus.HandleConflict(response, request, fmt.Errorf("node UID or resourceVersion changed"))
+		return
+	}
+	current.Status = incoming.Status
+	updated, err := h.clusterOperator.UpdateNode(request.Request.Context(), current)
+	if err != nil {
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if err := response.WriteHeaderAndEntity(http.StatusOK, updated); err != nil {
+		return
 	}
 }
 
@@ -869,108 +945,6 @@ func (h *handler) watchNodes(req *restful.Request, resp *restful.Response, q *qu
 	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Node"), req, resp, timeout)
 }
 
-func (h *handler) DescribeOperation(request *restful.Request, response *restful.Response) {
-	name := request.PathParameter(query.ParameterName)
-	resourceVersion := strutil.StringDefaultIfEmpty("0", request.QueryParameter(query.ParameterResourceVersion))
-	c, err := h.opOperator.GetOperationEx(request.Request.Context(), name, resourceVersion)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
-}
-
-func (h *handler) ListOperations(request *restful.Request, response *restful.Response) {
-	q := query.ParseQueryParameter(request)
-	if q.Watch {
-		h.watchOperations(request, response, q)
-		return
-	}
-	if clientrest.IsInformerRawQuery(request.Request) {
-		result, err := h.opOperator.ListOperations(request.Request.Context(), q)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
-	} else {
-		result, err := h.opOperator.ListOperationsEx(request.Request.Context(), q)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		_ = response.WriteHeaderAndEntity(http.StatusOK, result)
-	}
-}
-
-func (h *handler) TerminationOperation(request *restful.Request, response *restful.Response) {
-	ctx := request.Request.Context()
-	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
-	name := request.PathParameter(query.ParameterName)
-
-	op, err := h.opOperator.GetOperationEx(ctx, name, "0")
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	if op.Status.Status != v1.OperationStatusRunning {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("the operation status does not support termination"))
-		return
-	}
-	if !dryRun {
-		// if the kc-server is not the initiator of the operation, the request is forwarded to the specified service
-		if sponsor := op.Labels[common.LabelOperationSponsor]; sponsor != "" && !strings.Contains(sponsor, h.genericConfig.BindAddress) {
-			headers := make(map[string]string)
-			reqURL := fmt.Sprintf("%s%s", parseOperationSponsor(sponsor), request.Request.RequestURI)
-			headers["Authorization"] = request.Request.Header.Get("Authorization")
-			_, code, err := httputil.CommonRequest(reqURL, "POST", headers, nil, nil)
-			if err != nil {
-				restplus.HandleInternalError(response, request, err)
-				return
-			}
-			if code != http.StatusOK {
-				restplus.HandleInternalError(response, request, errors.New("forwarding request error"))
-				return
-			}
-			_ = response.WriteHeaderAndEntity(http.StatusOK, nil)
-			return
-		}
-		// update the data before broadcasting the message
-		// write termination label
-		op.Labels[common.LabelOperationIntent] = common.OperationIntent
-
-		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			_, err = h.opOperator.UpdateOperation(ctx, op)
-			return err
-		}); err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		// close channel for broadcast termination message
-		close(*h.terminationChan)
-		// reset channel
-		*h.terminationChan = make(chan struct{})
-	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, nil)
-}
-
-func (h *handler) watchOperations(req *restful.Request, resp *restful.Response, q *query.Query) {
-	timeout := query.MinTimeoutSeconds * time.Second
-	if q.TimeoutSeconds != nil {
-		timeout = time.Duration(*q.TimeoutSeconds) * time.Second
-	}
-	watcher, err := h.opOperator.WatchOperations(req.Request.Context(), q)
-	if err != nil {
-		restplus.HandleInternalError(resp, req, err)
-		return
-	}
-	restplus.ServeWatch(watcher, v1.SchemeGroupVersion.WithKind("Operation"), req, resp, timeout)
-}
-
 // TODO: it will be deprecated in the future
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
 	registry, err := utils.ResolveImageRegistry(ctx, c.ImageRegistry, h.clusterOperator)
@@ -1036,7 +1010,7 @@ func (h *handler) getNodeInfo(ctx context.Context, nodes v1.WorkerNodeList, skip
 			IPv4:     n.Status.Ipv4DefaultIP,
 			NodeIPv4: n.Status.NodeIpv4DefaultIP,
 			Region:   n.Labels[common.LabelTopologyRegion],
-			Hostname: n.Labels[common.LabelHostname],
+			Hostname: n.Status.NodeInfo.Hostname,
 			Role:     n.Labels[common.LabelNodeRole],
 		}
 		_, item.Disable = n.Labels[common.LabelNodeDisable]
@@ -1044,85 +1018,6 @@ func (h *handler) getNodeInfo(ctx context.Context, nodes v1.WorkerNodeList, skip
 	}
 
 	return meta, nil
-}
-
-func (h *handler) GetOperationLog(request *restful.Request, response *restful.Response) {
-	ctx := request.Request.Context()
-	resourceVer := strutil.StringDefaultIfEmpty("0", request.QueryParameter(query.ParameterResourceVersion))
-	nodeName := request.QueryParameter(query.ParameterNode)
-	if nodeName == "" {
-		restplus.HandleBadRequest(response, request, errors.New("node name is required"))
-		return
-	}
-	_, err := h.clusterOperator.GetNodeEx(ctx, nodeName, resourceVer)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	opID := request.QueryParameter(query.ParameterOperation)
-	if opID == "" {
-		restplus.HandleBadRequest(response, request, errors.New("operation ID is required"))
-		return
-	}
-	op, err := h.opOperator.GetOperationEx(ctx, opID, resourceVer)
-	if err != nil {
-		if apimachineryErrors.IsNotFound(err) {
-			restplus.HandleNotFound(response, request, err)
-			return
-		}
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	stepID := request.QueryParameter(query.ParameterStep)
-	if stepID == "" {
-		restplus.HandleBadRequest(response, request, errors.New("step ID is required"))
-		return
-	}
-	// validate operation contains the step
-	step, ok := op.GetStep(stepID)
-	if !ok {
-		restplus.HandleBadRequest(response, request, errors.New("step ID is invalid"))
-		return
-	}
-	offset, err := strconv.ParseInt(strutil.StringDefaultIfEmpty("0", request.QueryParameter(query.ParameterOffset)), 10, 64)
-	if err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-	stepKey := fmt.Sprintf("%s-%s", stepID, step.Name)
-	req, err := json.Marshal(oplog.LogContentRequest{
-		OpID:   opID,
-		StepID: stepKey,
-		Offset: offset,
-		Length: 0, // callers are not currently supported to set the length of the fetch data
-	})
-	if err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
-	defer cancel()
-	resp, err := h.delivery.DeliverLogRequest(ctx, &service.LogOperation{
-		Op:                service.OperationStepLog,
-		OperationIdentity: string(req),
-		To:                nodeName,
-	})
-	if err != nil {
-		logger.Error("request step log error", zap.Error(err))
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-	_ = response.WriteHeaderAndEntity(http.StatusOK, StepLog{
-		Content:      resp.Content,
-		Node:         nodeName,
-		Timeout:      step.Timeout,
-		DeliverySize: resp.DeliverySize,
-		LogSize:      resp.LogSize,
-	})
 }
 
 func (h *handler) ListRegions(request *restful.Request, response *restful.Response) {
@@ -1178,13 +1073,6 @@ func (h *handler) DescribeRegion(request *restful.Request, response *restful.Res
 		return
 	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, c)
-}
-
-// doOperation should be called in goroutine.
-func (h *handler) doOperation(ctx context.Context, op *v1.Operation, opts *service.Options) {
-	if err := h.delivery.DeliverTaskOperation(ctx, op, opts); err != nil {
-		logger.Error("distribute task error", zap.Error(err))
-	}
 }
 
 func (h *handler) createClusterCheck(ctx context.Context, c *v1.Cluster) error {
@@ -1431,7 +1319,7 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		if op, err = h.opOperator.CreateOperation(context.TODO(), op); err != nil {
+		if err = h.createOperationV2(context.TODO(), c, op); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -1445,7 +1333,6 @@ func (h *handler) CreateBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, backup)
 }
@@ -1514,7 +1401,7 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		if op, err = h.opOperator.CreateOperation(context.TODO(), op); err != nil {
+		if err = h.createOperationV2(context.TODO(), c, op); err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
@@ -1522,7 +1409,6 @@ func (h *handler) DeleteBackup(request *restful.Request, response *restful.Respo
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	}
 	response.WriteHeader(http.StatusOK)
 }
@@ -1559,129 +1445,6 @@ func (h *handler) UpdateBackup(request *restful.Request, response *restful.Respo
 		return
 	}
 	_ = response.WriteHeaderAndEntity(http.StatusOK, backup)
-}
-
-func (h *handler) RetryCluster(request *restful.Request, response *restful.Response) {
-	dryRun := query.GetBoolValueWithDefault(request, query.ParamDryRun, false)
-	name := request.PathParameter(query.ParameterName)
-
-	op, err := h.opOperator.GetOperationEx(request.Request.Context(), name, "0")
-	if err != nil {
-		restplus.HandleInternalError(response, request, err)
-		return
-	}
-
-	// backup/recovery/upgrade does not support retries
-	switch op.Labels[common.LabelOperationAction] {
-	case v1.OperationBackupCluster, v1.OperationRecoverCluster, v1.OperationUpgradeCluster:
-		restplus.HandleBadRequest(response, request, fmt.Errorf("backup/recovery/upgrade operation-action does not support retries"))
-		return
-	case "":
-		restplus.HandleBadRequest(response, request, fmt.Errorf("operation %s action is empty", name))
-		return
-	}
-
-	// only the last retry is supported
-	q := query.New()
-	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, op.Labels[common.LabelClusterName])
-	q.Pagination.Offset = 0
-	q.Pagination.Limit = 1
-	opList, err := h.opOperator.ListOperationsEx(request.Request.Context(), q)
-	if err != nil {
-		restplus.HandleBadRequest(response, request, err)
-		return
-	}
-
-	if len(opList.Items) == 0 {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("the cluster did not query the operation"))
-		return
-	}
-
-	op = opList.Items[0].(*v1.Operation)
-	if op.Status.Status == v1.OperationStatusSuccessful || op.Status.Status == v1.OperationStatusRunning || op.Name != name {
-		restplus.HandleBadRequest(response, request, fmt.Errorf("only the latest faild operation can do a retry"))
-		return
-	}
-
-	// error step index
-	failedIndex := len(op.Status.Conditions) - 1
-	ctx := component.WithRetry(context.TODO(), true)
-
-	// if there is an uninstall error, continue directly from the current step
-	var continueSteps []v1.Step
-	if op.Steps[0].Action == v1.ActionInstall {
-		findStepNode := func(nodes []v1.StepNode, nodeID string) v1.StepNode {
-			for _, v := range nodes {
-				if v.ID == nodeID {
-					return v
-				}
-			}
-			return v1.StepNode{}
-		}
-		var failedNodes []v1.StepNode
-		successStatus := make([]v1.StepStatus, 0)
-		for _, status := range op.Status.Conditions[failedIndex].Status {
-			if status.Status == "" || status.Status == v1.StepStatusFailed {
-				// select the nodes whose execution fails
-				if node := findStepNode(op.Steps[failedIndex].Nodes, status.Node); node.ID != "" {
-					failedNodes = append(failedNodes, node)
-				}
-				continue
-			}
-			successStatus = append(successStatus, status)
-		}
-		// the step to continue
-		continueSteps = op.Steps[failedIndex:]
-
-		// the node that failed to execute the task
-		continueSteps[0].Nodes = failedNodes
-
-		if len(successStatus) != 0 {
-			// failed status
-			failedStepStatus := op.Status.Conditions[failedIndex]
-			// retain successful status
-			failedStepStatus.Status = successStatus
-			// Remove the failed status and keep the successful status
-			op.Status.Conditions = op.Status.Conditions[0:failedIndex]
-			op.Status.Conditions = append(op.Status.Conditions, failedStepStatus)
-		} else {
-			op.Status.Conditions = op.Status.Conditions[0:failedIndex]
-		}
-		if failedIndex > 0 && op.Status.Conditions[failedIndex-1].Status[0].Response != nil {
-			ctx = component.WithExtraData(ctx, op.Status.Conditions[failedIndex-1].Status[0].Response)
-		}
-	}
-
-	// if there is an uninstall error, start from the beginning
-	if op.Steps[0].Action == v1.ActionUninstall {
-		continueSteps = op.Steps
-		op.Status.Conditions = make([]v1.OperationCondition, 0)
-	}
-
-	op.Status.Status = v1.OperationStatusRunning
-
-	if !dryRun {
-		_, err = h.opOperator.UpdateOperation(context.TODO(), op)
-		if err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		var c *v1.Cluster
-		if c, err = h.clusterOperator.GetClusterEx(context.TODO(), op.Labels[common.LabelClusterName], "0"); err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-		c.Status.Phase = v1.ClusterUpdating
-		if _, err = h.clusterOperator.UpdateCluster(context.TODO(), c); err != nil {
-			restplus.HandleInternalError(response, request, err)
-			return
-		}
-	}
-
-	op.Steps = continueSteps
-
-	go h.doOperation(ctx, op, &service.Options{DryRun: dryRun})
-	_ = response.WriteHeaderAndEntity(http.StatusOK, nil)
 }
 
 func (h *handler) CreateRecovery(request *restful.Request, response *restful.Response) {
@@ -1788,9 +1551,8 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 		}
 	}
 
-	go func(c *v1.Cluster, op *v1.Operation, r *v1.Recovery, b *v1.Backup) {
-		var err error
-		newOP, err := h.opOperator.CreateOperation(context.TODO(), op)
+	if !dryRun {
+		err := h.createOperationV2(context.TODO(), c, o)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
@@ -1801,8 +1563,7 @@ func (h *handler) CreateRecovery(request *restful.Request, response *restful.Res
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
-		h.doOperation(context.TODO(), newOP, &service.Options{DryRun: dryRun})
-	}(c, o, r, b)
+	}
 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, r)
 }
@@ -1884,6 +1645,11 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 			op.Steps[0] = *criStep
 			clu.Status.Registries = statusRegistry
 		}
+		clu, err = pcs.addOrRemoveComponentFromCluster(clu)
+		if err != nil {
+			restplus.HandleInternalError(response, request, err)
+			return
+		}
 		clu.Status.Phase = v1.ClusterUpdating
 		_, err = h.clusterOperator.UpdateCluster(context.TODO(), clu)
 		if err != nil {
@@ -1891,37 +1657,13 @@ func (h *handler) InstallOrUninstallPlugins(request *restful.Request, response *
 			return
 		}
 
-		op, err = h.opOperator.CreateOperation(context.TODO(), op)
+		err = h.createOperationV2(context.TODO(), clu, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 
 	}
-	go func(o *v1.Operation, opts *service.Options, oPcs *PatchComponents) {
-		if err := h.delivery.DeliverTaskOperation(context.TODO(), o, opts); err != nil {
-			logger.Error("delivery task error", zap.Error(err))
-			return
-		}
-		logger.Debugf("the install or uninstall plugins message was delivered successfully")
-		// the database is not updated until the message is delivered successfully
-		if !opts.DryRun {
-			latestCluster, err := h.clusterOperator.GetClusterEx(ctx, clusterName, "0")
-			if err != nil {
-				logger.Error("get the latest cluster info error", zap.Error(err))
-				return
-			}
-			newCluster, err := oPcs.addOrRemoveComponentFromCluster(latestCluster)
-			if err != nil {
-				logger.Error("add or remove component from cluster", zap.Error(err))
-				return
-			}
-			_, err = h.clusterOperator.UpdateCluster(context.TODO(), newCluster)
-			if err != nil {
-				logger.Error("update cluster metadata error", zap.Error(err))
-			}
-		}
-	}(op, &service.Options{DryRun: dryRun}, pcs)
 
 	_ = response.WriteHeaderAndEntity(http.StatusOK, clu)
 }
@@ -2015,13 +1757,12 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 	op.Labels[common.LabelUpgradeVersion] = body.Version
 	op.Status.Status = v1.OperationStatusRunning
 	if !dryRun {
-		op, err = h.opOperator.CreateOperation(context.TODO(), op)
+		err = h.createOperationV2(context.TODO(), clu, op)
 		if err != nil {
 			restplus.HandleInternalError(response, request, err)
 			return
 		}
 	}
-	go h.doOperation(context.TODO(), op, &service.Options{DryRun: dryRun})
 	response.WriteHeader(http.StatusOK)
 }
 

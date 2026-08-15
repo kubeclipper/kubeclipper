@@ -2739,62 +2739,6 @@
         }
       }
     },
-    "/api/core.kubeclipper.io/v1/logs": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Node"
-        ],
-        "summary": "Get operation log on node.",
-        "operationId": "GetOperationLog",
-        "parameters": [
-          {
-            "type": "string",
-            "format": "node=%s",
-            "description": "node name",
-            "name": "node",
-            "in": "query",
-            "required": true
-          },
-          {
-            "type": "string",
-            "format": "operation=%s",
-            "description": "operation id",
-            "name": "operation",
-            "in": "query",
-            "required": true
-          },
-          {
-            "type": "string",
-            "format": "step=%s",
-            "description": "step id",
-            "name": "step",
-            "in": "query",
-            "required": true
-          },
-          {
-            "type": "string",
-            "format": "offset=%s",
-            "description": "offset",
-            "name": "offset",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.StepLog"
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      }
-    },
     "/api/core.kubeclipper.io/v1/nodes": {
       "get": {
         "produces": [
@@ -2853,6 +2797,34 @@
             "description": "OK",
             "schema": {
               "$ref": "#/definitions/models.PageableResponse"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Register a node.",
+        "operationId": "CreateNode",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
             }
           }
         }
@@ -2990,6 +2962,36 @@
         }
       }
     },
+    "/api/core.kubeclipper.io/v1/nodes/{name}/status": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Core-Node"
+        ],
+        "summary": "Update node status.",
+        "operationId": "UpdateNodeStatus",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1.Node"
+            }
+          }
+        }
+      }
+    },
     "/api/core.kubeclipper.io/v1/nodes/{name}/terminal": {
       "get": {
         "produces": [
@@ -3052,174 +3054,6 @@
             "schema": {
               "$ref": "#/definitions/errors.HTTPError"
             }
-          }
-        }
-      }
-    },
-    "/api/core.kubeclipper.io/v1/operations": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Cluster"
-        ],
-        "summary": "List operations.",
-        "operationId": "ListOperations",
-        "parameters": [
-          {
-            "type": "string",
-            "format": "limit=%d,page=%d",
-            "default": "limit=10,page=1",
-            "description": "paging query, e.g. limit=100,page=1",
-            "name": "paging",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "format": "labelSelector=%s=%s",
-            "description": "resource filter by metadata label",
-            "name": "labelSelector",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "format": "fieldSelector=%s=%s",
-            "description": "resource filter by field",
-            "name": "fieldSelector",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "description": "resource sort reverse or not",
-            "name": "reverse",
-            "in": "query"
-          },
-          {
-            "type": "boolean",
-            "description": "watch request",
-            "name": "watch",
-            "in": "query"
-          },
-          {
-            "type": "integer",
-            "default": 60,
-            "description": "watch timeout seconds",
-            "name": "timeoutSeconds",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.OperationList"
-            }
-          }
-        }
-      }
-    },
-    "/api/core.kubeclipper.io/v1/operations/{name}": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Node"
-        ],
-        "summary": "Describe operations.",
-        "operationId": "DescribeOperation",
-        "parameters": [
-          {
-            "type": "string",
-            "description": "operation name",
-            "name": "name",
-            "in": "path",
-            "required": true
-          },
-          {
-            "type": "string",
-            "description": "resource version to query",
-            "name": "resourceVersion",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.Operation"
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      }
-    },
-    "/api/core.kubeclipper.io/v1/operations/{name}/retry": {
-      "post": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Cluster"
-        ],
-        "summary": "clusters retry operation.",
-        "operationId": "RetryCluster",
-        "parameters": [
-          {
-            "type": "boolean",
-            "description": "dry run clusters retry operation.",
-            "name": "dryRun",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "description": "operation name",
-            "name": "name",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/v1.Cluster"
-            }
-          }
-        }
-      }
-    },
-    "/api/core.kubeclipper.io/v1/operations/{name}/termination": {
-      "post": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "Core-Cluster"
-        ],
-        "summary": "clusters termination operation.",
-        "operationId": "TerminationOperation",
-        "parameters": [
-          {
-            "type": "boolean",
-            "description": "dry run clusters termination operation.",
-            "name": "dryRun",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "description": "operation name",
-            "name": "name",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -4630,6 +4464,215 @@
         }
       }
     },
+    "/api/operations.kubeclipper.io/v1alpha1/operations": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "listOperations",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationList"
+            }
+          }
+        }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "createOperation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.Operation"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.Operation"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operations/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "getOperation",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.Operation"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operations/{name}/cancel": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "cancelOperation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationControlRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.Operation"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operations/{name}/retry": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "retryOperation",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationControlRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.Operation"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operationtasks": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "listTasks",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationTaskList"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operationtasks/{name}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "getTask",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationTask"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operationtasks/{name}/logs": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "getTaskLogs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/map[string]interface%20%7B%7D"
+            }
+          }
+        }
+      }
+    },
+    "/api/operations.kubeclipper.io/v1alpha1/operationtasks/{name}/status": {
+      "put": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Operation-v2"
+        ],
+        "operationId": "updateTaskStatus",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationTask"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/v1alpha1.OperationTask"
+            }
+          }
+        }
+      }
+    },
     "/oauth/cb/{callback}": {
       "get": {
         "consumes": [
@@ -5459,6 +5502,9 @@
         "type": "boolean"
       }
     },
+    "map[string]interface {}": {
+      "type": "object"
+    },
     "mfa.UserMFAProvider": {
       "properties": {
         "token": {
@@ -6061,31 +6107,6 @@
           "type": "string"
         },
         "scheduler": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.Command": {
-      "required": [
-        "type"
-      ],
-      "properties": {
-        "customCommand": {
-          "type": "string"
-        },
-        "identity": {
-          "type": "string"
-        },
-        "shellCommand": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "template": {
-          "$ref": "#/definitions/v1.TemplateCommand"
-        },
-        "type": {
           "type": "string"
         }
       }
@@ -6807,80 +6828,6 @@
         }
       }
     },
-    "v1.Operation": {
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/definitions/v1.ObjectMeta"
-        },
-        "status": {
-          "$ref": "#/definitions/v1.OperationStatus"
-        },
-        "steps": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.Step"
-          }
-        }
-      }
-    },
-    "v1.OperationCondition": {
-      "properties": {
-        "status": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.StepStatus"
-          }
-        },
-        "stepID": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.OperationList": {
-      "required": [
-        "items"
-      ],
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.Operation"
-          }
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/definitions/v1.ListMeta"
-        }
-      }
-    },
-    "v1.OperationStatus": {
-      "properties": {
-        "conditions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.OperationCondition"
-          }
-        },
-        "status": {
-          "type": "string"
-        }
-      }
-    },
     "v1.OwnerReference": {
       "description": "OwnerReference contains enough information to let you identify an owning object. An owning object must be in the same namespace as the dependent, or be cluster-scoped, so there is no namespace field.",
       "required": [
@@ -7199,125 +7146,6 @@
         }
       }
     },
-    "v1.Step": {
-      "required": [
-        "errIgnore",
-        "automaticRetry"
-      ],
-      "properties": {
-        "action": {
-          "type": "string"
-        },
-        "afterRunCommands": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.Command"
-          }
-        },
-        "automaticRetry": {
-          "type": "boolean"
-        },
-        "beforeRunCommands": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.Command"
-          }
-        },
-        "commands": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.Command"
-          }
-        },
-        "errIgnore": {
-          "type": "boolean"
-        },
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "nodes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/v1.StepNode"
-          }
-        },
-        "retryTimes": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "timeout": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.StepLog": {
-      "properties": {
-        "content": {
-          "type": "string"
-        },
-        "deliverySize": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "logSize": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "node": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string"
-        },
-        "timeout": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.StepNode": {
-      "properties": {
-        "hostname": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "ipv4": {
-          "type": "string"
-        },
-        "nodeIPv4": {
-          "type": "string"
-        }
-      }
-    },
-    "v1.StepStatus": {
-      "properties": {
-        "endAt": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
-        },
-        "node": {
-          "type": "string"
-        },
-        "reason": {
-          "type": "string"
-        },
-        "response": {
-          "type": "string"
-        },
-        "startAt": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string"
-        }
-      }
-    },
     "v1.Taint": {
       "required": [
         "key",
@@ -7353,16 +7181,6 @@
         },
         "metadata": {
           "$ref": "#/definitions/v1.ObjectMeta"
-        }
-      }
-    },
-    "v1.TemplateCommand": {
-      "properties": {
-        "data": {
-          "type": "string"
-        },
-        "identity": {
-          "type": "string"
         }
       }
     },
@@ -7538,6 +7356,342 @@
           "items": {
             "$ref": "#/definitions/v1.Taint"
           }
+        }
+      }
+    },
+    "v1alpha1.NodeReference": {
+      "required": [
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.ObjectReference": {
+      "required": [
+        "kind",
+        "name",
+        "uid"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.Operation": {
+      "required": [
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/v1alpha1.OperationSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/v1alpha1.OperationStatus"
+        }
+      }
+    },
+    "v1alpha1.OperationControlRequest": {
+      "required": [
+        "uid",
+        "resourceVersion"
+      ],
+      "properties": {
+        "resourceVersion": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.OperationList": {
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1alpha1.Operation"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ListMeta"
+        }
+      }
+    },
+    "v1alpha1.OperationSpec": {
+      "required": [
+        "targetRef",
+        "action",
+        "desiredState",
+        "timeout",
+        "steps"
+      ],
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "desiredState": {
+          "type": "string"
+        },
+        "retryGeneration": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1alpha1.OperationStep"
+          }
+        },
+        "targetRef": {
+          "$ref": "#/definitions/v1alpha1.ObjectReference"
+        },
+        "timeout": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.OperationStatus": {
+      "required": [
+        "phase"
+      ],
+      "properties": {
+        "deadline": {
+          "type": "string"
+        },
+        "finishedAt": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "observedRetryGeneration": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.OperationStep": {
+      "required": [
+        "id",
+        "targets",
+        "executor",
+        "payload"
+      ],
+      "properties": {
+        "executor": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1alpha1.StepInput"
+          }
+        },
+        "payload": {
+          "type": "string"
+        },
+        "retryLimit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1alpha1.NodeReference"
+          }
+        }
+      }
+    },
+    "v1alpha1.OperationTask": {
+      "required": [
+        "spec"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "#/definitions/v1alpha1.OperationTaskSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/v1alpha1.OperationTaskStatus"
+        }
+      }
+    },
+    "v1alpha1.OperationTaskList": {
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1alpha1.OperationTask"
+          }
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/v1.ListMeta"
+        }
+      }
+    },
+    "v1alpha1.OperationTaskSpec": {
+      "required": [
+        "operationRef",
+        "stepID",
+        "nodeRef",
+        "retryGeneration",
+        "attempt",
+        "executor",
+        "payload",
+        "deadline"
+      ],
+      "properties": {
+        "attempt": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "deadline": {
+          "type": "string"
+        },
+        "executor": {
+          "type": "string"
+        },
+        "nodeRef": {
+          "$ref": "#/definitions/v1alpha1.NodeReference"
+        },
+        "operationRef": {
+          "$ref": "#/definitions/v1alpha1.ObjectReference"
+        },
+        "payload": {
+          "type": "string"
+        },
+        "retryGeneration": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "stepID": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.OperationTaskStatus": {
+      "required": [
+        "phase"
+      ],
+      "properties": {
+        "finishedAt": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/definitions/v1alpha1.TaskResult"
+        },
+        "startedAt": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.StepInput": {
+      "required": [
+        "field",
+        "fromStepID",
+        "fromNodeUID",
+        "outputKey"
+      ],
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "fromNodeUID": {
+          "type": "string"
+        },
+        "fromStepID": {
+          "type": "string"
+        },
+        "outputKey": {
+          "type": "string"
+        }
+      }
+    },
+    "v1alpha1.TaskResult": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
         }
       }
     }

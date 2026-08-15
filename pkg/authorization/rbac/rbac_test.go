@@ -56,7 +56,7 @@ var (
 	reqDeleteClusters, _ = http.NewRequest("DELETE", "/api/core.kubeclipper.io/v1/clusters/cluster1", nil)
 
 	// operation api
-	reqListOperations, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/operations", nil)
+	reqListOperations = mustNewRequest("GET", "/api/operations.kubeclipper.io/v1alpha1/operations")
 
 	// node api
 	reqListNodes, _ = http.NewRequest("GET", "/api/core.kubeclipper.io/v1/nodes", nil)
@@ -90,6 +90,14 @@ var (
 	reqChangeAdminPassword, _          = http.NewRequest("PUT", "/api/iam.kubeclipper.io/v1/users/admin/password", nil)
 	reqChangeClusterManagerPassword, _ = http.NewRequest("PUT", "/api/iam.kubeclipper.io/v1/users/clustermanager/password", nil)
 )
+
+func mustNewRequest(method, target string) *http.Request {
+	httpRequest, err := http.NewRequestWithContext(context.Background(), method, target, http.NoBody)
+	if err != nil {
+		panic(err)
+	}
+	return httpRequest
+}
 
 var (
 	userAdmin = &user.DefaultInfo{
@@ -258,13 +266,23 @@ func setupIAMMock(op *iammock.MockOperator) {
 			Rules: []rbacv1.PolicyRule{
 				{
 					APIGroups: []string{"core.kubeclipper.io"},
-					Resources: []string{"clusters", "nodes", "regions", "operations"},
+					Resources: []string{"clusters", "nodes", "regions"},
 					Verbs:     []string{"get", "list", "watch"},
 				},
 				{
 					APIGroups: []string{"core.kubeclipper.io"},
-					Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions", "operations"},
+					Resources: []string{"clusters", "clusters/nodes", "clusters/plugins", "nodes", "regions"},
 					Verbs:     []string{"*"},
+				},
+				{
+					APIGroups: []string{"operations.kubeclipper.io"},
+					Resources: []string{"operations", "operationtasks", "operationtasks/logs"},
+					Verbs:     []string{"get", "list", "watch"},
+				},
+				{
+					APIGroups: []string{"operations.kubeclipper.io"},
+					Resources: []string{"operations", "operations/cancel", "operations/retry"},
+					Verbs:     []string{"create", "update", "patch"},
 				},
 			},
 		},

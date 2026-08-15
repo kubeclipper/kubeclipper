@@ -30,9 +30,6 @@ type ClusterListerExpansion interface {
 type NodeListerExpansion interface {
 }
 
-type OperationListerExpansion interface {
-}
-
 type RegionListerExpansion interface {
 }
 

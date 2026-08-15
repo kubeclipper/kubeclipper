@@ -91,17 +91,11 @@ func (s *APIServer) kcServerStatus(ctx context.Context) platformstatus.Component
 			}
 			return platformstatus.Healthy, "active leader is ready"
 		}),
-		timedCheck("nats", func() (platformstatus.Status, string) {
-			if s.Config.MQOptions.External {
-				return platformstatus.Skipped, "embedded NATS is not enabled"
+		timedCheck("operation-api", func() (platformstatus.Status, string) {
+			if s.operationV2Store == nil {
+				return platformstatus.Unknown, "Operation API storage is unavailable"
 			}
-			if s.deliveryService == nil {
-				return platformstatus.Unknown, "embedded NATS status is unavailable"
-			}
-			if err := s.deliveryService.Health(ctx); err != nil {
-				return platformstatus.Unhealthy, "embedded server or messaging path is unavailable"
-			}
-			return platformstatus.Healthy, "embedded server and messaging path ready"
+			return platformstatus.Healthy, "Operation API storage ready"
 		}),
 		timedCheck("static-resource", func() (platformstatus.Status, string) {
 			if s.staticResourceService == nil {

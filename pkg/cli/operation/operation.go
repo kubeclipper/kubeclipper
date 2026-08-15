@@ -25,7 +25,7 @@ const (
     describe   Show detailed information about an operation
     logs       Show plain-text logs of an operation
     retry      Retry a failed operation
-    terminate  Terminate a running operation`
+    cancel     Cancel a pending or running operation`
 
 	example = `
   # List all operations
@@ -46,8 +46,8 @@ const (
   # Retry a failed operation
   kcctl operation retry <OPERATION_ID>
 
-  # Terminate a running operation
-  kcctl operation terminate <OPERATION_ID>`
+  # Cancel a pending or running operation
+  kcctl operation cancel <OPERATION_ID>`
 )
 
 // NewCmdOperation creates the operation command with all subcommands.

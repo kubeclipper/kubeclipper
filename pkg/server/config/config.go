@@ -36,8 +36,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/etcd"
 
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/natsio"
-
 	"github.com/spf13/viper"
 )
 
@@ -55,7 +53,6 @@ type Config struct {
 	StaticServerOptions     *staticserver.Options              `json:"staticServer" yaml:"staticServer" mapstructure:"staticServer"`
 	EtcdOptions             *etcd.Options                      `json:"etcd,omitempty" yaml:"etcd,omitempty" mapstructure:"etcd"`
 	CacheOptions            *cache.Options                     `json:"cache,omitempty" yaml:"cache,omitempty" mapstructure:"cache"`
-	MQOptions               *natsio.NatsOptions                `json:"mq,omitempty" yaml:"mq,omitempty"  mapstructure:"mq"`
 	LogOptions              *logger.Options                    `json:"log,omitempty" yaml:"log,omitempty" mapstructure:"log"`
 	AuthenticationOptions   *authoptions.AuthenticationOptions `json:"authentication,omitempty" yaml:"authentication,omitempty" mapstructure:"authentication"`
 	AuditOptions            *auditoptions.AuditOptions         `json:"audit,omitempty" yaml:"audit,omitempty" mapstructure:"audit"`
@@ -67,7 +64,6 @@ func New() *Config {
 		StaticServerOptions:     staticserver.NewOptions(),
 		EtcdOptions:             etcd.NewEtcdOptions(),
 		CacheOptions:            cache.NewEtcdOptions(),
-		MQOptions:               natsio.NewOptions(),
 		LogOptions:              logger.NewLogOptions(),
 		AuthenticationOptions:   authoptions.NewAuthenticateOptions(),
 		AuditOptions:            auditoptions.NewAuditOptions(),
@@ -109,9 +105,6 @@ func (conf *Config) ToMap() map[string]bool {
 func (conf *Config) stripEmptyOptions() {
 	if conf.EtcdOptions != nil && len(conf.EtcdOptions.ServerList) == 0 {
 		conf.EtcdOptions = nil
-	}
-	if conf.MQOptions != nil && len(conf.MQOptions.Client.ServerAddress) == 0 {
-		conf.MQOptions = nil
 	}
 }
 

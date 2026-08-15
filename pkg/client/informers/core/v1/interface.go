@@ -27,7 +27,6 @@ import (
 type Interface interface {
 	Clusters() ClusterInformer
 	Nodes() NodeInformer
-	Operations() OperationInformer
 	Regions() RegionInformer
 	Backups() BackupInformer
 	BackupPoints() BackupPointInformer
@@ -59,13 +58,6 @@ func (v *version) Clusters() ClusterInformer {
 
 func (v *version) Nodes() NodeInformer {
 	return &nodeInformer{
-		factory:          v.factory,
-		tweakListOptions: v.tweakListOptions,
-	}
-}
-
-func (v *version) Operations() OperationInformer {
-	return &operationInformer{
 		factory:          v.factory,
 		tweakListOptions: v.tweakListOptions,
 	}

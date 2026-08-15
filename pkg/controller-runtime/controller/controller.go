@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -197,7 +198,7 @@ func (c *controller) Reconcile(ctx context.Context, req reconcile.Request) (_ re
 	defer func() {
 		if r := recover(); r != nil {
 			if c.RecoverPanic {
-				err = fmt.Errorf("panic: %v [recovered]", r)
+				err = fmt.Errorf("panic: %v [recovered]\n%s", r, debug.Stack())
 				return
 			}
 

@@ -61,7 +61,6 @@ type Manager interface {
 	GetClusterClientSet(cluster string) (client.Client, bool)
 	AddClusterClientSet(cluster string, client client.Client)
 	RemoveClusterClientSet(cluster string)
-	GetCmdDelivery() service.CmdDelivery
 }
 
 // Runnable allows a component to be started.
@@ -97,7 +96,6 @@ type LoopFunc func()
 type SetupFunc func(mgr Manager, informerFactory informers.SharedInformerFactory, storageFactory registry.SharedStorageFactory) error
 
 type ControllerManager struct {
-	cmdDelivery    service.CmdDelivery
 	storageFactory registry.SharedStorageFactory
 
 	cs clientset.Interface
@@ -121,8 +119,6 @@ type ControllerManager struct {
 
 	// per cluster map storing cluster clientset
 	clusterClientMap *clusterClientMap
-
-	terminationChan *chan struct{}
 }
 
 type workerLoop struct {
@@ -160,21 +156,15 @@ func (c *clusterClientMap) removeClientSet(name string) {
 	c.Unlock()
 }
 
-func (s *ControllerManager) GetCmdDelivery() service.CmdDelivery {
-	return s.cmdDelivery
-}
-
-func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorageFactory, cmdDelivery service.CmdDelivery, terminationChan *chan struct{}, setupFunc SetupFunc) (*ControllerManager, error) {
+func NewControllerManager(rc *rest.Config, storageFactory registry.SharedStorageFactory, setupFunc SetupFunc) (*ControllerManager, error) {
 	identity := uuid.New().String()
 	leaseOperator := lease.NewLeaseOperator(storageFactory.Leases())
 	s := &ControllerManager{
 		leaderStopChan:          make(chan struct{}, 1),
 		defaultWorkerLoopPeriod: time.Second,
 		clusterClientMap:        newClusterClientMap(),
-		cmdDelivery:             cmdDelivery,
 		storageFactory:          storageFactory,
 		setupFunc:               setupFunc,
-		terminationChan:         terminationChan,
 		identity:                identity,
 		leaseOperator:           leaseOperator,
 	}
@@ -292,15 +282,11 @@ func (s *ControllerManager) runManager(ctx context.Context) {
 	s.runnableLock.Lock()
 	s.runnables = nil
 	s.runnableLock.Unlock()
+	// TODO: error should be caught
 	if err := s.setupFunc(s, inFactory, s.storageFactory); err != nil {
 		s.log.Error("setup controller manager failed", zap.Error(err))
-		return
 	}
 	inFactory.Start(ctx.Done())
-	if !inFactory.WaitForCacheSync(ctx) {
-		s.log.Error("controller manager informer cache sync failed")
-		return
-	}
 	s.runWorkerLoops(ctx)
 	s.runRunnables(ctx)
 	go s.runReadinessLease(ctx)
@@ -334,8 +320,7 @@ func validateLease(item *coordinationv1.Lease, now time.Time) error {
 	if item.Spec.RenewTime == nil || item.Spec.LeaseDurationSeconds == nil {
 		return fmt.Errorf("lease timing is incomplete")
 	}
-	expiresAt := item.Spec.RenewTime.Add(time.Duration(*item.Spec.LeaseDurationSeconds) * time.Second)
-	if !now.Before(expiresAt) {
+	if !now.Before(item.Spec.RenewTime.Add(time.Duration(*item.Spec.LeaseDurationSeconds) * time.Second)) {
 		return fmt.Errorf("lease expired")
 	}
 	return nil

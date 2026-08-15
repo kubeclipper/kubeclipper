@@ -34,6 +34,7 @@ import (
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/apis/iam/v1"
 
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/apis/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/apis/operations/v1alpha1"
 
 	"github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
@@ -99,7 +100,8 @@ func validateSpec(apiSpec []byte) error {
 func generateSwaggerJSON() []byte {
 
 	container := restful.NewContainer()
-	urlruntime.Must(corev1.AddToContainer(container, nil, nil, nil, nil, nil, nil, nil, nil, nil))
+	urlruntime.Must(corev1.AddToContainer(container, nil, nil, nil, nil, nil, nil, nil))
+	container.Add(operationsv1alpha1.SetupWebService(nil))
 	urlruntime.Must(iamv1.AddToContainer(container, nil, nil, nil))
 	urlruntime.Must(configv1.AddToContainer(container, nil, nil, nil))
 	urlruntime.Must(oauth.AddToContainer(container, nil, nil, nil, nil, nil, nil, nil))

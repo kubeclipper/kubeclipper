@@ -20,20 +20,15 @@ package clustercontroller
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
-	buildinerrors "errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	pkgerr "github.com/pkg/errors"
-	"k8s.io/client-go/util/cert"
 
 	"github.com/kubeclipper/kubeclipper/pkg/component/utils"
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clusteroperation"
 
@@ -59,19 +54,19 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/source"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
-	"github.com/kubeclipper/kubeclipper/pkg/models/operation"
+	operationv2store "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
+	operationv2builder "github.com/kubeclipper/kubeclipper/pkg/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
-	"github.com/kubeclipper/kubeclipper/pkg/service"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 
 	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 )
 
 type ClusterReconciler struct {
-	CmdDelivery         service.CmdDelivery
 	mgr                 manager.Manager
 	ClusterLister       listerv1.ClusterLister
 	ClusterWriter       cluster.ClusterWriter
@@ -79,8 +74,7 @@ type ClusterReconciler struct {
 	RegistryLister      listerv1.RegistryLister
 	NodeLister          listerv1.NodeLister
 	NodeWriter          cluster.NodeWriter
-	OperationOperator   operation.Operator
-	OperationWriter     operation.Writer
+	OperationStore      operationv2store.Store
 	CronBackupWriter    cluster.CronBackupWriter
 	CloudProviderLister listerv1.CloudProviderLister
 }
@@ -106,6 +100,12 @@ func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informer
 	if err = c.Watch(source.NewKindWithCache(&v1.Registry{}, cache),
 		handler.EnqueueRequestsFromMapFunc(r.findRegistryCluster)); err != nil {
 		return err
+	}
+	if watchErr := c.Watch(
+		source.NewKindWithCache(&operationsv1alpha1.Operation{}, cache),
+		handler.EnqueueRequestsFromMapFunc(findOperationCluster),
+	); watchErr != nil {
+		return watchErr
 	}
 
 	r.mgr = mgr
@@ -164,6 +164,14 @@ func (r *ClusterReconciler) findRegistryCluster(obj client.Object) []reconcile.R
 	return res
 }
 
+func findOperationCluster(obj client.Object) []reconcile.Request {
+	op, ok := obj.(*operationsv1alpha1.Operation)
+	if !ok || op.Spec.TargetRef.Kind != "Cluster" || op.Spec.TargetRef.Name == "" {
+		return nil
+	}
+	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: op.Spec.TargetRef.Name}}}
+}
+
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logger.FromContext(ctx)
 
@@ -201,11 +209,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				log.Error("Failed to delete cronBackup", zap.Error(err))
 				return ctrl.Result{}, err
 			}
-			err = r.OperationWriter.DeleteOperationCollection(ctx, &query.Query{LabelSelector: fmt.Sprintf("%s=%s", common.LabelClusterName, clu.Name)})
-			if err != nil {
-				log.Error("Failed to delete operation", zap.Error(err))
-				return ctrl.Result{}, err
-			}
 			// remove our cluster finalizer
 			finalizers := sets.NewString(clu.ObjectMeta.Finalizers...)
 			finalizers.Delete(v1.ClusterFinalizer)
@@ -233,11 +236,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error("process pending operation error", zap.Error(err))
 		return ctrl.Result{}, nil
 	}
-	if err = r.updateAPIServerCerts(ctx, clu); err != nil {
-		log.Error("update apiServer cert error", zap.Error(err))
-		return ctrl.Result{}, nil
-	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -394,178 +392,10 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 		return "", nil
 	}
 
-	token, err := r.CmdDelivery.DeliverCmd(ctx, c.Masters[0].ID,
-		[]string{"/bin/bash", "-c", `kubectl get secret $(kubectl get sa kc-server -n kube-system -o jsonpath={.secrets[0].name}) -n kube-system -o jsonpath={.data.token} | base64 -d`}, 3*time.Second)
-	if err != nil {
-		log.Error("get cluster service account token error", zap.Error(err))
-		return "", err
+	if len(c.KubeConfig) == 0 {
+		return "", nil
 	}
-	log.Debug("get cluster kc-server service account token", zap.String("token", string(token)))
-	if string(token) == "" {
-		return "", fmt.Errorf("get invalid token")
-	}
-	kubeconfig := getKubeConfig(c.Name, fmt.Sprintf("https://%s", apiServer), "kc-server", string(token))
-	return kubeconfig, nil
-}
-
-func (r *ClusterReconciler) updateAPIServerCerts(ctx context.Context, c *v1.Cluster) error {
-	log := logger.FromContext(ctx)
-
-	if c.Status.Phase != v1.ClusterRunning {
-		return nil
-	}
-	nodeList, err := r.canUpdate(c) // if some master node is unavailable,can't update cert.
-	if err != nil {
-		return err
-	}
-	needUpdate, err := r.needUpdate(ctx, c)
-	if err != nil {
-		return err
-	}
-	if !needUpdate {
-		log.Infof("cluster %s api server cert included all sans %v,skip update", c.Name, c.GetAllCertSANs())
-		return nil
-	}
-
-	// Check if there's already an ongoing UpdateAPIServerCertification operation
-	ongoing, err := r.hasOngoingUpdateAPIServerCertOperation(ctx, c.Name)
-	if err != nil {
-		return err
-	}
-	if ongoing {
-		log.Infof("UpdateAPIServerCertification operation already exists for cluster %s, skip creating new one", c.Name)
-		return nil
-	}
-
-	return r.doUpdateAPIServerCerts(ctx, c, nodeList)
-}
-
-func (r *ClusterReconciler) hasOngoingUpdateAPIServerCertOperation(ctx context.Context, clusterName string) (bool, error) {
-	operations, err := r.OperationOperator.ListOperations(ctx, &query.Query{
-		Pagination:      query.NoPagination(),
-		ResourceVersion: "0",
-		LabelSelector:   fmt.Sprintf("%s=%s,%s=%s", common.LabelClusterName, clusterName, common.LabelOperationAction, v1.OperationUpdateAPIServerCertification),
-	})
-	if err != nil {
-		return false, pkgerr.WithMessage(err, "failed to list operations")
-	}
-
-	// Check if there's any ongoing operation
-	for _, op := range operations.Items {
-		if op.Status.Status == v1.OperationStatusPending || op.Status.Status == v1.OperationStatusRunning {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (r *ClusterReconciler) doUpdateAPIServerCerts(ctx context.Context, c *v1.Cluster, nl component.NodeList) error {
-	sanOperation := generateUpdateSANOperation(c, nl)
-
-	_, err := r.OperationOperator.CreateOperation(ctx, sanOperation)
-	if err != nil {
-		return pkgerr.WithMessage(err, "create san update operation failed")
-	}
-
-	c.Status.Phase = v1.ClusterUpdating
-	_, err = r.ClusterOperator.UpdateCluster(ctx, c)
-	if err != nil {
-		return pkgerr.WithMessage(err, "create san update operation,update cluster status failed")
-	}
-
-	return nil
-}
-
-func generateUpdateSANOperation(c *v1.Cluster, nodeList component.NodeList) *v1.Operation {
-	san := &k8s.SAN{}
-	op := &v1.Operation{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: uuid.New().String(),
-			Labels: map[string]string{
-				common.LabelClusterName:     c.Name,
-				common.LabelTimeoutSeconds:  v1.DefaultOperationTimeoutSecs,
-				common.LabelOperationAction: v1.OperationUpdateAPIServerCertification,
-			}},
-		Steps: nil,
-		Status: v1.OperationStatus{
-			Status:     v1.OperationStatusPending, // operator controller will deliver it
-			Conditions: nil,
-		},
-	}
-	nodes := utils.UnwrapNodeList(nodeList)
-	op.Steps, _ = san.InstallSteps(nodes, c.GetAllCertSANs())
-	return op
-}
-
-func (r *ClusterReconciler) needUpdate(ctx context.Context, c *v1.Cluster) (bool, error) {
-	for _, nodeID := range c.Masters.GetNodeIDs() {
-		certificate, err := getCert(ctx, r.CmdDelivery, nodeID)
-		if err != nil {
-			return false, err
-		}
-		// if current cert not included all san，need update it
-		if !includeAllSan(c, certificate) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (r *ClusterReconciler) canUpdate(c *v1.Cluster) (component.NodeList, error) {
-	nl := make(component.NodeList, 0, len(c.Masters))
-	for _, nodeID := range c.Masters.GetNodeIDs() {
-		node, err := r.NodeLister.Get(nodeID)
-		if err != nil {
-			return nil, err
-		}
-		nl = append(nl, component.Node{
-			ID:       node.Name,
-			IPv4:     node.Status.Ipv4DefaultIP,
-			NodeIPv4: node.Status.NodeIpv4DefaultIP,
-			Region:   node.Labels[common.LabelTopologyRegion],
-			Hostname: node.Status.NodeInfo.Hostname,
-			Role:     node.Labels[common.LabelNodeRole],
-			Disable:  false,
-		})
-	}
-	masters, err := nl.AvailableKubeMasters()
-	if err != nil {
-		return nil, err
-	}
-	if len(masters) != len(nl) {
-		return nil, buildinerrors.New("there is an unavailable master node in the cluster, please check the cluster master node status")
-	}
-	return nl, nil
-}
-
-func getCert(ctx context.Context, cmdDelivery service.CmdDelivery, nodeID string) (*x509.Certificate, error) {
-	content, err := cmdDelivery.DeliverCmd(ctx, nodeID, []string{"cat", "/etc/kubernetes/pki/apiserver.crt"}, time.Second*30)
-	if err != nil {
-		return nil, pkgerr.WithMessagef(err, "cat /etc/kubernetes/pki/apiserver.crt on %s failed", nodeID)
-	}
-	certificates, err := cert.ParseCertsPEM(content)
-	if err != nil {
-		return nil, pkgerr.WithMessagef(err, "parse /etc/kubernetes/pki/apiserver.crt from %s,data:%s failed", nodeID, content)
-	}
-	if len(certificates) != 1 {
-		return nil, fmt.Errorf("invlaid apiserver cert")
-	}
-	return certificates[0], nil
-}
-
-// includeAllSan check is cert included all sans
-func includeAllSan(c *v1.Cluster, cert *x509.Certificate) bool {
-	set := sets.NewString(cert.DNSNames...)
-	for _, ip := range cert.IPAddresses {
-		set.Insert(ip.String())
-	}
-	sans := c.GetAllCertSANs()
-	for _, san := range sans {
-		if !set.Has(san) {
-			return false
-		}
-	}
-	return true
+	return string(c.KubeConfig), nil
 }
 
 func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {
@@ -608,9 +438,11 @@ func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Clust
 		if err != nil {
 			return fmt.Errorf("criRegistryUpdateOperation:%w", err)
 		}
-		err = r.CmdDelivery.DeliverStep(ctx, step, &service.Options{DryRun: false})
-		if err != nil {
-			return fmt.Errorf("DeliverTaskOperation:%w", err)
+		plan := &v1.Operation{ObjectMeta: metav1.ObjectMeta{Name: uuid.New().String(), Labels: map[string]string{
+			common.LabelClusterName: c.Name, common.LabelOperationAction: v1.OperationInstallComponents,
+		}}, Steps: []v1.Step{*step}}
+		if _, err = operationv2builder.CreateFromCore(ctx, r.OperationStore, r.ClusterOperator, c, plan); err != nil {
+			return fmt.Errorf("create CRI registry Operation:%w", err)
 		}
 		newSpec, err := r.ClusterWriter.UpdateCluster(ctx, c)
 		if err != nil {
@@ -747,7 +579,7 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 	for _, pendingOperation := range c.PendingOperations {
 		log.Debugf("pending operation info is %+v, extraData is %+v", pendingOperation, string(pendingOperation.ExtraData))
 		// the operation has been processed ?
-		op, err := r.OperationOperator.GetOperationEx(ctx, pendingOperation.OperationID, "0")
+		op, err := r.OperationStore.GetOperation(ctx, pendingOperation.OperationID, "")
 		// ignore IsNotFound error
 		if err != nil && !errors.IsNotFound(err) {
 			// if an error occurs, the deletion operation will not be performed
@@ -755,7 +587,7 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			continue
 		}
 		// if no, the operation will be created
-		if op == nil {
+		if errors.IsNotFound(err) {
 			clean = false
 
 			// get cluster information about the specified resource version when the operation is performed
@@ -769,7 +601,12 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			// restore and assemble the cluster metadata, passing it through
 			extraMeta, err := r.assembleClusterExtraMetadata(ctx, clu)
 			if err != nil {
-				log.Error("get cluster extra metadata failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				log.Error(
+					"get cluster extra metadata failed",
+					zap.String("cluster", c.Name),
+					zap.String("operation-id", pendingOperation.OperationID),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -779,16 +616,32 @@ func (r *ClusterReconciler) processPendingOperations(ctx context.Context, log lo
 			// build the operation structure based on the type of operation
 			newOperation, err := clusteroperation.BuildOperationAdapter(clu, pendingOperation, extraMeta, nil, r.ClusterOperator)
 			if err != nil {
-				log.Error("create operation struct failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				log.Error(
+					"create operation struct failed",
+					zap.String("cluster", c.Name),
+					zap.String("operation-id", pendingOperation.OperationID),
+					zap.Error(err),
+				)
 				continue
 			}
 
-			log.Debugf("create operation struct successful", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID))
-			_, err = r.OperationWriter.CreateOperation(ctx, newOperation)
+			log.Debugf(
+				"create operation struct successful",
+				zap.String("cluster", c.Name),
+				zap.String("operation-id", pendingOperation.OperationID),
+			)
+			_, err = operationv2builder.CreateFromCore(ctx, r.OperationStore, r.ClusterOperator, clu, newOperation)
 			if err != nil {
-				log.Error("create operation failed", zap.String("cluster", c.Name), zap.String("operation-id", pendingOperation.OperationID), zap.Error(err))
+				log.Error(
+					"create operation failed",
+					zap.String("cluster", c.Name),
+					zap.String("operation-id", pendingOperation.OperationID),
+					zap.Error(err),
+				)
 				continue
 			}
+		} else if op.Status.Phase == operationsv1alpha1.OperationPending || op.Status.Phase == operationsv1alpha1.OperationRunning {
+			clean = false
 		}
 	}
 

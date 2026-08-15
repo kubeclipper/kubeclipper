@@ -28,8 +28,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -104,7 +102,7 @@ func BuildStepNode(nodes []*v1.Node) (stepNodes []v1.StepNode) {
 			ID:       node.Name,
 			IPv4:     node.Status.Ipv4DefaultIP,
 			NodeIPv4: node.Status.NodeIpv4DefaultIP,
-			Hostname: node.Labels[common.LabelHostname],
+			Hostname: node.Status.NodeInfo.Hostname,
 		})
 	}
 	return stepNodes

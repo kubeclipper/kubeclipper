@@ -22,10 +22,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage/kubeadm"
@@ -33,10 +31,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/clustermanage"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
-
-	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
-
-	"github.com/kubeclipper/kubeclipper/pkg/service"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/labels"
@@ -63,7 +57,6 @@ type ClusterStatusMon struct {
 	ClusterWriter       cluster.ClusterWriter
 	ClusterLister       listerv1.ClusterLister
 	NodeLister          listerv1.NodeLister
-	CmdDelivery         service.CmdDelivery
 	mgr                 manager.Manager
 	log                 logger.Logging
 	CloudProviderLister listerv1.CloudProviderLister
@@ -95,17 +88,6 @@ func (s *ClusterStatusMon) monitorClusterStatus() {
 		if !exist {
 			s.log.Debug("clientset not exist, clientset may have not been finished", zap.String("cluster", clu.Name))
 			continue
-		}
-		// TODO: need refactor
-		// use backoff retry utils instead
-		for i := 0; i < updateClusterCertStatusRetryTimes; i++ {
-			if err = s.updateClusterCertification(clu.Name); err == nil {
-				break
-			}
-			time.Sleep(updateClusterCertStatusRetrySleepTime)
-		}
-		if err != nil {
-			s.log.Error("update cluster certification failed", zap.Error(err))
 		}
 		clientset := cc.Kubernetes()
 		content, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz").Timeout(3 * time.Second).DoRaw(context.TODO())
@@ -194,11 +176,9 @@ func (s *ClusterStatusMon) updateClusterCertification(clusterName string) error 
 			return err
 		}
 	} else {
-		// get certifications from kc
-		certifications, err = s.GetCertificationFromKC(clu)
-		if err != nil {
-			return err
-		}
+		// kubeadm certificate inspection is an explicit v2 Operation. The
+		// monitor does not synchronously execute commands on an Agent.
+		return nil
 	}
 
 	clu.Status.Certifications = certifications
@@ -219,55 +199,6 @@ func (s *ClusterStatusMon) getCertificationFromProvider(clu *v1.Cluster) ([]v1.C
 		return nil, err
 	}
 	return cp.GetCertification(context.TODO(), clu.Name)
-}
-
-func (s *ClusterStatusMon) GetCertificationFromKC(clu *v1.Cluster) ([]v1.Certification, error) {
-	var cmd []string
-	if clu.KubernetesVersion[1:] < k8s.KubeCertsCluVersion {
-		cmd = []string{"kubeadm", "alpha", "certs", "check-expiration"}
-	} else {
-		cmd = []string{"kubeadm", "certs", "check-expiration"}
-	}
-	res, err := s.CmdDelivery.DeliverCmd(context.TODO(), clu.Masters[0].ID, cmd, 3*time.Minute)
-	if err != nil {
-		s.log.Warn("get cluster failed when get cluster certification status, skip it", zap.String("cluster", clu.Name))
-		return nil, err
-	}
-	splitRes := strings.Split(string(res), "\n\n")
-	if len(splitRes) != 3 {
-		logger.Errorf("read cluster certs error")
-		return nil, fmt.Errorf("unexpected cert check output format: expected 3 sections, got %d", len(splitRes))
-	}
-	crts := strings.Split(splitRes[1], "\n")
-	cas := strings.Split(splitRes[2], "\n")
-	certification := make([]v1.Certification, 0)
-	for _, ca := range cas[1:4] {
-		crt := strings.Fields(ca)
-		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
-		if parErr != nil {
-			s.log.Warn("get cluster failed when get cluster ca expiration time", zap.String("cluster", clu.Name))
-			return nil, parErr
-		}
-		certification = append(certification, v1.Certification{
-			Name:           crt[0],
-			CAName:         "",
-			ExpirationTime: metav1.Time{Time: expire},
-		})
-	}
-	for _, cert := range crts[1:] {
-		crt := strings.Fields(cert)
-		expire, parErr := time.Parse("Jan 02, 2006 15:04 MST", strings.Join(crt[1:6], " "))
-		if parErr != nil {
-			s.log.Warn("get cluster failed when get cluster cert expiration time", zap.String("cluster", clu.Name))
-			return nil, parErr
-		}
-		certification = append(certification, v1.Certification{
-			Name:           crt[0],
-			CAName:         crt[7],
-			ExpirationTime: metav1.Time{Time: expire},
-		})
-	}
-	return certification, nil
 }
 
 func getClusterComponentIndex(clu *v1.Cluster, component string) int {
@@ -294,7 +225,7 @@ func (s *ClusterStatusMon) updateClusterControlPlaneStatus(clu *v1.Cluster) erro
 		}
 		health := v1.ControlPlaneHealth{
 			ID:       id,
-			Hostname: node.Labels[common.LabelHostname],
+			Hostname: node.Status.NodeInfo.Hostname,
 			Address:  apiServer,
 		}
 		resp, _, respErr := httputil.CommonRequest(fmt.Sprintf("https://%s/livez", apiServer), "GET", nil, nil, nil)

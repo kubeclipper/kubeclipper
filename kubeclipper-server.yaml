@@ -56,31 +56,3 @@ etcd:
   enableWatchCache: true
   defaultWatchCacheSize: 100
   #watchCacheSizes
-mq:
-  client:
-    serverAddress:
-      - 127.0.0.1:9889
-    subjectSuffix: k8s-installer
-    queueGroupName: status-report-queue
-    nodeReportSubject: status-report-subj
-    timeOutSeconds: 10
-    reconnectInterval: 2s
-    maxReconnect: 600
-    pingInterval: 2m
-    maxPingsOut: 2
-    tlsCertPath: ""
-    tlsKeyPath: ""
-    tlsCaPath: ""
-  server:
-    host: 0.0.0.0
-    port: 9889
-    cluster:
-      host: 0.0.0.0
-      port: 9890
-      leaderHost: 127.0.0.1:9890
-    tlsCertPath: ""
-    tlsKeyPath: ""
-    tlsCaPath: ""
-  auth:
-    username: user
-    password: password

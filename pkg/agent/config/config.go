@@ -36,7 +36,6 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
-	"github.com/kubeclipper/kubeclipper/pkg/simple/client/natsio"
 	"github.com/kubeclipper/kubeclipper/pkg/simple/downloader"
 )
 
@@ -58,9 +57,18 @@ type Config struct {
 	NodeStatusUpdateFrequency time.Duration       `json:"nodeStatusUpdateFrequency,omitempty" yaml:"nodeStatusUpdateFrequency"`
 	DownloaderOptions         *downloader.Options `json:"downloader" yaml:"downloader" mapstructure:"downloader"`
 	LogOptions                *logger.Options     `json:"log,omitempty" yaml:"log,omitempty" mapstructure:"log"`
-	MQOptions                 *natsio.NatsOptions `json:"mq,omitempty" yaml:"mq,omitempty"  mapstructure:"mq"`
+	APIServer                 *APIServerOptions   `json:"apiServer" yaml:"apiServer" mapstructure:"apiServer"`
 	OpLogOptions              *oplog.Options      `json:"oplog,omitempty" yaml:"oplog,omitempty" mapstructure:"oplog"`
 	ImageProxyOptions         *imageproxy.Options `json:"imageProxy,omitempty" yaml:"imageProxy,omitempty" mapstructure:"imageProxy"`
+}
+
+type APIServerOptions struct {
+	Endpoint   string `json:"endpoint" yaml:"endpoint" mapstructure:"endpoint"`
+	CAFile     string `json:"caFile" yaml:"caFile" mapstructure:"caFile"`
+	CertFile   string `json:"certFile" yaml:"certFile" mapstructure:"certFile"`
+	KeyFile    string `json:"keyFile" yaml:"keyFile" mapstructure:"keyFile"`
+	ServerName string `json:"serverName,omitempty" yaml:"serverName,omitempty" mapstructure:"serverName"`
+	LogAddress string `json:"logAddress,omitempty" yaml:"logAddress,omitempty" mapstructure:"logAddress"`
 }
 
 var (
@@ -74,7 +82,7 @@ func New() *Config {
 		RegisterNode:              true,
 		NodeStatusUpdateFrequency: 5 * time.Minute,
 		LogOptions:                logger.NewLogOptions(),
-		MQOptions:                 natsio.NewOptions(),
+		APIServer:                 &APIServerOptions{LogAddress: ":10260"},
 		DownloaderOptions:         downloader.NewOptions(),
 		OpLogOptions:              oplog.NewOptions(),
 		ImageProxyOptions:         imageproxy.NewOptions(),
@@ -110,9 +118,6 @@ func (conf *Config) ToMap() map[string]bool {
 
 // Remove invalid options before serializing to json or yaml
 func (conf *Config) stripEmptyOptions() {
-	if conf.MQOptions != nil && len(conf.MQOptions.Client.ServerAddress) == 0 {
-		conf.MQOptions = nil
-	}
 }
 
 func TryLoadFromDisk() (*Config, error) {

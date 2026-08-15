@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
+	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
 // currentView tracks which sub-view is active.
@@ -21,14 +21,14 @@ const (
 
 // ListModel renders the operation selection list as a table.
 type ListModel struct {
-	operations []v1.Operation
+	operations []operationsv1alpha1.Operation
 	cursor     int
 	width      int
 	height     int
 }
 
 // NewListModel creates a list model with the given operations.
-func NewListModel(operations []v1.Operation, width, height int) ListModel {
+func NewListModel(operations []operationsv1alpha1.Operation, width, height int) ListModel {
 	return ListModel{
 		operations: operations,
 		cursor:     0,
@@ -39,7 +39,7 @@ func NewListModel(operations []v1.Operation, width, height int) ListModel {
 
 // selectOpMsg is emitted when the user selects an operation.
 type selectOpMsg struct {
-	op v1.Operation
+	op operationsv1alpha1.Operation
 }
 
 // Update handles key events for the list view.
@@ -83,19 +83,19 @@ func (m ListModel) View() string {
 
 	// Rows
 	for i, op := range m.operations {
-		status := string(op.Status.Status)
+		status := string(op.Status.Phase)
 		name := op.Name
 		if utf8.RuneCountInString(name) > 28 {
 			name = string([]rune(name)[:28]) + ".."
 		}
 
-		action := op.Labels["kubeclipper.io/operation"]
+		action := op.Spec.Action
 		if action != "" {
 			name = action
 		}
 
 		created := op.CreationTimestamp.Format("2006-01-02 15:04:05")
-		steps := fmt.Sprintf("%d", len(op.Steps))
+		steps := fmt.Sprintf("%d", len(op.Spec.Steps))
 
 		// Apply style to status, then pad based on the plain-text length
 		// to avoid ANSI escape sequences breaking column alignment.
@@ -126,11 +126,11 @@ func (m ListModel) View() string {
 // statusStyle returns the lipgloss style for a given status string.
 func statusStyle(status string) lipgloss.Style {
 	switch status {
-	case string(v1.OperationStatusSuccessful):
+	case string(operationsv1alpha1.OperationSucceeded):
 		return StatusSuccessful
-	case string(v1.OperationStatusFailed):
+	case string(operationsv1alpha1.OperationFailed), string(operationsv1alpha1.OperationTimedOut):
 		return StatusFailed
-	case string(v1.OperationStatusRunning):
+	case string(operationsv1alpha1.OperationRunning):
 		return StatusRunning
 	default:
 		return StatusPending

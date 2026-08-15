@@ -238,7 +238,7 @@ func Test_parseOperationFromComponent(t *testing.T) {
 		cluster    *v1.Cluster
 		components []v1.Addon
 	}
-	h := newHandler(nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	h := newHandler(nil, nil, nil, nil, nil, nil, nil)
 	nfs := nfsprovisioner.NFSProvisioner{
 		ManifestsDir:     "/tmp/.nfs",
 		Namespace:        "kube-system",
