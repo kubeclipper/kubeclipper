@@ -40,6 +40,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/kubeclipper/kubeclipper/pkg/models"
@@ -432,18 +433,36 @@ func SetupWebService(h *handler) *restful.WebService {
 			Required(false)).
 		Returns(http.StatusOK, http.StatusText(http.StatusOK), models.PageableResponse{}))
 
+	webservice.Route(webservice.POST("/leases").
+		To(h.CreateLease).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreRegionTag}).
+		Doc("Create a lease.").
+		Reads(coordinationv1.Lease{}).
+		Returns(http.StatusCreated, http.StatusText(http.StatusCreated), coordinationv1.Lease{}))
+
 	webservice.Route(webservice.GET("/leases/{name}").
 		To(h.DescribeLease).
 		Metadata(restfulspec.KeyOpenAPITags, []string{CoreRegionTag}).
-		Doc("Describe region.").
-		Param(webservice.PathParameter(query.ParameterName, "region name").
+		Doc("Describe a lease.").
+		Param(webservice.PathParameter(query.ParameterName, "lease name").
 			Required(true).
+			DataType("string")).
+		Param(webservice.QueryParameter("namespace", "lease namespace").
+			Required(false).
 			DataType("string")).
 		Param(webservice.QueryParameter(query.ParameterResourceVersion, "resource version to query").
 			Required(false).
 			DataType("string")).
-		Returns(http.StatusOK, http.StatusText(http.StatusOK), corev1.Region{}).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), coordinationv1.Lease{}).
 		Returns(http.StatusNotFound, http.StatusText(http.StatusNotFound), nil))
+
+	webservice.Route(webservice.PUT("/leases/{name}").
+		To(h.UpdateLease).
+		Metadata(restfulspec.KeyOpenAPITags, []string{CoreRegionTag}).
+		Doc("Update a lease.").
+		Reads(coordinationv1.Lease{}).
+		Param(webservice.PathParameter(query.ParameterName, "lease name").Required(true).DataType("string")).
+		Returns(http.StatusOK, http.StatusText(http.StatusOK), coordinationv1.Lease{}))
 
 	webservice.Route(webservice.GET("/backups").
 		To(h.ListBackups).

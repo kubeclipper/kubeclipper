@@ -185,14 +185,18 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 		Short:                 "Deploy Kubeclipper platform",
 		Long:                  longDescription,
 		Example:               deployExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			utils.CheckErr(o.Complete())
-			utils.CheckErr(o.ValidateArgs())
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := o.Complete(); err != nil {
+				return err
+			}
+			if err := o.ValidateArgs(); err != nil {
+				return err
+			}
 			o.preRun()
 			if !o.preCheck() {
-				return
+				return fmt.Errorf("deploy precheck failed")
 			}
-			utils.CheckErr(o.RunDeploy())
+			return o.RunDeploy()
 		},
 		Args: cobra.NoArgs,
 	}
@@ -328,17 +332,20 @@ func (d *DeployOptions) preRun() {
 
 type precheckFunc func(sshConfig *sshutils.SSH, host string) error
 
+const (
+	timeSyncPrecheckCommand = `for service in chrony chronyd ntp ntpd systemd-timesyncd; ` +
+		`do systemctl is-active --quiet "$service" && exit 0; done; exit 10`
+	timeSyncServiceMissingExitCode = 10
+)
+
 var (
 	precheckKcEtcdFunc                = generateCommonPreCheckFunc("kc-etcd")
 	precheckKcServerFunc              = generateCommonPreCheckFunc("kc-server")
 	precheckKcAgentFunc               = generateCommonPreCheckFunc("kc-agent")
 	precheckNtpFunc      precheckFunc = func(sshConfig *sshutils.SSH, host string) error {
-		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "systemctl --all --type service --state running | grep -e chrony -e ntp|wc -l")
-		if err != nil {
-			return err
-		}
-		if ret.StdoutToString("") == "0" {
-			err = fmt.Errorf("chronyd or ntpd service not running, may cause service internal error")
+		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, timeSyncPrecheckCommand)
+		if ret.ExitCode == timeSyncServiceMissingExitCode {
+			return fmt.Errorf("no supported time synchronization service is running (chrony, ntp, or systemd-timesyncd)")
 		}
 		return err
 	}
@@ -429,11 +436,7 @@ func (d *DeployOptions) precheckService(name string, nodes []string, fn precheck
 		}
 	}
 	logger.Errorf("===========>%s PRECHECK FAILED!", name)
-	if options.AssumeYes {
-		return true
-	}
-	_, _ = d.IOStreams.Out.Write([]byte("Ignore this error, still install? Please input (yes/no)"))
-	return utils.AskForConfirmation()
+	return false
 }
 
 func (d *DeployOptions) precheckTimeLag() bool {
@@ -503,11 +506,7 @@ func (d *DeployOptions) precheckTimeLag() bool {
 		}
 	}
 	logger.Errorf("===========>TIME-LAG PRECHECK FAILED!")
-	if options.AssumeYes {
-		return true
-	}
-	_, _ = d.IOStreams.Out.Write([]byte("Ignore this error, still install? Please input (yes/no)"))
-	return utils.AskForConfirmation()
+	return false
 }
 
 func (d *DeployOptions) precheckPorts() bool {
@@ -617,6 +616,9 @@ func (d *DeployOptions) RunDeploy() error {
 	d.dumpConfig()
 	logger.Infof("------ Upload configs ------")
 	d.uploadConfig()
+	if err := writeLocalDeployConfig(d.deployConfig); err != nil {
+		return fmt.Errorf("sync local deploy config: %w", err)
+	}
 	fmt.Printf("\033[1;40;36m%s\033[0m\n", options.Contact)
 	return nil
 }

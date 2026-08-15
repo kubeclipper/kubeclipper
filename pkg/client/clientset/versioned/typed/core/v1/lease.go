@@ -38,6 +38,9 @@ type LeasesGetter interface {
 }
 
 type LeasesInterface interface {
+	Create(ctx context.Context, lease *coordinationv1.Lease, opts *v1.CreateOptions) (*coordinationv1.Lease, error)
+	Update(ctx context.Context, lease *coordinationv1.Lease, opts *v1.UpdateOptions) (*coordinationv1.Lease, error)
+	GetWithNamespace(ctx context.Context, name, namespace string, opts v1.GetOptions) (*coordinationv1.Lease, error)
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*coordinationv1.Lease, error)
 	List(ctx context.Context, opts v1.ListOptions) (*coordinationv1.LeaseList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
@@ -51,13 +54,49 @@ func newLeases(c *CoreV1Client) *leases {
 	return &leases{client: c.RESTClient()}
 }
 
-func (c *leases) Get(ctx context.Context, name string, opts v1.GetOptions) (result *coordinationv1.Lease, err error) {
+func (c *leases) Create(
+	ctx context.Context, lease *coordinationv1.Lease, opts *v1.CreateOptions,
+) (result *coordinationv1.Lease, err error) {
 	result = &coordinationv1.Lease{}
-	err = c.client.Get().
+	err = c.client.Post().
+		Resource("leases").
+		VersionedParams(opts, scheme.ParameterCodec).
+		Body(lease).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+func (c *leases) Update(
+	ctx context.Context, lease *coordinationv1.Lease, opts *v1.UpdateOptions,
+) (result *coordinationv1.Lease, err error) {
+	result = &coordinationv1.Lease{}
+	err = c.client.Put().
+		Resource("leases").
+		Name(lease.Name).
+		VersionedParams(opts, scheme.ParameterCodec).
+		Body(lease).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+func (c *leases) Get(ctx context.Context, name string, opts v1.GetOptions) (result *coordinationv1.Lease, err error) {
+	return c.GetWithNamespace(ctx, name, "", opts)
+}
+
+func (c *leases) GetWithNamespace(
+	ctx context.Context, name, namespace string, opts v1.GetOptions,
+) (result *coordinationv1.Lease, err error) {
+	result = &coordinationv1.Lease{}
+	request := c.client.Get().
 		Resource("leases").
 		Name(name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do(ctx).
+		VersionedParams(&opts, scheme.ParameterCodec)
+	if namespace != "" {
+		request.Param("namespace", namespace)
+	}
+	err = request.Do(ctx).
 		Into(result)
 	return
 }
