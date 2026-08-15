@@ -82,13 +82,12 @@ func (operationStrategy) PrepareForUpdate(_ context.Context, obj, old runtime.Ob
 	if !ok {
 		return
 	}
-	// Status is updated through OperationStore; ordinary REST updates may only
-	// change the two explicitly controlled spec fields.
+	// The execution plan is immutable. Operation status is a controller fact;
+	// the only public mutation paths are the controlled cancel and retry APIs.
 	op.Spec.TargetRef = oldOp.Spec.TargetRef
 	op.Spec.Action = oldOp.Spec.Action
 	op.Spec.Timeout = oldOp.Spec.Timeout
 	op.Spec.Steps = oldOp.Spec.Steps
-	op.Status = oldOp.Status
 	op.TypeMeta = oldOp.TypeMeta
 }
 
