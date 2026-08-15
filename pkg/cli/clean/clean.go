@@ -123,7 +123,7 @@ func (c *CleanOptions) Complete() error {
 		}
 
 		// deploy-config Complete
-		c.deployConfig, err = deploy.GetDeployConfig(context.Background(), c.client, false)
+		c.deployConfig, err = deploy.GetDeployConfig(context.Background(), c.client, true)
 		if err != nil {
 			return errors.WithMessage(err, "get online deploy-config failed")
 		}

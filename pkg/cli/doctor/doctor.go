@@ -30,6 +30,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/cli/config"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/deploy"
 	"github.com/kubeclipper/kubeclipper/pkg/platformstatus"
 	"github.com/kubeclipper/kubeclipper/pkg/query"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -142,25 +143,6 @@ func (o *Options) run(ctx context.Context) *Report {
 
 func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) Component {
 	component := Component{Name: "kcctl"}
-	deployConfig, err := loadDeployConfig(o.deployConfigPath)
-	if err != nil {
-		status := platformstatus.Degraded
-		message := fmt.Sprintf("cannot load %s", o.deployConfigPath)
-		if !errors.Is(err, os.ErrNotExist) {
-			message = fmt.Sprintf("invalid deployment configuration: %v", err)
-		}
-		component.Checks = append(component.Checks, Check{
-			Name: "deploy-config", Status: status, Message: message,
-			Evidence: []string{"remote service, network and journal checks will be skipped"},
-		})
-	} else {
-		state.deployConfig = deployConfig
-		state.remote = newRemoteRunner(ctx, deployConfig.SSHConfig)
-		component.Checks = append(component.Checks, Check{
-			Name: "deploy-config", Status: platformstatus.Healthy, Message: "deployment configuration loaded",
-		})
-	}
-
 	apiConfig, err := config.TryLoadFromFile(o.configPath)
 	if err != nil {
 		component.Checks = append(component.Checks, Check{
@@ -188,6 +170,7 @@ func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) 
 	defer cancel()
 	healthErr := client.Healthz(apiCtx)
 	if healthErr != nil {
+		o.useLocalDeployConfig(ctx, state, &component, "API is unreachable")
 		component.Checks = append(component.Checks, Check{
 			Name: "api-health", Status: platformstatus.Unhealthy, Message: "KubeClipper API is unreachable",
 			Evidence: []string{sanitize(healthErr.Error())},
@@ -198,6 +181,18 @@ func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) 
 	component.Checks = append(component.Checks, Check{
 		Name: "api-health", Status: platformstatus.Healthy, Message: "API liveness check passed",
 	})
+	deployCtx, deployCancel := context.WithTimeout(ctx, apiTimeout)
+	defer deployCancel()
+	deployConfig, deployErr := deploy.GetDeployConfig(deployCtx, client, false)
+	if deployErr != nil {
+		o.useLocalDeployConfig(ctx, state, &component, "cannot read deployment configuration from API")
+	} else {
+		state.deployConfig = deployConfig
+		state.remote = newRemoteRunner(ctx, deployConfig.SSHConfig)
+		component.Checks = append(component.Checks, Check{
+			Name: deployConfigCheck, Status: platformstatus.Healthy, Message: "deployment configuration loaded from API",
+		})
+	}
 
 	statusCtx, statusCancel := context.WithTimeout(ctx, apiTimeout)
 	defer statusCancel()
@@ -233,6 +228,27 @@ func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) 
 	}
 	component.Message = "connected to KubeClipper API"
 	return component
+}
+
+func (o *Options) useLocalDeployConfig(ctx context.Context, state *diagnosticState, component *Component, reason string) {
+	deployConfig, err := loadDeployConfig(o.deployConfigPath)
+	if err != nil {
+		message := fmt.Sprintf("%s; cannot load local deployment configuration", reason)
+		if !errors.Is(err, os.ErrNotExist) {
+			message = fmt.Sprintf("%s; invalid local deployment configuration: %v", reason, err)
+		}
+		component.Checks = append(component.Checks, Check{
+			Name: deployConfigCheck, Status: platformstatus.Degraded, Message: message,
+			Evidence: []string{"remote service, network and journal checks will be skipped"},
+		})
+		return
+	}
+	state.deployConfig = deployConfig
+	state.remote = newRemoteRunner(ctx, deployConfig.SSHConfig)
+	component.Checks = append(component.Checks, Check{
+		Name: deployConfigCheck, Status: platformstatus.Degraded,
+		Message: reason + "; using local deployment configuration cache",
+	})
 }
 
 func loadDeployConfig(path string) (*options.DeployConfig, error) {

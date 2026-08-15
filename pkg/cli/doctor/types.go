@@ -27,6 +27,7 @@ const (
 	platformStatus          = "platform-status"
 	heartbeatCheck          = "heartbeat"
 	apiConfigCheck          = "api-config"
+	deployConfigCheck       = "deploy-config"
 	commandNotFoundExitCode = 127
 )
 

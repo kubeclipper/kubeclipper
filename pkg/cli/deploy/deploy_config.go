@@ -33,8 +33,9 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/simple/client/kc"
 )
 
-// GetDeployConfig get online deploy config and dump to local if we need.
-func GetDeployConfig(ctx context.Context, cli *kc.Client, dump bool) (*options.DeployConfig, error) {
+// GetDeployConfig returns the authoritative deployment configuration stored by kc-server.
+// When syncLocal is true, it also refreshes the default local cache.
+func GetDeployConfig(ctx context.Context, cli *kc.Client, syncLocal bool) (*options.DeployConfig, error) {
 	dc := new(options.DeployConfig)
 	configMap, err := cli.DescribeConfigMap(ctx, constatns.DeployConfigConfigMapName)
 	if err != nil {
@@ -52,21 +53,17 @@ func GetDeployConfig(ctx context.Context, cli *kc.Client, dump bool) (*options.D
 		dc.Agents = make(options.Agents)
 	}
 
-	if !dump {
-		if err = dc.Write(); err != nil {
+	if syncLocal {
+		if err = writeLocalDeployConfig(dc); err != nil {
 			return nil, errors.WithMessage(err, "dump local deploy-config")
 		}
 	}
 	return dc, nil
 }
 
-// UpdateDeployConfig update online deploy config and dump to local if we need.
-func UpdateDeployConfig(ctx context.Context, cli *kc.Client, deployConfig *options.DeployConfig, dump bool) error {
-	if dump {
-		if err := deployConfig.Write(); err != nil {
-			return errors.WithMessage(err, "dump local deploy config")
-		}
-	}
+// UpdateDeployConfig updates the authoritative deployment configuration first.
+// The local cache is refreshed only after the server accepts the update.
+func UpdateDeployConfig(ctx context.Context, cli *kc.Client, deployConfig *options.DeployConfig, syncLocal bool) error {
 	marshal, err := yaml.Marshal(deployConfig)
 	if err != nil {
 		return err
@@ -75,19 +72,37 @@ func UpdateDeployConfig(ctx context.Context, cli *kc.Client, deployConfig *optio
 	defer cancelFunc()
 
 	// kcctl join、drain will update online config after cmd success,so update with retry to avoid data inconsistency
-	return utils.RetryFunc(timeout, component.Options{DryRun: false}, time.Second, "updateDeployConfig", func(ctx context.Context, opts component.Options) error {
-		configMap, err := cli.DescribeConfigMap(ctx, constatns.DeployConfigConfigMapName)
-		if err != nil {
-			return errors.WithMessage(err, "get configmap")
-		}
-		if len(configMap.Items) == 0 {
-			return fmt.Errorf("configmap %s not found in server", constatns.DeployConfigConfigMapName)
-		}
-		cm := configMap.Items[0]
-		cm.Data[constatns.DeployConfigConfigMapKey] = string(marshal)
-		if _, err = cli.UpdateConfigMap(ctx, &cm); err != nil {
-			return errors.WithMessage(err, "update online deploy config")
-		}
+	if err := utils.RetryFunc(
+		timeout, component.Options{DryRun: false}, time.Second, "updateDeployConfig",
+		func(ctx context.Context, _ component.Options) error {
+			configMap, err := cli.DescribeConfigMap(ctx, constatns.DeployConfigConfigMapName)
+			if err != nil {
+				return errors.WithMessage(err, "get configmap")
+			}
+			if len(configMap.Items) == 0 {
+				return fmt.Errorf("configmap %s not found in server", constatns.DeployConfigConfigMapName)
+			}
+			cm := configMap.Items[0]
+			cm.Data[constatns.DeployConfigConfigMapKey] = string(marshal)
+			if _, err = cli.UpdateConfigMap(ctx, &cm); err != nil {
+				return errors.WithMessage(err, "update online deploy config")
+			}
+			return nil
+		},
+	); err != nil {
+		return err
+	}
+	if !syncLocal {
 		return nil
-	})
+	}
+	if err := writeLocalDeployConfig(deployConfig); err != nil {
+		return errors.WithMessage(err, "dump local deploy config")
+	}
+	return nil
+}
+
+func writeLocalDeployConfig(deployConfig *options.DeployConfig) error {
+	localCopy := *deployConfig
+	localCopy.Config = ""
+	return localCopy.Write()
 }

@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"time"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -34,6 +35,7 @@ import (
 	operationv2 "github.com/kubeclipper/kubeclipper/pkg/agent/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/client/clientset"
 	"github.com/kubeclipper/kubeclipper/pkg/logger"
+	"github.com/kubeclipper/kubeclipper/pkg/nodestatus"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -73,7 +75,13 @@ func (a taskClientAdapter) UpdateStatus(ctx context.Context, task *operations.Op
 	return a.client.UpdateStatus(ctx, task, metav1.UpdateOptions{})
 }
 
-const nodeStatusUpdateTimeout = 30 * time.Second
+const (
+	nodeStatusUpdateTimeout   = 30 * time.Second
+	nodeLeaseNamespace        = "node-lease"
+	nodeLeaseDurationSeconds  = int32(240)
+	nodeLeaseRenewInterval    = time.Duration(nodeLeaseDurationSeconds) * time.Second / 4
+	nodeLeaseMaxUpdateRetries = 5
+)
 
 func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	opLog, err := oplog.NewOperationLog(s.Config.OpLogOptions)
@@ -166,6 +174,9 @@ func (s *Server) initialNode() *corev1.Node {
 	if gateway, err := netutil.GetDefaultGateway(true); err == nil {
 		node.Status.Ipv4DefaultGw = gateway.String()
 	}
+	if err := nodestatus.MachineInfo()(node); err != nil {
+		logger.Errorf("collect node machine information: %v", err)
+	}
 	return node
 }
 
@@ -177,11 +188,70 @@ func (s *Server) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 	go s.reportNodeStatus(stopCh)
+	go s.reportNodeLease(stopCh)
 	<-stopCh
 	logger.Debugf("get stopCh signal, exit...")
 	s.logServer.Close()
 	s.worker.Close()
 	return nil
+}
+
+func (s *Server) reportNodeLease(stopCh <-chan struct{}) {
+	ticker := time.NewTicker(nodeLeaseRenewInterval)
+	defer ticker.Stop()
+	for {
+		if err := s.renewNodeLease(); err != nil {
+			logger.Errorf("renew Node Lease: %v", err)
+		}
+		select {
+		case <-stopCh:
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Server) renewNodeLease() error {
+	ctx, cancel := context.WithTimeout(context.Background(), nodeStatusUpdateTimeout)
+	defer cancel()
+
+	leases := s.client.CoreV1().Leases()
+	for range nodeLeaseMaxUpdateRetries {
+		lease, err := leases.GetWithNamespace(ctx, s.Config.AgentID, nodeLeaseNamespace, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			_, err = leases.Create(ctx, s.newNodeLease(nil), &metav1.CreateOptions{})
+			if apierrors.IsAlreadyExists(err) {
+				continue
+			}
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		_, err = leases.Update(ctx, s.newNodeLease(lease), &metav1.UpdateOptions{})
+		if apierrors.IsConflict(err) {
+			continue
+		}
+		return err
+	}
+	return fmt.Errorf("renew Node Lease %q: too many resource version conflicts", s.Config.AgentID)
+}
+
+func (s *Server) newNodeLease(base *coordinationv1.Lease) *coordinationv1.Lease {
+	var lease *coordinationv1.Lease
+	if base == nil {
+		lease = &coordinationv1.Lease{ObjectMeta: metav1.ObjectMeta{
+			Name: s.Config.AgentID, Namespace: nodeLeaseNamespace,
+		}}
+	} else {
+		lease = base.DeepCopy()
+	}
+	holderIdentity := s.Config.AgentID
+	leaseDuration := nodeLeaseDurationSeconds
+	lease.Spec.HolderIdentity = &holderIdentity
+	lease.Spec.LeaseDurationSeconds = &leaseDuration
+	lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
+	return lease
 }
 
 func (s *Server) reportNodeStatus(stopCh <-chan struct{}) {

@@ -44,6 +44,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	apimachineryErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -1817,6 +1818,51 @@ func (h *handler) ListLeases(request *restful.Request, response *restful.Respons
 	response.WriteHeader(http.StatusOK)
 }
 
+func (h *handler) CreateLease(request *restful.Request, response *restful.Response) {
+	leaseObj := &coordinationv1.Lease{}
+	if err := request.ReadEntity(leaseObj); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	created, err := h.leaseOperator.CreateLease(request.Request.Context(), leaseObj)
+	if err != nil {
+		if apimachineryErrors.IsAlreadyExists(err) {
+			restplus.HandleConflict(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if err := response.WriteHeaderAndEntity(http.StatusCreated, created); err != nil {
+		return
+	}
+}
+
+func (h *handler) UpdateLease(request *restful.Request, response *restful.Response) {
+	leaseObj := &coordinationv1.Lease{}
+	if err := request.ReadEntity(leaseObj); err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	leaseObj.Name = request.PathParameter(query.ParameterName)
+	updated, err := h.leaseOperator.UpdateLease(request.Request.Context(), leaseObj)
+	if err != nil {
+		if apimachineryErrors.IsConflict(err) {
+			restplus.HandleConflict(response, request, err)
+			return
+		}
+		if apimachineryErrors.IsNotFound(err) {
+			restplus.HandleNotFound(response, request, err)
+			return
+		}
+		restplus.HandleInternalError(response, request, err)
+		return
+	}
+	if err := response.WriteHeaderAndEntity(http.StatusOK, updated); err != nil {
+		return
+	}
+}
+
 func (h *handler) watchLeases(req *restful.Request, resp *restful.Response, q *query.Query) {
 	timeout := time.Duration(0)
 	if q.TimeoutSeconds != nil {
@@ -1837,7 +1883,16 @@ func (h *handler) watchLeases(req *restful.Request, resp *restful.Response, q *q
 func (h *handler) DescribeLease(request *restful.Request, response *restful.Response) {
 	name := request.PathParameter(query.ParameterName)
 	resourceVersion := request.QueryParameter(query.ParameterResourceVersion)
-	c, err := h.leaseOperator.GetLease(request.Request.Context(), name, resourceVersion)
+	namespace := request.QueryParameter("namespace")
+	var (
+		c   *coordinationv1.Lease
+		err error
+	)
+	if namespace == "" {
+		c, err = h.leaseOperator.GetLease(request.Request.Context(), name, resourceVersion)
+	} else {
+		c, err = h.leaseOperator.GetLeaseWithNamespaceEx(request.Request.Context(), name, namespace, resourceVersion)
+	}
 	if err != nil {
 		if apimachineryErrors.IsNotFound(err) {
 			restplus.HandleNotFound(response, request, err)

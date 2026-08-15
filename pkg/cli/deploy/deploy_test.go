@@ -20,12 +20,34 @@ package deploy
 
 import (
 	"crypto/x509"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
+
+func TestPrecheckServiceDoesNotIgnoreFailureWithAssumeYes(t *testing.T) {
+	originalAssumeYes := options.AssumeYes
+	options.AssumeYes = true
+	t.Cleanup(func() { options.AssumeYes = originalAssumeYes })
+
+	d := NewDeployOptions(options.IOStreams{})
+	if d.precheckService("test", []string{"192.0.2.1"}, func(*sshutils.SSH, string) error {
+		return errors.New("precheck failed")
+	}) {
+		t.Fatal("precheckService() succeeded with --assumeyes after a precheck failure")
+	}
+}
+
+func TestTimeSyncPrecheckSupportsSystemdTimesyncd(t *testing.T) {
+	if !strings.Contains(timeSyncPrecheckCommand, "systemd-timesyncd") {
+		t.Fatalf("time synchronization precheck must support systemd-timesyncd: %q", timeSyncPrecheckCommand)
+	}
+}
 
 func TestKcServerCertificateUsesAuthenticatedServerIdentity(t *testing.T) {
 	certs := kcServerCertList([]string{options.KCServerAltName}, map[string][]x509.ExtKeyUsage{

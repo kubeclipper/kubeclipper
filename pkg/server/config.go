@@ -1019,7 +1019,7 @@ var Roles = GlobalRoleList{
 				Verbs:     []string{"get", "create", "update", "patch"},
 			},
 			{
-				APIGroups: []string{"coordination.k8s.io"},
+				APIGroups: []string{"core.kubeclipper.io"},
 				Resources: []string{"leases"},
 				Verbs:     []string{"get", "create", "update", "patch"},
 			},
