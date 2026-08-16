@@ -57,11 +57,10 @@ const (
 
 type ClusterUpgradeOpts struct {
 	BaseOptions
-	ClusterName           string
-	Version               string
-	Online                bool
-	ImageRegistry         string
-	imageRegistryExplicit bool
+	ClusterName   string
+	Version       string
+	Online        bool
+	ImageRegistry string
 }
 
 func NewClusterUpgradeOpts(streams options.IOStreams) *ClusterUpgradeOpts {
@@ -82,7 +81,6 @@ func NewCmdClusterUpgrade(streams options.IOStreams) *cobra.Command {
 		Long:    upgradeLongDescription,
 		Example: clusterUpgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			c.imageRegistryExplicit = cmd.Flags().Changed("image-registry")
 			utils.CheckErr(c.Complete())
 			utils.CheckErr(c.Validates())
 			utils.CheckErr(c.Run())
@@ -137,9 +135,6 @@ func (c *ClusterUpgradeOpts) Complete() error {
 }
 
 func (c *ClusterUpgradeOpts) Validates() error {
-	if !c.Online && !c.imageRegistryExplicit {
-		return errors.New("--image-registry must be explicitly specified in offline mode")
-	}
 	if err := c.checkImageRegistry(); err != nil {
 		return err
 	}
@@ -164,10 +159,7 @@ func (c *ClusterUpgradeOpts) Validates() error {
 
 func (c *ClusterUpgradeOpts) checkImageRegistry() error {
 	if c.ImageRegistry == "" {
-		if c.Online {
-			return nil
-		}
-		return errors.New("--image-registry must not be empty in offline mode")
+		return nil
 	}
 	registries, err := c.Client.ListRegistries(context.Background(), kc.Queries{})
 	if err != nil {

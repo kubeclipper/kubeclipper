@@ -29,7 +29,7 @@ import (
 
 // assembleClusterExtraMetadata assemble cluster extra metadata, used to share data between the various steps
 func (r *ClusterReconciler) assembleClusterExtraMetadata(ctx context.Context, c *v1.Cluster) (*component.ExtraMetadata, error) {
-	registry, err := componentutils.ResolveImageRegistry(ctx, c.ImageRegistry, r.ClusterOperator)
+	registry, err := componentutils.ResolveClusterImageRegistry(ctx, c, r.ClusterOperator)
 	if err != nil {
 		return nil, err
 	}

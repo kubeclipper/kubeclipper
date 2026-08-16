@@ -27,8 +27,46 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	mockcluster "github.com/kubeclipper/kubeclipper/pkg/models/cluster/mock"
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
+
+func TestResolveClusterImageRegistry(t *testing.T) {
+	t.Run("online cluster uses default registry", func(t *testing.T) {
+		registry, err := ResolveClusterImageRegistry(context.Background(), &v1.Cluster{}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if registry.Host != v1.DefaultImageRegistry {
+			t.Fatalf("registry host = %q, want %q", registry.Host, v1.DefaultImageRegistry)
+		}
+	})
+
+	t.Run("offline cluster without registry uses local images", func(t *testing.T) {
+		cluster := &v1.Cluster{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{common.AnnotationOffline: "true"}}}
+		registry, err := ResolveClusterImageRegistry(context.Background(), cluster, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if registry.Host != "" {
+			t.Fatalf("registry host = %q, want empty", registry.Host)
+		}
+	})
+}
+
+func TestGetClusterCRIRegistriesUsesLocalImagesForOfflineClusterWithoutRegistry(t *testing.T) {
+	cluster := &v1.Cluster{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{common.AnnotationOffline: "true"}}}
+	registries, err := GetClusterCRIRegistriesWithContext(context.Background(), cluster, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(registries) != 0 {
+		t.Fatalf("registries = %#v, want none", registries)
+	}
+	if cluster.ResolvedImageRegistry != "" {
+		t.Fatalf("resolved image registry = %q, want empty", cluster.ResolvedImageRegistry)
+	}
+}
 
 func TestGetClusterCRIRegistries(t *testing.T) {
 	ctrl := gomock.NewController(t)
