@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 	operationslister "github.com/kubeclipper/kubeclipper/pkg/client/lister/operations/v1alpha1"
@@ -56,13 +57,36 @@ func (r *BusinessReconciler) Reconcile(ctx context.Context, request ctrl.Request
 		(op.Spec.Action != corev1.OperationUpgradeCluster || op.Status.Phase != operations.OperationSucceeded) {
 		return ctrl.Result{}, nil
 	}
-	clusterObject = clusterObject.DeepCopy()
-	clusterObject.Status.Phase = desired
-	if op.Spec.Action == corev1.OperationUpgradeCluster && op.Status.Phase == operations.OperationSucceeded {
-		clusterObject.KubernetesVersion = op.Labels[common.LabelUpgradeVersion]
+	if err := r.updateCluster(ctx, op, desired); err != nil {
+		return ctrl.Result{}, err
 	}
-	_, err = r.Clusters.UpdateCluster(ctx, clusterObject)
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
+}
+
+// updateCluster retries the complete read/modify/write cycle. A retry must
+// re-read the object because the previous resourceVersion is no longer valid
+// after a concurrent controller update.
+func (r *BusinessReconciler) updateCluster(ctx context.Context, op *operations.Operation, desired corev1.ClusterPhase) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		clusterObject, err := r.Clusters.GetClusterEx(ctx, op.Spec.TargetRef.Name, "")
+		if err != nil {
+			return err
+		}
+		if clusterObject.UID != op.Spec.TargetRef.UID {
+			return fmt.Errorf("operation %q target Cluster UID changed", op.Name)
+		}
+		if clusterObject.Status.Phase == desired &&
+			(op.Spec.Action != corev1.OperationUpgradeCluster || op.Status.Phase != operations.OperationSucceeded) {
+			return nil
+		}
+		clusterObject = clusterObject.DeepCopy()
+		clusterObject.Status.Phase = desired
+		if op.Spec.Action == corev1.OperationUpgradeCluster && op.Status.Phase == operations.OperationSucceeded {
+			clusterObject.KubernetesVersion = op.Labels[common.LabelUpgradeVersion]
+		}
+		_, err = r.Clusters.UpdateCluster(ctx, clusterObject)
+		return err
+	})
 }
 
 func failedClusterPhase(action string) corev1.ClusterPhase {
@@ -75,6 +99,11 @@ func failedClusterPhase(action string) corev1.ClusterPhase {
 		return corev1.ClusterUpgradeFailed
 	case corev1.OperationRecoverCluster:
 		return corev1.ClusterRestoreFailed
+	case corev1.OperationAddNodes, corev1.OperationRemoveNodes:
+		// Node membership changes can leave a partially applied cluster state.
+		// Keep the cluster usable and expose the failure on the Operation itself;
+		// forcing UpdateFailed would unnecessarily block unrelated workflows.
+		return corev1.ClusterRunning
 	default:
 		return corev1.ClusterUpdateFailed
 	}

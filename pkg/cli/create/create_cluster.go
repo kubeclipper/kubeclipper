@@ -352,9 +352,6 @@ func (l *CreateClusterOptions) ValidateArgs(cmd *cobra.Command) error {
 		return utils.UsageErrorf(cmd, "unsupported cni version,support %v now", cniVersions)
 	}
 
-	if l.Offline && (!cmd.Flags().Changed("image-registry") || strings.TrimSpace(l.ImageRegistry) == "") {
-		return utils.UsageErrorf(cmd, "--image-registry must be explicitly specified in offline mode")
-	}
 	criRegistries := l.listCRIRegistry()
 	if l.ImageRegistry != "" && !sliceutil.HasString(criRegistries, l.ImageRegistry) {
 		return utils.UsageErrorf(cmd, "image registry [%s] not found,has %v now,use [kcctl get registry] to show", l.ImageRegistry, criRegistries)

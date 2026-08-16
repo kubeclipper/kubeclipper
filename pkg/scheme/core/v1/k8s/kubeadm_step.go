@@ -51,15 +51,18 @@ const (
 	clusterNode     = "clusterNode"
 	cniInfo         = "cniInfo"
 	health          = "health"
+	addedNodesReady = "addedNodesReady"
 	container       = "container"
 	kubectl         = "kubectl"
 	kubectlTerminal = "kubectlTerminal"
 	//KubeCertsCluVersion the version that kubeadm certs command appears
-	KubeCertsCluVersion        = "1.20"
-	bashCommand                = "bash"
-	binBashCommand             = "/bin/bash"
-	shellCommandFlag           = "-c"
-	restartControlPlaneCommand = "mv /etc/kubernetes/manifests/etcd.yaml " +
+	KubeCertsCluVersion          = "1.20"
+	defaultStepTimeout           = 10 * time.Minute
+	addedNodesReadyRetryInterval = 10 * time.Second
+	bashCommand                  = "bash"
+	binBashCommand               = "/bin/bash"
+	shellCommandFlag             = "-c"
+	restartControlPlaneCommand   = "mv /etc/kubernetes/manifests/etcd.yaml " +
 		"/etc/kubernetes/manifests/kube-apiserver.yaml " +
 		"/etc/kubernetes/manifests/kube-controller-manager.yaml " +
 		"/etc/kubernetes/manifests/kube-scheduler.yaml /tmp/.k8s/config && sleep 20"
@@ -679,6 +682,42 @@ func (stepper *Health) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 		}}, nil
 }
 
+func (stepper *AddedNodesReady) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
+	payload, err := json.Marshal(stepper)
+	if err != nil {
+		return nil, err
+	}
+	return []v1.Step{newCustomStep(
+		"waitForAddedNodesReady", defaultStepTimeout, false, v1.ActionInstall, nodes,
+		fmt.Sprintf(component.RegisterStepKeyFormat, addedNodesReady, version, component.TypeStep), payload,
+	)}, nil
+}
+
+func newCustomStep(
+	name string,
+	timeout time.Duration,
+	errIgnore bool,
+	action v1.StepAction,
+	nodes []v1.StepNode,
+	identity string,
+	payload []byte,
+) v1.Step {
+	return v1.Step{
+		ID:         strutil.GetUUID(),
+		Name:       name,
+		Timeout:    metav1.Duration{Duration: timeout},
+		ErrIgnore:  errIgnore,
+		RetryTimes: 0,
+		Nodes:      nodes,
+		Action:     action,
+		Commands: []v1.Command{{
+			Type:          v1.CommandCustom,
+			Identity:      identity,
+			CustomCommand: payload,
+		}},
+	}
+}
+
 func (stepper *Health) UninstallSteps(network *v1.Networking, nodes ...v1.StepNode) ([]v1.Step, error) {
 	if network.ProxyMode == "ipvs" {
 		// ipvs mode
@@ -832,24 +871,10 @@ func (stepper *Container) UninstallSteps(nodes []v1.StepNode) ([]v1.Step, error)
 	if err != nil {
 		return nil, err
 	}
-	return []v1.Step{
-		{
-			ID:         strutil.GetUUID(),
-			Name:       "cleanContainer",
-			Timeout:    metav1.Duration{Duration: 10 * time.Minute},
-			ErrIgnore:  true,
-			RetryTimes: 0,
-			Nodes:      nodes,
-			Action:     v1.ActionUninstall,
-			Commands: []v1.Command{
-				{
-					Type:          v1.CommandCustom,
-					Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, container, version, component.TypeStep),
-					CustomCommand: b,
-				},
-			},
-		},
-	}, nil
+	return []v1.Step{newCustomStep(
+		"cleanContainer", defaultStepTimeout, true, v1.ActionUninstall, nodes,
+		fmt.Sprintf(component.RegisterStepKeyFormat, container, version, component.TypeStep), b,
+	)}, nil
 }
 
 func (stepper *Kubectl) InitStepper() *Kubectl {

@@ -183,17 +183,24 @@ func (stepper *GenNode) MakeInstallSteps(metadata *component.ExtraMetadata, patc
 		stepper.installSteps = append(stepper.installSteps, steps...)
 
 		// A successful kubeadm join only proves that the command exited cleanly.
-		// Reuse the existing health executor so AddNodes is successful only after
-		// Kubernetes observes the node and kube-system Pods as ready.
-		health := &Health{}
-		if healthErr := health.InitStepper(metadata.KubeVersion, DefaultKubeConfigPath); healthErr != nil {
-			return healthErr
+		// Confirm that Kubernetes observes the nodes added by this operation as Ready.
+		targetNames := make([]string, 0, len(patchNodes))
+		for _, node := range patchNodes {
+			name := node.Hostname
+			if stepper.Cluster.Kubelet.IPAsName {
+				name = node.NodeIPv4
+			}
+			if name == "" {
+				return fmt.Errorf("added node %q has no Kubernetes node name", node.ID)
+			}
+			targetNames = append(targetNames, name)
 		}
-		steps, err = health.InstallSteps([]v1.StepNode{masters[0]})
+		ready := &AddedNodesReady{NodeNames: targetNames}
+		steps, err = ready.InstallSteps([]v1.StepNode{masters[0]})
 		if err != nil {
 			return err
 		}
-		stepper.installSteps = append(stepper.installSteps, steps[0])
+		stepper.installSteps = append(stepper.installSteps, steps...)
 	}
 
 	return nil
