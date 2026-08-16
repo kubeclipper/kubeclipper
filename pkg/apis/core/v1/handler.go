@@ -432,10 +432,6 @@ func (h *handler) CreateClusters(request *restful.Request, response *restful.Res
 	if v := request.QueryParameter("timeout"); v != "" {
 		timeoutSecs = v
 	}
-	if c.Offline() && strings.TrimSpace(c.ImageRegistry) == "" {
-		restplus.HandleBadRequest(response, request, errors.New("imageRegistry must be specified in offline mode"))
-		return
-	}
 	c.Complete()
 	// validate node exist
 	extraMeta, err := h.getClusterMetadata(request.Request.Context(), &c, false)
@@ -542,10 +538,6 @@ func (h *handler) UpdateClusters(request *restful.Request, response *restful.Res
 		clu.Annotations = c.Annotations
 		clu.ImageRegistry = c.ImageRegistry
 		clu.ContainerRuntime.Registries = c.ContainerRuntime.Registries
-		if clu.Offline() && strings.TrimSpace(clu.ImageRegistry) == "" {
-			restplus.HandleBadRequest(response, request, errors.New("imageRegistry must be specified in offline mode"))
-			return
-		}
 		if _, err = utils.GetClusterCRIRegistriesWithContext(request.Request.Context(), clu, h.clusterOperator); err != nil {
 			restplus.HandleBadRequest(response, request, err)
 			return
@@ -948,7 +940,7 @@ func (h *handler) watchNodes(req *restful.Request, resp *restful.Response, q *qu
 
 // TODO: it will be deprecated in the future
 func (h *handler) getClusterMetadata(ctx context.Context, c *v1.Cluster, skipNodeNotFound bool) (*component.ExtraMetadata, error) {
-	registry, err := utils.ResolveImageRegistry(ctx, c.ImageRegistry, h.clusterOperator)
+	registry, err := utils.ResolveClusterImageRegistry(ctx, c, h.clusterOperator)
 	if err != nil {
 		return nil, err
 	}
@@ -1692,10 +1684,6 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 	if v := request.QueryParameter("timeout"); v != "" {
 		timeoutSecs = v
 	}
-	if body.Offline && strings.TrimSpace(body.ImageRegistry) == "" {
-		restplus.HandleBadRequest(response, request, errors.New("imageRegistry must be specified in offline mode"))
-		return
-	}
 	clu.ImageRegistry = body.ImageRegistry
 	extraMeta, err := h.getClusterMetadata(request.Request.Context(), clu, false)
 	if err != nil {
@@ -1706,7 +1694,15 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 		restplus.HandleInternalError(response, request, err)
 		return
 	}
+	registry, err := utils.ResolveImageRegistryForMode(request.Request.Context(), body.Offline, body.ImageRegistry, h.clusterOperator)
+	if err != nil {
+		restplus.HandleBadRequest(response, request, err)
+		return
+	}
+	clu.ResolvedImageRegistry = registry.Host
+	clu.Complete()
 	extraMeta.Offline = body.Offline
+	extraMeta.ImageRegistry = registry.Host
 	extraMeta.KubeVersion = body.Version
 	upgradeComp := &k8s.Upgrade{}
 	upgradeComp.InitStepper(extraMeta, clu)
@@ -1727,7 +1723,7 @@ func (h *handler) UpgradeCluster(request *restful.Request, response *restful.Res
 		common.LabelTopologyRegion: extraMeta.Masters[0].Region,
 	}
 	op.Steps = upgradeComp.GetInstallSteps()
-	statusRegistries, err := utils.GetClusterCRIRegistriesWithContext(request.Request.Context(), clu, h.clusterOperator)
+	statusRegistries, err := utils.GetClusterCRIRegistriesForMode(request.Request.Context(), clu, body.Offline, h.clusterOperator)
 	if err != nil {
 		restplus.HandleBadRequest(response, request, err)
 		return

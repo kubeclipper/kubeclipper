@@ -145,12 +145,20 @@ func GetClusterCRIRegistries(c *v1.Cluster, op cluster.Operator) ([]v1.RegistryS
 }
 
 func GetClusterCRIRegistriesWithContext(ctx context.Context, c *v1.Cluster, op cluster.Operator) ([]v1.RegistrySpec, error) {
-	imageRegistry, err := ResolveImageRegistry(ctx, c.ImageRegistry, op)
+	return GetClusterCRIRegistriesForMode(ctx, c, c.Offline(), op)
+}
+
+// GetClusterCRIRegistriesForMode returns the CRI registry configuration for an image source mode.
+func GetClusterCRIRegistriesForMode(ctx context.Context, c *v1.Cluster, offline bool, op cluster.Operator) ([]v1.RegistrySpec, error) {
+	imageRegistry, err := ResolveImageRegistryForMode(ctx, offline, c.ImageRegistry, op)
 	if err != nil {
 		return nil, err
 	}
 	c.ResolvedImageRegistry = imageRegistry.Host
-	registries := []v1.RegistrySpec{imageRegistry}
+	registries := make([]v1.RegistrySpec, 0, len(c.ContainerRuntime.Registries)+1)
+	if imageRegistry.Host != "" {
+		registries = append(registries, imageRegistry)
+	}
 	explicitHosts := make(map[string]v1.RegistrySpec)
 	for _, ref := range c.ContainerRuntime.Registries {
 		if ref.RegistryRef == nil || strings.TrimSpace(*ref.RegistryRef) == "" {
@@ -184,6 +192,20 @@ func GetClusterCRIRegistriesWithContext(ctx context.Context, c *v1.Cluster, op c
 		return registries[i].Host < registries[j].Host
 	})
 	return registries, nil
+}
+
+// ResolveClusterImageRegistry returns the registry used to pull cluster images.
+// Offline clusters without an image registry load packaged images on each node.
+func ResolveClusterImageRegistry(ctx context.Context, c *v1.Cluster, op cluster.Operator) (v1.RegistrySpec, error) {
+	return ResolveImageRegistryForMode(ctx, c.Offline(), c.ImageRegistry, op)
+}
+
+// ResolveImageRegistryForMode returns an empty registry only for offline local-image mode.
+func ResolveImageRegistryForMode(ctx context.Context, offline bool, name string, op cluster.Operator) (v1.RegistrySpec, error) {
+	if offline && strings.TrimSpace(name) == "" {
+		return v1.RegistrySpec{}, nil
+	}
+	return ResolveImageRegistry(ctx, name, op)
 }
 
 func ResolveImageRegistry(ctx context.Context, name string, op cluster.Operator) (v1.RegistrySpec, error) {
