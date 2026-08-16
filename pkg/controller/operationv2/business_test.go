@@ -18,6 +18,7 @@ package operationv2
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -58,5 +59,72 @@ func TestBusinessReconcileIgnoresMissingTargetForTerminalOperation(t *testing.T)
 
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: operation.Name}}); err != nil {
 		t.Fatalf("reconcile terminal operation with deleted target: %v", err)
+	}
+}
+
+func TestFailedClusterPhaseForNodeOperationsKeepsClusterRunning(t *testing.T) {
+	tests := []struct {
+		action string
+	}{
+		{action: corev1.OperationAddNodes},
+		{action: corev1.OperationRemoveNodes},
+	}
+	for _, tt := range tests {
+		t.Run(tt.action, func(t *testing.T) {
+			if got := failedClusterPhase(tt.action); got != corev1.ClusterRunning {
+				t.Fatalf("failedClusterPhase(%q) = %q, want %q", tt.action, got, corev1.ClusterRunning)
+			}
+		})
+	}
+}
+
+func TestBusinessReconcileRetriesClusterUpdateConflict(t *testing.T) {
+	const clusterUID = types.UID("cluster-uid")
+	operation := &operations.Operation{
+		ObjectMeta: metav1.ObjectMeta{Name: "add-nodes"},
+		Spec: operations.OperationSpec{
+			Action: corev1.OperationAddNodes,
+			TargetRef: operations.ObjectReference{
+				Name: "cluster-a",
+				UID:  clusterUID,
+			},
+		},
+		Status: operations.OperationStatus{Phase: operations.OperationTimedOut},
+	}
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	if err := indexer.Add(operation); err != nil {
+		t.Fatal(err)
+	}
+
+	clusterObject := &corev1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-a", UID: clusterUID},
+		Status:     corev1.ClusterStatus{Phase: corev1.ClusterUpdateFailed},
+	}
+	controller := gomock.NewController(t)
+	clusters := clustermock.NewMockOperator(controller)
+	clusters.EXPECT().GetClusterEx(gomock.Any(), "cluster-a", "").Return(clusterObject, nil).Times(3)
+	clusters.EXPECT().UpdateCluster(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, c *corev1.Cluster) (*corev1.Cluster, error) {
+			if c.Status.Phase != corev1.ClusterRunning {
+				t.Fatalf("first update phase=%s, want Running", c.Status.Phase)
+			}
+			return nil, apierrors.NewConflict(corev1.Resource("cluster"), c.Name, fmt.Errorf("stale object"))
+		},
+	).Times(1)
+	clusters.EXPECT().UpdateCluster(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, c *corev1.Cluster) (*corev1.Cluster, error) {
+			if c.Status.Phase != corev1.ClusterRunning {
+				t.Fatalf("retry update phase=%s, want Running", c.Status.Phase)
+			}
+			return c, nil
+		},
+	).Times(1)
+
+	reconciler := &BusinessReconciler{
+		Operations: operationslister.NewOperationLister(indexer),
+		Clusters:   clusters,
+	}
+	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: operation.Name}}); err != nil {
+		t.Fatalf("reconcile conflict: %v", err)
 	}
 }
