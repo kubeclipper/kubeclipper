@@ -20,12 +20,54 @@ package k8s
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 )
+
+func TestNodeReady(t *testing.T) {
+	tests := []struct {
+		name string
+		node *corev1.Node
+		want bool
+	}{
+		{name: "missing Ready condition", node: &corev1.Node{}, want: false},
+		{name: "not ready", node: &corev1.Node{Status: corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionFalse}}}}, want: false},
+		{name: "ready", node: &corev1.Node{Status: corev1.NodeStatus{Conditions: []corev1.NodeCondition{{Type: corev1.NodeReady, Status: corev1.ConditionTrue}}}}, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nodeReady(tt.node); got != tt.want {
+				t.Fatalf("nodeReady() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddedNodesReadyStepTargetsOnlyRequestedNodes(t *testing.T) {
+	steps, err := (&AddedNodesReady{NodeNames: []string{"worker-1", "worker-2"}}).InstallSteps([]v1.StepNode{{ID: "master-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(steps) != 1 || steps[0].Name != "waitForAddedNodesReady" {
+		t.Fatalf("unexpected steps: %#v", steps)
+	}
+	if len(steps[0].Nodes) != 1 || steps[0].Nodes[0].ID != "master-1" {
+		t.Fatalf("readiness check must run on the selected master: %#v", steps[0].Nodes)
+	}
+	var payload AddedNodesReady
+	if err := json.Unmarshal(steps[0].Commands[0].CustomCommand, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(payload.NodeNames, ","), "worker-1,worker-2"; got != want {
+		t.Fatalf("target nodes = %q, want %q", got, want)
+	}
+}
 
 func TestKubeadmResetIsSafeWhenKubeadmIsAbsent(t *testing.T) {
 	steps, err := KubeadmReset([]v1.StepNode{{ID: "node-1"}})

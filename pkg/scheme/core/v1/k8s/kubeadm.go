@@ -75,6 +75,12 @@ func init() {
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, health, version, component.TypeStep), &Health{}); err != nil {
 		panic(err)
 	}
+	if err := component.RegisterAgentStep(
+		fmt.Sprintf(component.RegisterStepKeyFormat, addedNodesReady, version, component.TypeStep),
+		&AddedNodesReady{},
+	); err != nil {
+		panic(err)
+	}
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, container, version, component.TypeStep), &Container{}); err != nil {
 		panic(err)
 	}
@@ -100,6 +106,7 @@ var (
 	_ component.StepRunnable   = (*ClusterNode)(nil)
 	_ component.TemplateRender = (*KubectlTerminal)(nil)
 	_ component.StepRunnable   = (*Health)(nil)
+	_ component.StepRunnable   = (*AddedNodesReady)(nil)
 	_ component.StepRunnable   = (*Container)(nil)
 	_ component.StepRunnable   = (*Kubectl)(nil)
 )
@@ -161,6 +168,13 @@ type ClusterNode struct {
 type Health struct {
 	KubernetesVersion string
 	*kubernetes.Clientset
+}
+
+// AddedNodesReady waits until the API server reports every node added by the
+// current operation as Ready. It intentionally does not evaluate unrelated
+// nodes or workload Pods.
+type AddedNodesReady struct {
+	NodeNames []string `json:"nodeNames"`
 }
 
 type Certification struct{}
@@ -912,6 +926,48 @@ func (stepper *Health) kubeSystemPodsReady(ctx context.Context, opts component.O
 
 	logger.Info("all Pods in kube-system namespace are ready")
 	return
+}
+
+func (*AddedNodesReady) NewInstance() component.ObjectMeta {
+	return &AddedNodesReady{}
+}
+
+func (stepper *AddedNodesReady) Install(ctx context.Context, opts component.Options) ([]byte, error) {
+	if len(stepper.NodeNames) == 0 {
+		return nil, fmt.Errorf("at least one added node is required")
+	}
+	clientset, err := utils.BuildKubeClientset(DefaultKubeConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("build kube clientset: %w", err)
+	}
+	return nil, utils.RetryFunc(
+		ctx, opts, addedNodesReadyRetryInterval, "addedNodesReady",
+		func(ctx context.Context, _ component.Options) error {
+			for _, name := range stepper.NodeNames {
+				node, err := clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("get added node %q: %w", name, err)
+				}
+				if !nodeReady(node) {
+					return fmt.Errorf("added node %q is not Ready", name)
+				}
+			}
+			return nil
+		},
+	)
+}
+
+func (*AddedNodesReady) Uninstall(context.Context, component.Options) ([]byte, error) {
+	return nil, fmt.Errorf("AddedNodesReady does not support uninstall")
+}
+
+func nodeReady(node *corev1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == corev1.NodeReady {
+			return condition.Status == corev1.ConditionTrue
+		}
+	}
+	return false
 }
 
 func (stepper *Health) getRegisterServiceAccountCommands() ([]v1.Command, error) {
