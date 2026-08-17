@@ -160,7 +160,7 @@ func TestContainerdRegistryRender(t *testing.T) {
 	ca, err := os.ReadFile(cafile)
 	require.NoError(t, err)
 	assert.Equal(t, "ca data", string(ca))
-	exp := fmt.Sprintf(`server = "docker.io"
+	exp := fmt.Sprintf(`server = "https://docker.io"
 
 [host]
 
@@ -176,6 +176,26 @@ func TestContainerdRegistryRender(t *testing.T) {
 	hostConfig, err := os.ReadFile(filepath.Join(dir, "docker.io", "hosts.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, exp, string(hostConfig))
+}
+
+func TestToContainerdRegistryConfigPreservesRegistryScheme(t *testing.T) {
+	configs := ToContainerdRegistryConfig([]v1.RegistrySpec{{
+		Scheme:     "http",
+		Host:       "registry.example.test:5000",
+		SkipVerify: true,
+	}})
+
+	config, ok := configs["registry.example.test:5000"]
+	if !ok {
+		t.Fatal("registry config was not created")
+	}
+	assert.Equal(t, "registry.example.test:5000", config.Server)
+
+	dir := t.TempDir()
+	require.NoError(t, config.renderConfigs(dir))
+	data, err := os.ReadFile(filepath.Join(dir, "registry.example.test:5000", "hosts.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `server = "http://registry.example.test:5000"`)
 }
 
 func TestMergeRegistryAuthIntoConfig(t *testing.T) {
