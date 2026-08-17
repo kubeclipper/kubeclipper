@@ -566,6 +566,11 @@ func (h *ContainerdRegistry) renderConfigs(dir string) error {
 		Server:      h.Server,
 		HostConfigs: make(map[string]HostFileConfig),
 	}
+	if len(h.Hosts) > 0 {
+		// containerd uses server as the default endpoint. Preserve h.Server as
+		// the certs.d directory name and add the scheme only to this endpoint.
+		c.Server = fmt.Sprintf("%s://%s", h.Hosts[0].Scheme, h.Server)
+	}
 	for _, host := range h.Hosts {
 		var (
 			caFile     = ""
