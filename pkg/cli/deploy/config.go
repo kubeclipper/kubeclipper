@@ -107,6 +107,9 @@ agents:
 # static package directory.
 #staticServerPath: /opt/kubeclipper-server/resource
 
+# temporary directory for deployment packages and extracted files.
+#tempDir: /tmp
+
 # deploy resource package,support url or file absolute path.
 #pkg: ` + constatns.KubeClipperReleaseBaseURL + `/v1.1.0/kc-amd64.tar.gz
 pkg: /tmp/kc-minimal.tar.gz

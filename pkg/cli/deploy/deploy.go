@@ -313,6 +313,15 @@ func (d *DeployOptions) ValidateArgs() error {
 	if d.deployConfig.Pkg == "" {
 		return fmt.Errorf("--pkg must be specified")
 	}
+	if d.deployConfig.TempDir == "" {
+		d.deployConfig.TempDir = config.DefaultPkgPath
+	}
+	if !filepath.IsAbs(d.deployConfig.TempDir) {
+		return fmt.Errorf("temp directory must be an absolute path")
+	}
+	if filepath.Clean(d.deployConfig.TempDir) == string(filepath.Separator) {
+		return fmt.Errorf("temp directory must not be the filesystem root")
+	}
 	if !d.aio && d.deployConfig.SSHConfig.PkFile == "" && d.deployConfig.SSHConfig.Password == "" {
 		return fmt.Errorf("one of --pk-file or --passwd must be specified")
 	}
@@ -639,13 +648,15 @@ func (d *DeployOptions) RunDeploy() error {
 }
 
 func (d *DeployOptions) sendPackage() {
-	tar := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s", filepath.Join(config.DefaultPkgPath, "kc"),
-		filepath.Join(config.DefaultPkgPath, path.Base(d.deployConfig.Pkg)), config.DefaultPkgPath)
-	cp := sshutils.WrapSh(fmt.Sprintf("cp -rf %s /usr/local/bin/", filepath.Join(config.DefaultPkgPath, "kc/bin/*")))
+	tar := fmt.Sprintf("rm -rf %s && tar -xvf %s -C %s", filepath.Join(d.deployConfig.TempDir, "kc"),
+		filepath.Join(d.deployConfig.TempDir, path.Base(d.deployConfig.Pkg)), d.deployConfig.TempDir)
+	cp := sshutils.WrapSh(fmt.Sprintf("cp -rf %s /usr/local/bin/", filepath.Join(d.deployConfig.TempDir, "kc", "bin", "*")))
 	mkdir := "mkdir -p /usr/lib/systemd/system"
 	// rm -rf /root/kc && tar -xvf /root/kc/pkg/kc.tar -C ~/kc/pkg && /bin/bash -c 'cp -rf /root/kc/pkg/kc/bin/* /usr/local/bin/' && mkdir -p /usr/lib/systemd/system
 	hook := sshutils.Combine([]string{tar, cp, mkdir})
-	err := utils.SendPackage(d.deployConfig.SSHConfig, d.deployConfig.Pkg, d.allNodes, config.DefaultPkgPath, nil, &hook)
+	err := utils.SendPackageWithTempDir(
+		d.deployConfig.SSHConfig, d.deployConfig.Pkg, d.allNodes, d.deployConfig.TempDir, nil, &hook, d.deployConfig.TempDir,
+	)
 	if err != nil {
 		logger.Fatalf("sendPackage err:%s", err.Error())
 	}
@@ -976,8 +987,8 @@ func (d *DeployOptions) deployKcServer() {
 		"mkdir -pv /etc/kubeclipper-server",
 		sshutils.WrapEcho(config.KcServerService, "/usr/lib/systemd/system/kc-server.service"),
 		fmt.Sprintf("mkdir -pv %s/kc", d.deployConfig.StaticServerPath),
-		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/resource/* %s/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
-		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/* %s/kc/", config.DefaultPkgPath, d.deployConfig.StaticServerPath)),
+		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/resource/* %s/", d.deployConfig.TempDir, d.deployConfig.StaticServerPath)),
+		sshutils.WrapSh(fmt.Sprintf("cp -rf %s/kc/bin/* %s/kc/", d.deployConfig.TempDir, d.deployConfig.StaticServerPath)),
 	}
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(d.deployConfig.SSHConfig, d.deployConfig.ServerIPs, cmd, sshutils.DefaultWalk)
@@ -1061,7 +1072,7 @@ func (d *DeployOptions) deployKcConsole() {
 	data := d.getKcConsoleTemplateContent()
 
 	cmdList := []string{
-		fmt.Sprintf("mkdir -pv /etc/kc-console && cp -rf %s/kc/kc-console /etc/kc-console/dist", config.DefaultPkgPath),
+		fmt.Sprintf("mkdir -pv /etc/kc-console && cp -rf %s/kc/kc-console /etc/kc-console/dist", d.deployConfig.TempDir),
 		sshutils.WrapEcho(config.KcConsoleServiceTmpl, "/usr/lib/systemd/system/kc-console.service"),
 		sshutils.WrapEcho(data, "/etc/kc-console/Caddyfile") + " && systemctl daemon-reload && systemctl enable kc-console --now",
 	}
@@ -1106,7 +1117,9 @@ func (d *DeployOptions) sendAgentIdentity(agentIP string, cert, ca *certutils.Co
 		path.Join(ca.Path, ca.BaseName+".crt"),
 	}
 	for _, source := range sources {
-		if err := utils.SendPackageV2(d.deployConfig.SSHConfig, source, []string{agentIP}, destination, nil, nil); err != nil {
+		if err := utils.SendPackageV2WithTempDir(
+			d.deployConfig.SSHConfig, source, []string{agentIP}, destination, nil, nil, d.deployConfig.TempDir,
+		); err != nil {
 			return err
 		}
 	}
@@ -1115,7 +1128,7 @@ func (d *DeployOptions) sendAgentIdentity(agentIP string, cert, ca *certutils.Co
 
 func (d *DeployOptions) removeTempFile() {
 	cmdList := []string{
-		fmt.Sprintf("rm -rf %s/kc", config.DefaultPkgPath),
+		fmt.Sprintf("rm -rf %s/kc", d.deployConfig.TempDir),
 	}
 	for _, cmd := range cmdList {
 		err := sshutils.CmdBatchWithSudo(d.deployConfig.SSHConfig, d.allNodes, cmd, sshutils.DefaultWalk)
@@ -1134,17 +1147,17 @@ func (d *DeployOptions) dumpConfig() {
 
 func (d *DeployOptions) sendCertAndKey(contents []certutils.Config, pki string) error {
 	for _, content := range contents {
-		err := utils.SendPackageV2(d.deployConfig.SSHConfig,
+		err := utils.SendPackageV2WithTempDir(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".key"),
 			d.deployConfig.ServerIPs,
-			filepath.Join(options.DefaultKcServerConfigPath, pki), nil, nil)
+			filepath.Join(options.DefaultKcServerConfigPath, pki), nil, nil, d.deployConfig.TempDir)
 		if err != nil {
 			return err
 		}
-		err = utils.SendPackageV2(d.deployConfig.SSHConfig,
+		err = utils.SendPackageV2WithTempDir(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".crt"),
 			d.deployConfig.ServerIPs,
-			filepath.Join(options.DefaultKcServerConfigPath, pki), nil, nil)
+			filepath.Join(options.DefaultKcServerConfigPath, pki), nil, nil, d.deployConfig.TempDir)
 		if err != nil {
 			return err
 		}
@@ -1154,17 +1167,17 @@ func (d *DeployOptions) sendCertAndKey(contents []certutils.Config, pki string) 
 
 func (d *DeployOptions) sendAgentCertAndKey(contents []certutils.Config, pki string) error {
 	for _, content := range contents {
-		err := utils.SendPackageV2(d.deployConfig.SSHConfig,
+		err := utils.SendPackageV2WithTempDir(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".key"),
 			d.deployConfig.Agents.ListIP(),
-			filepath.Join(options.DefaultKcAgentConfigPath, pki), nil, nil)
+			filepath.Join(options.DefaultKcAgentConfigPath, pki), nil, nil, d.deployConfig.TempDir)
 		if err != nil {
 			return err
 		}
-		err = utils.SendPackageV2(d.deployConfig.SSHConfig,
+		err = utils.SendPackageV2WithTempDir(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".crt"),
 			d.deployConfig.Agents.ListIP(),
-			filepath.Join(options.DefaultKcAgentConfigPath, pki), nil, nil)
+			filepath.Join(options.DefaultKcAgentConfigPath, pki), nil, nil, d.deployConfig.TempDir)
 		if err != nil {
 			return err
 		}
@@ -1174,10 +1187,10 @@ func (d *DeployOptions) sendAgentCertAndKey(contents []certutils.Config, pki str
 
 func (d *DeployOptions) sendConsoleCert(contents []certutils.Config, pki string) error {
 	for _, content := range contents {
-		err := utils.SendPackageV2(d.deployConfig.SSHConfig,
+		err := utils.SendPackageV2WithTempDir(d.deployConfig.SSHConfig,
 			path.Join(content.Path, content.BaseName+".crt"),
 			d.deployConfig.ServerIPs,
-			filepath.Join(options.DefaultKcConsoleConfigPath, pki), nil, nil)
+			filepath.Join(options.DefaultKcConsoleConfigPath, pki), nil, nil, d.deployConfig.TempDir)
 		if err != nil {
 			return err
 		}
@@ -1244,10 +1257,10 @@ func (d *DeployOptions) sendDefaultAdminConf() error {
 		path.Join(options.DefaultKcServerConfigPath, options.DefaultConfig),
 		options.DefaultKcServerConfigPath,
 	)
-	err := utils.SendPackage(d.deployConfig.SSHConfig,
+	err := utils.SendPackageWithTempDir(d.deployConfig.SSHConfig,
 		options.DefaultConfigPath,
 		d.deployConfig.ServerIPs,
-		options.DefaultKcServerConfigPath, nil, &afterHook)
+		options.DefaultKcServerConfigPath, nil, &afterHook, d.deployConfig.TempDir)
 	return err
 }
 

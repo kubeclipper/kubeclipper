@@ -112,6 +112,34 @@ func TestDeployOptionsCompleteGeneratesAuthenticationJWTSecret(t *testing.T) {
 	}
 }
 
+func TestDeployOptionsValidateTempDir(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		tempDir string
+		wantErr string
+	}{
+		{name: "absolute path", tempDir: "/var/lib/kubeclipper/tmp"},
+		{name: "relative path", tempDir: "kubeclipper/tmp", wantErr: "absolute"},
+		{name: "filesystem root", tempDir: "/", wantErr: "must not be the filesystem root"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewDeployOptions(options.IOStreams{})
+			d.aio = true
+			d.deployConfig.Pkg = "/tmp/kc-amd64.tar.gz"
+			d.deployConfig.ServerIPs = []string{"192.0.2.10"}
+			d.deployConfig.TempDir = tt.tempDir
+
+			err := d.ValidateArgs()
+			if tt.wantErr == "" && err != nil {
+				t.Fatalf("ValidateArgs() error = %v", err)
+			}
+			if tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)) {
+				t.Fatalf("ValidateArgs() error = %v, want %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestKcServerConfigUsesAuthenticationJWTSecret(t *testing.T) {
 	d := NewDeployOptions(options.IOStreams{})
 	d.deployConfig.ServerIPs = []string{"192.0.2.10"}

@@ -35,9 +35,15 @@ import (
 
 const KB = 1024
 const MB = 1024 * 1024
+const defaultCopyTempDir = "/tmp"
 
 // CopyForMD5V2 copy and check md5
 func (ss *SSH) CopyForMD5V2(host, localFilePath, remoteFilePath, localMD5 string) (bool, error) {
+	return ss.CopyForMD5V2WithTempDir(host, localFilePath, remoteFilePath, localMD5, defaultCopyTempDir)
+}
+
+// CopyForMD5V2WithTempDir copies a file through tempDir when sudo is required.
+func (ss *SSH) CopyForMD5V2WithTempDir(host, localFilePath, remoteFilePath, localMD5, tempDir string) (bool, error) {
 	var err error
 	if localMD5 == "" {
 		localMD5, err = MD5FromLocal(localFilePath)
@@ -45,7 +51,7 @@ func (ss *SSH) CopyForMD5V2(host, localFilePath, remoteFilePath, localMD5 string
 			return false, err
 		}
 	}
-	err = ss.CopySudo(host, localFilePath, remoteFilePath)
+	err = ss.CopySudoWithTempDir(host, localFilePath, remoteFilePath, tempDir)
 	if err != nil {
 		return false, err
 	}
@@ -60,11 +66,16 @@ func (ss *SSH) CopyForMD5V2(host, localFilePath, remoteFilePath, localMD5 string
 }
 
 func (ss *SSH) CopySudo(host, localFilePath, remoteFilePath string) error {
+	return ss.CopySudoWithTempDir(host, localFilePath, remoteFilePath, defaultCopyTempDir)
+}
+
+// CopySudoWithTempDir copies a file through tempDir when sudo is required.
+func (ss *SSH) CopySudoWithTempDir(host, localFilePath, remoteFilePath, tempDir string) error {
 	if ss.User == "root" { // root user,need not transit
 		return ss.Copy(host, localFilePath, remoteFilePath)
 	}
-	// 	if not root,first scp to /tmp,then sudo mv to target
-	middle := filepath.Join("/tmp", remoteFilePath)
+	// if not root, first scp to the configured temp directory, then sudo mv to target
+	middle := filepath.Join(tempDir, remoteFilePath)
 	err := ss.Copy(host, localFilePath, middle)
 	if err != nil {
 		return errors.Wrap(err, "copy")
@@ -142,7 +153,7 @@ func (ss *SSH) DownloadSudo(host, localFilePath, remoteFilePath string) error {
 	if ss.User == "root" { // root user,need not transit
 		return ss.download(host, localFilePath, remoteFilePath)
 	}
-	// 	if not root,first scp to /tmp,then sudo mv to target
+	// if not root, first scp to /tmp, then sudo mv to target
 	middle := filepath.Join("/tmp", localFilePath)
 	err := ss.download(host, middle, remoteFilePath)
 	if err != nil {
@@ -237,11 +248,16 @@ func toSizeFromInt(length int) (float64, string) {
 }
 
 func (ss *SSH) CopySudoWithBar(bar *mpb.Bar, host, localFilePath, remoteFilePath string) error {
+	return ss.CopySudoWithBarWithTempDir(bar, host, localFilePath, remoteFilePath, defaultCopyTempDir)
+}
+
+// CopySudoWithBarWithTempDir copies a file with progress through tempDir when sudo is required.
+func (ss *SSH) CopySudoWithBarWithTempDir(bar *mpb.Bar, host, localFilePath, remoteFilePath, tempDir string) error {
 	if ss.User == "root" { // root user,need not transit
 		return ss.CopyWithBar(bar, host, localFilePath, remoteFilePath)
 	}
-	// 	if not root,first scp to /tmp,then sudo mv to target
-	middle := filepath.Join("/tmp", remoteFilePath)
+	// if not root, first scp to the configured temp directory, then sudo mv to target
+	middle := filepath.Join(tempDir, remoteFilePath)
 	err := ss.CopyWithBar(bar, host, localFilePath, middle)
 	if err != nil {
 		return errors.Wrap(err, "copy")

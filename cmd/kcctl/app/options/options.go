@@ -263,6 +263,7 @@ type DeployConfig struct {
 	TLS                        bool                           `json:"tls" yaml:"tls,omitempty"`
 	StaticServerPort           int                            `json:"staticServerPort" yaml:"staticServerPort,omitempty"`
 	StaticServerPath           string                         `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
+	TempDir                    string                         `json:"tempDir" yaml:"tempDir,omitempty"`
 	Pkg                        string                         `json:"pkg" yaml:"pkg,omitempty"`
 	ConsolePort                int                            `json:"consolePort" yaml:"consolePort,omitempty"`
 	AuditOpts                  *option.AuditOptions           `json:"audit" yaml:"audit,omitempty"`
@@ -326,6 +327,7 @@ func NewDeployOptions() *DeployConfig {
 		TLS:              true,
 		StaticServerPort: 8081,
 		StaticServerPath: "/opt/kubeclipper-server/resource",
+		TempDir:          config.DefaultPkgPath,
 		AuditOpts:        option.NewAuditOptions(),
 		ConsolePort:      80,
 		OpLog: &OpLog{
@@ -430,6 +432,7 @@ func (c *DeployConfig) AddFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&c.ServerPort, "server-port", c.ServerPort, "Kc server port")
 	flags.IntVar(&c.StaticServerPort, "static-server-port", c.StaticServerPort, "Kc static server port")
 	flags.StringVar(&c.StaticServerPath, "static-server-path", c.StaticServerPath, "Kc static server path(absolute path")
+	flags.StringVar(&c.TempDir, "temp-dir", c.TempDir, "Temporary directory used for deployment files (absolute path)")
 	flags.StringSliceVar(&c.ServerIPs, "server", c.ServerIPs, "Kc server ips")
 	flags.IntVar(&c.EtcdConfig.ClientPort, "etcd-port", c.EtcdConfig.ClientPort, "Etcd port")
 	flags.IntVar(&c.EtcdConfig.PeerPort, "etcd-peer-port", c.EtcdConfig.PeerPort, "Etcd peer port")
