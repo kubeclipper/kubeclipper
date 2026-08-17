@@ -32,6 +32,9 @@ func TestDeployOptions_GenDefaultConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := options.NewDeployOptions()
+	if d.TempDir != "/tmp" {
+		t.Fatalf("default tempDir = %q, want /tmp", d.TempDir)
+	}
 	err = yaml.Unmarshal(omitempty, d)
 	if err != nil {
 		return
@@ -41,4 +44,14 @@ func TestDeployOptions_GenDefaultConfig(t *testing.T) {
 		return
 	}
 	t.Log(string(marshal))
+}
+
+func TestDeployOptionsConfigTempDir(t *testing.T) {
+	d := options.NewDeployOptions()
+	if err := yaml.Unmarshal([]byte("tempDir: /var/lib/kubeclipper/tmp\n"), d); err != nil {
+		t.Fatalf("unmarshal deploy config: %v", err)
+	}
+	if d.TempDir != "/var/lib/kubeclipper/tmp" {
+		t.Fatalf("tempDir = %q", d.TempDir)
+	}
 }

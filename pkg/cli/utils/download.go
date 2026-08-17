@@ -21,7 +21,10 @@ package utils
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/vbauerster/mpb/v8"
@@ -36,15 +39,41 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
+const defaultTempDir = "/tmp"
+
+const (
+	stagingDirPerm = 0700
+	stagedFilePerm = 0600
+)
+
 // SendPackageV2 scp file to remote host
 // Deprecated
 func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dstDir string, before, after *string) error {
+	return SendPackageV2WithTempDir(sshConfig, location, hosts, dstDir, before, after, defaultTempDir)
+}
+
+// SendPackageV2WithTempDir scp a package to remote hosts using tempDir for local staging.
+//
+//nolint:funlen,gocyclo // preserve the existing transfer state machine while adding configurable staging.
+func SendPackageV2WithTempDir(
+	sshConfig *sshutils.SSH,
+	location string,
+	hosts []string,
+	dstDir string,
+	before, after *string,
+	tempDir string,
+) error {
 	var md5 string
-	// download pkg to /tmp/kc/
-	location, md5, err := downloadFile(location)
+	location, md5, err := downloadFile(location, tempDir)
 	if err != nil {
 		return errors.Wrap(err, "downloadFile")
 	}
+	stagedLocation, cleanup, err := stagePackage(location, tempDir)
+	if err != nil {
+		return errors.Wrap(err, "stagePackage")
+	}
+	defer cleanup()
+	location = stagedLocation
 	pkg := path.Base(location)
 	// scp to ~/kc/kc-bj-cd.tar.gz
 	fullPath := fmt.Sprintf("%s/%s", dstDir, pkg)
@@ -95,7 +124,7 @@ func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dst
 						logger.Errorf("[%s]remove old file(%s) err %s", host, fullPath, err.Error())
 						return
 					}
-					ok, err := sshConfig.CopyForMD5V2(host, location, fullPath, md5)
+					ok, err := sshConfig.CopyForMD5V2WithTempDir(host, location, fullPath, md5, tempDir)
 					if err != nil {
 						logger.Errorf("[%s]copy file(%s) md5 validate failed err %s", host, location, err.Error())
 						return
@@ -107,7 +136,7 @@ func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dst
 					}
 				}
 			} else {
-				ok, err := sshConfig.CopyForMD5V2(host, location, fullPath, md5)
+				ok, err := sshConfig.CopyForMD5V2WithTempDir(host, location, fullPath, md5, tempDir)
 				if err != nil {
 					logger.Errorf("[%s]copy file(%s) md5 validate failed err %s", host, fullPath, err.Error())
 					return
@@ -151,9 +180,10 @@ func SendPackageV2(sshConfig *sshutils.SSH, location string, hosts []string, dst
 	}
 }
 
-func downloadFile(location string) (filePATH, md5 string, err error) {
+func downloadFile(location, tempDir string) (filePATH, md5 string, err error) {
 	if _, ok := httputil.IsURL(location); ok {
-		absPATH := "/tmp/kc/" + path.Base(location)
+		sourceDir := filepath.Join(tempDir, "kc-source")
+		absPATH := filepath.Join(sourceDir, path.Base(location))
 		exist, err := sshutils.IsFileExist(absPATH)
 		if err != nil {
 			return "", "", err
@@ -162,8 +192,8 @@ func downloadFile(location string) (filePATH, md5 string, err error) {
 			// generator download cmd
 			dwnCmd := downloadCmd(location)
 			// os exec download command
-			if err = sshutils.Cmd("/bin/sh", "-c", "mkdir -p /tmp/kc && cd /tmp/kc && "+dwnCmd); err != nil {
-				return "", "", err
+			if downloadErr := sshutils.Cmd("/bin/sh", "-c", "mkdir -p "+sourceDir+" && cd "+sourceDir+" && "+dwnCmd); downloadErr != nil {
+				return "", "", downloadErr
 			}
 		}
 		location = absPATH
@@ -189,12 +219,34 @@ func downloadCmd(url string) string {
 }
 
 func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDir string, before, after *string) error {
+	return SendPackageWithTempDir(sshConfig, location, hosts, dstDir, before, after, defaultTempDir)
+}
+
+// SendPackageWithTempDir scp a package to remote hosts using tempDir for local staging.
+//
+//nolint:funlen,gocyclo // preserve the existing transfer state machine while adding configurable staging.
+func SendPackageWithTempDir(
+	sshConfig *sshutils.SSH,
+	location string,
+	hosts []string,
+	dstDir string,
+	before, after *string,
+	tempDir string,
+) error {
 	var md5 string
-	// download pkg to /tmp/kc/
-	location, md5, err := downloadFile(location)
+	location, md5, err := downloadFile(location, tempDir)
 	if err != nil {
 		return errors.Wrap(err, "downloadFile")
 	}
+	// Keep the local source separate from the remote extraction directory. A
+	// target host may be the machine running kcctl and remove tempDir/kc while
+	// other hosts are still copying the package.
+	stagedLocation, cleanup, err := stagePackage(location, tempDir)
+	if err != nil {
+		return errors.Wrap(err, "stagePackage")
+	}
+	defer cleanup()
+	location = stagedLocation
 	pkg := path.Base(location)
 	// scp to ~/kc/kc-bj-cd.tar.gz
 	fullPath := fmt.Sprintf("%s/%s", dstDir, pkg)
@@ -330,13 +382,17 @@ func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDi
 				} else {
 					rm := fmt.Sprintf("rm -rf %s", fullPath)
 					ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, rm)
-					if err != nil || ret.Error() != nil {
+					if err != nil {
+						errCh <- errors.WithMessage(err, "remove remote old files")
+						return
+					}
+					if err = ret.Error(); err != nil {
 						errCh <- errors.WithMessage(err, "remove remote old files")
 						return
 					}
 					checkmd5bar.SetTotal(-1, true)
-					if err := sshConfig.CopySudoWithBar(downloadbar, host, location, fullPath); err != nil {
-						errCh <- errors.WithMessage(err, "download")
+					if copyErr := sshConfig.CopySudoWithBarWithTempDir(downloadbar, host, location, fullPath, tempDir); copyErr != nil {
+						errCh <- errors.WithMessage(copyErr, "download")
 						return
 					}
 					if downloadbar.IsRunning() {
@@ -356,7 +412,7 @@ func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDi
 				}
 			} else {
 				checkmd5bar.SetTotal(-1, true)
-				if err := sshConfig.CopySudoWithBar(downloadbar, host, location, fullPath); err != nil {
+				if err := sshConfig.CopySudoWithBarWithTempDir(downloadbar, host, location, fullPath, tempDir); err != nil {
 					errCh <- errors.WithMessage(err, "download")
 					return
 				}
@@ -404,11 +460,62 @@ func SendPackage(sshConfig *sshutils.SSH, location string, hosts []string, dstDi
 	}
 }
 
+// Keep staging isolated from the remote extraction directory.
+func stagePackage(location, tempDir string) (stagedPath string, cleanup func(), err error) {
+	sourceDir := filepath.Join(tempDir, "kc-source")
+	if mkdirErr := os.MkdirAll(sourceDir, stagingDirPerm); mkdirErr != nil {
+		return "", func() {}, mkdirErr
+	}
+	dir, err := os.MkdirTemp(sourceDir, "stage-")
+	if err != nil {
+		return "", func() {}, err
+	}
+	cleanup = func() { _ = os.RemoveAll(dir) }
+	staged := filepath.Join(dir, path.Base(location))
+
+	if linkErr := os.Link(location, staged); linkErr == nil {
+		return staged, cleanup, nil
+	}
+
+	src, err := os.Open(location)
+	if err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	defer src.Close()
+	dst, err := os.OpenFile(staged, os.O_WRONLY|os.O_CREATE|os.O_EXCL, stagedFilePerm)
+	if err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	if _, err = io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		cleanup()
+		return "", func() {}, err
+	}
+	if err = dst.Close(); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	return staged, cleanup, nil
+}
+
 func SendPackageLocal(location string, dstDir string, after *string) error {
-	location, _, err := downloadFile(location)
+	return SendPackageLocalWithTempDir(location, dstDir, after, defaultTempDir)
+}
+
+// SendPackageLocalWithTempDir copies a package locally using tempDir for local staging.
+func SendPackageLocalWithTempDir(location, dstDir string, after *string, tempDir string) error {
+	location, _, err := downloadFile(location, tempDir)
 	if err != nil {
 		return errors.Wrap(err, "downloadFile")
 	}
+	stagedLocation, cleanup, err := stagePackage(location, tempDir)
+	if err != nil {
+		return errors.Wrap(err, "stagePackage")
+	}
+	defer cleanup()
+	location = stagedLocation
 
 	mkDstDir := fmt.Sprintf("mkdir -p %s || true", dstDir)
 	if err = sshutils.Cmd("/bin/sh", "-c", mkDstDir); err != nil {
