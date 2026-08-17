@@ -106,8 +106,6 @@ agents:
 #staticServerPort: 8081
 # static package directory.
 #staticServerPath: /opt/kubeclipper-server/resource
-#automatic generate jwt token.
-#jwtSecret: ""
 
 # deploy resource package,support url or file absolute path.
 #pkg: ` + constatns.KubeClipperReleaseBaseURL + `/v1.1.0/kc-amd64.tar.gz
