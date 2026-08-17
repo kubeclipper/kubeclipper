@@ -115,10 +115,9 @@ func TestAggregateServerChecks(t *testing.T) {
 		wantStatus platformstatus.Status
 		wantMsg    string
 	}{
-		{name: "healthy operation API", checks: []platformstatus.Check{
+		{name: "healthy", checks: []platformstatus.Check{
 			{Name: "api", Status: platformstatus.Healthy},
 			{Name: "controller-manager", Status: platformstatus.Healthy},
-			{Name: "operation-api", Status: platformstatus.Healthy},
 			{Name: "static-resource", Status: platformstatus.Healthy},
 		}, wantStatus: platformstatus.Healthy, wantMsg: "all server subsystems ready"},
 		{name: "static resource degraded", checks: []platformstatus.Check{
@@ -127,14 +126,13 @@ func TestAggregateServerChecks(t *testing.T) {
 		}, wantStatus: platformstatus.Degraded, wantMsg: "resource service is unavailable"},
 		{name: "core subsystem unhealthy", checks: []platformstatus.Check{
 			{Name: "api", Status: platformstatus.Healthy},
-			{Name: "operation-api", Status: platformstatus.Unhealthy, Message: "Operation API storage is unavailable"},
-		}, wantStatus: platformstatus.Unhealthy, wantMsg: "Operation API storage is unavailable"},
+			{Name: "controller-manager", Status: platformstatus.Unhealthy, Message: "active leader is not ready"},
+		}, wantStatus: platformstatus.Unhealthy, wantMsg: "active leader is not ready"},
 		{name: "multiple failures", checks: []platformstatus.Check{
-			{Name: "api", Status: platformstatus.Healthy},
+			{Name: "api", Status: platformstatus.Unhealthy},
 			{Name: "controller-manager", Status: platformstatus.Unhealthy},
-			{Name: "operation-api", Status: platformstatus.Unhealthy},
 			{Name: "static-resource", Status: platformstatus.Healthy},
-		}, wantStatus: platformstatus.Unhealthy, wantMsg: "2/4 subsystems unhealthy"},
+		}, wantStatus: platformstatus.Unhealthy, wantMsg: "2/3 subsystems unhealthy"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -156,9 +154,6 @@ func TestAggregateCount(t *testing.T) {
 		wantStatus platformstatus.Status
 		wantMsg    string
 	}{
-		{name: "all etcd endpoints", healthy: 3, total: 3, suffix: "endpoints healthy", wantStatus: platformstatus.Healthy, wantMsg: "3/3 endpoints healthy"},
-		{name: "some etcd endpoints", healthy: 2, total: 3, suffix: "endpoints healthy", wantStatus: platformstatus.Degraded, wantMsg: "2/3 endpoints healthy"},
-		{name: "no etcd endpoints healthy", total: 3, suffix: "endpoints healthy", wantStatus: platformstatus.Unhealthy, wantMsg: "0/3 endpoints healthy"},
 		{name: "all agents lost", total: 8, suffix: "agents running", skipEmpty: true, wantStatus: platformstatus.Unhealthy, wantMsg: "0/8 agents running"},
 		{name: "no agents", suffix: "agents running", skipEmpty: true, wantStatus: platformstatus.Skipped, wantMsg: "no agents registered"},
 	}
@@ -167,6 +162,29 @@ func TestAggregateCount(t *testing.T) {
 			status, message := aggregateCount(test.healthy, test.total, test.suffix, test.skipEmpty)
 			if status != test.wantStatus || message != test.wantMsg {
 				t.Fatalf("aggregateCount() = (%q, %q), want (%q, %q)", status, message, test.wantStatus, test.wantMsg)
+			}
+		})
+	}
+}
+
+func TestAggregateEtcdEndpoints(t *testing.T) {
+	tests := []struct {
+		name       string
+		healthy    int
+		total      int
+		wantStatus platformstatus.Status
+		wantMsg    string
+	}{
+		{name: "all healthy", healthy: 3, total: 3, wantStatus: platformstatus.Healthy, wantMsg: "etcd is healthy"},
+		{name: "partially healthy", healthy: 2, total: 3, wantStatus: platformstatus.Degraded, wantMsg: "some etcd endpoints are unavailable"},
+		{name: "all unavailable", total: 3, wantStatus: platformstatus.Unhealthy, wantMsg: "etcd is unavailable"},
+		{name: "no configuration", wantStatus: platformstatus.Unknown, wantMsg: "no endpoints configured"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			status, message := aggregateEtcdEndpoints(test.healthy, test.total)
+			if status != test.wantStatus || message != test.wantMsg {
+				t.Fatalf("aggregateEtcdEndpoints() = (%q, %q), want (%q, %q)", status, message, test.wantStatus, test.wantMsg)
 			}
 		})
 	}

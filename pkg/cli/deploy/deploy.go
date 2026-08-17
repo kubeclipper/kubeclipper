@@ -79,10 +79,12 @@ import (
 )
 
 const (
-	deployExamplePkg          = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
-	kcServerClientIdentity    = "system:kc-server"
-	serviceHealthCheckTimeout = 5 * time.Second
-	longDescription           = `
+	deployExamplePkg              = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
+	kcServerClientIdentity        = "system:kc-server"
+	serviceHealthCheckTimeout     = 5 * time.Second
+	authenticationJWTSecretLength = 24
+	authenticationJWTSecretDigits = 5
+	longDescription               = `
   Deploy Kubeclipper Platform from deploy-config.yaml or cmd flags.
 
   Kubeclipper Platform must have one kc-server node at lease, kc-server use etcd as db backend.
@@ -225,11 +227,10 @@ func NewCmdDeploy(streams options.IOStreams) *cobra.Command {
 }
 
 func (d *DeployOptions) Complete() error {
-	var err error
-	if err = d.deployConfig.Complete(); err != nil {
+	if err := d.deployConfig.Complete(); err != nil {
 		return err
 	}
-	if err = d.generateAuthenticationJWTSecret(); err != nil {
+	if err := d.generateAuthenticationJWTSecret(); err != nil {
 		return err
 	}
 	if d.deployConfig.Pkg == "" {
@@ -259,9 +260,11 @@ func (d *DeployOptions) Complete() error {
 
 	// if specify config，ignore flags.
 	if d.deployConfig.Config == "" {
-		if d.deployConfig.Agents, err = BuildAgent(d.agents, d.fips, d.deployConfig.DefaultRegion); err != nil {
+		agents, err := BuildAgent(d.agents, d.fips, d.deployConfig.DefaultRegion)
+		if err != nil {
 			return err
 		}
+		d.deployConfig.Agents = agents
 	}
 
 	d.allNodes = sets.NewString().
@@ -282,7 +285,7 @@ func (d *DeployOptions) Complete() error {
 }
 
 func (d *DeployOptions) generateAuthenticationJWTSecret() error {
-	secret, err := password.Generate(24, 5, 0, false, true)
+	secret, err := password.Generate(authenticationJWTSecretLength, authenticationJWTSecretDigits, 0, false, true)
 	if err != nil {
 		return fmt.Errorf("generate authentication JWT secret: %w", err)
 	}
@@ -823,7 +826,7 @@ func (d *DeployOptions) etcdEndpoints() []string {
 	return endpoints
 }
 
-func (d *DeployOptions) etcdHealthTLSConfig() (*tls.Config, error) {
+func (*DeployOptions) etcdHealthTLSConfig() (*tls.Config, error) {
 	basePath := filepath.Join(options.HomeDIR, options.DefaultPath)
 	clientCert, err := tls.LoadX509KeyPair(
 		filepath.Join(basePath, options.DefaultEtcdPKIPath, options.EtcdHealthCheck+".crt"),

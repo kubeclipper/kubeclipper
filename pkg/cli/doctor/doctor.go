@@ -115,7 +115,8 @@ func NewCmdDoctor(streams options.IOStreams) *cobra.Command {
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cmd.Root().SilenceErrors = true
-			report := o.run(cmd.Context())
+			progress := newProgressReporter(o.Out)
+			report := o.run(cmd.Context(), progress)
 			if err := printReport(o.Out, report); err != nil {
 				return &ExitError{code: 2, err: err}
 			}
@@ -128,16 +129,27 @@ func NewCmdDoctor(streams options.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func (o *Options) run(ctx context.Context) *Report {
+func (o *Options) run(ctx context.Context, progress *progressReporter) *Report {
 	startedAt := o.now()
 	state := &diagnosticState{}
-	local := o.checkLocalAccess(ctx, state)
-	components := []Component{
-		local,
-		checkKCServer(ctx, state),
-		checkKCEtcd(ctx, state),
-		checkKCAgents(ctx, state),
+	checks := []struct {
+		name string
+		run  func() Component
+	}{
+		{name: "kcctl", run: func() Component { return o.checkLocalAccess(ctx, state) }},
+		{name: "kc-server", run: func() Component { return checkKCServer(ctx, state) }},
+		{name: "kc-etcd", run: func() Component { return checkKCEtcd(ctx, state) }},
+		{name: "kc-agent", run: func() Component { return checkKCAgents(ctx, state) }},
 	}
+	components := make([]Component, 0, len(checks))
+	for _, check := range checks {
+		progress.start(check.name)
+		component := check.run()
+		component.Status = aggregateChecks(component.Checks)
+		progress.complete(component)
+		components = append(components, component)
+	}
+	progress.finish()
 	return newReport(startedAt, o.now().Sub(startedAt), components)
 }
 
@@ -145,6 +157,7 @@ func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) 
 	component := Component{Name: "kcctl"}
 	apiConfig, err := config.TryLoadFromFile(o.configPath)
 	if err != nil {
+		o.useLocalDeployConfig(ctx, state, &component, "cannot load API configuration")
 		component.Checks = append(component.Checks, Check{
 			Name: apiConfigCheck, Status: platformstatus.Unhealthy,
 			Message: fmt.Sprintf("cannot load API configuration %s", o.configPath), Evidence: []string{sanitize(err.Error())},
@@ -154,6 +167,7 @@ func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) 
 	}
 	client, err := kc.FromConfigWithoutValidation(*apiConfig)
 	if err != nil {
+		o.useLocalDeployConfig(ctx, state, &component, "API configuration is invalid")
 		component.Checks = append(component.Checks, Check{
 			Name: apiConfigCheck, Status: platformstatus.Unhealthy,
 			Message: "API configuration is invalid", Evidence: []string{sanitize(err.Error())},
@@ -189,9 +203,16 @@ func (o *Options) checkLocalAccess(ctx context.Context, state *diagnosticState) 
 	} else {
 		state.deployConfig = deployConfig
 		state.remote = newRemoteRunner(ctx, deployConfig.SSHConfig)
-		component.Checks = append(component.Checks, Check{
-			Name: deployConfigCheck, Status: platformstatus.Healthy, Message: "deployment configuration loaded from API",
-		})
+		if state.remote == nil {
+			component.Checks = append(component.Checks, Check{
+				Name: deployConfigCheck, Status: platformstatus.Degraded,
+				Message: "deployment configuration has no SSH settings; remote checks will be skipped",
+			})
+		} else {
+			component.Checks = append(component.Checks, Check{
+				Name: deployConfigCheck, Status: platformstatus.Healthy, Message: "deployment configuration loaded from API",
+			})
+		}
 	}
 
 	statusCtx, statusCancel := context.WithTimeout(ctx, apiTimeout)
@@ -245,6 +266,13 @@ func (o *Options) useLocalDeployConfig(ctx context.Context, state *diagnosticSta
 	}
 	state.deployConfig = deployConfig
 	state.remote = newRemoteRunner(ctx, deployConfig.SSHConfig)
+	if state.remote == nil {
+		component.Checks = append(component.Checks, Check{
+			Name: deployConfigCheck, Status: platformstatus.Degraded,
+			Message: reason + "; local deployment configuration has no SSH settings; remote checks will be skipped",
+		})
+		return
+	}
 	component.Checks = append(component.Checks, Check{
 		Name: deployConfigCheck, Status: platformstatus.Degraded,
 		Message: reason + "; using local deployment configuration cache",

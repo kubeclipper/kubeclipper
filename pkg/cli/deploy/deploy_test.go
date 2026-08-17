@@ -43,7 +43,7 @@ func (c *fakeEtcdHealthClient) Get(_ context.Context, key string, _ ...clientv3.
 	return &clientv3.GetResponse{}, c.getErr
 }
 
-func (c *fakeEtcdHealthClient) Close() error {
+func (*fakeEtcdHealthClient) Close() error {
 	return nil
 }
 

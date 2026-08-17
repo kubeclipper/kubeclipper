@@ -91,12 +91,6 @@ func (s *APIServer) kcServerStatus(ctx context.Context) platformstatus.Component
 			}
 			return platformstatus.Healthy, "active leader is ready"
 		}),
-		timedCheck("operation-api", func() (platformstatus.Status, string) {
-			if s.operationV2Store == nil {
-				return platformstatus.Unknown, "Operation API storage is unavailable"
-			}
-			return platformstatus.Healthy, "Operation API storage ready"
-		}),
 		timedCheck("static-resource", func() (platformstatus.Status, string) {
 			if s.staticResourceService == nil {
 				return platformstatus.Unknown, "resource service status is unavailable"
@@ -189,7 +183,7 @@ func (s *APIServer) kcEtcdStatus(ctx context.Context) platformstatus.Component {
 		}
 	}
 	component.DurationMillis = time.Since(startedAt).Milliseconds()
-	component.Status, component.Message = aggregateCount(healthy, len(endpoints), "endpoints healthy", false)
+	component.Status, component.Message = aggregateEtcdEndpoints(healthy, len(endpoints))
 	return component
 }
 
@@ -340,6 +334,20 @@ func aggregateCount(
 		return platformstatus.Unhealthy, message
 	default:
 		return platformstatus.Degraded, message
+	}
+}
+
+func aggregateEtcdEndpoints(healthy, total int) (status platformstatus.Status, message string) {
+	if total == 0 {
+		return platformstatus.Unknown, "no endpoints configured"
+	}
+	switch healthy {
+	case total:
+		return platformstatus.Healthy, "etcd is healthy"
+	case 0:
+		return platformstatus.Unhealthy, "etcd is unavailable"
+	default:
+		return platformstatus.Degraded, "some etcd endpoints are unavailable"
 	}
 }
 
