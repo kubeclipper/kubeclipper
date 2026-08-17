@@ -30,7 +30,7 @@ func testStatus() *platformstatus.PlatformStatus {
 		CheckedAt:  time.Date(2026, 7, 29, 8, 30, 12, 0, time.UTC),
 		Components: []platformstatus.Component{
 			{Name: "kc-server", Status: platformstatus.Healthy, Message: "all server subsystems ready", Checks: []platformstatus.Check{{Name: "api", Status: platformstatus.Healthy, Message: "API ready"}}},
-			{Name: "kc-etcd", Status: platformstatus.Healthy, Message: "3/3 endpoints healthy"},
+			{Name: "kc-etcd", Status: platformstatus.Healthy, Message: "etcd is healthy"},
 			{Name: "kc-agent", Status: platformstatus.Degraded, Message: "7/8 agents running"},
 		},
 	}

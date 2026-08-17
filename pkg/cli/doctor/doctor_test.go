@@ -46,6 +46,7 @@ func TestServiceState(t *testing.T) {
 		{name: "running", output: serviceOutput("active", "running", "enabled"), wantStatus: platformstatus.Healthy},
 		{name: "stopped", output: serviceOutput("inactive", "dead", "enabled"), wantStatus: platformstatus.Unhealthy},
 		{name: "disabled", output: serviceOutput("active", "running", "disabled"), wantStatus: platformstatus.Degraded},
+		{name: "restarting", output: serviceOutput("activating", "auto-restart", "enabled"), wantStatus: platformstatus.Degraded},
 		{name: "ssh failure", err: errors.New("connection refused"), wantStatus: platformstatus.Unknown},
 	}
 	for _, test := range tests {
@@ -57,7 +58,16 @@ func TestServiceState(t *testing.T) {
 			if check.Status != test.wantStatus {
 				t.Fatalf("status = %s, want %s", check.Status, test.wantStatus)
 			}
+			if test.name == "restarting" && !strings.Contains(check.Message, "restarting") {
+				t.Fatalf("message = %q, want restarting state", check.Message)
+			}
 		})
+	}
+}
+
+func TestNewRemoteRunnerRequiresSSHSettings(t *testing.T) {
+	if runner := newRemoteRunner(context.Background(), nil); runner != nil {
+		t.Fatalf("newRemoteRunner(nil) = %#v, want nil", runner)
 	}
 }
 
@@ -175,6 +185,28 @@ func TestPadRightUsesDisplayCharacters(t *testing.T) {
 	}
 }
 
+func TestProgressReporterShowsEachCompletedComponent(t *testing.T) {
+	var output bytes.Buffer
+	progress := &progressReporter{out: &output, enabled: true}
+	progress.start("kc-server")
+	progress.complete(Component{
+		Name: "kc-server", Status: platformstatus.Healthy, Message: "all server subsystems ready",
+	})
+
+	text := output.String()
+	for _, expected := range []string{
+		"Running KubeClipper diagnostics...",
+		"checking...",
+		"kc-server",
+		"Healthy",
+		"all server subsystems ready",
+	} {
+		if !strings.Contains(text, expected) {
+			t.Errorf("progress output does not contain %q:\n%s", expected, text)
+		}
+	}
+}
+
 func TestPrintReportExpandsOnlyProblems(t *testing.T) {
 	report := newReport(time.Now(), time.Second, []Component{
 		{Name: "kcctl", Message: "API reachable", Checks: []Check{{Name: "api", Status: platformstatus.Healthy, Message: "healthy detail"}}},
@@ -194,7 +226,7 @@ func TestPrintReportExpandsOnlyProblems(t *testing.T) {
 		"[FAIL] kc-agent",
 		"Problems",
 		"ActiveState=inactive",
-		"Summary: 1 passed, 1 failed",
+		"Summary: 1 passed, 0 warnings, 1 failed, 0 skipped",
 	} {
 		if !strings.Contains(text, expected) {
 			t.Errorf("output does not contain %q:\n%s", expected, text)
@@ -202,6 +234,20 @@ func TestPrintReportExpandsOnlyProblems(t *testing.T) {
 	}
 	if strings.Contains(text, "healthy detail") {
 		t.Errorf("healthy check details should be collapsed:\n%s", text)
+	}
+}
+
+func TestCountChecksSeparatesWarnings(t *testing.T) {
+	report := newReport(time.Now(), 0, []Component{{Checks: []Check{
+		{Status: platformstatus.Healthy},
+		{Status: platformstatus.Degraded},
+		{Status: platformstatus.Unhealthy},
+		{Status: platformstatus.Unknown},
+		{Status: platformstatus.Skipped},
+	}}})
+	passed, warnings, failed, skipped := countChecks(report)
+	if passed != 1 || warnings != 1 || failed != 2 || skipped != 1 {
+		t.Fatalf("countChecks() = (%d, %d, %d, %d), want (1, 1, 2, 1)", passed, warnings, failed, skipped)
 	}
 }
 
@@ -252,6 +298,42 @@ audit:
 	if !config.Agents.ExistsByID("worker-1") {
 		t.Fatalf("agent was not loaded: %v", config.Agents)
 	}
+}
+
+func TestDoctorUsesLocalDeployConfigWhenAPIConfigIsUnavailable(t *testing.T) {
+	deployConfigPath := filepath.Join(t.TempDir(), "deploy-config.yaml")
+	data := []byte(`
+serverIPs: [192.0.2.10]
+ssh:
+  user: root
+  port: 22
+`)
+	if err := os.WriteFile(deployConfigPath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	o := &Options{
+		configPath:       filepath.Join(t.TempDir(), "missing-config"),
+		deployConfigPath: deployConfigPath,
+	}
+	state := &diagnosticState{}
+	component := o.checkLocalAccess(context.Background(), state)
+
+	if state.deployConfig == nil || state.remote == nil {
+		t.Fatalf("local deploy config was not loaded: state=%#v", state)
+	}
+	if check := componentCheck(component, deployConfigCheck); check == nil || check.Status != platformstatus.Degraded {
+		t.Fatalf("deploy config fallback check = %#v", check)
+	}
+}
+
+func componentCheck(component Component, name string) *Check {
+	for i := range component.Checks {
+		if component.Checks[i].Name == name {
+			return &component.Checks[i]
+		}
+	}
+	return nil
 }
 
 func serviceOutput(active, sub, unitFile string) string {

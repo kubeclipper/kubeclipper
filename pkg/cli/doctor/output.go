@@ -46,11 +46,12 @@ func printReport(out io.Writer, report *Report) error {
 	if err := printProblems(out, report, style); err != nil {
 		return err
 	}
-	passed, failed, skipped := countChecks(report)
-	_, err := fmt.Fprintf(out, "\n%s%s%s, %s, %s\n",
+	passed, warnings, failed, skipped := countChecks(report)
+	_, err := fmt.Fprintf(out, "\n%s%s%s, %s, %s, %s\n",
 		style.label("Summary"),
 		style.separator(),
 		style.checkCount(platformstatus.Healthy, passed, "passed"),
+		style.checkCount(platformstatus.Degraded, warnings, "warnings"),
 		style.checkCount(platformstatus.Unhealthy, failed, "failed"),
 		style.checkCount(platformstatus.Skipped, skipped, "skipped"),
 	)
@@ -162,7 +163,7 @@ func printDetailLines(out io.Writer, style outputStyle, heading string, lines []
 	return nil
 }
 
-func countChecks(report *Report) (passed, failed, skipped int) {
+func countChecks(report *Report) (passed, warnings, failed, skipped int) {
 	for componentIndex := range report.Components {
 		component := &report.Components[componentIndex]
 		for checkIndex := range component.Checks {
@@ -170,6 +171,8 @@ func countChecks(report *Report) (passed, failed, skipped int) {
 			switch check.Status {
 			case platformstatus.Healthy:
 				passed++
+			case platformstatus.Degraded:
+				warnings++
 			case platformstatus.Skipped:
 				skipped++
 			default:
@@ -177,7 +180,7 @@ func countChecks(report *Report) (passed, failed, skipped int) {
 			}
 		}
 	}
-	return passed, failed, skipped
+	return passed, warnings, failed, skipped
 }
 
 func statusMarker(status platformstatus.Status, terminal bool) string {
@@ -217,6 +220,48 @@ func padRight(value string, width int) string {
 
 type outputStyle struct {
 	enabled bool
+}
+
+type progressReporter struct {
+	out     io.Writer
+	style   outputStyle
+	enabled bool
+	started time.Time
+}
+
+func newProgressReporter(out io.Writer) *progressReporter {
+	return &progressReporter{
+		out:     out,
+		style:   newOutputStyle(out),
+		enabled: writerIsTerminal(out) && os.Getenv("TERM") != "dumb",
+	}
+}
+
+func (p *progressReporter) start(name string) {
+	if !p.enabled {
+		return
+	}
+	if p.started.IsZero() {
+		_, _ = fmt.Fprintln(p.out, "Running KubeClipper diagnostics...")
+	}
+	p.started = time.Now()
+	_, _ = fmt.Fprintf(p.out, "\r\x1b[2K  %s %-14s checking...", p.style.muted("..."), name)
+}
+
+func (p *progressReporter) complete(component Component) {
+	if !p.enabled {
+		return
+	}
+	duration := formatDuration(time.Since(p.started).Milliseconds())
+	status := statusMarker(component.Status, true) + " " + string(component.Status)
+	_, _ = fmt.Fprintf(p.out, "\r\x1b[2K  %s  %-14s %s %s\n",
+		p.style.status(component.Status, status), component.Name, component.Message, p.style.muted("("+duration+")"))
+}
+
+func (p *progressReporter) finish() {
+	if p.enabled && !p.started.IsZero() {
+		_, _ = fmt.Fprintln(p.out)
+	}
 }
 
 func newOutputStyle(out io.Writer) outputStyle {
