@@ -73,6 +73,9 @@ type serviceState struct {
 }
 
 func newRemoteRunner(ctx context.Context, sshConfig *sshutils.SSH) *remoteRunner {
+	if sshConfig == nil {
+		return nil
+	}
 	config := *sshConfig
 	timeout := sshConnectionTimeout
 	config.ConnectionTimeout = &timeout
@@ -121,12 +124,12 @@ func (r *remoteRunner) service(host, unit string) Check {
 	case state.ActiveState == "failed" || state.ActiveState == "inactive":
 		check.Status = platformstatus.Unhealthy
 		check.Message = fmt.Sprintf("%s on %s is not running", unit, host)
-	case state.ActiveState != "active":
-		check.Status = platformstatus.Degraded
-		check.Message = fmt.Sprintf("%s on %s is %s", unit, host, state.ActiveState)
 	case state.SubState == "auto-restart" || state.ActiveState == "activating":
 		check.Status = platformstatus.Degraded
 		check.Message = fmt.Sprintf("%s on %s is restarting", unit, host)
+	case state.ActiveState != "active":
+		check.Status = platformstatus.Degraded
+		check.Message = fmt.Sprintf("%s on %s is %s", unit, host, state.ActiveState)
 	case state.UnitFileState == "disabled":
 		check.Status = platformstatus.Degraded
 		check.Message = fmt.Sprintf("%s on %s is running but disabled", unit, host)

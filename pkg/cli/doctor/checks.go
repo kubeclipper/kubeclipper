@@ -35,7 +35,7 @@ import (
 func checkKCServer(_ context.Context, state *diagnosticState) Component {
 	component := Component{Name: "kc-server"}
 	statusComponent := platformComponent(state.platform, "kc-server")
-	for _, name := range []string{"api", "controller-manager", "operation-api", "static-resource"} {
+	for _, name := range []string{"api", "controller-manager", "static-resource"} {
 		check := platformCheck(statusComponent, name)
 		if check == nil {
 			status := platformstatus.Unknown
