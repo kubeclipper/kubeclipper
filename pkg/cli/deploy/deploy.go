@@ -41,6 +41,7 @@ import (
 	"text/template"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/component-base/version"
 
 	"github.com/kubeclipper/kubeclipper/pkg/utils/strutil"
@@ -78,9 +79,10 @@ import (
 )
 
 const (
-	deployExamplePkg       = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
-	kcServerClientIdentity = "system:kc-server"
-	longDescription        = `
+	deployExamplePkg          = constatns.KubeClipperReleaseBaseURL + "/v1.4.0/kc-amd64.tar.gz"
+	kcServerClientIdentity    = "system:kc-server"
+	serviceHealthCheckTimeout = 5 * time.Second
+	longDescription           = `
   Deploy Kubeclipper Platform from deploy-config.yaml or cmd flags.
 
   Kubeclipper Platform must have one kc-server node at lease, kc-server use etcd as db backend.
@@ -227,6 +229,9 @@ func (d *DeployOptions) Complete() error {
 	if err = d.deployConfig.Complete(); err != nil {
 		return err
 	}
+	if err = d.generateAuthenticationJWTSecret(); err != nil {
+		return err
+	}
 	if d.deployConfig.Pkg == "" {
 		v := os.Getenv("KC_VERSION")
 		var ok bool
@@ -273,6 +278,15 @@ func (d *DeployOptions) Complete() error {
 		logger.Infof("run in aio mode.")
 	}
 
+	return nil
+}
+
+func (d *DeployOptions) generateAuthenticationJWTSecret() error {
+	secret, err := password.Generate(24, 5, 0, false, true)
+	if err != nil {
+		return fmt.Errorf("generate authentication JWT secret: %w", err)
+	}
+	d.deployConfig.AuthenticationOpts.JwtSecret = secret
 	return nil
 }
 
@@ -325,8 +339,6 @@ func (d *DeployOptions) preRun() {
 		}
 		d.servers[sip] = hostname
 	}
-	res, _ := password.Generate(24, 5, 0, false, true)
-	d.deployConfig.JWTSecret = res
 	d.dumpConfig()
 }
 
@@ -601,11 +613,11 @@ func (d *DeployOptions) RunDeploy() error {
 	d.sendPackage()
 	logger.Infof("------ Install kc-etcd ------")
 	d.deployEtcd()
-	// TODO: add check etcd status instead of time.sleep
-	time.Sleep(5 * time.Second)
+	if err := d.waitEtcdReady(); err != nil {
+		return err
+	}
 	logger.Infof("------ Install kc-server ------")
 	d.deployKcServer()
-	time.Sleep(5 * time.Second)
 	logger.Infof("------ Install kc-agent ------")
 	d.deployKcAgent()
 	logger.Infof("------ Install kc-console ------")
@@ -775,6 +787,106 @@ func (d *DeployOptions) deployEtcd() {
 	}
 }
 
+type etcdHealthClient interface {
+	Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error)
+	Close() error
+}
+
+func (d *DeployOptions) waitEtcdReady() error {
+	tlsConfig, err := d.etcdHealthTLSConfig()
+	if err != nil {
+		return fmt.Errorf("load etcd health check credentials: %w", err)
+	}
+
+	endpoints := d.etcdEndpoints()
+	clients, err := newEtcdHealthClients(endpoints, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("create etcd health check clients: %w", err)
+	}
+	defer closeEtcdHealthClients(clients)
+
+	ctx, cancel := context.WithTimeout(context.Background(), d.deployConfig.KCServerHealthCheckTimeout)
+	defer cancel()
+	if err := retryFunc(ctx, 3*time.Second, "waitEtcdReady", "cluster", func(string) error {
+		return checkEtcdEndpoints(ctx, clients, endpoints)
+	}); err != nil {
+		return fmt.Errorf("etcd cluster is not ready: %w", err)
+	}
+	return nil
+}
+
+func (d *DeployOptions) etcdEndpoints() []string {
+	endpoints := make([]string, 0, len(d.deployConfig.ServerIPs))
+	for _, host := range d.deployConfig.ServerIPs {
+		endpoints = append(endpoints, net.JoinHostPort(host, strconv.Itoa(d.deployConfig.EtcdConfig.ClientPort)))
+	}
+	return endpoints
+}
+
+func (d *DeployOptions) etcdHealthTLSConfig() (*tls.Config, error) {
+	basePath := filepath.Join(options.HomeDIR, options.DefaultPath)
+	clientCert, err := tls.LoadX509KeyPair(
+		filepath.Join(basePath, options.DefaultEtcdPKIPath, options.EtcdHealthCheck+".crt"),
+		filepath.Join(basePath, options.DefaultEtcdPKIPath, options.EtcdHealthCheck+".key"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	caCert, err := os.ReadFile(filepath.Join(basePath, options.DefaultCaPath, options.Ca+".crt"))
+	if err != nil {
+		return nil, err
+	}
+	rootCAs := x509.NewCertPool()
+	if !rootCAs.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("parse etcd CA certificate")
+	}
+
+	return &tls.Config{
+		Certificates: []tls.Certificate{clientCert},
+		RootCAs:      rootCAs,
+		MinVersion:   tls.VersionTLS12,
+	}, nil
+}
+
+func newEtcdHealthClients(endpoints []string, tlsConfig *tls.Config) ([]etcdHealthClient, error) {
+	clients := make([]etcdHealthClient, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		client, err := clientv3.New(clientv3.Config{
+			Endpoints:   []string{endpoint},
+			DialTimeout: serviceHealthCheckTimeout,
+			TLS:         tlsConfig,
+		})
+		if err != nil {
+			closeEtcdHealthClients(clients)
+			return nil, err
+		}
+		clients = append(clients, client)
+	}
+	return clients, nil
+}
+
+func closeEtcdHealthClients(clients []etcdHealthClient) {
+	for _, client := range clients {
+		_ = client.Close()
+	}
+}
+
+func checkEtcdEndpoints(ctx context.Context, clients []etcdHealthClient, endpoints []string) error {
+	if len(clients) != len(endpoints) {
+		return fmt.Errorf("etcd health client count %d does not match endpoint count %d", len(clients), len(endpoints))
+	}
+	for i, endpoint := range endpoints {
+		requestCtx, cancel := context.WithTimeout(ctx, serviceHealthCheckTimeout)
+		_, err := clients[i].Get(requestCtx, "health")
+		cancel()
+		if err != nil {
+			return fmt.Errorf("endpoint %s is unhealthy: %w", endpoint, err)
+		}
+	}
+	return nil
+}
+
 func (d *DeployOptions) getEtcdTemplateContent(ip string) string {
 	tmpl, err := template.New("text").Parse(config.EtcdServiceTmpl)
 	if err != nil {
@@ -900,7 +1012,7 @@ func (d *DeployOptions) waitServerRunning(host string) error {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{Transport: tr, Timeout: serviceHealthCheckTimeout}
 
 	addr := fmt.Sprintf("http://%s:%v/healthz", host, d.deployConfig.ServerPort)
 	if d.deployConfig.TLS {
@@ -923,17 +1035,21 @@ func (d *DeployOptions) waitServerRunning(host string) error {
 }
 
 func retryFunc(ctx context.Context, intervalTime time.Duration, funcName, host string, fn func(host string) error) error {
+	ticker := time.NewTicker(intervalTime)
+	defer ticker.Stop()
+
 	for {
+		err := fn(host)
+		if err == nil {
+			return nil
+		}
+		logger.Infof("function '%s' running error: %s. about to enter retry", funcName, err.Error())
+
 		select {
 		case <-ctx.Done():
 			logger.Warnf("retry function '%s' timeout...", funcName)
 			return ctx.Err()
-		case <-time.After(intervalTime):
-			err := fn(host)
-			if err == nil {
-				return nil
-			}
-			logger.Infof("function '%s' running error: %s. about to enter retry", funcName, err.Error())
+		case <-ticker.C:
 		}
 	}
 }

@@ -265,7 +265,6 @@ type DeployConfig struct {
 	StaticServerPath           string                         `json:"staticServerPath" yaml:"staticServerPath,omitempty"`
 	Pkg                        string                         `json:"pkg" yaml:"pkg,omitempty"`
 	ConsolePort                int                            `json:"consolePort" yaml:"consolePort,omitempty"`
-	JWTSecret                  string                         `json:"jwtSecret" yaml:"jwtSecret,omitempty"`
 	AuditOpts                  *option.AuditOptions           `json:"audit" yaml:"audit,omitempty"`
 	OpLog                      *OpLog                         `json:"opLog" yaml:"opLog,omitempty"`
 	ImageProxy                 *ImageProxy                    `json:"imageProxy" yaml:"imageProxy,omitempty"`
@@ -469,8 +468,7 @@ func (c *DeployConfig) GetKcServerConfigTemplateContent(ip string) (string, erro
 		data["TLSPrivateKey"] = filepath.Join(DefaultKcServerConfigPath, DefaultKCPKIPath, fmt.Sprintf("%s.key", KCServer))
 		data["CACertFile"] = filepath.Join(DefaultKcServerConfigPath, DefaultCaPath, "ca.crt")
 	}
-	// JWTSecret is injected from the generated deploy config.
-	data["JwtSecret"] = c.JWTSecret
+	data["JwtSecret"] = c.AuthenticationOpts.JwtSecret
 	data["InitialPassword"] = c.AuthenticationOpts.InitialPassword
 	data["RetentionPeriod"] = c.AuditOpts.RetentionPeriod
 	data["MaximumEntries"] = c.AuditOpts.MaximumEntries

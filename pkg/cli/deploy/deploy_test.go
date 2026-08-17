@@ -19,16 +19,33 @@
 package deploy
 
 import (
+	"context"
 	"crypto/x509"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
+
+type fakeEtcdHealthClient struct {
+	getErr error
+	keys   []string
+}
+
+func (c *fakeEtcdHealthClient) Get(_ context.Context, key string, _ ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	c.keys = append(c.keys, key)
+	return &clientv3.GetResponse{}, c.getErr
+}
+
+func (c *fakeEtcdHealthClient) Close() error {
+	return nil
+}
 
 func TestPrecheckServiceDoesNotIgnoreFailureWithAssumeYes(t *testing.T) {
 	originalAssumeYes := options.AssumeYes
@@ -46,6 +63,66 @@ func TestPrecheckServiceDoesNotIgnoreFailureWithAssumeYes(t *testing.T) {
 func TestTimeSyncPrecheckSupportsSystemdTimesyncd(t *testing.T) {
 	if !strings.Contains(timeSyncPrecheckCommand, "systemd-timesyncd") {
 		t.Fatalf("time synchronization precheck must support systemd-timesyncd: %q", timeSyncPrecheckCommand)
+	}
+}
+
+func TestCheckEtcdEndpoints(t *testing.T) {
+	endpoints := []string{"192.0.2.10:12379", "192.0.2.11:12379"}
+	t.Run("all endpoints healthy", func(t *testing.T) {
+		clients := []*fakeEtcdHealthClient{{}, {}}
+		if err := checkEtcdEndpoints(context.Background(), []etcdHealthClient{clients[0], clients[1]}, endpoints); err != nil {
+			t.Fatalf("checkEtcdEndpoints() error = %v", err)
+		}
+		for _, client := range clients {
+			if !reflect.DeepEqual(client.keys, []string{"health"}) {
+				t.Fatalf("health check keys = %v, want [health]", client.keys)
+			}
+		}
+	})
+
+	t.Run("endpoint unhealthy", func(t *testing.T) {
+		clients := []etcdHealthClient{&fakeEtcdHealthClient{}, &fakeEtcdHealthClient{getErr: errors.New("connection refused")}}
+		err := checkEtcdEndpoints(context.Background(), clients, endpoints)
+		if err == nil || !strings.Contains(err.Error(), endpoints[1]) {
+			t.Fatalf("checkEtcdEndpoints() error = %v, want endpoint %q", err, endpoints[1])
+		}
+	})
+}
+
+func TestDeployOptionsEtcdEndpoints(t *testing.T) {
+	d := NewDeployOptions(options.IOStreams{})
+	d.deployConfig.ServerIPs = []string{"192.0.2.10", "192.0.2.11"}
+	d.deployConfig.EtcdConfig.ClientPort = 22379
+
+	if got, want := d.etcdEndpoints(), []string{"192.0.2.10:22379", "192.0.2.11:22379"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("etcdEndpoints() = %v, want %v", got, want)
+	}
+}
+
+func TestDeployOptionsCompleteGeneratesAuthenticationJWTSecret(t *testing.T) {
+	d := NewDeployOptions(options.IOStreams{})
+	d.deployConfig.ServerIPs = []string{"192.0.2.10"}
+	d.deployConfig.AuthenticationOpts.JwtSecret = ""
+
+	if err := d.Complete(); err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+	if d.deployConfig.AuthenticationOpts.JwtSecret == "" {
+		t.Fatal("Complete() did not generate authentication JWT secret")
+	}
+}
+
+func TestKcServerConfigUsesAuthenticationJWTSecret(t *testing.T) {
+	d := NewDeployOptions(options.IOStreams{})
+	d.deployConfig.ServerIPs = []string{"192.0.2.10"}
+	d.deployConfig.AuthenticationOpts.JwtSecret = "authentication-secret"
+
+	content, err := d.deployConfig.GetKcServerConfigTemplateContent("192.0.2.10")
+	if err != nil {
+		t.Fatalf("GetKcServerConfigTemplateContent() error = %v", err)
+	}
+	if !strings.Contains(content, "jwtSecret: authentication-secret") {
+		t.Fatalf("server config does not use authentication JWT secret:\n%s", content)
 	}
 }
 
