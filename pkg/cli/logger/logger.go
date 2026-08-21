@@ -316,6 +316,28 @@ func Errorf(format string, args ...interface{}) {
 	_logging.printf(errorLog, format, args...)
 }
 
+// ColorizeError formats structured CLI errors for terminal output while preserving
+// plain text when color output is disabled.
+func ColorizeError(message string) string {
+	if !_logging.Colorful {
+		return message
+	}
+	lines := strings.Split(message, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "deploy precheck failed:"):
+			lines[i] = color.RedString(line)
+		case strings.HasPrefix(trimmed, "clean old environment before deploying"):
+			lines[i] = color.YellowString(line)
+		case strings.HasPrefix(trimmed, "check:"), strings.HasPrefix(trimmed, "node:"),
+			strings.HasPrefix(trimmed, "reason:"), strings.HasPrefix(trimmed, "state:"):
+			lines[i] = color.CyanString(line)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func Fatal(args ...interface{}) {
 	_logging.println(fatalLog, args...)
 }

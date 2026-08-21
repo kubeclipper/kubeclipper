@@ -53,10 +53,47 @@ func TestPrecheckServiceDoesNotIgnoreFailureWithAssumeYes(t *testing.T) {
 	t.Cleanup(func() { options.AssumeYes = originalAssumeYes })
 
 	d := NewDeployOptions(options.IOStreams{})
-	if d.precheckService("test", []string{"192.0.2.1"}, func(*sshutils.SSH, string) error {
+	err := d.precheckService("test", []string{"192.0.2.1"}, func(*sshutils.SSH, string) error {
 		return errors.New("precheck failed")
-	}) {
+	})
+	if err == nil {
 		t.Fatal("precheckService() succeeded with --assumeyes after a precheck failure")
+	}
+	if !strings.Contains(err.Error(), "check: test") || !strings.Contains(err.Error(), "node: [192.0.2.1]") || !strings.Contains(err.Error(), "reason: precheck failed") {
+		t.Fatalf("precheckService() error = %v, want check, node, and root cause", err)
+	}
+}
+
+func TestDeployPrecheckErrorFormatsServiceFailure(t *testing.T) {
+	err := (&deployPrecheckError{cause: &precheckFailure{
+		check: "kc-etcd",
+		node:  "[server+agent@172.16.131.208]",
+		cause: &existingServiceError{
+			name:  "kc-etcd",
+			state: systemdUnitState{load: "loaded", active: "active", sub: "running"},
+		},
+	}}).Error()
+	want := "deploy precheck failed:\n" +
+		"  check: kc-etcd\n" +
+		"  node: [server+agent@172.16.131.208]\n" +
+		"  reason: kc-etcd.service already exists\n" +
+		"  state: load=loaded, active=active, sub=running\n" +
+		"clean old environment before deploying"
+	if err != want {
+		t.Fatalf("deploy precheck error = %q, want %q", err, want)
+	}
+}
+
+func TestParseSystemdUnitState(t *testing.T) {
+	state, err := parseSystemdUnitState("loaded\nactive\nrunning\n")
+	if err != nil {
+		t.Fatalf("parseSystemdUnitState() error = %v", err)
+	}
+	if got, want := state, (systemdUnitState{load: "loaded", active: "active", sub: "running"}); got != want {
+		t.Fatalf("parseSystemdUnitState() = %#v, want %#v", got, want)
+	}
+	if _, err := parseSystemdUnitState("loaded\nactive"); err == nil {
+		t.Fatal("parseSystemdUnitState() succeeded with incomplete state")
 	}
 }
 

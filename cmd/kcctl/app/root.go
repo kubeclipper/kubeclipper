@@ -68,9 +68,11 @@ kcctl controls the Kubeclipper platform.`
 
 func NewKubeClipperCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
-		Use:   "kcctl",
-		Short: "kcctl is kubeclipper command line tool",
-		Long:  longDescription,
+		Use:           "kcctl",
+		Short:         "kcctl is kubeclipper command line tool",
+		Long:          longDescription,
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
 		},
