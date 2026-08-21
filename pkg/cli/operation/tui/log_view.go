@@ -51,6 +51,8 @@ type LogModel struct {
 	cursor     int
 	followMode bool
 	lastOffset map[string]int64
+	logContent map[string]string
+	displayed  string
 	viewport   viewport.Model
 	rawContent string
 	width      int
@@ -68,7 +70,7 @@ func NewLogModel(client *kc.Client, op *operationsv1alpha1.Operation, width, hei
 	logPanelWidth = max(minLogPanelWidth, logPanelWidth)
 	return LogModel{
 		client: client, operation: op, steps: buildStepEntries(op, nil),
-		lastOffset: make(map[string]int64), viewport: viewport.New(logPanelWidth, height-3),
+		lastOffset: make(map[string]int64), logContent: make(map[string]string), viewport: viewport.New(logPanelWidth, height-3),
 		width: width, height: height,
 	}
 }
@@ -193,10 +195,25 @@ func (m *LogModel) currentTask() *TaskEntry {
 	return &m.steps[m.cursor].Tasks[len(m.steps[m.cursor].Tasks)-1]
 }
 
+func (m *LogModel) showCurrentLog() bool {
+	task := m.currentTask()
+	if task == nil {
+		m.displayed = ""
+		m.rawContent = "(no Task has been created for this step)\n"
+		m.viewport.SetContent(m.rawContent)
+		return false
+	}
+	m.displayed = task.Name
+	m.rawContent = m.logContent[task.Name]
+	m.viewport.SetContent(m.rawContent)
+	m.viewport.GotoTop()
+	return true
+}
+
 func (m *LogModel) fetchCurrentLogCmd() tea.Cmd {
 	task := m.currentTask()
 	if task == nil {
-		return func() tea.Msg { return logFetchedMsg{content: "(no Task has been created for this step)\n"} }
+		return nil
 	}
 	offset := m.lastOffset[task.Name]
 	return func() tea.Msg {
@@ -240,14 +257,15 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 		m.viewport.Width = maxInt(minLogPanelWidth, m.width-m.width*35/100-2)
 		m.viewport.Height = m.height - 3
 	case logFetchedMsg:
-		if msg.content != "" {
-			m.rawContent += msg.content
-			m.viewport.SetContent(m.rawContent)
-			if msg.key != "" {
-				m.lastOffset[msg.key] = msg.offset
-			}
-			if m.followMode {
-				m.viewport.GotoBottom()
+		if msg.content != "" && msg.key != "" {
+			m.logContent[msg.key] += msg.content
+			m.lastOffset[msg.key] = msg.offset
+			if msg.key == m.displayed {
+				m.rawContent = m.logContent[msg.key]
+				m.viewport.SetContent(m.rawContent)
+				if m.followMode {
+					m.viewport.GotoBottom()
+				}
 			}
 		}
 	case tickMsg:
@@ -261,7 +279,11 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 			if m.cursor >= len(m.steps) {
 				m.cursor = maxInt(0, len(m.steps)-1)
 			}
-			if m.rawContent == "" {
+			if m.currentTask() == nil || m.currentTask().Name != m.displayed {
+				if m.showCurrentLog() {
+					cmds = append(cmds, m.fetchCurrentLogCmd())
+				}
+			} else if m.rawContent == "" {
 				cmds = append(cmds, m.fetchCurrentLogCmd())
 			}
 			if msg.operation.Status.Phase.IsTerminal() {
@@ -273,14 +295,16 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 		case DefaultKeyMap.Up, "k":
 			if m.cursor > 0 {
 				m.cursor--
-				m.resetLog()
-				cmds = append(cmds, m.fetchCurrentLogCmd())
+				if m.showCurrentLog() {
+					cmds = append(cmds, m.fetchCurrentLogCmd())
+				}
 			}
 		case DefaultKeyMap.Down, "j":
 			if m.cursor < len(m.steps)-1 {
 				m.cursor++
-				m.resetLog()
-				cmds = append(cmds, m.fetchCurrentLogCmd())
+				if m.showCurrentLog() {
+					cmds = append(cmds, m.fetchCurrentLogCmd())
+				}
 			}
 		case DefaultKeyMap.PageUp:
 			m.viewport.HalfPageUp()
@@ -305,8 +329,6 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 	}
 	return m, tea.Batch(cmds...)
 }
-
-func (m *LogModel) resetLog() { m.rawContent = ""; m.viewport.SetContent("") }
 
 type backMsg struct{}
 

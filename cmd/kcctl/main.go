@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app"
+	"github.com/kubeclipper/kubeclipper/pkg/cli/logger"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 			code = exitError.ExitCode()
 		}
 		if err.Error() != "" {
-			_, _ = fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, logger.ColorizeError(err.Error()))
 		}
 		os.Exit(code)
 	}
