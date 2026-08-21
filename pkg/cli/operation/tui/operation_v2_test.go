@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
@@ -43,5 +44,54 @@ func TestTaskStatusMarks(t *testing.T) {
 	}
 	if stepStatusMark(string(operationsv1alpha1.TaskTimedOut)) != StepFailedMark {
 		t.Fatal("TimedOut mark")
+	}
+}
+
+func TestLogModelRestoresTaskLogAfterNavigation(t *testing.T) {
+	m := NewLogModel(nil, &operationsv1alpha1.Operation{}, 100, 20)
+	m.steps = []StepEntry{
+		{ID: "first", Tasks: []TaskEntry{{Name: "first-task"}}},
+		{ID: "second", Tasks: []TaskEntry{{Name: "second-task"}}},
+	}
+	if !m.showCurrentLog() {
+		t.Fatal("expected first task to be selected")
+	}
+
+	m, _ = m.Update(logFetchedMsg{content: "first log\n", offset: 10, key: "first-task"})
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(logFetchedMsg{content: "second log\n", offset: 11, key: "second-task"})
+	m.viewport.SetContent(strings.Repeat("second log\n", 50))
+	m.viewport.GotoBottom()
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+
+	if m.rawContent != "first log\n" {
+		t.Fatalf("restored log = %q, want first task log", m.rawContent)
+	}
+	if m.lastOffset["first-task"] != 10 {
+		t.Fatalf("first task offset = %d, want 10", m.lastOffset["first-task"])
+	}
+	if m.viewport.YOffset != 0 {
+		t.Fatalf("viewport offset = %d, want top of restored log", m.viewport.YOffset)
+	}
+}
+
+func TestLogModelIgnoresStaleLogForAnotherTask(t *testing.T) {
+	m := NewLogModel(nil, &operationsv1alpha1.Operation{}, 100, 20)
+	m.steps = []StepEntry{
+		{ID: "first", Tasks: []TaskEntry{{Name: "first-task"}}},
+		{ID: "second", Tasks: []TaskEntry{{Name: "second-task"}}},
+	}
+	if !m.showCurrentLog() {
+		t.Fatal("expected first task to be selected")
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(logFetchedMsg{content: "first log\n", offset: 10, key: "first-task"})
+
+	if m.rawContent != "" {
+		t.Fatalf("displayed log = %q, want empty second task log", m.rawContent)
+	}
+	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.rawContent != "first log\n" {
+		t.Fatalf("restored log = %q, want stale first task response", m.rawContent)
 	}
 }

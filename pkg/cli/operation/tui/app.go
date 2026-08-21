@@ -70,9 +70,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.listModel = NewListModel(m.operations, m.width, m.height)
-		if m.currentView == viewLog {
-			m.logModel = NewLogModel(m.client, m.logModel.operation, m.width, m.height)
-		}
 
 	case selectOpMsg:
 		m.currentView = viewLog
