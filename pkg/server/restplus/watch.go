@@ -58,7 +58,13 @@ func ServeWatch(watcher watch.Interface, gvk schema.GroupVersionKind, request *r
 	}
 	framer := serializer.StreamSerializer.Framer.NewFrameWriter(response.ResponseWriter)
 
-	e := streaming.NewEncoder(framer, scheme.Encoder)
+	// Encode every payload through a versioning codec: it resolves the
+	// payload's kind/apiVersion via the scheme. The storage layer builds
+	// error events (a 410 "too old resource version" Status) with an empty
+	// TypeMeta, and the bare serializer would stream them undecodable — the
+	// client fails with "Object 'Kind' is missing" instead of relisting.
+	versionedEncoder := scheme.Codecs.EncoderForVersion(scheme.Encoder, schema.GroupVersions{gvk.GroupVersion()})
+	e := streaming.NewEncoder(framer, versionedEncoder)
 
 	mediaType := serializer.MediaType
 	if mediaType != "application/json" {
@@ -67,7 +73,7 @@ func ServeWatch(watcher watch.Interface, gvk schema.GroupVersionKind, request *r
 
 	if wssstream.IsWebSocketRequest(request.Request) {
 		response.Header().Set("Content-Type", mediaType)
-		handlerWebsocket(watcher, request, response, serializer.EncodesAsText)
+		handlerWebsocket(watcher, request, response, versionedEncoder)
 		return
 	}
 
@@ -108,10 +114,7 @@ func ServeWatch(watcher watch.Interface, gvk schema.GroupVersionKind, request *r
 				return
 			}
 			obj := event.Object
-			if event.Type == watch.Bookmark {
-				obj.GetObjectKind().SetGroupVersionKind(gvk)
-			}
-			if err := scheme.Encoder.Encode(obj, buf); err != nil {
+			if err := versionedEncoder.Encode(obj, buf); err != nil {
 				HandleInternalError(response, request, fmt.Errorf("unable to encode watch object %T: %v", obj, err))
 				return
 			}
@@ -137,7 +140,9 @@ func ServeWatch(watcher watch.Interface, gvk schema.GroupVersionKind, request *r
 	}
 }
 
-func handlerWebsocket(watcher watch.Interface, request *restful.Request, response *restful.Response, encodesAsText bool) {
+func handlerWebsocket(
+	watcher watch.Interface, request *restful.Request, response *restful.Response, versionedEncoder runtime.Encoder,
+) {
 	upgrade := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024 * 1024 * 10,
@@ -210,7 +215,7 @@ func handlerWebsocket(watcher watch.Interface, request *restful.Request, respons
 				return
 			}
 			obj := event.Object
-			if err := scheme.Encoder.Encode(obj, buf); err != nil {
+			if err := versionedEncoder.Encode(obj, buf); err != nil {
 				logger.Error("unable to encode watch object", zap.Any("object", obj), zap.Error(err))
 				return
 			}
@@ -225,7 +230,7 @@ func handlerWebsocket(watcher watch.Interface, request *restful.Request, respons
 				logger.Error("unable to convert watch object", zap.Error(err))
 				return
 			}
-			if err := scheme.Encoder.Encode(outEvent, streamBuf); err != nil {
+			if err := versionedEncoder.Encode(outEvent, streamBuf); err != nil {
 				logger.Error("unable to encode event", zap.Error(err))
 				return
 			}
