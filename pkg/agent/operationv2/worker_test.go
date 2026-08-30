@@ -225,3 +225,78 @@ func TestSelectTaskResumesRunningBeforePending(t *testing.T) {
 		t.Fatalf("selected %s, want Running task %s", selected.UID, running.UID)
 	}
 }
+
+// deadlineRecordingClient captures the contexts the worker uses for its
+// one-shot List and long-lived Watch round trips.
+type deadlineRecordingClient struct {
+	listCtx  context.Context
+	watchCtx context.Context
+}
+
+func (*deadlineRecordingClient) Get(_ context.Context, _ string, _ metav1.GetOptions) (*operations.OperationTask, error) {
+	return &operations.OperationTask{}, nil
+}
+
+func (c *deadlineRecordingClient) List(ctx context.Context, _ *metav1.ListOptions) (*operations.OperationTaskList, error) {
+	c.listCtx = ctx
+	return &operations.OperationTaskList{}, nil
+}
+
+func (c *deadlineRecordingClient) Watch(ctx context.Context, _ *metav1.ListOptions) (watch.Interface, error) {
+	c.watchCtx = ctx
+	return watch.NewEmptyWatch(), nil
+}
+
+func (*deadlineRecordingClient) UpdateStatus(_ context.Context, task *operations.OperationTask) (*operations.OperationTask, error) {
+	return task, nil
+}
+
+// The rest config no longer sets a client-wide timeout because it would sever
+// the informer's long-lived watch on every interval. Instead the one-shot List
+// carries its own deadline and the Watch inherits only the worker run context.
+func TestTaskListIsBoundedAndWatchIsNot(t *testing.T) {
+	registry := NewRegistry()
+	if err := registry.Register(NoopExecutorName, NoopExecutor{}); err != nil {
+		t.Fatal(err)
+	}
+	logStore, err := oplog.NewOperationLog(&oplog.Options{Dir: t.TempDir(), SingleThreshold: oplog.DefaultThreshold})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &deadlineRecordingClient{}
+	w, err := NewWorker(&WorkerOptions{
+		AgentID:  "agent-1",
+		NodeUID:  types.UID("node-uid"),
+		Client:   client,
+		Registry: registry,
+		OpLog:    logStore,
+		LockFile: t.TempDir() + "/worker.lock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := w.listTasks(&metav1.ListOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	deadline, ok := client.listCtx.Deadline()
+	if !ok {
+		t.Fatal("task List context carries no deadline; a hung server would block the reflector forever")
+	}
+	if remaining := time.Until(deadline); remaining <= 0 || remaining > 2*serverCallTimeout {
+		t.Fatalf("task List deadline remaining = %v, want within %v", remaining, 2*serverCallTimeout)
+	}
+
+	if _, err := w.watchTasks(&metav1.ListOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if d, ok := client.watchCtx.Deadline(); ok {
+		t.Fatalf("task Watch context must not carry a deadline (would sever the watch on every interval), got %v", d)
+	}
+	w.cancel()
+	select {
+	case <-client.watchCtx.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("task Watch context does not follow the worker run context")
+	}
+}

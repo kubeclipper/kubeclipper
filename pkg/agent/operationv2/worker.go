@@ -43,6 +43,10 @@ import (
 const (
 	syncKey        = "tasks"
 	workerLockMode = 0600
+	// serverCallTimeout bounds each one-shot server round trip. The shared
+	// rest config carries no client-wide timeout because http.Client.Timeout
+	// would sever the informer's long-lived watch on every interval.
+	serverCallTimeout = 30 * time.Second
 )
 
 type TaskClient interface {
@@ -111,11 +115,11 @@ func NewWorker(opts *WorkerOptions) (*Worker, error) {
 	w.informer = cache.NewSharedIndexInformer(&cache.ListWatch{
 		ListFunc: func(listOptions metav1.ListOptions) (runtime.Object, error) {
 			listOptions.FieldSelector = selector
-			return w.client.List(context.Background(), &listOptions)
+			return w.listTasks(&listOptions)
 		},
 		WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
 			listOptions.FieldSelector = selector
-			return w.client.Watch(context.Background(), &listOptions)
+			return w.watchTasks(&listOptions)
 		},
 	}, &operations.OperationTask{}, 0, cache.Indexers{})
 	if _, err := w.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -208,6 +212,23 @@ func (w *Worker) sync(ctx context.Context) error {
 	return w.execute(ctx, live)
 }
 
+// listTasks serves the reflector's initial List. It is a one-shot round trip
+// and carries its own deadline; a client-wide timeout must not be used because
+// it would also sever the long-lived watch below.
+func (w *Worker) listTasks(listOptions *metav1.ListOptions) (runtime.Object, error) {
+	ctx, cancel := context.WithTimeout(w.runCtx, serverCallTimeout)
+	defer cancel()
+	return w.client.List(ctx, listOptions)
+}
+
+// watchTasks serves the reflector's long-lived Watch. It inherits only the
+// worker's run context, so the stream lives until the worker stops and the
+// reflector owns reconnects; bounding it here would kill the watch on every
+// timeout and turn event delivery into polling.
+func (w *Worker) watchTasks(listOptions *metav1.ListOptions) (watch.Interface, error) {
+	return w.client.Watch(w.runCtx, listOptions)
+}
+
 func (w *Worker) eligibleTasks() []*operations.OperationTask {
 	objects := w.informer.GetStore().List()
 	tasks := make([]*operations.OperationTask, 0, len(objects))
@@ -222,7 +243,9 @@ func (w *Worker) eligibleTasks() []*operations.OperationTask {
 }
 
 func (w *Worker) getLiveTask(ctx context.Context, selected *operations.OperationTask) (*operations.OperationTask, error) {
-	live, err := w.client.Get(ctx, selected.Name, metav1.GetOptions{})
+	getCtx, cancel := context.WithTimeout(ctx, serverCallTimeout)
+	defer cancel()
+	live, err := w.client.Get(getCtx, selected.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
@@ -243,7 +266,9 @@ func (w *Worker) startPendingTask(ctx context.Context, live *operations.Operatio
 	if live.Status.Phase == operations.TaskPending {
 		runningTask := live.DeepCopy()
 		runningTask.Status = operations.OperationTaskStatus{Phase: operations.TaskRunning}
-		return w.client.UpdateStatus(ctx, runningTask)
+		putCtx, cancel := context.WithTimeout(ctx, serverCallTimeout)
+		defer cancel()
+		return w.client.UpdateStatus(putCtx, runningTask)
 	}
 	return live, nil
 }
@@ -334,9 +359,13 @@ func (w *Worker) finish(
 	updatedTask := task.DeepCopy()
 	updatedTask.Status.Phase = phase
 	updatedTask.Status.Result = &result
-	_, err := w.client.UpdateStatus(ctx, updatedTask)
+	putCtx, cancel := context.WithTimeout(ctx, serverCallTimeout)
+	defer cancel()
+	_, err := w.client.UpdateStatus(putCtx, updatedTask)
 	if err != nil {
-		latest, getErr := w.client.Get(context.Background(), task.Name, metav1.GetOptions{})
+		getCtx, getCancel := context.WithTimeout(ctx, serverCallTimeout)
+		latest, getErr := w.client.Get(getCtx, task.Name, metav1.GetOptions{})
+		getCancel()
 		if getErr == nil && latest.UID == task.UID && latest.Status.Phase.IsTerminal() {
 			w.queue.Add(syncKey)
 			return nil

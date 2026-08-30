@@ -91,25 +91,30 @@ func (s *Server) PrepareRun(stopCh <-chan struct{}) error {
 	if s.Config.APIServer == nil {
 		return fmt.Errorf("apiServer configuration is required")
 	}
+	// No client-wide Timeout: http.Client.Timeout covers the whole response
+	// body and would sever the informer's long-lived task watch on every
+	// interval. One-shot calls carry per-call deadlines instead
+	// (nodeStatusUpdateTimeout here, serverCallTimeout in the task worker).
 	restConfig := &rest.Config{
 		Host: s.Config.APIServer.Endpoint,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAFile: s.Config.APIServer.CAFile, CertFile: s.Config.APIServer.CertFile,
 			KeyFile: s.Config.APIServer.KeyFile, ServerName: s.Config.APIServer.ServerName,
 		},
-		Timeout: 30 * time.Second,
-		QPS:     20, Burst: 40,
+		QPS: 20, Burst: 40,
 	}
 	client, err := clientset.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("create kc-server client: %w", err)
 	}
 	s.client = client
-	node, err := client.CoreV1().Nodes().Get(context.Background(), s.Config.AgentID, metav1.GetOptions{})
+	nodeCtx, nodeCancel := context.WithTimeout(context.Background(), nodeStatusUpdateTimeout)
+	defer nodeCancel()
+	node, err := client.CoreV1().Nodes().Get(nodeCtx, s.Config.AgentID, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) && s.Config.RegisterNode {
-		node, err = client.CoreV1().Nodes().Create(context.Background(), s.initialNode(), &metav1.CreateOptions{})
+		node, err = client.CoreV1().Nodes().Create(nodeCtx, s.initialNode(), &metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
-			node, err = client.CoreV1().Nodes().Get(context.Background(), s.Config.AgentID, metav1.GetOptions{})
+			node, err = client.CoreV1().Nodes().Get(nodeCtx, s.Config.AgentID, metav1.GetOptions{})
 		}
 	}
 	if err != nil {
