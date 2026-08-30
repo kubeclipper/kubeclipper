@@ -23,8 +23,10 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/sys/unix"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -295,6 +297,13 @@ func selectTask(tasks []*operations.OperationTask) (*operations.OperationTask, e
 	}
 	sort.Slice(pending, func(i, j int) bool {
 		if pending[i].CreationTimestamp.Equal(&pending[j].CreationTimestamp) {
+			// Second granularity is not enough for a deterministic order:
+			// the monotonic resourceVersion is the intended tiebreaker.
+			ri, errI := strconv.ParseUint(pending[i].ResourceVersion, 10, 64)
+			rj, errJ := strconv.ParseUint(pending[j].ResourceVersion, 10, 64)
+			if errI == nil && errJ == nil && ri != rj {
+				return ri < rj
+			}
 			return string(pending[i].UID) < string(pending[j].UID)
 		}
 		return pending[i].CreationTimestamp.Before(&pending[j].CreationTimestamp)
@@ -313,9 +322,9 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 	if err := w.oplog.CreateOperationDir(string(task.UID)); err != nil {
 		logger.Errorf("create Task log directory for %s: %v", task.Name, err)
 	}
-	logWriter, err := w.oplog.CreateStepLogFile(string(task.UID), "task")
-	if err != nil {
-		logger.Errorf("open Task log for %s: %v", task.Name, err)
+	logWriter, logErr := w.oplog.CreateStepLogFile(string(task.UID), "task")
+	if logErr != nil {
+		logger.Errorf("open Task log for %s: %v", task.Name, logErr)
 		logWriter = nil
 	}
 	if logWriter != nil {
@@ -327,6 +336,14 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 		writer = logWriter
 	}
 
+	if task.Spec.Deadline.Time.IsZero() {
+		// A zero deadline would expire the context immediately and kill the
+		// command before it ran; fail the task with an explicit reason.
+		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
+			Reason:  operations.TaskReasonExecutionFailed,
+			Message: "task has no deadline",
+		})
+	}
 	ctx, cancel := context.WithDeadline(parent, task.Spec.Deadline.Time)
 	defer cancel()
 	result, reconcileErr := executor.Reconcile(ctx, task.DeepCopy(), writer)
@@ -347,6 +364,11 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 	}
 	result.Reason = ""
 	result.Message = boundedMessage(result.Message)
+	if logErr != nil {
+		// The server-side log read would 404 without an explanation; surface
+		// the reason through the task result instead.
+		result.Message = boundedMessage(result.Message + "; agent task log unavailable: " + logErr.Error())
+	}
 	return w.finish(parent, task, operations.TaskSucceeded, result)
 }
 
@@ -380,7 +402,17 @@ func boundedMessage(message string) string {
 	if len(message) <= operations.MaxMessageSize {
 		return message
 	}
-	return message[:operations.MaxMessageSize]
+	truncated := message[:operations.MaxMessageSize]
+	// Do not split a rune: trim the invalid trailing bytes so the message
+	// stays valid UTF-8 after truncation.
+	for truncated != "" {
+		r, size := utf8.DecodeLastRuneInString(truncated)
+		if r != utf8.RuneError || size != 1 {
+			break
+		}
+		truncated = truncated[:len(truncated)-1]
+	}
+	return truncated
 }
 
 var _ interface {

@@ -67,5 +67,5 @@ func (s *Options) Validate() (errs []error) {
 
 func (s *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Dir, "oplog-dir", s.Dir, "directory of op log file")
-	fs.StringVar(&s.Dir, "oplog-threshold", s.Dir, "maximum value of log data transfer")
+	fs.Int64Var(&s.SingleThreshold, "oplog-threshold", s.SingleThreshold, "maximum bytes of log data returned per read")
 }

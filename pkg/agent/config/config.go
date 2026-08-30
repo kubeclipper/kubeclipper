@@ -92,7 +92,6 @@ func New() *Config {
 // ToMap convertToMap simply converts config to map[string]bool
 // to hide sensitive information
 func (conf *Config) ToMap() map[string]bool {
-	conf.stripEmptyOptions()
 	result := make(map[string]bool)
 
 	if conf == nil {
@@ -114,10 +113,6 @@ func (conf *Config) ToMap() map[string]bool {
 	}
 
 	return result
-}
-
-// Remove invalid options before serializing to json or yaml
-func (conf *Config) stripEmptyOptions() {
 }
 
 func TryLoadFromDisk() (*Config, error) {

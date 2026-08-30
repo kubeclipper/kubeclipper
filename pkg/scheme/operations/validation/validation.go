@@ -194,6 +194,11 @@ func ValidateTask(task *operations.OperationTask) field.ErrorList {
 	if task.Spec.Executor == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "executor"), "executor is required"))
 	}
+	if task.Spec.Deadline.Time.IsZero() {
+		// The agent derives its execution context from the deadline; a task
+		// without one would be killed before it ran.
+		allErrs = append(allErrs, field.Required(field.NewPath("spec", "deadline"), "deadline is required"))
+	}
 	if task.Spec.RetryGeneration < 0 {
 		allErrs = append(
 			allErrs,
