@@ -97,14 +97,25 @@ type StoreOptions struct {
 	Operations rest.StandardStorage
 	Tasks      rest.StandardStorage
 	Locks      rest.StandardStorage
-	Now        func() time.Time
+	// OperationsStrong/TasksStrong/LocksStrong serve safety-boundary reads
+	// (target ordering, attempt creation, lock acquisition/release checks) from
+	// storages that bypass the watch cache: the cache may lag behind etcd and
+	// must never back an irreversible conclusion. When nil, the cacher-backed
+	// storages above are used instead (test fakes).
+	OperationsStrong rest.StandardStorage
+	TasksStrong      rest.StandardStorage
+	LocksStrong      rest.StandardStorage
+	Now              func() time.Time
 }
 
 type store struct {
-	operations rest.StandardStorage
-	tasks      rest.StandardStorage
-	locks      rest.StandardStorage
-	now        func() time.Time
+	operations       rest.StandardStorage
+	tasks            rest.StandardStorage
+	locks            rest.StandardStorage
+	operationsStrong rest.StandardStorage
+	tasksStrong      rest.StandardStorage
+	locksStrong      rest.StandardStorage
+	now              func() time.Time
 }
 
 var _ Store = (*store)(nil)
@@ -116,7 +127,25 @@ func NewStore(opts StoreOptions) (Store, error) {
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
-	return &store{operations: opts.Operations, tasks: opts.Tasks, locks: opts.Locks, now: opts.Now}, nil
+	s := &store{
+		operations: opts.Operations,
+		tasks:      opts.Tasks,
+		locks:      opts.Locks,
+		now:        opts.Now,
+	}
+	s.operationsStrong = opts.OperationsStrong
+	if s.operationsStrong == nil {
+		s.operationsStrong = opts.Operations
+	}
+	s.tasksStrong = opts.TasksStrong
+	if s.tasksStrong == nil {
+		s.tasksStrong = opts.Tasks
+	}
+	s.locksStrong = opts.LocksStrong
+	if s.locksStrong == nil {
+		s.locksStrong = opts.Locks
+	}
+	return s, nil
 }
 
 func withNamespace(ctx context.Context) context.Context {
@@ -150,12 +179,26 @@ func (s *store) CreateOperation(ctx context.Context, op *operations.Operation) (
 	return result, nil
 }
 
+// ListOperations is a safety-boundary read (target ordering, latest-operation
+// guards) and is served by the quorum storage, bypassing the watch cache.
 func (s *store) ListOperations(ctx context.Context, targetUID types.UID, resourceVersion string) (*operations.OperationList, error) {
 	options := metav1.ListOptions{ResourceVersion: resourceVersion}
 	if targetUID != "" {
 		options.FieldSelector = fields.OneTermEqualSelector("spec.targetRef.uid", string(targetUID)).String()
 	}
-	return s.ListOperationsWithOptions(ctx, &options)
+	internal, err := internalListOptions(&options)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := s.operationsStrong.List(withNamespace(ctx), internal)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := obj.(*operations.OperationList)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", obj)
+	}
+	return list, nil
 }
 
 func (s *store) ListOperationsWithOptions(ctx context.Context, options *metav1.ListOptions) (*operations.OperationList, error) {
@@ -317,23 +360,53 @@ func (s *store) CreateTask(ctx context.Context, task *operations.OperationTask) 
 	return result, nil
 }
 
+// ListTasksByOperationUID is a safety-boundary read (terminal transition,
+// attempt creation, lock-release re-check) and is served by the quorum
+// storage, bypassing the watch cache.
 func (s *store) ListTasksByOperationUID(
 	ctx context.Context,
 	operationUID types.UID,
 	resourceVersion string,
 ) (*operations.OperationTaskList, error) {
-	return s.ListTasksWithOptions(
-		ctx,
-		"",
-		&metav1.ListOptions{
-			FieldSelector:   fields.OneTermEqualSelector("spec.operationRef.uid", string(operationUID)).String(),
-			ResourceVersion: resourceVersion,
-		},
-	)
+	options := metav1.ListOptions{
+		FieldSelector:   fields.OneTermEqualSelector("spec.operationRef.uid", string(operationUID)).String(),
+		ResourceVersion: resourceVersion,
+	}
+	internal, err := internalListOptions(&options)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := s.tasksStrong.List(withNamespace(ctx), internal)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := obj.(*operations.OperationTaskList)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	return list, nil
 }
 
+// ListTasksByNode backs the agent's task discovery and is served by the
+// quorum storage, bypassing the watch cache.
 func (s *store) ListTasksByNode(ctx context.Context, nodeName, resourceVersion string) (*operations.OperationTaskList, error) {
-	return s.ListTasksWithOptions(ctx, nodeName, &metav1.ListOptions{ResourceVersion: resourceVersion})
+	options := metav1.ListOptions{ResourceVersion: resourceVersion}
+	internal, err := internalListOptions(&options)
+	if err != nil {
+		return nil, err
+	}
+	if nodeName != "" {
+		internal.FieldSelector = fields.OneTermEqualSelector("spec.nodeRef.name", nodeName)
+	}
+	obj, err := s.tasksStrong.List(withNamespace(ctx), internal)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := obj.(*operations.OperationTaskList)
+	if !ok {
+		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	return list, nil
 }
 
 func (s *store) ListTasksWithOptions(
@@ -590,7 +663,11 @@ func (s *store) AcquireLock(ctx context.Context, lock *operations.ExecutionLock)
 }
 
 func (s *store) GetLock(ctx context.Context, name, resourceVersion string) (*operations.ExecutionLock, error) {
-	obj, err := s.locks.Get(withNamespace(ctx), name, &metav1.GetOptions{ResourceVersion: resourceVersion})
+	// Lock ownership is an irreversible safety boundary: AcquireLock uses this
+	// read after an AlreadyExists result and ReleaseLock uses it before Delete.
+	// A cacher can return a deleted predecessor after a lock is recreated, so
+	// this must read the quorum storage.
+	obj, err := s.locksStrong.Get(withNamespace(ctx), name, &metav1.GetOptions{ResourceVersion: resourceVersion})
 	if err != nil {
 		return nil, err
 	}
