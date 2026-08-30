@@ -324,7 +324,6 @@ func (r *CronBackupReconciler) createBackup(log logger.Logging, cronBackup *v1.C
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = backup.Name
 	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
-	op.Status.Status = v1.OperationStatusRunning
 	// add backup
 	backup.Labels = make(map[string]string)
 	backup.Labels[common.LabelClusterName] = c.Name
@@ -495,7 +494,6 @@ func (r *CronBackupReconciler) deleteBackup(log logger.Logging, clusterName stri
 	op.Labels[common.LabelClusterName] = c.Name
 	op.Labels[common.LabelBackupName] = b.Name
 	op.Labels[common.LabelTopologyRegion] = c.Masters[0].Labels[common.LabelTopologyRegion]
-	op.Status.Status = v1.OperationStatusRunning
 
 	if b.Status.ClusterBackupStatus == v1.ClusterBackupRestoring || b.Status.ClusterBackupStatus == v1.ClusterBackupCreating {
 		return fmt.Errorf("backup is %s now, can't delete", b.Status.ClusterBackupStatus)

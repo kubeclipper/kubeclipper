@@ -19,8 +19,6 @@
 package v1
 
 import (
-	"errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,52 +30,14 @@ type Operation struct {
 	// Standard object's metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Steps             []Step          `json:"steps,omitempty"`
-	Status            OperationStatus `json:"status,omitempty"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// OperationList contains a list of User
-type OperationList struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Operation `json:"items"`
-}
-
-func (op *Operation) GetStep(stepID string) (step Step, ok bool) {
-	for _, s := range op.Steps {
-		if s.ID == stepID {
-			return s, true
-		}
-	}
-	return
+	Steps             []Step `json:"steps,omitempty"`
 }
 
 // default operation timeout is 90 min
 
 const DefaultOperationTimeoutSecs = "5400"
 
-type OperationStatusType string
-
-const (
-	OperationStatusPending     OperationStatusType = "pending"
-	OperationStatusRunning     OperationStatusType = "running"
-	OperationStatusFailed      OperationStatusType = "failed"
-	OperationStatusTermination OperationStatusType = "termination"
-	OperationStatusUnknown     OperationStatusType = "unknown"
-	OperationStatusSuccessful  OperationStatusType = "successful"
-)
-
-type OperationStatus struct {
-	Status     OperationStatusType  `json:"status,omitempty"`
-	Conditions []OperationCondition `json:"conditions,omitempty"`
-}
-
 type StepAction string
-
-var ErrInvalidAction = errors.New("invalid step action")
 
 const (
 	ActionInstall   StepAction = "install"
@@ -141,33 +101,6 @@ type Command struct {
 	Identity      string           `json:"identity,omitempty"`
 	CustomCommand []byte           `json:"customCommand,omitempty"`
 	Template      *TemplateCommand `json:"template,omitempty"`
-}
-
-// OperationCondition contains condition information for a node.
-type OperationCondition struct {
-	StepID string       `json:"stepID,omitempty"`
-	Status []StepStatus `json:"status,omitempty"`
-}
-
-type StepStatusType string
-
-const (
-	StepStatusSuccessful StepStatusType = "successful"
-	StepStatusFailed     StepStatusType = "failed"
-)
-
-type StepStatus struct {
-	StartAt metav1.Time    `json:"startAt,omitempty"`
-	EndAt   metav1.Time    `json:"endAt,omitempty"`
-	Node    string         `json:"node,omitempty"`
-	Status  StepStatusType `json:"status,omitempty"`
-	// (brief) reason for the condition's last transition.
-	// +optional
-	Reason string `json:"reason,omitempty"`
-	// Human readable message indicating details about last transition.
-	// +optional
-	Message  string `json:"message,omitempty"`
-	Response []byte `json:"response,omitempty"`
 }
 
 type PendingOperation struct {

@@ -78,7 +78,6 @@ func (n *NodeOperation) Builder() (*corev1.Operation, error) {
 
 	op.Labels[common.LabelTimeoutSeconds] = n.pendingOperation.Timeout
 	op.Labels[common.LabelOperationSponsor] = n.pendingOperation.OperationSponsor
-	op.Status.Status = corev1.OperationStatusPending
 
 	return op, nil
 }
