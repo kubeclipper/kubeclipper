@@ -21,8 +21,10 @@ package agent
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
@@ -169,7 +171,10 @@ func (s *Server) initialNode() *corev1.Node {
 			common.LabelOSStable: runtime.GOOS, common.LabelArchStable: runtime.GOARCH,
 			common.LabelTopologyRegion: s.Config.Metadata.Region, common.LabelHostname: hostname,
 		}},
-		Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{Hostname: hostname, OS: runtime.GOOS, Arch: runtime.GOARCH}},
+		Status: corev1.NodeStatus{
+			AgentLogPort: s.agentLogPort(),
+			NodeInfo:     corev1.NodeSystemInfo{Hostname: hostname, OS: runtime.GOOS, Arch: runtime.GOARCH},
+		},
 	}
 	if ip, err := netutil.GetDefaultIP(true, s.Config.IPDetect); err == nil {
 		node.Status.Ipv4DefaultIP = ip.String()
@@ -183,6 +188,22 @@ func (s *Server) initialNode() *corev1.Node {
 		logger.Errorf("collect node machine information: %v", err)
 	}
 	return node
+}
+
+func (s *Server) agentLogPort() int32 {
+	address := operationv2.DefaultAgentLogAddress
+	if s.Config != nil && s.Config.APIServer != nil && s.Config.APIServer.LogAddress != "" {
+		address = s.Config.APIServer.LogAddress
+	}
+	_, rawPort, err := net.SplitHostPort(address)
+	if err != nil {
+		return 0
+	}
+	port, err := strconv.ParseInt(rawPort, 10, 32)
+	if err != nil || port < 1 || port > 65535 {
+		return 0
+	}
+	return int32(port)
 }
 
 func (s *Server) Run(stopCh <-chan struct{}) error {

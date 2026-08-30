@@ -32,6 +32,7 @@ import (
 
 	"github.com/kubeclipper/kubeclipper/pkg/auditing/option"
 	"github.com/kubeclipper/kubeclipper/pkg/authentication/options"
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/autodetection"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sliceutil"
 
@@ -244,9 +245,20 @@ func (a Agents) Add(ip string, metadata Metadata) {
 
 // Metadata user custom node info,region will use by filter,use label,others use annotation.
 type Metadata struct {
-	AgentID string `json:"agentID" yaml:"agentID,omitempty"`
-	Region  string `json:"region" yaml:"region,omitempty"`
-	FloatIP string `json:"floatIP" yaml:"floatIP,omitempty"`
+	AgentID      string `json:"agentID" yaml:"agentID,omitempty"`
+	Region       string `json:"region" yaml:"region,omitempty"`
+	FloatIP      string `json:"floatIP" yaml:"floatIP,omitempty"`
+	AgentLogPort int    `json:"agentLogPort" yaml:"agentLogPort,omitempty"`
+}
+
+func (m Metadata) LogPort() (int, error) {
+	if m.AgentLogPort == 0 {
+		return constatns.DefaultAgentLogPort, nil
+	}
+	if m.AgentLogPort < 1 || m.AgentLogPort > 65535 {
+		return 0, fmt.Errorf("agent log port %d must be between 1 and 65535", m.AgentLogPort)
+	}
+	return m.AgentLogPort, nil
 }
 
 type DeployConfig struct {
@@ -508,6 +520,11 @@ func (c *DeployConfig) GetKcAgentConfigTemplateContent(metadata Metadata) (strin
 	data["AgentID"] = metadata.AgentID
 	data["Region"] = metadata.Region
 	data["FloatIP"] = metadata.FloatIP
+	logPort, err := metadata.LogPort()
+	if err != nil {
+		return "", err
+	}
+	data["AgentLogPort"] = logPort
 	data["IPDetect"] = c.IPDetect
 	data["NodeIPDetect"] = c.NodeIPDetect
 	data["StaticServerAddress"] = fmt.Sprintf("http://%s:%d", c.ServerIPs[0], c.StaticServerPort)

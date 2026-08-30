@@ -36,6 +36,11 @@ const (
 	ClusterPodSubnet     = "172.25.0.0/16"
 )
 
+// DefaultAgentLogPort must match the logAddress in the agent config template
+// (pkg/cli/config/template.go) and the agent default in
+// pkg/agent/config/config.go.
+const DefaultAgentLogPort = 10260
+
 const (
 	KubeClipperOSSEndpoint        = "https://kubeclipper.oss-ap-southeast-1.aliyuncs.com"
 	KubeClipperKCDownloadBaseURL  = KubeClipperOSSEndpoint + "/kc"

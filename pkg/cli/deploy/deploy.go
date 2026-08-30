@@ -375,7 +375,7 @@ var (
 	}
 )
 
-func precheckPortFunc(port int, serviceName string) precheckFunc {
+func PrecheckPortFunc(port int, serviceName string) precheckFunc {
 	return func(sshConfig *sshutils.SSH, host string) error {
 		ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, "ss -tlnp")
 		if err != nil {
@@ -614,25 +614,17 @@ func (d *DeployOptions) precheckTimeLag() error {
 }
 
 func (d *DeployOptions) precheckPorts() error {
-	var (
-		missingToolHosts = make(map[string]bool)
-		mu               sync.Mutex
-	)
 	toolCheck := func(sshConfig *sshutils.SSH, host string) error {
 		_, err := sshutils.SSHCmdWithSudo(sshConfig, host, "which ss")
 		if err != nil {
 			_, err = sshutils.SSHCmdWithSudo(sshConfig, host, "which netstat")
 			if err != nil {
-				mu.Lock()
-				missingToolHosts[host] = true
-				mu.Unlock()
-				return fmt.Errorf("port check tool (ss or netstat) not found, " +
-					"skip port availability check, deployment may fail if port is occupied")
+				return fmt.Errorf("port precheck requires ss or netstat: %w", err)
 			}
 		}
 		return nil
 	}
-	if err := d.precheckService("PORT-TOOL", d.deployConfig.ServerIPs, toolCheck); err != nil {
+	if err := d.precheckService("PORT-TOOL", d.allNodes, toolCheck); err != nil {
 		return err
 	}
 
@@ -651,22 +643,24 @@ func (d *DeployOptions) precheckPorts() error {
 		if err := d.precheckService(
 			fmt.Sprintf("PORT-%d(%s)", p.port, p.name),
 			d.deployConfig.ServerIPs,
-			func(port int, svc string) precheckFunc {
-				return func(sshConfig *sshutils.SSH, host string) error {
-					mu.Lock()
-					missing := missingToolHosts[host]
-					mu.Unlock()
-					if missing {
-						return nil
-					}
-					return precheckPortFunc(port, svc)(sshConfig, host)
-				}
-			}(p.port, p.name),
+			PrecheckPortFunc(p.port, p.name),
 		); err != nil {
 			return err
 		}
 	}
-	return nil
+	// Only configured Agent nodes run kc-agent. A server-only node can use this
+	// port for an unrelated service.
+	return d.precheckService(
+		"PORT(kc-agent-log)",
+		d.deployConfig.Agents.ListIP(),
+		func(sshConfig *sshutils.SSH, host string) error {
+			logPort, err := d.deployConfig.Agents[host].LogPort()
+			if err != nil {
+				return err
+			}
+			return PrecheckPortFunc(logPort, "kc-agent-log")(sshConfig, host)
+		},
+	)
 }
 
 func (d *DeployOptions) preCheck() error {

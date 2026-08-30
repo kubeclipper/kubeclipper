@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	userapi "k8s.io/apiserver/pkg/authentication/user"
 
+	"github.com/kubeclipper/kubeclipper/pkg/constatns"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
 	operationv2 "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
@@ -358,12 +360,11 @@ func (h *handler) getTaskLogs(req *restful.Request, resp *restful.Response) {
 	query := url.Values{}
 	query.Set("offset", req.QueryParameter("offset"))
 	query.Set("limit", req.QueryParameter("limit"))
-	endpoint := fmt.Sprintf(
-		"https://%s:10260/v1/tasks/%s/logs?%s",
-		node.Status.Ipv4DefaultIP,
-		url.PathEscape(string(task.UID)),
-		query.Encode(),
-	)
+	endpoint, err := taskLogEndpoint(node, task, query)
+	if err != nil {
+		writeError(resp, apierrors.NewConflict(operations.Resource(operations.ResourceTasks), task.Name, err))
+		return
+	}
 	request, err := http.NewRequestWithContext(req.Request.Context(), http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		writeError(resp, apierrors.NewInternalError(err))
@@ -397,6 +398,22 @@ func (h *handler) getTaskLogs(req *restful.Request, resp *restful.Response) {
 	if _, err := resp.Write(body); err != nil {
 		return
 	}
+}
+
+func taskLogEndpoint(node *corev1.Node, task *operations.OperationTask, query url.Values) (string, error) {
+	port := node.Status.AgentLogPort
+	if port == 0 {
+		port = constatns.DefaultAgentLogPort
+	}
+	if port < 1 || port > 65535 {
+		return "", fmt.Errorf("agent log port %d is invalid", port)
+	}
+	return fmt.Sprintf(
+		"https://%s/v1/tasks/%s/logs?%s",
+		net.JoinHostPort(node.Status.Ipv4DefaultIP, strconv.Itoa(int(port))),
+		url.PathEscape(string(task.UID)),
+		query.Encode(),
+	), nil
 }
 
 func newLogClient(caFile, certFile, keyFile string) (*http.Client, error) {

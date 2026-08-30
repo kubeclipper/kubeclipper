@@ -50,6 +50,19 @@ func TestInitialNodePublishesHostnameLabel(t *testing.T) {
 	if _, found := node.Status.Capacity[corev1.ResourceMemory]; !found {
 		t.Fatal("expected memory capacity in node status")
 	}
+	if got, want := node.Status.AgentLogPort, int32(10260); got != want {
+		t.Fatalf("agent log port = %d, want %d", got, want)
+	}
+}
+
+func TestInitialNodePublishesConfiguredAgentLogPort(t *testing.T) {
+	cfg := config.New()
+	cfg.AgentID = "agent-1"
+	cfg.APIServer.LogAddress = ":18080"
+
+	if got, want := (&Server{Config: cfg}).initialNode().Status.AgentLogPort, int32(18080); got != want {
+		t.Fatalf("agent log port = %d, want %d", got, want)
+	}
 }
 
 func TestNewNodeLease(t *testing.T) {
