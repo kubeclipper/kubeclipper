@@ -35,7 +35,7 @@ func RunCmdWithContext(ctx context.Context, dryRun bool, command string, args ..
 	ec := NewExecCmd(ctx, command, args...)
 	logger.Debug("running command", zap.String("cmd", ec.String()))
 	if dryRun {
-		_, err := ec.stdOutBuf.WriteString("dry run command")
+		_, err := ec.stdOutBuf.Write([]byte("dry run command"))
 		return ec, err
 	}
 	// check context, get log file if conditions permit

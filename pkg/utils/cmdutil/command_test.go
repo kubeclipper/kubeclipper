@@ -21,7 +21,10 @@ package cmdutil
 import (
 	"context"
 	"errors"
+	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -137,3 +140,52 @@ rm limit.conf
 	}
 }
 */
+
+func TestTailBufferKeepsMostRecentTail(t *testing.T) {
+	tb := newTailBuffer(16)
+	if _, err := tb.Write([]byte("0123456789abcdef")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tb.Write([]byte("XYZ")); err != nil {
+		t.Fatal(err)
+	}
+	if got := tb.String(); got != "3456789abcdefXYZ" {
+		t.Fatalf("tail = %q, want the most recent 16 bytes", got)
+	}
+}
+
+func TestTailBufferReportsFullWriteWhenInputExceedsLimit(t *testing.T) {
+	tb := newTailBuffer(16)
+	input := strings.Repeat("x", 32)
+	n, err := tb.Write([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != len(input) {
+		t.Fatalf("Write returned %d, want %d", n, len(input))
+	}
+	if got := tb.String(); got != input[len(input)-16:] {
+		t.Fatalf("tail = %q, want the most recent 16 bytes", got)
+	}
+}
+
+// A grandchild that inherits the command's stdout pipe and outlives it used to
+// block Cmd.Wait forever (single worker wedge). WaitDelay must make Run return
+// once the command itself exited.
+func TestRunReturnsWhenGrandchildHoldsPipe(t *testing.T) {
+	ec := NewExecCmd(context.Background(), "/bin/sh", "-c", "echo started; sleep 30 & exit 0")
+	// Shorten the grace so the test does not wait for the 30s default.
+	ec.WaitDelay = 500 * time.Millisecond
+	start := time.Now()
+	err := ec.Run()
+	elapsed := time.Since(start)
+	if err != nil && !errors.Is(err, exec.ErrWaitDelay) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if elapsed > 10*time.Second {
+		t.Fatalf("Run blocked for %v; WaitDelay did not give up on the pipe", elapsed)
+	}
+	if !strings.Contains(ec.StdOut(), "started") {
+		t.Fatalf("stdout = %q, want the child's output", ec.StdOut())
+	}
+}
