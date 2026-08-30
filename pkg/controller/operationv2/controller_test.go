@@ -588,3 +588,17 @@ func (f *fakeStore) setTaskTerminal(name string, phase operations.TaskPhase, out
 	}
 	task.ResourceVersion = f.rv()
 }
+
+func (f *fakeStore) CleanupByTargetUID(_ context.Context, targetUID types.UID) error {
+	for name, op := range f.operations {
+		if op.Spec.TargetRef.UID == targetUID {
+			for taskName, task := range f.tasks {
+				if task.Spec.OperationRef.UID == op.UID {
+					delete(f.tasks, taskName)
+				}
+			}
+			delete(f.operations, name)
+		}
+	}
+	return nil
+}

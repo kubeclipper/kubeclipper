@@ -501,6 +501,7 @@ func (s *APIServer) SetupController(
 	}
 	if setupErr := (&operationv2controller.BusinessReconciler{
 		Operations: informerFactory.Operations().V1alpha1().Operations().Lister(), Clusters: clusterOperator,
+		Cleaner: s.operationV2Store,
 	}).SetupWithManager(mgr, informerFactory); setupErr != nil {
 		return setupErr
 	}

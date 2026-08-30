@@ -91,6 +91,18 @@ type Store interface {
 	AcquireLock(ctx context.Context, lock *operations.ExecutionLock) (*operations.ExecutionLock, bool, error)
 	GetLock(ctx context.Context, name, resourceVersion string) (*operations.ExecutionLock, error)
 	ReleaseLock(ctx context.Context, name string, lockUID, holderUID types.UID) error
+
+	// CleanupByTargetUID is the controlled history purge for cluster deletion:
+	// it removes the target's safe-terminal Operations, their Tasks and the
+	// target's ExecutionLock, and refuses to touch anything while an Operation
+	// or Task is still active.
+	CleanupByTargetUID(ctx context.Context, targetUID types.UID) error
+}
+
+// HistoryCleaner narrows the Store to the controlled history purge used by the
+// business reconciler during cluster deletion.
+type HistoryCleaner interface {
+	CleanupByTargetUID(ctx context.Context, targetUID types.UID) error
 }
 
 type StoreOptions struct {
@@ -733,4 +745,120 @@ func internalListOptions(options *metav1.ListOptions) (*metainternalversion.List
 		return nil, apierrors.NewBadRequest(errs.ToAggregate().Error())
 	}
 	return internal, nil
+}
+
+// CleanupByTargetUID implements the controlled history purge required for
+// cluster deletion. There is no generic GC for Operation/Task/Lock objects, so
+// this is the only path that removes them. Enumeration uses list reads (a
+// stale view can only leave objects behind, never delete live ones), while
+// every terminal-state check re-reads the object with a Get — Gets bypass the
+// watch cache and are served by etcd quorum — so an irreversible delete is
+// never backed by a lagging cache. The method tolerates already-deleted
+// objects and is safe to retry.
+func (s *store) CleanupByTargetUID(ctx context.Context, targetUID types.UID) error {
+	if targetUID == "" {
+		return fmt.Errorf("target UID is required")
+	}
+	ops, err := s.ListOperations(ctx, targetUID, "")
+	if err != nil {
+		return err
+	}
+	if err := s.verifyTerminalHistory(ctx, ops.Items); err != nil {
+		return err
+	}
+	if err := s.purgeHistory(ctx, ops.Items); err != nil {
+		return err
+	}
+	return s.deleteStaleLocks(ctx, targetUID)
+}
+
+// verifyTerminalHistory re-reads every Operation and Task of the target with a
+// quorum Get and refuses while anything is still active.
+func (s *store) verifyTerminalHistory(ctx context.Context, ops []operations.Operation) error {
+	for i := range ops {
+		op, err := s.GetOperation(ctx, ops[i].Name, "")
+		if err != nil {
+			return err
+		}
+		if !op.Status.Phase.IsTerminal() {
+			return fmt.Errorf("operation %s is not terminal", op.Name)
+		}
+		tasks, err := s.ListTasksByOperationUID(ctx, op.UID, "")
+		if err != nil {
+			return err
+		}
+		for j := range tasks.Items {
+			task, err := s.GetTask(ctx, tasks.Items[j].Name, "")
+			if err != nil {
+				return err
+			}
+			if !task.Status.Phase.IsTerminal() {
+				return fmt.Errorf("task %s is not terminal", task.Name)
+			}
+		}
+	}
+	return nil
+}
+
+// purgeHistory deletes the tasks of every Operation first, then the Operations
+// themselves.
+func (s *store) purgeHistory(ctx context.Context, ops []operations.Operation) error {
+	for i := range ops {
+		tasks, err := s.ListTasksByOperationUID(ctx, ops[i].UID, "")
+		if err != nil {
+			return err
+		}
+		for j := range tasks.Items {
+			if err := s.deleteObject(ctx, s.tasks, tasks.Items[j].Name); err != nil {
+				return err
+			}
+		}
+		if err := s.deleteObject(ctx, s.operations, ops[i].Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deleteStaleLocks removes ExecutionLock objects of a deleted target: a crash
+// between terminal-status write and lock release can leave the lock behind.
+func (s *store) deleteStaleLocks(ctx context.Context, targetUID types.UID) error {
+	locks, err := s.listLocks(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range locks.Items {
+		if locks.Items[i].Spec.TargetRef.UID == targetUID {
+			if err := s.deleteObject(ctx, s.locks, locks.Items[i].Name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// deleteObject deletes by name and tolerates an already-deleted object, which
+// is what makes repeated cleanup calls safe.
+func (*store) deleteObject(ctx context.Context, storage rest.StandardStorage, name string) error {
+	_, _, err := storage.Delete(withNamespace(ctx), name, nil, &metav1.DeleteOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (s *store) listLocks(ctx context.Context) (*operations.ExecutionLockList, error) {
+	internal, err := internalListOptions(&metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	obj, err := s.locks.List(withNamespace(ctx), internal)
+	if err != nil {
+		return nil, err
+	}
+	list, ok := obj.(*operations.ExecutionLockList)
+	if !ok {
+		return nil, fmt.Errorf("lock storage returned %T", obj)
+	}
+	return list, nil
 }
