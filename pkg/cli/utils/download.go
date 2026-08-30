@@ -118,34 +118,40 @@ func SendPackageV2WithTempDir(
 					ret, err := sshutils.SSHCmdWithSudo(sshConfig, host, rm)
 					if err != nil {
 						logger.Errorf("[%s]remove old file(%s) err %s", host, fullPath, err.Error())
+						errCh <- errors.WithMessagef(err, "[%s] remove old file %s", host, fullPath)
 						return
 					}
 					if err = ret.Error(); err != nil {
 						logger.Errorf("[%s]remove old file(%s) err %s", host, fullPath, err.Error())
+						errCh <- errors.WithMessagef(err, "[%s] remove old file %s", host, fullPath)
 						return
 					}
 					ok, err := sshConfig.CopyForMD5V2WithTempDir(host, location, fullPath, md5, tempDir)
 					if err != nil {
 						logger.Errorf("[%s]copy file(%s) md5 validate failed err %s", host, location, err.Error())
+						errCh <- errors.WithMessagef(err, "[%s] copy %s", host, fullPath)
 						return
 					}
-					if ok {
-						logger.V(2).Infof("[%s]copy file(%s) md5 validate success", host, location)
-					} else {
+					if !ok {
 						logger.Errorf("[%s]copy file(%s) md5 validate failed", host, location)
+						errCh <- fmt.Errorf("[%s] copy %s md5 validate failed", host, fullPath)
+						return
 					}
+					logger.V(2).Infof("[%s]copy file(%s) md5 validate success", host, location)
 				}
 			} else {
 				ok, err := sshConfig.CopyForMD5V2WithTempDir(host, location, fullPath, md5, tempDir)
 				if err != nil {
 					logger.Errorf("[%s]copy file(%s) md5 validate failed err %s", host, fullPath, err.Error())
+					errCh <- errors.WithMessagef(err, "[%s] copy %s", host, fullPath)
 					return
 				}
-				if ok {
-					logger.V(2).Infof("[%s]copy file(%s) md5 validate success", host, location)
-				} else {
+				if !ok {
 					logger.Errorf("[%s]copy file(%s) md5 validate failed", host, location)
+					errCh <- fmt.Errorf("[%s] copy %s md5 validate failed", host, fullPath)
+					return
 				}
+				logger.V(2).Infof("[%s]copy file(%s) md5 validate success", host, fullPath)
 			}
 
 			if after != nil {
@@ -176,6 +182,15 @@ func SendPackageV2WithTempDir(
 	case err = <-errCh:
 		return err
 	case <-stopCh:
+		// A failure sent just before the last transfer completed may race with
+		// the stop signal; drain it instead of reporting success.
+		select {
+		case err = <-errCh:
+			if err != nil {
+				return err
+			}
+		default:
+		}
 		return nil
 	}
 }
