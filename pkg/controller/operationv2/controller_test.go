@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/reconcile"
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
@@ -601,4 +602,54 @@ func (f *fakeStore) CleanupByTargetUID(_ context.Context, targetUID types.UID) e
 		}
 	}
 	return nil
+}
+
+func TestConflictBackoffEscalatesAndResets(t *testing.T) {
+	r := &OperationReconciler{}
+	want := []time.Duration{200 * time.Millisecond, 400 * time.Millisecond, 800 * time.Millisecond,
+		1600 * time.Millisecond, 3200 * time.Millisecond, 5 * time.Second, 5 * time.Second}
+	for i, d := range want {
+		if got := r.bumpConflictBackoff("op-1"); got != d {
+			t.Fatalf("backoff[%d] = %v, want %v", i, got, d)
+		}
+	}
+	r.forgetConflict("op-1")
+	if got := r.bumpConflictBackoff("op-1"); got != 200*time.Millisecond {
+		t.Fatalf("backoff after forget = %v, want the 200ms floor", got)
+	}
+}
+
+func TestMapTargetOperationsUsesTargetUIDIndex(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		targetUIDIndex: func(raw any) ([]string, error) {
+			op, ok := raw.(*operations.Operation)
+			if !ok || op.Spec.TargetRef.UID == "" {
+				return nil, nil
+			}
+			return []string{string(op.Spec.TargetRef.UID)}, nil
+		},
+	})
+	newOp := func(name, uid string) *operations.Operation {
+		return &operations.Operation{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec:       operations.OperationSpec{TargetRef: operations.ObjectReference{Kind: "Cluster", UID: types.UID(uid), Name: "cluster"}},
+		}
+	}
+	self := newOp("op-self", "uid-1")
+	sibling := newOp("op-sibling", "uid-1")
+	other := newOp("op-other", "uid-2")
+	for _, op := range []*operations.Operation{self, sibling, other} {
+		if err := indexer.Add(op); err != nil {
+			t.Fatal(err)
+		}
+	}
+	requests := mapTargetOperations(indexer)(self)
+	names := make([]string, 0, len(requests))
+	for _, req := range requests {
+		names = append(names, req.Name)
+	}
+	sort.Strings(names)
+	if len(names) != 2 || names[0] != "op-self" || names[1] != "op-sibling" {
+		t.Fatalf("mapped requests = %v, want the operation itself and its same-target sibling only", names)
+	}
 }

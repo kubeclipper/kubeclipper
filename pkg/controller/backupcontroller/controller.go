@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
 	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
@@ -48,8 +49,12 @@ import (
 )
 
 type BackupReconciler struct {
-	ClusterLister   listerv1.ClusterLister
-	BackupLister    listerv1.BackupLister
+	ClusterLister listerv1.ClusterLister
+	BackupLister  listerv1.BackupLister
+	// BackupIndexer indexes Backups by their operation-name label; nil falls
+	// back to the full lister scan in findObjectsForOperation. Wired from the
+	// server composition, where the backup informer index is registered.
+	BackupIndexer   cache.Indexer
 	OperationLister operationslister.OperationLister
 	OperationStore  operationv2store.Store
 	BackupWriter    cluster.BackupWriter
@@ -204,20 +209,43 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 	return nil
 }
 
+// operationNameIndex keys Backups by their operation-name label so operation
+// events fan out to the matching backups without a full lister scan.
+const OperationNameIndex = "operationNameIndex"
+
 func (r *BackupReconciler) findObjectsForOperation(clu client.Object) []reconcile.Request {
-	backups, err := r.BackupLister.List(labels.Everything())
+	if r.BackupIndexer == nil {
+		backups, err := r.BackupLister.List(labels.Everything())
+		if err != nil {
+			return []reconcile.Request{}
+		}
+		requests := make([]reconcile.Request, 0)
+		for _, backup := range backups {
+			if backup.Labels[common.LabelOperationName] != clu.GetName() {
+				continue
+			}
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: backup.Name},
+			})
+		}
+		return requests
+	}
+
+	matched, err := r.BackupIndexer.ByIndex(OperationNameIndex, clu.GetName())
 	if err != nil {
 		return []reconcile.Request{}
 	}
-	var requests []reconcile.Request
-	for _, backup := range backups {
-		if backup.Labels[common.LabelOperationName] == clu.GetName() {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name: backup.Name,
-				},
-			})
+	requests := make([]reconcile.Request, 0, len(matched))
+	for _, raw := range matched {
+		backup, ok := raw.(*v1.Backup)
+		if !ok {
+			continue
 		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name: backup.Name,
+			},
+		})
 	}
 	return requests
 }

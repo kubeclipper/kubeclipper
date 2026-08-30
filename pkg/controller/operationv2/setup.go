@@ -17,11 +17,10 @@
 package operationv2
 
 import (
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/kubeclipper/kubeclipper/pkg/client/informers"
-	operationslister "github.com/kubeclipper/kubeclipper/pkg/client/lister/operations/v1alpha1"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/client"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/controller"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/handler"
@@ -38,6 +37,20 @@ func (r *OperationReconciler) SetupWithManager(mgr manager.Manager, factory info
 	// for them during controller startup.
 	operationInformer.Informer()
 	taskInformer.Informer()
+	// Index Operations by target UID so the terminal-event map function can
+	// enqueue same-target Pending operations without a full lister scan; the
+	// scan degrades as history accumulates.
+	if err := operationInformer.Informer().AddIndexers(cache.Indexers{
+		targetUIDIndex: func(raw any) ([]string, error) {
+			op, ok := raw.(*operations.Operation)
+			if !ok || op.Spec.TargetRef.UID == "" {
+				return nil, nil
+			}
+			return []string{string(op.Spec.TargetRef.UID)}, nil
+		},
+	}); err != nil {
+		return err
+	}
 
 	c, err := controller.NewUnmanaged("operation-v2", controller.Options{
 		MaxConcurrentReconciles: 2,
@@ -50,7 +63,7 @@ func (r *OperationReconciler) SetupWithManager(mgr manager.Manager, factory info
 	}
 	if err := c.Watch(
 		source.NewKindWithCache(&operations.Operation{}, factory),
-		handler.EnqueueRequestsFromMapFunc(mapTargetOperations(operationInformer.Lister())),
+		handler.EnqueueRequestsFromMapFunc(mapTargetOperations(operationInformer.Informer().GetIndexer())),
 	); err != nil {
 		return err
 	}
@@ -64,26 +77,26 @@ func (r *OperationReconciler) SetupWithManager(mgr manager.Manager, factory info
 	return nil
 }
 
-func mapTargetOperations(lister operationslister.OperationLister) handler.MapFunc {
+// targetUIDIndex keys Operations by spec.targetRef.uid for O(1) same-target
+// fan-out on terminal events.
+const targetUIDIndex = "spec.targetRef.uid"
+
+func mapTargetOperations(indexer cache.Indexer) handler.MapFunc {
 	return func(object client.Object) []reconcile.Request {
 		op, ok := object.(*operations.Operation)
 		if !ok {
 			return nil
 		}
 		result := []reconcile.Request{{NamespacedName: types.NamespacedName{Name: op.Name}}}
-		all, err := lister.List(labels.Everything())
+		matched, err := indexer.ByIndex(targetUIDIndex, string(op.Spec.TargetRef.UID))
 		if err != nil {
 			return result
 		}
-		seen := map[string]struct{}{op.Name: {}}
-		for _, candidate := range all {
-			if candidate.Spec.TargetRef.UID != op.Spec.TargetRef.UID {
+		for _, raw := range matched {
+			candidate, ok := raw.(*operations.Operation)
+			if !ok || candidate.Name == op.Name {
 				continue
 			}
-			if _, exists := seen[candidate.Name]; exists {
-				continue
-			}
-			seen[candidate.Name] = struct{}{}
 			result = append(result, reconcile.Request{NamespacedName: types.NamespacedName{Name: candidate.Name}})
 		}
 		return result

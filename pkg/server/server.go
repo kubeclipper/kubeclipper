@@ -35,7 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	unionauth "k8s.io/apiserver/pkg/authentication/request/union"
 	etcdRESTOptions "k8s.io/apiserver/pkg/server/options"
+	clientgocache "k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/version"
+
+	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
+	schemecore "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
 	auditingv1 "github.com/kubeclipper/kubeclipper/pkg/apis/auditing/v1"
@@ -153,7 +157,7 @@ func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.container.DoNotRecover(false)
 	s.container.Filter(filters.LogRequestAndResponse)
 	s.container.Router(restful.CurlyRouter{})
-	s.container.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
+	s.container.RecoverHandler(func(panicReason any, httpWriter http.ResponseWriter) {
 		filters.LogStackOnRecover(panicReason, httpWriter)
 	})
 	if err := s.installAPIs(stopCh); err != nil {
@@ -511,12 +515,26 @@ func (s *APIServer) SetupController(
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
+	backupInformer := informerFactory.Core().V1().Backups().Informer()
+	addBackupIndexErr := backupInformer.AddIndexers(clientgocache.Indexers{
+		backupcontroller.OperationNameIndex: func(raw any) ([]string, error) {
+			backup, ok := raw.(*schemecore.Backup)
+			if !ok || backup.Labels[common.LabelOperationName] == "" {
+				return nil, nil
+			}
+			return []string{backup.Labels[common.LabelOperationName]}, nil
+		},
+	})
+	if addBackupIndexErr != nil {
+		return addBackupIndexErr
+	}
 	if err = (&backupcontroller.BackupReconciler{
 		ClusterLister:   informerFactory.Core().V1().Clusters().Lister(),
 		BackupLister:    informerFactory.Core().V1().Backups().Lister(),
 		OperationLister: informerFactory.Operations().V1alpha1().Operations().Lister(),
 		OperationStore:  s.operationV2Store,
 		BackupWriter:    clusterOperator,
+		BackupIndexer:   backupInformer.GetIndexer(),
 	}).SetupWithManager(mgr, informerFactory); err != nil {
 		return err
 	}
