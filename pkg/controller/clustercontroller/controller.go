@@ -199,21 +199,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}()
 		// The object is being deleted
 		if sets.NewString(clu.ObjectMeta.Finalizers...).Has(v1.ClusterFinalizer) {
-			err = r.updateClusterNode(ctx, clu, true)
-			if err != nil {
-				log.Error("Failed to update cluster node", zap.Error(err))
-				return ctrl.Result{}, err
-			}
-			err = r.CronBackupWriter.DeleteCronBackupCollection(ctx, &query.Query{FieldSelector: fmt.Sprintf("spec.clusterName=%s", clu.Name)})
-			if err != nil {
-				log.Error("Failed to delete cronBackup", zap.Error(err))
-				return ctrl.Result{}, err
-			}
-			// remove our cluster finalizer
-			finalizers := sets.NewString(clu.ObjectMeta.Finalizers...)
-			finalizers.Delete(v1.ClusterFinalizer)
-			clu.ObjectMeta.Finalizers = finalizers.List()
-			if _, err = r.ClusterWriter.UpdateCluster(ctx, clu); err != nil {
+			if err = r.finalizeCluster(ctx, clu); err != nil {
+				log.Error("Failed to finalize cluster deletion", zap.Error(err))
 				return ctrl.Result{}, err
 			}
 		}
@@ -237,6 +224,31 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ClusterReconciler) finalizeCluster(ctx context.Context, clu *v1.Cluster) error {
+	if r.OperationStore == nil {
+		return fmt.Errorf("operation store is required to finalize cluster deletion")
+	}
+	if err := r.OperationStore.CleanupByTargetUID(ctx, clu.UID); err != nil {
+		return fmt.Errorf("cleanup cluster operation history: %w", err)
+	}
+	if err := r.updateClusterNode(ctx, clu, true); err != nil {
+		return fmt.Errorf("update cluster node: %w", err)
+	}
+	cronBackupQuery := &query.Query{
+		FieldSelector: fmt.Sprintf("spec.clusterName=%s", clu.Name),
+	}
+	if err := r.CronBackupWriter.DeleteCronBackupCollection(ctx, cronBackupQuery); err != nil {
+		return fmt.Errorf("delete cronBackup: %w", err)
+	}
+	finalizers := sets.NewString(clu.Finalizers...)
+	finalizers.Delete(v1.ClusterFinalizer)
+	clu.Finalizers = finalizers.List()
+	if _, err := r.ClusterWriter.UpdateCluster(ctx, clu); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *ClusterReconciler) updateClusterNode(ctx context.Context, c *v1.Cluster, del bool) error {

@@ -66,8 +66,8 @@ func TestSafetyBoundaryReadsUseStrongStorage(t *testing.T) {
 	ops := &recordingStorage{listObj: &operations.OperationList{}, getObj: &operations.Operation{}}
 	tasks := &recordingStorage{listObj: &operations.OperationTaskList{}}
 	locks := &recordingStorage{getObj: &operations.ExecutionLock{}}
-	opsStrong := &recordingStorage{listObj: &operations.OperationList{}}
-	tasksStrong := &recordingStorage{listObj: &operations.OperationTaskList{}}
+	opsStrong := &recordingStorage{listObj: &operations.OperationList{}, getObj: &operations.Operation{}}
+	tasksStrong := &recordingStorage{listObj: &operations.OperationTaskList{}, getObj: &operations.OperationTask{}}
 	locksStrong := &recordingStorage{getObj: &operations.ExecutionLock{}}
 
 	s, err := NewStore(StoreOptions{
@@ -81,6 +81,10 @@ func TestSafetyBoundaryReadsUseStrongStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	concreteStore, ok := s.(*store)
+	if !ok {
+		t.Fatalf("NewStore() returned %T, want *store", s)
+	}
 	ctx := context.Background()
 	for _, call := range []func() error{
 		func() error { _, err := s.ListOperations(ctx, "target-uid", ""); return err },
@@ -92,11 +96,25 @@ func TestSafetyBoundaryReadsUseStrongStorage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if ops.listCalls != 0 || tasks.listCalls != 0 || locks.getCalls != 0 {
-		t.Fatalf("safety-boundary reads reached cacher-backed storages: ops=%d tasks=%d locks=%d", ops.listCalls, tasks.listCalls, locks.getCalls)
+	operation, err := concreteStore.getOperationStrong(ctx, "op-1")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if opsStrong.listCalls != 1 || tasksStrong.listCalls != 2 || locksStrong.getCalls != 1 {
-		t.Fatalf("strong storage calls = ops:%d tasks:%d locks:%d, want 1, 2 and 1", opsStrong.listCalls, tasksStrong.listCalls, locksStrong.getCalls)
+	if operation == nil {
+		t.Fatal("strong operation storage returned nil")
+	}
+	task, err := concreteStore.getTaskStrong(ctx, "task-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task == nil {
+		t.Fatal("strong task storage returned nil")
+	}
+	if ops.listCalls != 0 || ops.getCalls != 0 || tasks.listCalls != 0 || tasks.getCalls != 0 || locks.getCalls != 0 {
+		t.Fatalf("safety-boundary reads reached cacher-backed storages: ops=list:%d get:%d tasks=list:%d get:%d locks=get:%d", ops.listCalls, ops.getCalls, tasks.listCalls, tasks.getCalls, locks.getCalls)
+	}
+	if opsStrong.listCalls != 1 || opsStrong.getCalls != 1 || tasksStrong.listCalls != 2 || tasksStrong.getCalls != 1 || locksStrong.getCalls != 1 {
+		t.Fatalf("strong storage calls = ops:list:%d get:%d tasks:list:%d get:%d locks:get:%d, want 1, 1, 2, 1 and 1", opsStrong.listCalls, opsStrong.getCalls, tasksStrong.listCalls, tasksStrong.getCalls, locksStrong.getCalls)
 	}
 }
 

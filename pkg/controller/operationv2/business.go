@@ -15,7 +15,6 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/manager"
 	"github.com/kubeclipper/kubeclipper/pkg/controller-runtime/source"
 	"github.com/kubeclipper/kubeclipper/pkg/models/cluster"
-	operationv2models "github.com/kubeclipper/kubeclipper/pkg/models/operationv2"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
@@ -24,11 +23,6 @@ import (
 type BusinessReconciler struct {
 	Operations operationslister.OperationLister
 	Clusters   cluster.Operator
-	// Cleaner purges the target's safe-terminal Operation/Task/Lock history
-	// before the Cluster object goes away: Operation v2 has no generic
-	// history GC, so cluster deletion is the only cleanup window. Optional
-	// in tests; wired from the server composition.
-	Cleaner operationv2models.HistoryCleaner
 }
 
 func (r *BusinessReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
@@ -53,14 +47,6 @@ func (r *BusinessReconciler) Reconcile(ctx context.Context, request ctrl.Request
 		return ctrl.Result{}, fmt.Errorf("operation %q target Cluster UID changed", op.Name)
 	}
 	if op.Spec.Action == corev1.OperationDeleteCluster && op.Status.Phase == operations.OperationSucceeded {
-		if r.Cleaner != nil {
-			if err := r.Cleaner.CleanupByTargetUID(ctx, op.Spec.TargetRef.UID); err != nil {
-				// Keep the Cluster object until its history is cleaned; the
-				// workqueue backoff retries while storage recovers and while
-				// still-active operations converge to a terminal phase.
-				return ctrl.Result{}, err
-			}
-		}
 		return ctrl.Result{}, r.Clusters.DeleteCluster(ctx, clusterObject.Name)
 	}
 	desired := failedClusterPhase(op.Spec.Action)

@@ -99,12 +99,6 @@ type Store interface {
 	CleanupByTargetUID(ctx context.Context, targetUID types.UID) error
 }
 
-// HistoryCleaner narrows the Store to the controlled history purge used by the
-// business reconciler during cluster deletion.
-type HistoryCleaner interface {
-	CleanupByTargetUID(ctx context.Context, targetUID types.UID) error
-}
-
 type StoreOptions struct {
 	Operations rest.StandardStorage
 	Tasks      rest.StandardStorage
@@ -166,6 +160,18 @@ func withNamespace(ctx context.Context) context.Context {
 
 func (s *store) GetOperation(ctx context.Context, name, resourceVersion string) (*operations.Operation, error) {
 	obj, err := s.operations.Get(withNamespace(ctx), name, &metav1.GetOptions{ResourceVersion: resourceVersion})
+	if err != nil {
+		return nil, err
+	}
+	op, ok := obj.(*operations.Operation)
+	if !ok {
+		return nil, fmt.Errorf("operation storage returned %T", obj)
+	}
+	return op, nil
+}
+
+func (s *store) getOperationStrong(ctx context.Context, name string) (*operations.Operation, error) {
+	obj, err := s.operationsStrong.Get(withNamespace(ctx), name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +362,18 @@ func (s *store) GetTask(ctx context.Context, name, resourceVersion string) (*ope
 	task, ok := obj.(*operations.OperationTask)
 	if !ok {
 		return nil, fmt.Errorf("task storage returned %T", obj)
+	}
+	return task, nil
+}
+
+func (s *store) getTaskStrong(ctx context.Context, name string) (*operations.OperationTask, error) {
+	obj, err := s.tasksStrong.Get(withNamespace(ctx), name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	task, ok := obj.(*operations.OperationTask)
+	if !ok {
+		return nil, fmt.Errorf("operation task storage returned %T", obj)
 	}
 	return task, nil
 }
@@ -751,10 +769,9 @@ func internalListOptions(options *metav1.ListOptions) (*metainternalversion.List
 // cluster deletion. There is no generic GC for Operation/Task/Lock objects, so
 // this is the only path that removes them. Enumeration uses list reads (a
 // stale view can only leave objects behind, never delete live ones), while
-// every terminal-state check re-reads the object with a Get — Gets bypass the
-// watch cache and are served by etcd quorum — so an irreversible delete is
-// never backed by a lagging cache. The method tolerates already-deleted
-// objects and is safe to retry.
+// every terminal-state check re-reads the object from the strong storage, so
+// an irreversible delete is never backed by a lagging cache. The method
+// tolerates already-deleted objects and is safe to retry.
 func (s *store) CleanupByTargetUID(ctx context.Context, targetUID types.UID) error {
 	if targetUID == "" {
 		return fmt.Errorf("target UID is required")
@@ -776,7 +793,7 @@ func (s *store) CleanupByTargetUID(ctx context.Context, targetUID types.UID) err
 // quorum Get and refuses while anything is still active.
 func (s *store) verifyTerminalHistory(ctx context.Context, ops []operations.Operation) error {
 	for i := range ops {
-		op, err := s.GetOperation(ctx, ops[i].Name, "")
+		op, err := s.getOperationStrong(ctx, ops[i].Name)
 		if err != nil {
 			return err
 		}
@@ -788,7 +805,7 @@ func (s *store) verifyTerminalHistory(ctx context.Context, ops []operations.Oper
 			return err
 		}
 		for j := range tasks.Items {
-			task, err := s.GetTask(ctx, tasks.Items[j].Name, "")
+			task, err := s.getTaskStrong(ctx, tasks.Items[j].Name)
 			if err != nil {
 				return err
 			}

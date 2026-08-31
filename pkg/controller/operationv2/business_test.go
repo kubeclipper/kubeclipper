@@ -18,7 +18,6 @@ package operationv2
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -128,80 +127,4 @@ func TestBusinessReconcileRetriesClusterUpdateConflict(t *testing.T) {
 	if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: operation.Name}}); err != nil {
 		t.Fatalf("reconcile conflict: %v", err)
 	}
-}
-
-type recordingCleaner struct {
-	uid   types.UID
-	err   error
-	calls int
-}
-
-func (r *recordingCleaner) CleanupByTargetUID(_ context.Context, targetUID types.UID) error {
-	r.calls++
-	r.uid = targetUID
-	return r.err
-}
-
-// A succeeded delete-cluster operation must purge the target's history before
-// the Cluster object is removed, and must keep the cluster when the purge
-// cannot confirm completion yet.
-func TestBusinessReconcileCleansHistoryBeforeClusterDelete(t *testing.T) {
-	newOperation := func() *operations.Operation {
-		return &operations.Operation{
-			ObjectMeta: metav1.ObjectMeta{Name: "delete-cluster"},
-			Spec: operations.OperationSpec{
-				Action:    corev1.OperationDeleteCluster,
-				TargetRef: operations.ObjectReference{Kind: "Cluster", Name: "cluster", UID: "target-uid"},
-			},
-			Status: operations.OperationStatus{Phase: operations.OperationSucceeded},
-		}
-	}
-	clusterObject := &corev1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster", UID: "target-uid"}}
-
-	t.Run("deletes cluster after successful cleanup", func(t *testing.T) {
-		operation := newOperation()
-		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
-		if err := indexer.Add(operation); err != nil {
-			t.Fatal(err)
-		}
-		controller := gomock.NewController(t)
-		clusters := clustermock.NewMockOperator(controller)
-		clusters.EXPECT().GetClusterEx(gomock.Any(), "cluster", "").Return(clusterObject, nil)
-		clusters.EXPECT().DeleteCluster(gomock.Any(), "cluster").Return(nil)
-		cleaner := &recordingCleaner{}
-		reconciler := &BusinessReconciler{
-			Operations: operationslister.NewOperationLister(indexer),
-			Clusters:   clusters,
-			Cleaner:    cleaner,
-		}
-		if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: operation.Name}}); err != nil {
-			t.Fatalf("reconcile: %v", err)
-		}
-		if cleaner.calls != 1 || cleaner.uid != "target-uid" {
-			t.Fatalf("cleaner calls=%d uid=%s, want 1 call for target-uid", cleaner.calls, cleaner.uid)
-		}
-	})
-
-	t.Run("keeps cluster while cleanup fails", func(t *testing.T) {
-		operation := newOperation()
-		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
-		if err := indexer.Add(operation); err != nil {
-			t.Fatal(err)
-		}
-		controller := gomock.NewController(t)
-		clusters := clustermock.NewMockOperator(controller)
-		clusters.EXPECT().GetClusterEx(gomock.Any(), "cluster", "").Return(clusterObject, nil)
-		cleaner := &recordingCleaner{err: errors.New("task task-1 is not terminal")}
-		reconciler := &BusinessReconciler{
-			Operations: operationslister.NewOperationLister(indexer),
-			Clusters:   clusters,
-			Cleaner:    cleaner,
-		}
-		if _, err := reconciler.Reconcile(context.Background(), ctrl.Request{NamespacedName: types.NamespacedName{Name: operation.Name}}); err == nil {
-			t.Fatal("expected the reconcile error so the workqueue retries")
-		}
-		if cleaner.calls != 1 {
-			t.Fatalf("cleaner calls = %d, want 1", cleaner.calls)
-		}
-	})
 }
