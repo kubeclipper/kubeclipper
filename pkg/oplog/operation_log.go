@@ -96,7 +96,7 @@ func (op *OperationLog) GetStepLogContent(opID, stepID string, offset int64, len
 		err = errors.New("opId or stepId is invalid")
 		return
 	}
-	realLen := op.cfg.SingleThreshold
+	realLen := op.cfg.MaxReadBytes
 	// length greater than zero and the threshold is not exceeded, length allowed
 	if length > 0 && int64(length) <= realLen {
 		realLen = int64(length)

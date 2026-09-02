@@ -107,7 +107,7 @@ func newTestWorker(t *testing.T, client *fakeTaskClient, executor Executor) *Wor
 	if err := registry.Register("test/v1", executor); err != nil {
 		t.Fatal(err)
 	}
-	logStore, err := oplog.NewOperationLog(&oplog.Options{Dir: t.TempDir(), SingleThreshold: oplog.DefaultThreshold})
+	logStore, err := oplog.NewOperationLog(&oplog.Options{Dir: t.TempDir(), MaxReadBytes: oplog.DefaultThreshold})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestTaskListIsBoundedAndWatchIsNot(t *testing.T) {
 	if err := registry.Register(NoopExecutorName, NoopExecutor{}); err != nil {
 		t.Fatal(err)
 	}
-	logStore, err := oplog.NewOperationLog(&oplog.Options{Dir: t.TempDir(), SingleThreshold: oplog.DefaultThreshold})
+	logStore, err := oplog.NewOperationLog(&oplog.Options{Dir: t.TempDir(), MaxReadBytes: oplog.DefaultThreshold})
 	if err != nil {
 		t.Fatal(err)
 	}
