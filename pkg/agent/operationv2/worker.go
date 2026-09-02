@@ -341,7 +341,7 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 		// command before it ran; fail the task with an explicit reason.
 		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
 			Reason:  operations.TaskReasonExecutionFailed,
-			Message: "task has no deadline",
+			Message: taskResultMessage("task has no deadline", logErr),
 		})
 	}
 	ctx, cancel := context.WithDeadline(parent, task.Spec.Deadline.Time)
@@ -353,22 +353,19 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(reconcileErr, context.DeadlineExceeded) {
 		return w.finish(context.Background(), task, operations.TaskTimedOut, operations.TaskResult{
 			Reason:  operations.TaskReasonDeadlineExceeded,
-			Message: "task deadline exceeded",
+			Message: taskResultMessage("task deadline exceeded", logErr),
 		})
 	}
 	if reconcileErr != nil {
 		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
 			Reason:  operations.TaskReasonExecutionFailed,
-			Message: boundedMessage(reconcileErr.Error()),
+			Message: taskResultMessage(reconcileErr.Error(), logErr),
 		})
 	}
 	result.Reason = ""
-	result.Message = boundedMessage(result.Message)
-	if logErr != nil {
-		// The server-side log read would 404 without an explanation; surface
-		// the reason through the task result instead.
-		result.Message = boundedMessage(result.Message + "; agent task log unavailable: " + logErr.Error())
-	}
+	// The server-side log read would 404 without an explanation; surface the
+	// reason through the task result regardless of executor outcome.
+	result.Message = taskResultMessage(result.Message, logErr)
 	return w.finish(parent, task, operations.TaskSucceeded, result)
 }
 
@@ -413,6 +410,13 @@ func boundedMessage(message string) string {
 		truncated = truncated[:len(truncated)-1]
 	}
 	return truncated
+}
+
+func taskResultMessage(message string, logErr error) string {
+	if logErr != nil {
+		message += "; agent task log unavailable: " + logErr.Error()
+	}
+	return boundedMessage(message)
 }
 
 var _ interface {

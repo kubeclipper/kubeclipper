@@ -88,8 +88,9 @@ func Peek(filepath string, offset int64, length int) (data []byte, err error) {
 	data = make([]byte, length)
 	// Tolerate a file truncated between Stat and Read: return the partial
 	// bytes instead of failing the read.
-	if _, err = io.ReadFull(f, data); err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+	var n int
+	if n, err = io.ReadFull(f, data); err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
-	return
+	return data[:n], nil
 }

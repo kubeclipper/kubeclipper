@@ -19,8 +19,10 @@
 package fileutil
 
 import (
+	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,5 +53,21 @@ func TestWriteFileWithDataFunc(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, content, string(data))
 		os.Remove(tt.filename)
+	}
+}
+
+func TestPeekReturnsOnlyBytesReadAfterTruncation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "task.log")
+	content := []byte("partial log")
+	if err := os.WriteFile(path, content, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Peek(path, 0, len(content)+10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatalf("Peek() = %q, want %q", got, content)
 	}
 }

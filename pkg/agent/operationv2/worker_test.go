@@ -338,3 +338,13 @@ func TestBoundedMessageKeepsValidUTF8(t *testing.T) {
 		t.Fatalf("bounded message length = %d, want <= %d", len(bounded), operations.MaxMessageSize)
 	}
 }
+
+func TestTaskResultMessageIncludesLogError(t *testing.T) {
+	if got, want := taskResultMessage("command failed", errors.New("permission denied")),
+		"command failed; agent task log unavailable: permission denied"; got != want {
+		t.Fatalf("message = %q, want %q", got, want)
+	}
+	if got, want := taskResultMessage("done", nil), "done"; got != want {
+		t.Fatalf("message without log error = %q, want %q", got, want)
+	}
+}
