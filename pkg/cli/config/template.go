@@ -272,7 +272,7 @@ apiServer:
   logAddress: ":{{.AgentLogPort}}"
 oplog:
   dir: {{.OpLogDir}}
-  singleThreshold: {{.OpLogThreshold}}
+  oplog-threshold: {{.OpLogThreshold}}
 backupStore:
   type: fs
   provider:

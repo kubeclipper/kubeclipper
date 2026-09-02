@@ -32,14 +32,14 @@ const (
 )
 
 type Options struct {
-	Dir          string `json:"dir" yaml:"dir"`
-	MaxReadBytes int64  `json:"singleThreshold" yaml:"singleThreshold"`
+	Dir            string `json:"dir" yaml:"dir"`
+	OplogThreshold int64  `json:"oplog-threshold" yaml:"oplog-threshold" mapstructure:"oplog-threshold"`
 }
 
 func NewOptions() *Options {
 	return &Options{
-		Dir:          DefaultDir,
-		MaxReadBytes: DefaultThreshold,
+		Dir:            DefaultDir,
+		OplogThreshold: DefaultThreshold,
 	}
 }
 
@@ -56,10 +56,10 @@ func (s *Options) Validate() (errs []error) {
 	if !filepath.IsAbs(s.Dir) {
 		return append(errs, errors.New("the dir for storing operation logs must be absolute"))
 	}
-	if s.MaxReadBytes <= 0 {
+	if s.OplogThreshold <= 0 {
 		return append(errs, errors.New("the threshold must be greater than 0"))
 	}
-	if s.MaxReadBytes > MaximumThreshold {
+	if s.OplogThreshold > MaximumThreshold {
 		return append(errs, errors.New("the threshold exceeded the limit, the maximum threshold is 1MB"))
 	}
 	return
@@ -67,5 +67,5 @@ func (s *Options) Validate() (errs []error) {
 
 func (s *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Dir, "oplog-dir", s.Dir, "directory of op log file")
-	fs.Int64Var(&s.MaxReadBytes, "oplog-threshold", s.MaxReadBytes, "maximum bytes of log data returned per read")
+	fs.Int64Var(&s.OplogThreshold, "oplog-threshold", s.OplogThreshold, "maximum bytes of log data returned per read")
 }
