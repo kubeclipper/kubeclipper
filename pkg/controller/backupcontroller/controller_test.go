@@ -32,7 +32,10 @@ import (
 func TestMapObjectsForOperationUsesOperationNameIndex(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
 		OperationNameIndex: func(raw any) ([]string, error) {
-			backup := raw.(*corev1.Backup)
+			backup, ok := raw.(*corev1.Backup)
+			if !ok || backup.Labels == nil {
+				return nil, nil
+			}
 			return []string{backup.Labels[common.LabelOperationName]}, nil
 		},
 	})

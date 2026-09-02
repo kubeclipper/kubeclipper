@@ -77,16 +77,17 @@ func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, informerCache i
 	if err != nil {
 		return err
 	}
-	if err := backupInformer.AddIndexers(cache.Indexers{
+	indexErr := backupInformer.AddIndexers(cache.Indexers{
 		OperationNameIndex: func(raw any) ([]string, error) {
 			backup, ok := raw.(*v1.Backup)
-			if !ok || backup.Labels[common.LabelOperationName] == "" {
+			if !ok || backup.Labels == nil || backup.Labels[common.LabelOperationName] == "" {
 				return nil, nil
 			}
 			return []string{backup.Labels[common.LabelOperationName]}, nil
 		},
-	}); err != nil {
-		return err
+	})
+	if indexErr != nil {
+		return indexErr
 	}
 	c, err := controller.NewUnmanaged("backup", controller.Options{
 		MaxConcurrentReconciles: 2,
@@ -97,8 +98,9 @@ func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, informerCache i
 	if err != nil {
 		return err
 	}
-	if err = c.Watch(source.NewKindWithCache(&v1.Backup{}, informerCache), &handler.EnqueueRequestForObject{}); err != nil {
-		return err
+	watchErr := c.Watch(source.NewKindWithCache(&v1.Backup{}, informerCache), &handler.EnqueueRequestForObject{})
+	if watchErr != nil {
+		return watchErr
 	}
 	if watchErr := c.Watch(
 		source.NewKindWithCache(&operations.Operation{}, informerCache),

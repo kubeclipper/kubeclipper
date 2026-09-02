@@ -153,7 +153,7 @@ func (s *APIServer) PrepareRun(stopCh <-chan struct{}) error {
 	s.container.DoNotRecover(false)
 	s.container.Filter(filters.LogRequestAndResponse)
 	s.container.Router(restful.CurlyRouter{})
-	s.container.RecoverHandler(func(panicReason interface{}, httpWriter http.ResponseWriter) {
+	s.container.RecoverHandler(func(panicReason any, httpWriter http.ResponseWriter) {
 		filters.LogStackOnRecover(panicReason, httpWriter)
 	})
 	if err := s.installAPIs(stopCh); err != nil {
