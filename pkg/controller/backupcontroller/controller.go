@@ -25,7 +25,6 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 
@@ -49,12 +48,8 @@ import (
 )
 
 type BackupReconciler struct {
-	ClusterLister listerv1.ClusterLister
-	BackupLister  listerv1.BackupLister
-	// BackupIndexer indexes Backups by their operation-name label; nil falls
-	// back to the full lister scan in findObjectsForOperation. Wired from the
-	// server composition, where the backup informer index is registered.
-	BackupIndexer   cache.Indexer
+	ClusterLister   listerv1.ClusterLister
+	BackupLister    listerv1.BackupLister
 	OperationLister operationslister.OperationLister
 	OperationStore  operationv2store.Store
 	BackupWriter    cluster.BackupWriter
@@ -77,7 +72,22 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, r.updateBackupStatus(ctx, log, b)
 }
 
-func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
+func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, informerCache informers.InformerCache) error {
+	backupInformer, err := informerCache.GetInformer(context.Background(), &v1.Backup{})
+	if err != nil {
+		return err
+	}
+	if err := backupInformer.AddIndexers(cache.Indexers{
+		OperationNameIndex: func(raw any) ([]string, error) {
+			backup, ok := raw.(*v1.Backup)
+			if !ok || backup.Labels[common.LabelOperationName] == "" {
+				return nil, nil
+			}
+			return []string{backup.Labels[common.LabelOperationName]}, nil
+		},
+	}); err != nil {
+		return err
+	}
 	c, err := controller.NewUnmanaged("backup", controller.Options{
 		MaxConcurrentReconciles: 2,
 		Reconciler:              r,
@@ -87,12 +97,12 @@ func (r *BackupReconciler) SetupWithManager(mgr manager.Manager, cache informers
 	if err != nil {
 		return err
 	}
-	if err = c.Watch(source.NewKindWithCache(&v1.Backup{}, cache), &handler.EnqueueRequestForObject{}); err != nil {
+	if err = c.Watch(source.NewKindWithCache(&v1.Backup{}, informerCache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 	if watchErr := c.Watch(
-		source.NewKindWithCache(&operations.Operation{}, cache),
-		handler.EnqueueRequestsFromMapFunc(r.findObjectsForOperation),
+		source.NewKindWithCache(&operations.Operation{}, informerCache),
+		handler.EnqueueRequestsFromMapFunc(mapObjectsForOperation(backupInformer.GetIndexer())),
 	); watchErr != nil {
 		return watchErr
 	}
@@ -213,39 +223,24 @@ func (r *BackupReconciler) updateBackupStatus(ctx context.Context, log logger.Lo
 // events fan out to the matching backups without a full lister scan.
 const OperationNameIndex = "operationNameIndex"
 
-func (r *BackupReconciler) findObjectsForOperation(clu client.Object) []reconcile.Request {
-	if r.BackupIndexer == nil {
-		backups, err := r.BackupLister.List(labels.Everything())
+func mapObjectsForOperation(indexer cache.Indexer) handler.MapFunc {
+	return func(clu client.Object) []reconcile.Request {
+		matched, err := indexer.ByIndex(OperationNameIndex, clu.GetName())
 		if err != nil {
 			return []reconcile.Request{}
 		}
-		requests := make([]reconcile.Request, 0)
-		for _, backup := range backups {
-			if backup.Labels[common.LabelOperationName] != clu.GetName() {
+		requests := make([]reconcile.Request, 0, len(matched))
+		for _, raw := range matched {
+			backup, ok := raw.(*v1.Backup)
+			if !ok {
 				continue
 			}
 			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{Name: backup.Name},
+				NamespacedName: types.NamespacedName{
+					Name: backup.Name,
+				},
 			})
 		}
 		return requests
 	}
-
-	matched, err := r.BackupIndexer.ByIndex(OperationNameIndex, clu.GetName())
-	if err != nil {
-		return []reconcile.Request{}
-	}
-	requests := make([]reconcile.Request, 0, len(matched))
-	for _, raw := range matched {
-		backup, ok := raw.(*v1.Backup)
-		if !ok {
-			continue
-		}
-		requests = append(requests, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: backup.Name,
-			},
-		})
-	}
-	return requests
 }

@@ -604,21 +604,6 @@ func (f *fakeStore) CleanupByTargetUID(_ context.Context, targetUID types.UID) e
 	return nil
 }
 
-func TestConflictBackoffEscalatesAndResets(t *testing.T) {
-	r := &OperationReconciler{}
-	want := []time.Duration{200 * time.Millisecond, 400 * time.Millisecond, 800 * time.Millisecond,
-		1600 * time.Millisecond, 3200 * time.Millisecond, 5 * time.Second, 5 * time.Second}
-	for i, d := range want {
-		if got := r.bumpConflictBackoff("op-1"); got != d {
-			t.Fatalf("backoff[%d] = %v, want %v", i, got, d)
-		}
-	}
-	r.forgetConflict("op-1")
-	if got := r.bumpConflictBackoff("op-1"); got != 200*time.Millisecond {
-		t.Fatalf("backoff after forget = %v, want the 200ms floor", got)
-	}
-}
-
 func TestMapTargetOperationsUsesTargetUIDIndex(t *testing.T) {
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
 		targetUIDIndex: func(raw any) ([]string, error) {

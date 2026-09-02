@@ -24,14 +24,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	listerv1 "github.com/kubeclipper/kubeclipper/pkg/client/lister/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	corev1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
 
-func TestFindObjectsForOperationFallsBackToListerWithoutIndex(t *testing.T) {
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+func TestMapObjectsForOperationUsesOperationNameIndex(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
+		OperationNameIndex: func(raw any) ([]string, error) {
+			backup := raw.(*corev1.Backup)
+			return []string{backup.Labels[common.LabelOperationName]}, nil
+		},
+	})
 	for _, backup := range []*corev1.Backup{
 		{ObjectMeta: metav1.ObjectMeta{Name: "matching", Labels: map[string]string{common.LabelOperationName: "operation-1"}}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{common.LabelOperationName: "operation-2"}}},
@@ -41,8 +45,7 @@ func TestFindObjectsForOperationFallsBackToListerWithoutIndex(t *testing.T) {
 		}
 	}
 
-	reconciler := &BackupReconciler{BackupLister: listerv1.NewBackupLister(indexer)}
-	requests := reconciler.findObjectsForOperation(&operations.Operation{ObjectMeta: metav1.ObjectMeta{Name: "operation-1"}})
+	requests := mapObjectsForOperation(indexer)(&operations.Operation{ObjectMeta: metav1.ObjectMeta{Name: "operation-1"}})
 	if len(requests) != 1 || requests[0].Name != "matching" {
 		t.Fatalf("requests = %#v, want only matching backup", requests)
 	}

@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -43,12 +42,6 @@ const (
 type OperationReconciler struct {
 	Store Store
 	Now   func() time.Time
-	// conflictCounts tracks consecutive CAS conflicts per Operation so the
-	// requeue grows exponentially instead of spinning at the 200ms floor.
-	// Only the single controller goroutine family touches one key at a time,
-	// but the map itself is guarded for the two reconcile workers.
-	conflictMu     sync.Mutex
-	conflictCounts map[string]int
 }
 
 // Store is the narrow persistence contract needed by the reconciler. The
@@ -69,42 +62,6 @@ type Store interface {
 }
 
 func (r *OperationReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	result, err := r.reconcile(ctx, req)
-	if err == nil && result.RequeueAfter == conflictRequeue {
-		// A CAS conflict: escalate the requeue exponentially so contended
-		// keys do not spin at the 200ms floor. The workqueue rate limiter is
-		// not engaged by RequeueAfter, so the backoff is applied here.
-		result.RequeueAfter = r.bumpConflictBackoff(req.Name)
-		return result, nil
-	}
-	r.forgetConflict(req.Name)
-	return result, err
-}
-
-func (r *OperationReconciler) bumpConflictBackoff(key string) time.Duration {
-	r.conflictMu.Lock()
-	defer r.conflictMu.Unlock()
-	if r.conflictCounts == nil {
-		r.conflictCounts = make(map[string]int)
-	}
-	r.conflictCounts[key]++
-	backoff := conflictRequeue
-	for i := 1; i < r.conflictCounts[key] && backoff < defaultWaitRequeue; i++ {
-		backoff *= 2
-	}
-	if backoff > defaultWaitRequeue {
-		backoff = defaultWaitRequeue
-	}
-	return backoff
-}
-
-func (r *OperationReconciler) forgetConflict(key string) {
-	r.conflictMu.Lock()
-	defer r.conflictMu.Unlock()
-	delete(r.conflictCounts, key)
-}
-
-func (r *OperationReconciler) reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	if r.Store == nil {
 		return reconcile.Result{}, fmt.Errorf("operation v2 store is required")
 	}
