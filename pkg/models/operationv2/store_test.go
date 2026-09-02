@@ -174,10 +174,11 @@ func TestStrongStoragesFallBackToInjected(t *testing.T) {
 // configurable list/get views so the quorum re-check can be exercised.
 type recordingDeletes struct {
 	rest.StandardStorage
-	listObj  runtime.Object
-	getObj   runtime.Object
-	deleted  []string
-	notFound map[string]bool
+	listObj              runtime.Object
+	getObj               runtime.Object
+	deleted              []string
+	notFound             map[string]bool
+	nilDeleteValidations int
 }
 
 func (r *recordingDeletes) List(_ context.Context, _ *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -198,8 +199,11 @@ func (r *recordingDeletes) Get(_ context.Context, name string, _ *metav1.GetOpti
 }
 
 func (r *recordingDeletes) Delete(
-	_ context.Context, name string, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions,
+	_ context.Context, name string, validateDeletion rest.ValidateObjectFunc, _ *metav1.DeleteOptions,
 ) (runtime.Object, bool, error) {
+	if validateDeletion == nil {
+		r.nilDeleteValidations++
+	}
 	r.deleted = append(r.deleted, name)
 	return nil, true, nil
 }
@@ -310,5 +314,8 @@ func TestCleanupByTargetUIDPurgesTerminalHistoryIdempotently(t *testing.T) {
 	}
 	if len(locks.deleted) != 2 || locks.deleted[0] != "cluster-stale-lock" {
 		t.Fatalf("lock deletes = %v", locks.deleted)
+	}
+	if ops.nilDeleteValidations != 0 || tasks.nilDeleteValidations != 0 || locks.nilDeleteValidations != 0 {
+		t.Fatalf("cleanup passed nil delete validation: ops:%d tasks:%d locks:%d", ops.nilDeleteValidations, tasks.nilDeleteValidations, locks.nilDeleteValidations)
 	}
 }

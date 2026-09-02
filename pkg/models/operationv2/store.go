@@ -857,7 +857,15 @@ func (s *store) deleteStaleLocks(ctx context.Context, targetUID types.UID) error
 // deleteObject deletes by name and tolerates an already-deleted object, which
 // is what makes repeated cleanup calls safe.
 func (*store) deleteObject(ctx context.Context, storage rest.StandardStorage, name string) error {
-	_, _, err := storage.Delete(withNamespace(ctx), name, nil, &metav1.DeleteOptions{})
+	// The apiserver storage implementation invokes the deletion validator
+	// unconditionally, so cleanup must provide a callback even without custom
+	// validation rules for these internal objects.
+	_, _, err := storage.Delete(
+		withNamespace(ctx),
+		name,
+		func(_ context.Context, _ runtime.Object) error { return nil },
+		&metav1.DeleteOptions{},
+	)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
