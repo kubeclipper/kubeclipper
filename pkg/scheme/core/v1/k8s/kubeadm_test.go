@@ -86,6 +86,19 @@ func TestKubeadmResetIsSafeWhenKubeadmIsAbsent(t *testing.T) {
 	}
 }
 
+func TestDeduplicateProcessIDs(t *testing.T) {
+	got := deduplicateProcessIDs([]string{"101", "202", "101", "303", "202"})
+	want := []string{"101", "202", "303"}
+	if len(got) != len(want) {
+		t.Fatalf("deduplicateProcessIDs() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("deduplicateProcessIDs() = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestRemoveDummyInterfaceIsSafeWhenInterfaceIsAbsent(t *testing.T) {
 	steps, err := (&Health{}).UninstallSteps(&v1.Networking{ProxyMode: "ipvs"}, v1.StepNode{ID: "node-1"})
 	if err != nil {

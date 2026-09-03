@@ -573,18 +573,15 @@ func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
 	processes := []string{"kube-proxy", "kube-apiserver", "kube-controller", "kube-scheduler", "containerd-shim", "etcd"}
 
 	for _, process := range processes {
+		command := "ps -ef | grep " + process + " | grep -v grep | awk '{print $2}'"
 		if strings.Contains(process, "etcd") {
-			ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | grep -v \"/usr\" | awk '{print $2}'")
-			if err != nil {
-				logger.Error("run ps -ef error", zap.Error(err))
-				return pids, err
-			}
-		} else {
-			ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", "ps -ef | grep "+process+" | grep -v grep | awk '{print $2}'")
-			if err != nil {
-				logger.Error("run ps -ef error", zap.Error(err))
-				return pids, err
-			}
+			command = "ps -ef | grep -E \"[[:space:]]" + process +
+				"([[:space:]]|$)\" | grep -v grep | grep -v \"/usr\" | awk '{print $2}'"
+		}
+		ec, err = cmdutil.RunCmdWithContext(ctx, dryRun, "/bin/bash", "-c", command)
+		if err != nil {
+			logger.Error("run ps -ef error", zap.Error(err))
+			return pids, err
 		}
 		if ec.StdOut() != "" {
 			p := strings.Split(ec.StdOut(), "\n")
@@ -597,13 +594,31 @@ func getProcessID(ctx context.Context, dryRun bool) ([]string, error) {
 		}
 	}
 
-	return pids, nil
+	return deduplicateProcessIDs(pids), nil
+}
+
+func deduplicateProcessIDs(pids []string) []string {
+	result := make([]string, 0, len(pids))
+	seen := make(map[string]struct{}, len(pids))
+	for _, pid := range pids {
+		if _, ok := seen[pid]; ok {
+			continue
+		}
+		seen[pid] = struct{}{}
+		result = append(result, pid)
+	}
+	return result
 }
 
 func killProcess(ctx context.Context, dryRun bool, pids []string) error {
-	for _, pid := range pids {
-		_, err := cmdutil.RunCmdWithContext(ctx, dryRun, "kill", "-9", pid)
+	for _, pid := range deduplicateProcessIDs(pids) {
+		ec, err := cmdutil.RunCmdWithContext(ctx, dryRun, "kill", "-9", pid)
 		if err != nil {
+			// A process can exit between ps and kill. That is already the
+			// desired state for cleanup, so do not fail the whole operation.
+			if ec != nil && strings.Contains(ec.StdErr(), "No such process") {
+				continue
+			}
 			logger.Error("kill the process error", zap.Error(err))
 			return err
 		}
