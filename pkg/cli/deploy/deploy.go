@@ -239,7 +239,7 @@ func (d *DeployOptions) Complete() error {
 		if v == "" {
 			v, ok = strutil.ParseGitDescribeInfo(version.Get().GitVersion)
 			if !ok {
-				v = "v1.6.0"
+				v = "v1.7.0"
 			}
 		}
 		d.deployConfig.Pkg = fmt.Sprintf(defaultPkg, v, runtime.GOARCH)

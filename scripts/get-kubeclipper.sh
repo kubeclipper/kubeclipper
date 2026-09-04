@@ -50,7 +50,7 @@ DOWNLOAD_URL="${OSS_ENDPOINT}/kc"
 BIN_DIR="/usr/local/bin"
 
 if [[ -z "${KC_VERSION}" ]]; then
-  KC_VERSION="v1.6.0"
+  KC_VERSION="v1.7.0"
 fi
 info "The ${KC_VERSION} version will be installed"
 
