@@ -93,8 +93,8 @@ KubeClipper has passed the [CNCF Kubernetes Conformance Certification](https://w
 | Kubernetes | Calico | Containerd |
 |------------|--------|------------|
 | v1.37.0 (default) | v3.31.5 | v2.2.4 |
-| v1.36.1 | v3.31.5 | v2.2.4 |
-| v1.35.0 | v3.29.6 | v1.7.29 |
+| v1.36.4 | v3.31.5 | v2.2.4 |
+| v1.35.8 | v3.31.5 | v2.2.4 |
 
 ## Roadmap & Todo list
 
