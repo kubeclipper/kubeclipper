@@ -194,15 +194,17 @@ func GetClusterCRIRegistriesForMode(ctx context.Context, c *v1.Cluster, offline 
 	return registries, nil
 }
 
-// ResolveClusterImageRegistry returns the registry used to pull cluster images.
-// Offline clusters without an image registry load packaged images on each node.
+// ResolveClusterImageRegistry resolves only an explicitly selected registry.
+// Component-specific defaults are applied later when the cluster steps render.
 func ResolveClusterImageRegistry(ctx context.Context, c *v1.Cluster, op cluster.Operator) (v1.RegistrySpec, error) {
 	return ResolveImageRegistryForMode(ctx, c.Offline(), c.ImageRegistry, op)
 }
 
-// ResolveImageRegistryForMode returns an empty registry only for offline local-image mode.
-func ResolveImageRegistryForMode(ctx context.Context, offline bool, name string, op cluster.Operator) (v1.RegistrySpec, error) {
-	if offline && strings.TrimSpace(name) == "" {
+// ResolveImageRegistryForMode returns an empty registry when no registry resource
+// is explicitly selected. Online components apply their own defaults, including
+// the configured agent-side image repository mirror.
+func ResolveImageRegistryForMode(ctx context.Context, _ bool, name string, op cluster.Operator) (v1.RegistrySpec, error) {
+	if strings.TrimSpace(name) == "" {
 		return v1.RegistrySpec{}, nil
 	}
 	return ResolveImageRegistry(ctx, name, op)

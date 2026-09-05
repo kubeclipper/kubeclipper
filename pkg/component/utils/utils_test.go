@@ -32,13 +32,13 @@ import (
 )
 
 func TestResolveClusterImageRegistry(t *testing.T) {
-	t.Run("online cluster uses default registry", func(t *testing.T) {
+	t.Run("online cluster without registry uses component defaults", func(t *testing.T) {
 		registry, err := ResolveClusterImageRegistry(context.Background(), &v1.Cluster{}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if registry.Host != v1.DefaultImageRegistry {
-			t.Fatalf("registry host = %q, want %q", registry.Host, v1.DefaultImageRegistry)
+		if registry.Host != "" {
+			t.Fatalf("registry host = %q, want empty", registry.Host)
 		}
 	})
 
@@ -54,6 +54,16 @@ func TestResolveClusterImageRegistry(t *testing.T) {
 	})
 }
 
+func TestResolveImageRegistryDefaultsToKubernetesRegistry(t *testing.T) {
+	registry, err := ResolveImageRegistry(context.Background(), "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if registry.Host != v1.DefaultImageRegistry {
+		t.Fatalf("registry host = %q, want %q", registry.Host, v1.DefaultImageRegistry)
+	}
+}
+
 func TestGetClusterCRIRegistriesUsesLocalImagesForOfflineClusterWithoutRegistry(t *testing.T) {
 	cluster := &v1.Cluster{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{common.AnnotationOffline: "true"}}}
 	registries, err := GetClusterCRIRegistriesWithContext(context.Background(), cluster, nil)
@@ -65,6 +75,16 @@ func TestGetClusterCRIRegistriesUsesLocalImagesForOfflineClusterWithoutRegistry(
 	}
 	if cluster.ResolvedImageRegistry != "" {
 		t.Fatalf("resolved image registry = %q, want empty", cluster.ResolvedImageRegistry)
+	}
+}
+
+func TestGetClusterCRIRegistriesLeavesOnlineDefaultToComponent(t *testing.T) {
+	registries, err := GetClusterCRIRegistriesWithContext(context.Background(), &v1.Cluster{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(registries) != 0 {
+		t.Fatalf("registries = %#v, want none", registries)
 	}
 }
 
