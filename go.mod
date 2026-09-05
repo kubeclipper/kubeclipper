@@ -12,7 +12,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.6.0
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/dlclark/regexp2 v1.11.5
-	github.com/emicklei/go-restful v2.9.6+incompatible
+	github.com/emicklei/go-restful v2.16.0+incompatible
 	github.com/emicklei/go-restful-openapi v0.0.0-00010101000000-000000000000
 	github.com/fatih/color v1.7.0
 	github.com/go-logr/zapr v1.2.3
@@ -250,7 +250,7 @@ replace (
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
-	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.14.3+incompatible
+	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.16.0+incompatible
 	github.com/emicklei/go-restful-openapi => github.com/emicklei/go-restful-openapi v1.4.1
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/fatih/color => github.com/fatih/color v1.13.0
