@@ -142,7 +142,7 @@ func (o *LogsOptions) runClusterMode() error {
 func (o *LogsOptions) nonTTYClusterFallback() error {
 	ctx := context.Background()
 	labelSelector := fmt.Sprintf("kubeclipper.io/cluster=%s", o.Cluster)
-	list, err := o.Client.ListOperation(ctx, kc.Queries{
+	list, err := o.Client.ListOperations(ctx, kc.OperationListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {

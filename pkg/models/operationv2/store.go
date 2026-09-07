@@ -24,7 +24,10 @@ package operationv2
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -223,7 +226,45 @@ func (s *store) ListOperationsWithOptions(ctx context.Context, options *metav1.L
 	if options == nil {
 		options = &metav1.ListOptions{}
 	}
-	internal, err := internalListOptions(options)
+	if options.Watch {
+		internal, err := internalListOptions(options)
+		if err != nil {
+			return nil, err
+		}
+		obj, err := s.operations.List(withNamespace(ctx), internal)
+		if err != nil {
+			return nil, err
+		}
+		list, ok := obj.(*operations.OperationList)
+		if !ok {
+			return nil, fmt.Errorf("operation storage returned %T", obj)
+		}
+		return list, nil
+	}
+	if options.Limit < 0 {
+		return nil, apierrors.NewBadRequest("limit must be a non-negative integer")
+	}
+
+	continueToken, err := decodeOperationContinue(options.Continue)
+	if err != nil {
+		return nil, err
+	}
+	storageOptions := *options
+	pageLimit := options.Limit
+	// The generic storage layer applies its limit before returning the list,
+	// while Operation V2 needs to sort by creation time first. Fetch the
+	// selected snapshot without storage pagination and apply the stable cursor
+	// below after sorting.
+	storageOptions.Limit = 0
+	storageOptions.Continue = ""
+	if continueToken != nil {
+		if storageOptions.ResourceVersion != "" &&
+			storageOptions.ResourceVersion != continueToken.ResourceVersion {
+			return nil, apierrors.NewBadRequest("resourceVersion does not match continue token")
+		}
+		storageOptions.ResourceVersion = continueToken.ResourceVersion
+	}
+	internal, err := internalListOptions(&storageOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +276,105 @@ func (s *store) ListOperationsWithOptions(ctx context.Context, options *metav1.L
 	if !ok {
 		return nil, fmt.Errorf("operation storage returned %T", obj)
 	}
+	list = list.DeepCopy()
+	sort.SliceStable(list.Items, func(i, j int) bool {
+		return operationNewer(&list.Items[i], &list.Items[j])
+	})
+
+	start := 0
+	if continueToken != nil {
+		start = sort.Search(len(list.Items), func(i int) bool {
+			return operationAfterCursor(&list.Items[i], continueToken)
+		})
+	}
+	if start > 0 {
+		list.Items = list.Items[start:]
+	}
+	if pageLimit == 0 {
+		return list, nil
+	}
+
+	end := len(list.Items)
+	if pageLimit < int64(len(list.Items)) {
+		end = int(pageLimit)
+	}
+	remaining := len(list.Items) - end
+	if remaining == 0 {
+		list.Items = list.Items[:end]
+		return list, nil
+	}
+
+	page := list.Items[:end]
+	last := page[len(page)-1]
+	resourceVersion := list.ResourceVersion
+	if resourceVersion == "" && continueToken != nil {
+		resourceVersion = continueToken.ResourceVersion
+	}
+	encoded, err := encodeOperationContinue(operationContinueToken{
+		Version:           operationContinueTokenVersion,
+		ResourceVersion:   resourceVersion,
+		CreationTimestamp: last.CreationTimestamp.Time,
+		UID:               last.UID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	list.Items = page
+	list.Continue = encoded
+	remainingCount := int64(remaining)
+	list.RemainingItemCount = &remainingCount
 	return list, nil
+}
+
+const operationContinueTokenVersion = 1
+
+type operationContinueToken struct {
+	Version           int       `json:"version"`
+	ResourceVersion   string    `json:"resourceVersion,omitempty"`
+	CreationTimestamp time.Time `json:"creationTimestamp"`
+	UID               types.UID `json:"uid"`
+}
+
+func encodeOperationContinue(token operationContinueToken) (string, error) {
+	payload, err := json.Marshal(token)
+	if err != nil {
+		return "", fmt.Errorf("encode operation continue token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+func decodeOperationContinue(value string) (*operationContinueToken, error) {
+	if value == "" {
+		return nil, nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return nil, apierrors.NewBadRequest("invalid operation continue token")
+	}
+	token := &operationContinueToken{}
+	if err := json.Unmarshal(payload, token); err != nil ||
+		token.Version != operationContinueTokenVersion || token.UID == "" {
+		return nil, apierrors.NewBadRequest("invalid operation continue token")
+	}
+	return token, nil
+}
+
+func operationNewer(left, right *operations.Operation) bool {
+	if !left.CreationTimestamp.Equal(&right.CreationTimestamp) {
+		return left.CreationTimestamp.After(right.CreationTimestamp.Time)
+	}
+	return string(left.UID) > string(right.UID)
+}
+
+func operationAfterCursor(op *operations.Operation, token *operationContinueToken) bool {
+	cursorTime := metav1.Time{Time: token.CreationTimestamp}
+	if op.CreationTimestamp.Before(&cursorTime) {
+		return true
+	}
+	if op.CreationTimestamp.After(cursorTime.Time) {
+		return false
+	}
+	return string(op.UID) < string(token.UID)
 }
 
 func (s *store) WatchOperations(ctx context.Context, resourceVersion string) (watch.Interface, error) {

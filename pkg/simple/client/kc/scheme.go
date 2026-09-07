@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"strconv"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 
 	iamv1 "github.com/kubeclipper/kubeclipper/pkg/scheme/iam/v1"
@@ -306,8 +308,9 @@ func (n *TemplateList) TablePrint() ([]string, [][]string) {
 var _ printer.ResourcePrinter = (*OperationList)(nil)
 
 type OperationList struct {
-	Items      []operationsv1alpha1.Operation `json:"items" description:"paging data"`
-	TotalCount int                            `json:"totalCount,omitempty" description:"total count"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []operationsv1alpha1.Operation `json:"items" description:"paging data"`
+	TotalCount      int                            `json:"totalCount,omitempty" description:"total count"`
 }
 
 func (n *OperationList) JSONPrint() ([]byte, error) {

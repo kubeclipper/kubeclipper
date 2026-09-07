@@ -89,12 +89,12 @@ func (o *ListOptions) Complete(opts *options.CliOptions) error {
 
 // RunList fetches and displays the operation list.
 func (o *ListOptions) RunList() error {
-	q := query.New()
+	listOptions := kc.OperationListOptions{}
 	if o.Cluster != "" {
-		q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, o.Cluster)
+		listOptions.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, o.Cluster)
 	}
 
-	result, err := o.Client.ListOperation(context.TODO(), kc.Queries(*q))
+	result, err := o.Client.ListOperations(context.TODO(), listOptions)
 	if err != nil {
 		return err
 	}
