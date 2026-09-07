@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/kubeclipper/kubeclipper/pkg/query"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 
@@ -94,9 +93,9 @@ func WaitForClusterCondition(
 }
 
 func printClusterOperationLogs(c *kc.Client, clusterName string) {
-	q := query.New()
-	q.LabelSelector = fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName)
-	opList, err := c.ListOperation(context.TODO(), kc.Queries(*q))
+	opList, err := c.ListOperations(context.TODO(), kc.OperationListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", common.LabelClusterName, clusterName),
+	})
 	if err != nil {
 		framework.Logf("List Cluster Operation Failed: %v", err)
 		return

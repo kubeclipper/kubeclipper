@@ -20,13 +20,16 @@ package operationv2
 
 import (
 	"context"
+	"sort"
 	"testing"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
@@ -41,6 +44,83 @@ type recordingStorage struct {
 	getCalls  int
 	listObj   runtime.Object
 	getObj    runtime.Object
+}
+
+func TestOperationOrderingAndContinueToken(t *testing.T) {
+	first := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	second := first.Add(time.Minute)
+	items := []operations.Operation{
+		{ObjectMeta: metav1.ObjectMeta{Name: "old", UID: types.UID("uid-old"), CreationTimestamp: metav1.NewTime(first)}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "newer-b", UID: types.UID("uid-newer-b"), CreationTimestamp: metav1.NewTime(second)}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "newer-a", UID: types.UID("uid-newer-a"), CreationTimestamp: metav1.NewTime(second)}},
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		return operationNewer(&items[i], &items[j])
+	})
+	if got := []string{items[0].Name, items[1].Name, items[2].Name}; got[0] != "newer-b" || got[1] != "newer-a" || got[2] != "old" {
+		t.Fatalf("ordered operations = %v", got)
+	}
+
+	tokenValue, err := encodeOperationContinue(operationContinueToken{
+		Version:           operationContinueTokenVersion,
+		ResourceVersion:   "42",
+		CreationTimestamp: items[1].CreationTimestamp.Time,
+		UID:               items[1].UID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := decodeOperationContinue(tokenValue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := sort.Search(len(items), func(i int) bool {
+		return operationAfterCursor(&items[i], token)
+	})
+	if start != 2 || items[start].Name != "old" {
+		t.Fatalf("next page starts at %d with %q", start, items[start].Name)
+	}
+
+	if _, err := decodeOperationContinue("not-a-token"); !apierrors.IsBadRequest(err) {
+		t.Fatalf("invalid token error = %v, want BadRequest", err)
+	}
+}
+
+func TestListOperationsWithOptionsPaginatesNewestFirst(t *testing.T) {
+	first := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	second := first.Add(time.Minute)
+	storage := &recordingStorage{listObj: &operations.OperationList{
+		ListMeta: metav1.ListMeta{ResourceVersion: "42"},
+		Items: []operations.Operation{
+			{ObjectMeta: metav1.ObjectMeta{Name: "old", UID: types.UID("uid-old"), CreationTimestamp: metav1.NewTime(first)}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "newer-a", UID: types.UID("uid-newer-a"), CreationTimestamp: metav1.NewTime(second)}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "newer-b", UID: types.UID("uid-newer-b"), CreationTimestamp: metav1.NewTime(second)}},
+		},
+	}}
+	store, err := NewStore(StoreOptions{Operations: storage, Tasks: &recordingStorage{}, Locks: &recordingStorage{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstPage, err := store.ListOperationsWithOptions(context.Background(), &metav1.ListOptions{Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := []string{firstPage.Items[0].Name, firstPage.Items[1].Name}; got[0] != "newer-b" || got[1] != "newer-a" {
+		t.Fatalf("first page = %v", got)
+	}
+	if firstPage.Continue == "" || firstPage.RemainingItemCount == nil || *firstPage.RemainingItemCount != 1 {
+		t.Fatalf("first page metadata = continue:%q remaining:%v", firstPage.Continue, firstPage.RemainingItemCount)
+	}
+
+	secondPage, err := store.ListOperationsWithOptions(context.Background(), &metav1.ListOptions{Limit: 2, Continue: firstPage.Continue})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(secondPage.Items) != 1 || secondPage.Items[0].Name != "old" || secondPage.Continue != "" {
+		t.Fatalf("second page = %#v", secondPage)
+	}
 }
 
 func (r *recordingStorage) List(_ context.Context, _ *metainternalversion.ListOptions) (runtime.Object, error) {

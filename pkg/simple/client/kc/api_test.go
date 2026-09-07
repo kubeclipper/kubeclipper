@@ -65,6 +65,42 @@ func TestListOperationTasksFiltersByOperationUID(t *testing.T) {
 	}
 }
 
+func TestListOperationsUsesV2ListOptions(t *testing.T) {
+	var request *http.Request
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		request = r
+		if err := json.NewEncoder(w).Encode(&OperationList{
+			ListMeta: metav1.ListMeta{Continue: "next-page"},
+		}); err != nil {
+			t.Errorf("encode operation list: %v", err)
+		}
+	})
+
+	list, err := client.ListOperations(context.Background(), OperationListOptions{
+		LabelSelector:   "kubeclipper.io/cluster=demo",
+		FieldSelector:   "metadata.name=operation-a",
+		Limit:           10,
+		Continue:        "opaque-token",
+		ResourceVersion: "42",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list.Continue != "next-page" {
+		t.Fatalf("continue = %q", list.Continue)
+	}
+	query := request.URL.Query()
+	if query.Get("labelSelector") != "kubeclipper.io/cluster=demo" {
+		t.Fatalf("labelSelector = %q", query.Get("labelSelector"))
+	}
+	if query.Get("fieldSelector") != "metadata.name=operation-a" {
+		t.Fatalf("fieldSelector = %q", query.Get("fieldSelector"))
+	}
+	if query.Get("limit") != "10" || query.Get("continue") != "opaque-token" || query.Get("resourceVersion") != "42" {
+		t.Fatalf("list options = %s", request.URL.RawQuery)
+	}
+}
+
 func TestOperationControlUsesCASPreconditions(t *testing.T) {
 	for _, subresource := range []string{"retry", "cancel"} {
 		t.Run(subresource, func(t *testing.T) {

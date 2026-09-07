@@ -176,8 +176,36 @@ func (cli *Client) DescribeCluster(ctx context.Context, name string) (*ClustersL
 	return &clusters, err
 }
 
-func (cli *Client) ListOperation(ctx context.Context, query Queries) (*OperationList, error) {
-	serverResp, err := cli.get(ctx, operationPath, query.ToRawQuery(), nil)
+// OperationListOptions contains the Kubernetes-style list options supported by
+// the Operation V2 endpoint. Continue is opaque and must be passed back to
+// the server unchanged when fetching the next page.
+type OperationListOptions struct {
+	LabelSelector   string
+	FieldSelector   string
+	Limit           int64
+	Continue        string
+	ResourceVersion string
+}
+
+func (cli *Client) ListOperations(ctx context.Context, options OperationListOptions) (*OperationList, error) {
+	query := url.Values{}
+	if options.LabelSelector != "" {
+		query.Set("labelSelector", options.LabelSelector)
+	}
+	if options.FieldSelector != "" {
+		query.Set("fieldSelector", options.FieldSelector)
+	}
+	if options.Limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", options.Limit))
+	}
+	if options.Continue != "" {
+		query.Set("continue", options.Continue)
+	}
+	if options.ResourceVersion != "" {
+		query.Set("resourceVersion", options.ResourceVersion)
+	}
+
+	serverResp, err := cli.get(ctx, operationPath, query, nil)
 	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return nil, err
