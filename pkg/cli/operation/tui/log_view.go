@@ -18,15 +18,26 @@ import (
 type StepEntry struct {
 	ID     string
 	Status string
+	Groups []TaskGroup
+}
+
+// TaskGroup keeps all execution attempts for nodes sharing one IP together.
+// An operation creates one task per node and attempt, so rendering the raw
+// task list directly makes retries look like unrelated nodes.
+type TaskGroup struct {
+	IP     string
+	Status string
 	Tasks  []TaskEntry
 }
 
 type TaskEntry struct {
-	Name     string
-	Node     string
-	Attempt  int32
-	Status   string
-	Duration string
+	Name            string
+	NodeUID         string
+	RetryGeneration int64
+	Attempt         int32
+	Status          string
+	Duration        string
+	CreatedAt       time.Time
 }
 
 type tickMsg time.Time
@@ -44,19 +55,21 @@ type operationStatusMsg struct {
 }
 
 type LogModel struct {
-	client     *kc.Client
-	operation  *operationsv1alpha1.Operation
-	tasks      []operationsv1alpha1.OperationTask
-	steps      []StepEntry
-	cursor     int
-	followMode bool
-	lastOffset map[string]int64
-	logContent map[string]string
-	displayed  string
-	viewport   viewport.Model
-	rawContent string
-	width      int
-	height     int
+	client       *kc.Client
+	operation    *operationsv1alpha1.Operation
+	tasks        []operationsv1alpha1.OperationTask
+	steps        []StepEntry
+	cursor       int
+	followMode   bool
+	lastOffset   map[string]int64
+	logContent   map[string]string
+	displayed    string
+	stepViewport viewport.Model
+	stepLines    []int
+	viewport     viewport.Model
+	rawContent   string
+	width        int
+	height       int
 }
 
 const (
@@ -68,14 +81,22 @@ func NewLogModel(client *kc.Client, op *operationsv1alpha1.Operation, width, hei
 	stepPanelWidth := width * 35 / 100
 	logPanelWidth := width - stepPanelWidth - 2
 	logPanelWidth = max(minLogPanelWidth, logPanelWidth)
-	return LogModel{
+	stepViewportWidth := maxInt(1, stepPanelWidth-4)
+	viewHeight := maxInt(1, height-3)
+	m := LogModel{
 		client: client, operation: op, steps: buildStepEntries(op, nil),
-		lastOffset: make(map[string]int64), logContent: make(map[string]string), viewport: viewport.New(logPanelWidth, height-3),
-		width: width, height: height,
+		lastOffset: make(map[string]int64), logContent: make(map[string]string),
+		stepViewport: viewport.New(stepViewportWidth, viewHeight),
+		viewport:     viewport.New(logPanelWidth, viewHeight), width: width, height: height,
 	}
+	m.rebuildStepViewport()
+	return m
 }
 
 func buildStepEntries(op *operationsv1alpha1.Operation, tasks []operationsv1alpha1.OperationTask) []StepEntry {
+	if op == nil {
+		return nil
+	}
 	byStep := make(map[string][]operationsv1alpha1.OperationTask)
 	for i := range tasks {
 		byStep[tasks[i].Spec.StepID] = append(byStep[tasks[i].Spec.StepID], tasks[i])
@@ -91,9 +112,27 @@ func buildStepEntries(op *operationsv1alpha1.Operation, tasks []operationsv1alph
 			if stepTasks[i].Spec.Attempt != stepTasks[j].Spec.Attempt {
 				return stepTasks[i].Spec.Attempt < stepTasks[j].Spec.Attempt
 			}
-			return stepTasks[i].Spec.NodeRef.Name < stepTasks[j].Spec.NodeRef.Name
+			if stepTasks[i].Spec.NodeRef.IP != stepTasks[j].Spec.NodeRef.IP {
+				return stepTasks[i].Spec.NodeRef.IP < stepTasks[j].Spec.NodeRef.IP
+			}
+			return stepTasks[i].Name < stepTasks[j].Name
 		})
 		entry := StepEntry{ID: step.ID, Status: string(operationsv1alpha1.TaskPending)}
+		groups := make([]TaskGroup, 0, len(step.Targets))
+		groupByKey := make(map[string]int, len(step.Targets))
+		groupByUID := make(map[string]int, len(step.Targets))
+		for _, target := range step.Targets {
+			key := nodeGroupKey(target)
+			groupIndex, exists := groupByKey[key]
+			if !exists {
+				groupIndex = len(groups)
+				groups = append(groups, TaskGroup{IP: target.IP})
+				groupByKey[key] = groupIndex
+			}
+			if target.UID != "" {
+				groupByUID[string(target.UID)] = groupIndex
+			}
+		}
 		for i := range stepTasks {
 			task := &stepTasks[i]
 			duration := ""
@@ -104,21 +143,92 @@ func buildStepEntries(op *operationsv1alpha1.Operation, tasks []operationsv1alph
 				}
 				duration = d.String()
 			}
-			entry.Tasks = append(
-				entry.Tasks,
-				TaskEntry{
-					Name:     task.Name,
-					Node:     task.Spec.NodeRef.Name,
-					Attempt:  task.Spec.Attempt,
-					Status:   string(task.Status.Phase),
-					Duration: duration,
-				},
-			)
+			entryTask := TaskEntry{
+				Name:            task.Name,
+				NodeUID:         string(task.Spec.NodeRef.UID),
+				RetryGeneration: task.Spec.RetryGeneration,
+				Attempt:         task.Spec.Attempt,
+				Status:          string(task.Status.Phase),
+				Duration:        duration,
+				CreatedAt:       task.CreationTimestamp.Time,
+			}
+			groupIndex, exists := groupByUID[string(task.Spec.NodeRef.UID)]
+			if !exists {
+				key := nodeGroupKey(task.Spec.NodeRef)
+				groupIndex, exists = groupByKey[key]
+				if !exists {
+					groupIndex = len(groups)
+					groups = append(groups, TaskGroup{IP: task.Spec.NodeRef.IP})
+					groupByKey[key] = groupIndex
+				}
+			}
+			groups[groupIndex].Tasks = append(groups[groupIndex].Tasks, entryTask)
 		}
+		for groupIndex := range groups {
+			groups[groupIndex].Status = aggregateTaskGroupPhase(groups[groupIndex].Tasks)
+		}
+		entry.Groups = groups
 		entry.Status = aggregateStepPhase(step, stepTasks, op.Status.Phase)
 		entries = append(entries, entry)
 	}
 	return entries
+}
+
+func nodeGroupKey(node operationsv1alpha1.NodeReference) string {
+	if node.IP != "" {
+		return "ip:" + node.IP
+	}
+	if node.UID != "" {
+		return "uid:" + string(node.UID)
+	}
+	return "name:" + node.Name
+}
+
+func aggregateTaskGroupPhase(tasks []TaskEntry) string {
+	if len(tasks) == 0 {
+		return string(operationsv1alpha1.TaskPending)
+	}
+	latestByNode := make(map[string]TaskEntry, len(tasks))
+	for _, task := range tasks {
+		current, exists := latestByNode[task.NodeUID]
+		if !exists || newerTask(task, current) {
+			latestByNode[task.NodeUID] = task
+		}
+	}
+	allSucceeded := true
+	for _, task := range latestByNode {
+		switch task.Status {
+		case string(operationsv1alpha1.TaskFailed), string(operationsv1alpha1.TaskTimedOut), string(operationsv1alpha1.TaskCancelled):
+			return task.Status
+		case string(operationsv1alpha1.TaskRunning):
+			allSucceeded = false
+		case string(operationsv1alpha1.TaskSucceeded):
+		default:
+			allSucceeded = false
+		}
+	}
+	if allSucceeded {
+		return string(operationsv1alpha1.TaskSucceeded)
+	}
+	for _, task := range latestByNode {
+		if task.Status == string(operationsv1alpha1.TaskRunning) {
+			return string(operationsv1alpha1.TaskRunning)
+		}
+	}
+	return string(operationsv1alpha1.TaskPending)
+}
+
+func newerTask(left, right TaskEntry) bool {
+	if left.RetryGeneration != right.RetryGeneration {
+		return left.RetryGeneration > right.RetryGeneration
+	}
+	if left.Attempt != right.Attempt {
+		return left.Attempt > right.Attempt
+	}
+	if !left.CreatedAt.Equal(right.CreatedAt) {
+		return left.CreatedAt.After(right.CreatedAt)
+	}
+	return left.Name > right.Name
 }
 
 func aggregateStepPhase(
@@ -189,10 +299,74 @@ func missingStepPhase(operationPhase operationsv1alpha1.OperationPhase) string {
 }
 
 func (m *LogModel) currentTask() *TaskEntry {
-	if m.cursor >= len(m.steps) || len(m.steps[m.cursor].Tasks) == 0 {
+	if m.cursor >= len(m.steps) || len(m.steps[m.cursor].Groups) == 0 {
 		return nil
 	}
-	return &m.steps[m.cursor].Tasks[len(m.steps[m.cursor].Tasks)-1]
+	var latest *TaskEntry
+	for groupIndex := range m.steps[m.cursor].Groups {
+		for taskIndex := range m.steps[m.cursor].Groups[groupIndex].Tasks {
+			task := &m.steps[m.cursor].Groups[groupIndex].Tasks[taskIndex]
+			if latest == nil || newerTask(*task, *latest) {
+				latest = task
+			}
+		}
+	}
+	return latest
+}
+
+func (m *LogModel) rebuildStepViewport() {
+	lines := []string{HeaderStyle.Render("Steps and Tasks")}
+	m.stepLines = make([]int, len(m.steps))
+	for stepIndex, step := range m.steps {
+		m.stepLines[stepIndex] = len(lines)
+		stepLine := fmt.Sprintf(" %s %s", stepStatusMark(step.Status), step.ID)
+		if stepIndex == m.cursor {
+			stepLine = SelectedStyle.Render(stepLine)
+		}
+		lines = append(lines, stepLine)
+		for _, group := range step.Groups {
+			groupLine := fmt.Sprintf("   %s %s", stepStatusMark(group.Status), displayIP(group.IP))
+			if stepIndex == m.cursor {
+				groupLine = SelectedStyle.Render(groupLine)
+			}
+			lines = append(lines, groupLine)
+			for _, task := range group.Tasks {
+				taskLine := fmt.Sprintf("      %s attempt=%d", stepStatusMark(task.Status), task.Attempt)
+				if task.Duration != "" {
+					taskLine += " [" + task.Duration + "]"
+				}
+				if stepIndex == m.cursor {
+					taskLine = SelectedStyle.Render(taskLine)
+				}
+				lines = append(lines, taskLine)
+			}
+		}
+	}
+	m.stepViewport.SetContent(strings.Join(lines, "\n"))
+	m.ensureStepCursorVisible()
+}
+
+func (m *LogModel) ensureStepCursorVisible() {
+	if m.cursor < 0 || m.cursor >= len(m.stepLines) {
+		return
+	}
+	line := m.stepLines[m.cursor]
+	height := maxInt(1, m.stepViewport.Height)
+	if line < m.stepViewport.YOffset || line >= m.stepViewport.YOffset+height {
+		offset := line
+		maxOffset := maxInt(0, m.stepViewport.TotalLineCount()-height)
+		if offset > maxOffset {
+			offset = maxOffset
+		}
+		m.stepViewport.SetYOffset(offset)
+	}
+}
+
+func displayIP(ip string) string {
+	if ip == "" {
+		return "-"
+	}
+	return ip
 }
 
 func (m *LogModel) showCurrentLog() bool {
@@ -255,7 +429,10 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.viewport.Width = maxInt(minLogPanelWidth, m.width-m.width*35/100-2)
-		m.viewport.Height = m.height - 3
+		m.viewport.Height = maxInt(1, m.height-3)
+		m.stepViewport.Width = maxInt(1, m.width*35/100-4)
+		m.stepViewport.Height = maxInt(1, m.height-3)
+		m.rebuildStepViewport()
 	case logFetchedMsg:
 		if msg.content != "" && msg.key != "" {
 			m.logContent[msg.key] += msg.content
@@ -279,6 +456,7 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 			if m.cursor >= len(m.steps) {
 				m.cursor = maxInt(0, len(m.steps)-1)
 			}
+			m.rebuildStepViewport()
 			if m.currentTask() == nil || m.currentTask().Name != m.displayed {
 				if m.showCurrentLog() {
 					cmds = append(cmds, m.fetchCurrentLogCmd())
@@ -295,6 +473,7 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 		case DefaultKeyMap.Up, "k":
 			if m.cursor > 0 {
 				m.cursor--
+				m.rebuildStepViewport()
 				if m.showCurrentLog() {
 					cmds = append(cmds, m.fetchCurrentLogCmd())
 				}
@@ -302,6 +481,7 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 		case DefaultKeyMap.Down, "j":
 			if m.cursor < len(m.steps)-1 {
 				m.cursor++
+				m.rebuildStepViewport()
 				if m.showCurrentLog() {
 					cmds = append(cmds, m.fetchCurrentLogCmd())
 				}
@@ -323,9 +503,16 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 		}
 	}
 	var cmd tea.Cmd
+	m.stepViewport, cmd = m.stepViewport.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	m.viewport, cmd = m.viewport.Update(msg)
 	if cmd != nil {
 		cmds = append(cmds, cmd)
+	}
+	if key, ok := msg.(tea.KeyMsg); ok && (key.String() == DefaultKeyMap.Up || key.String() == DefaultKeyMap.Down || key.String() == "k" || key.String() == "j") {
+		m.ensureStepCursorVisible()
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -338,31 +525,9 @@ func (m LogModel) View() string {
 	}
 	stepPanelWidth := m.width * 35 / 100
 	logPanelWidth := maxInt(minLogPanelWidth, m.width-stepPanelWidth-2)
-	var left strings.Builder
-	left.WriteString(HeaderStyle.Render("Steps and Tasks"))
-	left.WriteString("\n")
-	for i, step := range m.steps {
-		line := fmt.Sprintf(" %s %s", stepStatusMark(step.Status), step.ID)
-		if i == m.cursor {
-			line = SelectedStyle.Render(line)
-		}
-		left.WriteString(line)
-		left.WriteString("\n")
-		for _, task := range step.Tasks {
-			taskLine := fmt.Sprintf("   %s %s attempt=%d", stepStatusMark(task.Status), task.Node, task.Attempt)
-			if task.Duration != "" {
-				taskLine += " [" + task.Duration + "]"
-			}
-			if i == m.cursor {
-				taskLine = SelectedStyle.Render(taskLine)
-			}
-			left.WriteString(taskLine)
-			left.WriteString("\n")
-		}
-	}
 	combined := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		StepPanelStyle.Width(stepPanelWidth).Render(left.String()),
+		StepPanelStyle.Width(stepPanelWidth).Render(m.stepViewport.View()),
 		LogPanelStyle.Width(logPanelWidth).Render(m.viewport.View()),
 	)
 	follow := "off"
