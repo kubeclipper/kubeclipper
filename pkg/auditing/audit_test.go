@@ -209,3 +209,45 @@ func Test_auditing_LogResponseObject(t *testing.T) {
 		})
 	}
 }
+
+func TestRedactAuditObject(t *testing.T) {
+	tests := []struct {
+		name     string
+		resource string
+		body     string
+		secrets  []string
+	}{
+		{
+			name:     "operation task outputs",
+			resource: "operationtasks",
+			body:     `{"status":{"result":{"outputs":{"response":"task-secret"}}}}`,
+			secrets:  []string{"task-secret"},
+		},
+		{
+			name:     "cluster kubeconfig",
+			resource: "clusters",
+			body:     `{"kubeConfig":"cluster-credential"}`,
+			secrets:  []string{"cluster-credential"},
+		},
+		{
+			name:     "terminal private key",
+			resource: "platformsettings",
+			body:     `{"terminal":{"privateKey":"private-key"}}`,
+			secrets:  []string{"private-key"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			redacted := string(redactAuditObject([]byte(tt.body), tt.resource))
+			for _, secret := range tt.secrets {
+				if bytes.Contains([]byte(redacted), []byte(secret)) {
+					t.Fatalf("audit body exposes %q: %s", secret, redacted)
+				}
+			}
+			if !bytes.Contains([]byte(redacted), []byte(redactedAuditValue)) {
+				t.Fatalf("audit body was not redacted: %s", redacted)
+			}
+		})
+	}
+}

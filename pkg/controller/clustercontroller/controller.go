@@ -20,6 +20,7 @@ package clustercontroller
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -60,6 +61,7 @@ import (
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/common"
 	v1 "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1"
 	"github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/cri"
+	k8s "github.com/kubeclipper/kubeclipper/pkg/scheme/core/v1/k8s"
 	operationsv1alpha1 "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 
 	ctrl "github.com/kubeclipper/kubeclipper/pkg/controller-runtime"
@@ -78,6 +80,11 @@ type ClusterReconciler struct {
 	CronBackupWriter    cluster.CronBackupWriter
 	CloudProviderLister listerv1.CloudProviderLister
 }
+
+const (
+	kubeConfigSyncOperationTimeoutSecs = "120"
+	kubeConfigAuthCheckTimeout         = 5 * time.Second
+)
 
 func (r *ClusterReconciler) SetupWithManager(mgr manager.Manager, cache informers.InformerCache) error {
 	c, err := controller.NewUnmanaged("cluster", controller.Options{
@@ -384,6 +391,9 @@ func (r *ClusterReconciler) getKubeconfigFromProvider(c *v1.Cluster) (string, er
 // clientset need local lb
 func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (string, error) {
 	log := logger.FromContext(ctx)
+	if len(c.Masters) == 0 {
+		return "", fmt.Errorf("cluster %q has no master node", c.Name)
+	}
 
 	node, err := r.NodeLister.Get(c.Masters[0].ID)
 	if err != nil {
@@ -404,10 +414,105 @@ func (r *ClusterReconciler) getKubeConfig(ctx context.Context, c *v1.Cluster) (s
 		return "", nil
 	}
 
-	if len(c.KubeConfig) == 0 {
+	if len(c.KubeConfig) != 0 {
+		valid, validationErr := kubeConfigCredentialValid(ctx, c.KubeConfig)
+		if validationErr != nil {
+			return "", validationErr
+		}
+		if valid {
+			return string(c.KubeConfig), nil
+		}
+	}
+
+	operationName := kubeConfigSyncOperationName(c.UID, c.KubeConfig)
+	op, err := r.OperationStore.GetOperation(ctx, operationName, "")
+	if errors.IsNotFound(err) {
+		if createErr := r.createKubeConfigSyncOperation(ctx, c, operationName); createErr != nil {
+			return "", createErr
+		}
 		return "", nil
 	}
-	return string(c.KubeConfig), nil
+	if err != nil {
+		return "", fmt.Errorf("get kubeconfig sync operation: %w", err)
+	}
+	if op.Status.Phase != operationsv1alpha1.OperationSucceeded {
+		return "", fmt.Errorf("kubeconfig sync operation %q finished with phase %q", operationName, op.Status.Phase)
+	}
+	tasks, err := r.OperationStore.ListTasksByOperationUID(ctx, op.UID, "")
+	if err != nil {
+		return "", fmt.Errorf("list kubeconfig sync tasks: %w", err)
+	}
+	token, err := kubeConfigTokenFromTasks(tasks.Items)
+	if err != nil {
+		return "", err
+	}
+	return getKubeConfig(c.Name, fmt.Sprintf("https://%s", apiServer), "kc-server", token), nil
+}
+
+func kubeConfigSyncOperationName(clusterUID types.UID, kubeconfig []byte) string {
+	if len(kubeconfig) == 0 {
+		return fmt.Sprintf("sync-kubeconfig-%s", clusterUID)
+	}
+	sum := sha256.Sum256(kubeconfig)
+	return fmt.Sprintf("sync-kubeconfig-%s-%x", clusterUID, sum[:6])
+}
+
+func kubeConfigCredentialValid(ctx context.Context, kubeconfig []byte) (bool, error) {
+	clientConfig, err := clientcmd.NewClientConfigFromBytes(kubeconfig)
+	if err != nil {
+		// A malformed stored kubeconfig cannot authenticate and should be replaced.
+		return false, nil
+	}
+	config, err := clientConfig.ClientConfig()
+	if err != nil {
+		return false, nil
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return false, nil
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, kubeConfigAuthCheckTimeout)
+	defer cancel()
+	if _, err = clientset.CoreV1().Pods("kube-system").List(checkCtx, metav1.ListOptions{Limit: 1}); err == nil {
+		return true, nil
+	}
+	if errors.IsUnauthorized(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("check stored kubeconfig: %w", err)
+}
+
+func (r *ClusterReconciler) createKubeConfigSyncOperation(ctx context.Context, c *v1.Cluster, name string) error {
+	plan := &v1.Operation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				common.LabelClusterName:     c.Name,
+				common.LabelOperationAction: v1.OperationSyncKubeConfig,
+				common.LabelTimeoutSeconds:  kubeConfigSyncOperationTimeoutSecs,
+			},
+		},
+		Steps: []v1.Step{k8s.ClusterAccessStep([]v1.StepNode{{ID: c.Masters[0].ID}})},
+	}
+	_, err := operationv2builder.CreateFromCore(ctx, r.OperationStore, r.ClusterOperator, c, plan)
+	if errors.IsAlreadyExists(err) {
+		return nil
+	}
+	return err
+}
+
+func kubeConfigTokenFromTasks(tasks []operationsv1alpha1.OperationTask) (string, error) {
+	for index := range tasks {
+		task := &tasks[index]
+		if task.Spec.StepID != k8s.ClusterAccessStepID || task.Status.Phase != operationsv1alpha1.TaskSucceeded || task.Status.Result == nil {
+			continue
+		}
+		token := strings.TrimSpace(task.Status.Result.Outputs["response"])
+		if token != "" {
+			return token, nil
+		}
+	}
+	return "", fmt.Errorf("kubeconfig sync operation completed without a service account token")
 }
 
 func (r *ClusterReconciler) updateCRIRegistries(ctx context.Context, c *v1.Cluster) error {

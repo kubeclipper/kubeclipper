@@ -19,6 +19,9 @@
 package v1
 
 import (
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 
@@ -153,7 +156,7 @@ func (h *handler) GetSSHRSAKey(req *restful.Request, resp *restful.Response) {
 		}
 		_, err = h.platformOperator.CreatePlatformSetting(req.Request.Context(), setting)
 	} else {
-		if setting.Terminal.PrivateKey == "" {
+		if !hasSecureWebTerminalKey(setting.Terminal) {
 			setting.Terminal, err = generateWebTerminal()
 			if err != nil {
 				restplus.HandleInternalError(resp, req, err)
@@ -177,7 +180,7 @@ func (h *handler) CreateSSHRSAKey(req *restful.Request, resp *restful.Response) 
 		restplus.HandleInternalError(resp, req, err)
 		return
 	}
-	t.PrivateKey, t.PublicKey, err = certs.GetSSHKeyPair(512)
+	t.PrivateKey, t.PublicKey, err = certs.GetSSHKeyPair(certs.DefaultRSAKeySize)
 	if err != nil {
 		restplus.HandleInternalError(resp, req, err)
 		return
@@ -192,7 +195,7 @@ func (h *handler) CreateSSHRSAKey(req *restful.Request, resp *restful.Response) 
 }
 
 func generateWebTerminal() (v1.WebTerminal, error) {
-	priv, pub, err := certs.GetSSHKeyPair(512)
+	priv, pub, err := certs.GetSSHKeyPair(certs.DefaultRSAKeySize)
 	if err != nil {
 		return v1.WebTerminal{}, err
 	}
@@ -201,6 +204,22 @@ func generateWebTerminal() (v1.WebTerminal, error) {
 		PublicKey:  pub,
 	}, nil
 
+}
+
+func hasSecureWebTerminalKey(terminal v1.WebTerminal) bool {
+	if terminal.PrivateKey == "" || terminal.PublicKey == "" {
+		return false
+	}
+	privateKeyPEM, err := base64.StdEncoding.DecodeString(terminal.PrivateKey)
+	if err != nil {
+		return false
+	}
+	block, _ := pem.Decode(privateKeyPEM)
+	if block == nil {
+		return false
+	}
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	return err == nil && privateKey.N.BitLen() >= certs.DefaultRSAKeySize
 }
 
 func generatePlatformSetting() *v1.PlatformSetting {

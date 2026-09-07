@@ -50,7 +50,7 @@ const (
 	CertificateBlockType = "CERTIFICATE"
 	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
 	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
-	rsaKeySize             = 2048
+	DefaultRSAKeySize      = 2048
 	duration365d           = time.Hour * 24 * 365
 )
 
@@ -80,7 +80,7 @@ func NewPrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
 		return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	}
 
-	return rsa.GenerateKey(rand.Reader, rsaKeySize)
+	return rsa.GenerateKey(rand.Reader, DefaultRSAKeySize)
 }
 
 // NewSelfSignedCACert creates a CA certificate
