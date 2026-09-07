@@ -75,6 +75,10 @@ func init() {
 	if err := component.RegisterAgentStep(fmt.Sprintf(component.RegisterStepKeyFormat, health, version, component.TypeStep), &Health{}); err != nil {
 		panic(err)
 	}
+	clusterAccessKey := fmt.Sprintf(component.RegisterStepKeyFormat, clusterAccess, version, component.TypeStep)
+	if err := component.RegisterAgentStep(clusterAccessKey, &KubeConfigToken{}); err != nil {
+		panic(err)
+	}
 	if err := component.RegisterAgentStep(
 		fmt.Sprintf(component.RegisterStepKeyFormat, addedNodesReady, version, component.TypeStep),
 		&AddedNodesReady{},
@@ -106,6 +110,7 @@ var (
 	_ component.StepRunnable   = (*ClusterNode)(nil)
 	_ component.TemplateRender = (*KubectlTerminal)(nil)
 	_ component.StepRunnable   = (*Health)(nil)
+	_ component.StepRunnable   = (*KubeConfigToken)(nil)
 	_ component.StepRunnable   = (*AddedNodesReady)(nil)
 	_ component.StepRunnable   = (*Container)(nil)
 	_ component.StepRunnable   = (*Kubectl)(nil)
@@ -169,6 +174,11 @@ type Health struct {
 	KubernetesVersion string
 	*kubernetes.Clientset
 }
+
+// KubeConfigToken returns the credential used by kc-server to access a
+// KubeClipper-managed Kubernetes cluster. It is only scheduled by the
+// cluster controller after the cluster's ServiceAccount has been created.
+type KubeConfigToken struct{}
 
 // AddedNodesReady waits until the API server reports every node added by the
 // current operation as Ready. It intentionally does not evaluate unrelated
@@ -895,6 +905,37 @@ func (stepper *Health) Install(ctx context.Context, opts component.Options) (b [
 	}
 
 	return
+}
+
+func (*KubeConfigToken) NewInstance() component.ObjectMeta {
+	return &KubeConfigToken{}
+}
+
+func (*KubeConfigToken) Install(ctx context.Context, _ component.Options) ([]byte, error) {
+	clientset, err := utils.BuildKubeClientset(DefaultKubeConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("build kube clientset: %w", err)
+	}
+	secret, err := clientset.CoreV1().Secrets("kube-system").Get(ctx, "kc-server-secret", metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get kc-server ServiceAccount secret: %w", err)
+	}
+	return kubeConfigTokenFromSecret(secret)
+}
+
+func kubeConfigTokenFromSecret(secret *corev1.Secret) ([]byte, error) {
+	if secret == nil {
+		return nil, fmt.Errorf("kc-server ServiceAccount secret is nil")
+	}
+	token := secret.Data["token"]
+	if len(token) == 0 {
+		return nil, fmt.Errorf("kc-server ServiceAccount token is empty")
+	}
+	return token, nil
+}
+
+func (*KubeConfigToken) Uninstall(context.Context, component.Options) ([]byte, error) {
+	return nil, fmt.Errorf("KubeConfigToken does not support uninstall")
 }
 
 func (stepper *Health) Uninstall(ctx context.Context, opts component.Options) ([]byte, error) {

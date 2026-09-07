@@ -58,6 +58,47 @@ func TestFindOperationCluster(t *testing.T) {
 	}
 }
 
+func TestKubeConfigTokenFromTasks(t *testing.T) {
+	tasks := []operations.OperationTask{
+		{
+			Spec:   operations.OperationTaskSpec{StepID: "another-step"},
+			Status: operations.OperationTaskStatus{Phase: operations.TaskSucceeded},
+		},
+		{
+			Spec: operations.OperationTaskSpec{StepID: "capture-cluster-access"},
+			Status: operations.OperationTaskStatus{
+				Phase:  operations.TaskSucceeded,
+				Result: &operations.TaskResult{Outputs: map[string]string{"response": " cluster-token\n"}},
+			},
+		},
+	}
+	token, err := kubeConfigTokenFromTasks(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != "cluster-token" {
+		t.Fatalf("token = %q, want cluster-token", token)
+	}
+	if _, err := kubeConfigTokenFromTasks(nil); err == nil {
+		t.Fatal("missing task output must fail")
+	}
+}
+
+func TestKubeConfigSyncOperationName(t *testing.T) {
+	uid := types.UID("f1a8e6a3-9b05-40a7-9ddc-f5580c33fe88")
+	if got, want := kubeConfigSyncOperationName(uid, nil), "sync-kubeconfig-f1a8e6a3-9b05-40a7-9ddc-f5580c33fe88"; got != want {
+		t.Fatalf("empty kubeconfig operation name = %q, want %q", got, want)
+	}
+	first := kubeConfigSyncOperationName(uid, []byte("old-kubeconfig"))
+	second := kubeConfigSyncOperationName(uid, []byte("old-kubeconfig"))
+	if first != second {
+		t.Fatalf("operation name must be stable: %q != %q", first, second)
+	}
+	if first == kubeConfigSyncOperationName(uid, []byte("new-kubeconfig")) {
+		t.Fatal("operation name must change when the stored kubeconfig changes")
+	}
+}
+
 func TestFinalizeClusterCleansOperationHistoryBeforeReleasingFinalizer(t *testing.T) {
 	clusterObject := &v1.Cluster{ObjectMeta: metav1.ObjectMeta{
 		Name:       "cluster-a",

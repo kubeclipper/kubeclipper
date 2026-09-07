@@ -211,7 +211,7 @@ func (a *auditing) LogRequestObject(req *http.Request, info *request.Info) *audi
 					e.User.Username = obj.Username
 				}
 			} else {
-				e.RequestObject = &runtime.Unknown{Raw: body}
+				e.RequestObject = &runtime.Unknown{Raw: redactAuditObject(body, info.Resource)}
 			}
 		}
 
@@ -229,9 +229,56 @@ func (a *auditing) LogResponseObject(e *audit.Event, resp *ResponseCapture) {
 	e.StageTimestamp = metav1.NowMicro()
 	e.ResponseStatus = &metav1.Status{Code: int32(resp.StatusCode())}
 	if e.Level.GreaterOrEqual(audit.LevelRequestResponse) {
-		e.ResponseObject = &runtime.Unknown{Raw: resp.Bytes()}
+		resource := ""
+		if e.ObjectRef != nil {
+			resource = e.ObjectRef.Resource
+		}
+		e.ResponseObject = &runtime.Unknown{Raw: redactAuditObject(resp.Bytes(), resource)}
 	}
 	a.sendEvent(e)
+}
+
+const redactedAuditValue = "[REDACTED]"
+
+// redactAuditObject returns a copy of an API object that is safe to retain in
+// an audit event. Operation task outputs can contain controller-only data, and
+// Cluster.KubeConfig contains a service account credential. Neither belongs in
+// the audit log.
+func redactAuditObject(raw []byte, resource string) []byte {
+	var object any
+	if err := json.Unmarshal(raw, &object); err != nil {
+		return raw
+	}
+	redactAuditFields(object, resource)
+	redacted, err := json.Marshal(object)
+	if err != nil {
+		return raw
+	}
+	return redacted
+}
+
+func redactAuditFields(value any, resource string) {
+	switch object := value.(type) {
+	case map[string]any:
+		for key, child := range object {
+			switch key {
+			case "kubeConfig", "privateKey":
+				object[key] = redactedAuditValue
+			case "outputs":
+				if resource == "operationtasks" {
+					object[key] = redactedAuditValue
+					continue
+				}
+				redactAuditFields(child, resource)
+			default:
+				redactAuditFields(child, resource)
+			}
+		}
+	case []any:
+		for _, child := range object {
+			redactAuditFields(child, resource)
+		}
+	}
 }
 
 func (a *auditing) sendEvent(e *audit.Event) {

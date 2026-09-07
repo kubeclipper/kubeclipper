@@ -51,6 +51,7 @@ const (
 	clusterNode     = "clusterNode"
 	cniInfo         = "cniInfo"
 	health          = "health"
+	clusterAccess   = "clusterAccess"
 	addedNodesReady = "addedNodesReady"
 	container       = "container"
 	kubectl         = "kubectl"
@@ -59,10 +60,13 @@ const (
 	KubeCertsCluVersion          = "1.20"
 	defaultStepTimeout           = 10 * time.Minute
 	addedNodesReadyRetryInterval = 10 * time.Second
-	bashCommand                  = "bash"
-	binBashCommand               = "/bin/bash"
-	shellCommandFlag             = "-c"
-	restartControlPlaneCommand   = "mv /etc/kubernetes/manifests/etcd.yaml " +
+	// ClusterAccessStepID identifies the internal Operation step that reads
+	// the kc-server ServiceAccount credential from a running cluster.
+	ClusterAccessStepID        = "capture-cluster-access"
+	bashCommand                = "bash"
+	binBashCommand             = "/bin/bash"
+	shellCommandFlag           = "-c"
+	restartControlPlaneCommand = "mv /etc/kubernetes/manifests/etcd.yaml " +
 		"/etc/kubernetes/manifests/kube-apiserver.yaml " +
 		"/etc/kubernetes/manifests/kube-controller-manager.yaml " +
 		"/etc/kubernetes/manifests/kube-scheduler.yaml /tmp/.k8s/config && sleep 20"
@@ -680,6 +684,25 @@ func (stepper *Health) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {
 			Action:     v1.ActionInstall,
 			Commands:   registerSaCommands,
 		}}, nil
+}
+
+// ClusterAccessStep returns the internal step used by the cluster controller
+// to initialize the API client for a cluster created by KubeClipper.
+func ClusterAccessStep(nodes []v1.StepNode) v1.Step {
+	return v1.Step{
+		ID:         ClusterAccessStepID,
+		Name:       ClusterAccessStepID,
+		Timeout:    metav1.Duration{Duration: 30 * time.Second},
+		ErrIgnore:  false,
+		RetryTimes: 1,
+		Nodes:      nodes,
+		Action:     v1.ActionInstall,
+		Commands: []v1.Command{{
+			Type:          v1.CommandCustom,
+			Identity:      fmt.Sprintf(component.RegisterStepKeyFormat, clusterAccess, version, component.TypeStep),
+			CustomCommand: []byte("{}"),
+		}},
+	}
 }
 
 func (stepper *AddedNodesReady) InstallSteps(nodes []v1.StepNode) ([]v1.Step, error) {

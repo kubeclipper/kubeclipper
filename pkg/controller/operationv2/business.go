@@ -53,6 +53,9 @@ func (r *BusinessReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	if op.Status.Phase == operations.OperationSucceeded {
 		desired = corev1.ClusterRunning
 	}
+	if op.Spec.Action == corev1.OperationSyncKubeConfig {
+		return ctrl.Result{}, nil
+	}
 	if clusterObject.Status.Phase == desired &&
 		(op.Spec.Action != corev1.OperationUpgradeCluster || op.Status.Phase != operations.OperationSucceeded) {
 		return ctrl.Result{}, nil

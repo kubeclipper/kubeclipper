@@ -58,6 +58,9 @@ const (
 	OperationUninstallComponents          = "UninstallComponents"
 	OperationUpdateCertification          = "UpdateCertifications"
 	OperationUpdateAPIServerCertification = "UpdateAPIServerCertifications"
+	// OperationSyncKubeConfig is an internal operation that initializes the
+	// client credential for a KubeClipper-managed cluster.
+	OperationSyncKubeConfig = "SyncKubeConfig"
 )
 
 // Step TODO: add commands struct instead of string
