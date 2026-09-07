@@ -30,7 +30,7 @@ func TestFromCoreOperationBuildsUIDBoundOrderedPlan(t *testing.T) {
 	}
 	cluster := &corev1.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "cluster-a", UID: types.UID("cluster-uid")}}
 	nodes := fakeNodes{
-		"node-a": {ObjectMeta: metav1.ObjectMeta{Name: "node-a", UID: types.UID("node-a-uid")}},
+		"node-a": {ObjectMeta: metav1.ObjectMeta{Name: "node-a", UID: types.UID("node-a-uid")}, Status: corev1.NodeStatus{Ipv4DefaultIP: "10.0.0.1"}},
 		"node-b": {ObjectMeta: metav1.ObjectMeta{Name: "node-b", UID: types.UID("node-b-uid")}},
 	}
 
@@ -40,6 +40,9 @@ func TestFromCoreOperationBuildsUIDBoundOrderedPlan(t *testing.T) {
 	}
 	if result.Spec.TargetRef.UID != cluster.UID || result.Spec.Steps[0].Targets[0].UID != nodes["node-a"].UID {
 		t.Fatalf("target identities were not bound: %#v", result.Spec)
+	}
+	if result.Spec.Steps[0].Targets[0].IP != "10.0.0.1" {
+		t.Fatalf("target ip = %q, want 10.0.0.1", result.Spec.Steps[0].Targets[0].IP)
 	}
 	if result.Spec.Steps[0].RetryLimit != 1 {
 		t.Fatalf("retryLimit = %d, want 1", result.Spec.Steps[0].RetryLimit)

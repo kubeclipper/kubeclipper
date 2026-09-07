@@ -62,6 +62,8 @@ type ObjectReference struct {
 type NodeReference struct {
 	Name string    `json:"name"`
 	UID  types.UID `json:"uid"`
+	// IP is the node's default IPv4 address, used for display in the console.
+	IP string `json:"ip,omitempty"`
 }
 
 type OperationDesiredState string
