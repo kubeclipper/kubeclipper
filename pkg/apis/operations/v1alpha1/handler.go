@@ -102,19 +102,35 @@ func (h *handler) validateTargetRefs(req *restful.Request, op *operations.Operat
 	if clusterObj.UID != op.Spec.TargetRef.UID {
 		return apierrors.NewConflict(corev1.Resource("clusters"), clusterObj.Name, fmt.Errorf("cluster UID does not match"))
 	}
-	nodes := make(map[string]operations.NodeReference)
+	return validateAndEnrichTargetIPs(req.Request.Context(), op, h.clusterReader)
+}
+
+func validateAndEnrichTargetIPs(
+	ctx context.Context,
+	op *operations.Operation,
+	nodeReader interface {
+		GetNodeEx(context.Context, string, string) (*corev1.Node, error)
+	},
+) error {
+	nodes := make(map[string]*corev1.Node)
 	for stepIndex := range op.Spec.Steps {
-		for _, node := range op.Spec.Steps[stepIndex].Targets {
-			nodes[node.Name] = node
-		}
-	}
-	for _, ref := range nodes {
-		node, err := h.clusterReader.GetNodeEx(req.Request.Context(), ref.Name, "")
-		if err != nil {
-			return err
-		}
-		if node.UID != ref.UID {
-			return apierrors.NewConflict(corev1.Resource("nodes"), node.Name, fmt.Errorf("node UID does not match"))
+		for targetIndex := range op.Spec.Steps[stepIndex].Targets {
+			target := &op.Spec.Steps[stepIndex].Targets[targetIndex]
+			node := nodes[target.Name]
+			if node == nil {
+				var err error
+				node, err = nodeReader.GetNodeEx(ctx, target.Name, "")
+				if err != nil {
+					return err
+				}
+				nodes[target.Name] = node
+			}
+			if node.UID != target.UID {
+				return apierrors.NewConflict(corev1.Resource("nodes"), node.Name, fmt.Errorf("node UID does not match"))
+			}
+			// Keep the display address authoritative even when a client submits
+			// an Operation directly instead of using the core-operation builder.
+			target.IP = node.Status.Ipv4DefaultIP
 		}
 	}
 	return nil

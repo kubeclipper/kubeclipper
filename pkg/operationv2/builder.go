@@ -139,7 +139,7 @@ func resolveTargets(
 			}
 			cache[target.ID] = node
 		}
-		targets = append(targets, operations.NodeReference{Name: node.Name, UID: node.UID})
+		targets = append(targets, operations.NodeReference{Name: node.Name, UID: node.UID, IP: node.Status.Ipv4DefaultIP})
 	}
 	return targets, nil
 }
