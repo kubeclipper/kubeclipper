@@ -146,13 +146,13 @@ func TestLogModelScrollsStepPanelWithLongTaskList(t *testing.T) {
 	if m.stepViewport.YOffset != 0 {
 		t.Fatalf("initial step offset = %d, want 0", m.stepViewport.YOffset)
 	}
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	}
 	if m.stepViewport.YOffset == 0 {
 		t.Fatal("long step list did not scroll")
 	}
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	}
 	if m.cursor != 0 || m.stepViewport.YOffset != 0 {

@@ -73,15 +73,16 @@ type LogModel struct {
 }
 
 const (
-	followTickInterval = 2 * time.Second
-	minLogPanelWidth   = 10
+	followTickInterval         = 2 * time.Second
+	minLogPanelWidth           = 10
+	stepPanelHorizontalPadding = 4
 )
 
 func NewLogModel(client *kc.Client, op *operationsv1alpha1.Operation, width, height int) LogModel {
 	stepPanelWidth := width * 35 / 100
 	logPanelWidth := width - stepPanelWidth - 2
 	logPanelWidth = max(minLogPanelWidth, logPanelWidth)
-	stepViewportWidth := maxInt(1, stepPanelWidth-4)
+	stepViewportWidth := maxInt(1, stepPanelWidth-stepPanelHorizontalPadding)
 	viewHeight := maxInt(1, height-3)
 	m := LogModel{
 		client: client, operation: op, steps: buildStepEntries(op, nil),
@@ -188,8 +189,9 @@ func aggregateTaskGroupPhase(tasks []TaskEntry) string {
 	if len(tasks) == 0 {
 		return string(operationsv1alpha1.TaskPending)
 	}
-	latestByNode := make(map[string]TaskEntry, len(tasks))
-	for _, task := range tasks {
+	latestByNode := make(map[string]*TaskEntry, len(tasks))
+	for taskIndex := range tasks {
+		task := &tasks[taskIndex]
 		current, exists := latestByNode[task.NodeUID]
 		if !exists || newerTask(task, current) {
 			latestByNode[task.NodeUID] = task
@@ -218,7 +220,7 @@ func aggregateTaskGroupPhase(tasks []TaskEntry) string {
 	return string(operationsv1alpha1.TaskPending)
 }
 
-func newerTask(left, right TaskEntry) bool {
+func newerTask(left, right *TaskEntry) bool {
 	if left.RetryGeneration != right.RetryGeneration {
 		return left.RetryGeneration > right.RetryGeneration
 	}
@@ -306,7 +308,7 @@ func (m *LogModel) currentTask() *TaskEntry {
 	for groupIndex := range m.steps[m.cursor].Groups {
 		for taskIndex := range m.steps[m.cursor].Groups[groupIndex].Tasks {
 			task := &m.steps[m.cursor].Groups[groupIndex].Tasks[taskIndex]
-			if latest == nil || newerTask(*task, *latest) {
+			if latest == nil || newerTask(task, latest) {
 				latest = task
 			}
 		}
@@ -430,7 +432,7 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.viewport.Width = maxInt(minLogPanelWidth, m.width-m.width*35/100-2)
 		m.viewport.Height = maxInt(1, m.height-3)
-		m.stepViewport.Width = maxInt(1, m.width*35/100-4)
+		m.stepViewport.Width = maxInt(1, m.width*35/100-stepPanelHorizontalPadding)
 		m.stepViewport.Height = maxInt(1, m.height-3)
 		m.rebuildStepViewport()
 	case logFetchedMsg:
@@ -511,10 +513,19 @@ func (m LogModel) Update(msg tea.Msg) (LogModel, tea.Cmd) {
 	if cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	if key, ok := msg.(tea.KeyMsg); ok && (key.String() == DefaultKeyMap.Up || key.String() == DefaultKeyMap.Down || key.String() == "k" || key.String() == "j") {
+	if key, ok := msg.(tea.KeyMsg); ok && isStepNavigationKey(key.String()) {
 		m.ensureStepCursorVisible()
 	}
 	return m, tea.Batch(cmds...)
+}
+
+func isStepNavigationKey(key string) bool {
+	switch key {
+	case DefaultKeyMap.Up, DefaultKeyMap.Down, "k", "j":
+		return true
+	default:
+		return false
+	}
 }
 
 type backMsg struct{}
