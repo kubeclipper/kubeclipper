@@ -19,13 +19,19 @@ package doctor
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	rpctypes "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubeclipper/kubeclipper/cmd/kcctl/app/options"
@@ -172,11 +178,181 @@ func TestSanitize(t *testing.T) {
 func TestEtcdSummaryUsesNativeEndpointHealth(t *testing.T) {
 	checks := []Check{
 		{Name: "kc-etcd-service", Status: platformstatus.Healthy},
-		{Name: "endpoint-health", Status: platformstatus.Healthy},
+		{Name: etcdEndpointHealthCheck, Status: platformstatus.Healthy},
 	}
-	if got, want := etcdSummary([]string{"192.0.2.10"}, checks, nil), "1/1 members healthy"; got != want {
+	status := &platformstatus.Component{Name: "kc-etcd", Status: platformstatus.Degraded}
+	if got, want := etcdSummary([]string{"192.0.2.10"}, checks, status), "1/1 members healthy"; got != want {
 		t.Fatalf("etcd summary = %q, want %q", got, want)
 	}
+}
+
+func TestCheckEtcdClusterWithClientMatchesEtcdctlClusterChecks(t *testing.T) {
+	const (
+		initialEndpoint = "https://192.0.2.10:2379"
+		memberOne       = "https://192.0.2.11:2379"
+		memberTwo       = "https://192.0.2.12:2379"
+	)
+	clusterClient := &fakeEtcdClient{
+		members: &clientv3.MemberListResponse{Members: []*etcdserverpb.Member{
+			{ClientURLs: []string{memberTwo, memberOne}},
+			{ClientURLs: []string{memberOne}},
+		}},
+		statuses: map[string]*clientv3.StatusResponse{
+			memberOne: {Header: &etcdserverpb.ResponseHeader{MemberId: 1}, Leader: 2},
+			memberTwo: {Header: &etcdserverpb.ResponseHeader{MemberId: 2}, Leader: 2},
+		},
+	}
+	memberOneClient := &fakeEtcdClient{}
+	memberTwoClient := &fakeEtcdClient{}
+	factory := &fakeEtcdClientFactory{clients: map[string]*fakeEtcdClient{
+		etcdClientKey([]string{initialEndpoint}): clusterClient,
+		etcdClientKey([]string{memberOne}):       memberOneClient,
+		etcdClientKey([]string{memberTwo}):       memberTwoClient,
+	}}
+
+	check := checkEtcdClusterWithClient(context.Background(), []string{initialEndpoint}, &tls.Config{}, factory.new)
+	if check.Status != platformstatus.Healthy {
+		t.Fatalf("status = %s, want %s: %#v", check.Status, platformstatus.Healthy, check)
+	}
+	if !strings.Contains(strings.Join(check.Evidence, "\n"), "leader="+memberTwo) {
+		t.Fatalf("leader evidence = %v, want %s", check.Evidence, memberTwo)
+	}
+	if got, want := strings.Join(clusterClient.statusEndpoints(), ","), memberOne+","+memberTwo; got != want {
+		t.Fatalf("status endpoints = %q, want %q", got, want)
+	}
+	for endpoint, client := range map[string]*fakeEtcdClient{memberOne: memberOneClient, memberTwo: memberTwoClient} {
+		if got := strings.Join(client.getKeys(), ","); got != "health" {
+			t.Errorf("Get keys for %s = %q, want health", endpoint, got)
+		}
+	}
+}
+
+func TestCheckEtcdClusterWithClientAcceptsPermissionDenied(t *testing.T) {
+	const endpoint = "https://192.0.2.10:2379"
+	clusterClient := &fakeEtcdClient{
+		members: &clientv3.MemberListResponse{Members: []*etcdserverpb.Member{{ClientURLs: []string{endpoint}}}},
+		statuses: map[string]*clientv3.StatusResponse{
+			endpoint: {Header: &etcdserverpb.ResponseHeader{MemberId: 1}, Leader: 1},
+		},
+	}
+	factory := &fakeEtcdClientFactory{clients: map[string]*fakeEtcdClient{
+		etcdClientKey([]string{endpoint}): clusterClient,
+	}}
+	// The cluster and endpoint client use the same endpoint in this one-member case.
+	clusterClient.getErr = rpctypes.ErrPermissionDenied
+
+	check := checkEtcdClusterWithClient(context.Background(), []string{endpoint}, &tls.Config{}, factory.new)
+	if check.Status != platformstatus.Healthy {
+		t.Fatalf("status = %s, want %s: %#v", check.Status, platformstatus.Healthy, check)
+	}
+}
+
+func TestCheckEtcdClusterWithClientStopsBeforeStatusOnHealthFailure(t *testing.T) {
+	const endpoint = "https://192.0.2.10:2379"
+	clusterClient := &fakeEtcdClient{
+		members: &clientv3.MemberListResponse{Members: []*etcdserverpb.Member{{ClientURLs: []string{endpoint}}}},
+	}
+	endpointClient := &fakeEtcdClient{getErr: errors.New("connection refused")}
+	factory := &fakeEtcdClientFactory{clients: map[string]*fakeEtcdClient{
+		etcdClientKey([]string{endpoint}): endpointClient,
+	}}
+	// A separate initial endpoint keeps status calls observable on the discovery client.
+	const initialEndpoint = "https://192.0.2.9:2379"
+	factory.clients[etcdClientKey([]string{initialEndpoint})] = clusterClient
+
+	check := checkEtcdClusterWithClient(context.Background(), []string{initialEndpoint}, &tls.Config{}, factory.new)
+	if check.Status != platformstatus.Unhealthy {
+		t.Fatalf("status = %s, want %s: %#v", check.Status, platformstatus.Unhealthy, check)
+	}
+	if got := clusterClient.statusEndpoints(); len(got) != 0 {
+		t.Fatalf("status called after failed health check: %v", got)
+	}
+}
+
+func TestCheckEtcdClusterWithClientDegradesWhenStatusFails(t *testing.T) {
+	const endpoint = "https://192.0.2.10:2379"
+	clusterClient := &fakeEtcdClient{
+		members:    &clientv3.MemberListResponse{Members: []*etcdserverpb.Member{{ClientURLs: []string{endpoint}}}},
+		statusErrs: map[string]error{endpoint: errors.New("status unavailable")},
+	}
+	endpointClient := &fakeEtcdClient{}
+	const initialEndpoint = "https://192.0.2.9:2379"
+	factory := &fakeEtcdClientFactory{clients: map[string]*fakeEtcdClient{
+		etcdClientKey([]string{initialEndpoint}): clusterClient,
+		etcdClientKey([]string{endpoint}):        endpointClient,
+	}}
+
+	check := checkEtcdClusterWithClient(context.Background(), []string{initialEndpoint}, &tls.Config{}, factory.new)
+	if check.Status != platformstatus.Degraded {
+		t.Fatalf("status = %s, want %s: %#v", check.Status, platformstatus.Degraded, check)
+	}
+	if !strings.Contains(strings.Join(check.Evidence, "\n"), "status unavailable") {
+		t.Fatalf("status evidence = %v", check.Evidence)
+	}
+}
+
+type fakeEtcdClientFactory struct {
+	mu      sync.Mutex
+	clients map[string]*fakeEtcdClient
+}
+
+func (f *fakeEtcdClientFactory) new(endpoints []string, _ *tls.Config) (etcdClient, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	client, found := f.clients[etcdClientKey(endpoints)]
+	if !found {
+		return nil, fmt.Errorf("unexpected etcd client endpoints %v", endpoints)
+	}
+	return client, nil
+}
+
+func etcdClientKey(endpoints []string) string {
+	return strings.Join(endpoints, ",")
+}
+
+type fakeEtcdClient struct {
+	mu            sync.Mutex
+	members       *clientv3.MemberListResponse
+	memberListErr error
+	getErr        error
+	statuses      map[string]*clientv3.StatusResponse
+	statusErrs    map[string]error
+	gets          []string
+	statusCalls   []string
+}
+
+func (c *fakeEtcdClient) Get(_ context.Context, key string, _ ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gets = append(c.gets, key)
+	return nil, c.getErr
+}
+
+func (c *fakeEtcdClient) MemberList(context.Context) (*clientv3.MemberListResponse, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.members, c.memberListErr
+}
+
+func (c *fakeEtcdClient) Status(_ context.Context, endpoint string) (*clientv3.StatusResponse, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.statusCalls = append(c.statusCalls, endpoint)
+	return c.statuses[endpoint], c.statusErrs[endpoint]
+}
+
+func (*fakeEtcdClient) Close() error { return nil }
+
+func (c *fakeEtcdClient) getKeys() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.gets...)
+}
+
+func (c *fakeEtcdClient) statusEndpoints() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.statusCalls...)
 }
 
 func TestPadRightUsesDisplayCharacters(t *testing.T) {
