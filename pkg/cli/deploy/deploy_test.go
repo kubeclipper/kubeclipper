@@ -147,6 +147,16 @@ func TestDeployOptionsCompleteGeneratesAuthenticationJWTSecret(t *testing.T) {
 	if d.deployConfig.AuthenticationOpts.JwtSecret == "" {
 		t.Fatal("Complete() did not generate authentication JWT secret")
 	}
+	if errs := d.deployConfig.AuthenticationOpts.Validate(); len(errs) != 0 {
+		t.Fatalf("generated authentication options are invalid: %v", errs)
+	}
+	content, err := d.deployConfig.GetKcServerConfigTemplateContent("192.0.2.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(content, "jwtSecret: "+d.deployConfig.AuthenticationOpts.JwtSecret) {
+		t.Fatal("server config does not contain the generated JWT secret")
+	}
 }
 
 func TestDeployOptionsValidateTempDir(t *testing.T) {
@@ -165,6 +175,9 @@ func TestDeployOptionsValidateTempDir(t *testing.T) {
 			d.deployConfig.Pkg = "/tmp/kc-amd64.tar.gz"
 			d.deployConfig.ServerIPs = []string{"192.0.2.10"}
 			d.deployConfig.TempDir = tt.tempDir
+			if err := d.Complete(); err != nil {
+				t.Fatal(err)
+			}
 
 			err := d.ValidateArgs()
 			if tt.wantErr == "" && err != nil {
