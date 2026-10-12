@@ -61,7 +61,6 @@ func NewAuthenticateOptions() *AuthenticationOptions {
 		MFAOptions:                      mfa.NewOptions(),
 		OAuthOptions:                    oauth.NewOauthOptions(),
 		MultipleLogin:                   false,
-		JwtSecret:                       "kubeclipper",
 		InitialPassword:                 constatns.DefaultAdminUserPass,
 	}
 }
@@ -69,7 +68,9 @@ func NewAuthenticateOptions() *AuthenticationOptions {
 func (a *AuthenticationOptions) Validate() []error {
 	var errs []error
 	if len(a.JwtSecret) == 0 {
-		errs = append(errs, errors.New("JWT secret MUST not be empty"))
+		errs = append(errs, errors.New("JWT secret must be explicitly configured using authentication.jwtSecret or --jwt-secret"))
+	} else if a.JwtSecret == "kubeclipper" {
+		errs = append(errs, errors.New("JWT secret must not use the public default; configure a randomly generated secret"))
 	}
 	if a.LoginHistoryMaximumEntries <= 0 {
 		errs = append(errs, errors.New("loginHistoryMaximumEntries must greater than 0"))
@@ -103,7 +104,7 @@ func (a *AuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&a.AuthenticateRateLimiterMaxTries, "authenticate-rate-limiter-max-retries", a.AuthenticateRateLimiterMaxTries, "")
 	fs.DurationVar(&a.AuthenticateRateLimiterDuration, "authenticate-rate-limiter-duration", a.AuthenticateRateLimiterDuration, "")
 	fs.BoolVar(&a.MultipleLogin, "multiple-login", a.MultipleLogin, "Allow multiple login with the same account, disable means only one user can login at the same time.")
-	fs.StringVar(&a.JwtSecret, "jwt-secret", a.JwtSecret, "Secret to sign jwt token, must not be empty.")
+	fs.StringVar(&a.JwtSecret, "jwt-secret", a.JwtSecret, "Secret to sign JWT tokens; explicitly configure a randomly generated secret.")
 	fs.DurationVar(&a.LoginHistoryRetentionPeriod, "login-history-retention-period", a.LoginHistoryRetentionPeriod, "login-history-retention-period defines how long login history should be kept.")
 	fs.IntVar(&a.LoginHistoryMaximumEntries, "login-history-maximum-entries", a.LoginHistoryMaximumEntries, "login-history-maximum-entries defines how many entries of login history should be kept.")
 	fs.DurationVar(&a.OAuthOptions.AccessTokenMaxAge, "access-token-max-age", a.OAuthOptions.AccessTokenMaxAge, "access-token-max-age control the lifetime of access tokens, 0 means no expiration.")
