@@ -66,7 +66,7 @@ func RunCmdWithContext(ctx context.Context, dryRun bool, command string, args ..
 	}
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	configureProcessGroup(ec.Cmd, doneCh)
+	configureProcessGroup(ec.Cmd, doneCh, commandTerminationGrace)
 	if err = ec.Run(); err != nil {
 		// e.g. run command failed(exit status 1): ${raw_std_error}
 		logger.Errorf("run command failed(%v): %s", err, ec.StdErr(), zap.String("cmd", ec.String()))
