@@ -50,7 +50,8 @@ func lookupUnitStatus(ctx context.Context, conn *dbus.Conn, name string) (*dbus.
 
 // ReloadDeamon reloads the systemd daemon.
 // equivalent to `systemctl daemon-reload`
-func ReloadDeamon(ctx context.Context) error {
+func ReloadDeamon(ctx context.Context) (operationErr error) {
+	defer logOperation(ctx, "daemon-reload", "", &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
@@ -62,7 +63,8 @@ func ReloadDeamon(ctx context.Context) error {
 
 // EnableUnit enables the unit if it exists.
 // equivalent to `systemctl enable <unit-name> --force`
-func EnableUnit(ctx context.Context, name string) error {
+func EnableUnit(ctx context.Context, name string) (operationErr error) {
+	defer logOperation(ctx, "enable", name, &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
@@ -86,7 +88,8 @@ func EnableUnit(ctx context.Context, name string) error {
 
 // DisableUnit disables the unit if it exists.
 // equivalent to `systemctl disable <unit-name> --force`
-func DisableUnit(ctx context.Context, name string) error {
+func DisableUnit(ctx context.Context, name string) (operationErr error) {
+	defer logOperation(ctx, "disable", name, &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
@@ -107,7 +110,8 @@ func DisableUnit(ctx context.Context, name string) error {
 
 // StartUnit starts a unit idempotently if it exists.
 // equivalent to `systemctl start <unit-name>`
-func StartUnit(ctx context.Context, name string) error {
+func StartUnit(ctx context.Context, name string) (operationErr error) {
+	defer logOperation(ctx, "start", name, &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
@@ -126,12 +130,12 @@ func StartUnit(ctx context.Context, name string) error {
 		return nil
 	}
 
-	res := make(chan string)
+	res := make(chan string, 1)
 	if _, err := conn.StartUnitContext(ctx, name, defaultJobMode, res); err != nil {
 		return fmt.Errorf("failed to start unit %s: %w", name, err)
 	}
-	if result := <-res; result != "done" {
-		return fmt.Errorf("failed to start unit %s: %s", name, result)
+	if err := waitJobResult(ctx, res); err != nil {
+		return fmt.Errorf("failed to start unit %s: %w", name, err)
 	}
 
 	return nil
@@ -139,7 +143,8 @@ func StartUnit(ctx context.Context, name string) error {
 
 // RestartUnit restarts a unit idempotently only if it exists.
 // equivalent to `systemctl restart <unit-name>`
-func RestartUnit(ctx context.Context, name string) error {
+func RestartUnit(ctx context.Context, name string) (operationErr error) {
+	defer logOperation(ctx, "restart", name, &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
@@ -154,12 +159,12 @@ func RestartUnit(ctx context.Context, name string) error {
 		return fmt.Errorf("unit %s not found", name)
 	}
 
-	res := make(chan string)
+	res := make(chan string, 1)
 	if _, err := conn.RestartUnitContext(ctx, name, defaultJobMode, res); err != nil {
 		return fmt.Errorf("failed to restart unit %s: %w", name, err)
 	}
-	if result := <-res; result != "done" {
-		return fmt.Errorf("failed to restart unit %s: %s", name, result)
+	if err := waitJobResult(ctx, res); err != nil {
+		return fmt.Errorf("failed to restart unit %s: %w", name, err)
 	}
 
 	return nil
@@ -167,7 +172,8 @@ func RestartUnit(ctx context.Context, name string) error {
 
 // StartUnit stops a unit idempotently if it exists.
 // equivalent to `systemctl stop <unit-name>`
-func StopUnit(ctx context.Context, name string) error {
+func StopUnit(ctx context.Context, name string) (operationErr error) {
+	defer logOperation(ctx, "stop", name, &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
@@ -187,12 +193,12 @@ func StopUnit(ctx context.Context, name string) error {
 		return nil
 	}
 
-	res := make(chan string)
+	res := make(chan string, 1)
 	if _, err := conn.StopUnitContext(ctx, name, defaultJobMode, res); err != nil {
 		return fmt.Errorf("failed to stop unit %s: %w", name, err)
 	}
-	if result := <-res; result != "done" {
-		return fmt.Errorf("failed to stop unit %s: %s", name, result)
+	if err := waitJobResult(ctx, res); err != nil {
+		return fmt.Errorf("failed to stop unit %s: %w", name, err)
 	}
 
 	return nil
@@ -200,20 +206,34 @@ func StopUnit(ctx context.Context, name string) error {
 
 // ReloadUnit reloads a unit.
 // equivalent to `systemctl reload <unit-name>`
-func ReloadUnit(ctx context.Context, name string) error {
+func ReloadUnit(ctx context.Context, name string) (operationErr error) {
+	defer logOperation(ctx, "reload", name, &operationErr)()
 	conn, err := dbus.NewWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect dbus: %w", err)
 	}
 	defer conn.Close()
 
-	res := make(chan string)
+	res := make(chan string, 1)
 	if _, err := conn.ReloadUnitContext(ctx, name, defaultJobMode, res); err != nil {
 		return fmt.Errorf("failed to reload unit %s: %w", name, err)
 	}
-	if result := <-res; result != "done" {
-		return fmt.Errorf("failed to reload unit %s: %s", name, result)
+	if err := waitJobResult(ctx, res); err != nil {
+		return fmt.Errorf("failed to reload unit %s: %w", name, err)
 	}
 
 	return nil
+}
+
+// Returning on cancellation only stops the local wait; systemd may still run the job.
+func waitJobResult(ctx context.Context, results <-chan string) error {
+	select {
+	case result := <-results:
+		if result != "done" {
+			return fmt.Errorf("systemd job result: %s", result)
+		}
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("stopped waiting; systemd job cancellation is not confirmed: %w", ctx.Err())
+	}
 }

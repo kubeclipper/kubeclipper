@@ -47,9 +47,18 @@ func WriteFileWithDataFunc(path string, flag int, perm os.FileMode, dataFunc fun
 	return dataFunc(f)
 }
 
-func WriteFileWithContext(ctx context.Context, path string, flag int, perm os.FileMode, fn func(w io.Writer) error, dryRun bool) error {
+func WriteFileWithContext(
+	ctx context.Context, path string, flag int, perm os.FileMode, fn func(w io.Writer) error, dryRun bool,
+) (writeErr error) {
 	defer func() {
-		ln := fmt.Sprintf("[%s] + rendering %s\n\n", time.Now().Format(time.RFC3339), path)
+		message := fmt.Sprintf("+ rendered %s", path)
+		if dryRun {
+			message = fmt.Sprintf("+ dry run rendering %s", path)
+		}
+		if writeErr != nil {
+			message = fmt.Sprintf("ERROR rendering %s: %v", path, writeErr)
+		}
+		ln := fmt.Sprintf("[%s] %s\n\n", time.Now().Format(time.RFC3339), message)
 		if check, err := cmdutil.CheckContextAndAppendStepLogFile(ctx, []byte(ln)); err != nil {
 			// detect context content and distinguish errors
 			if check {

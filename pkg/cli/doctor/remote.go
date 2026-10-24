@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/kubeclipper/kubeclipper/pkg/platformstatus"
+	"github.com/kubeclipper/kubeclipper/pkg/utils/redact"
 	"github.com/kubeclipper/kubeclipper/pkg/utils/sshutils"
 )
 
@@ -41,15 +42,7 @@ const (
 )
 
 var (
-	keyValueSecretPattern = regexp.MustCompile(
-		`(?i)((?:"?)(?:password|passwd|token|secret|authorization)(?:"?)[=:][[:space:]]*"?)([^",[:space:]}]+)`,
-	)
-	authorizationPattern    = regexp.MustCompile(`(?i)(authorization"?[=:][[:space:]]*)(?:bearer[[:space:]]+)?[^",;[:space:]}]+`)
-	bearerPattern           = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/-]+=*`)
-	jwtPattern              = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`)
-	brokerCredentialPattern = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://)[^@\s]+@`)
-	pemPrivateKeyPattern    = regexp.MustCompile(`(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----`)
-	interestingLogPattern   = regexp.MustCompile(
+	interestingLogPattern = regexp.MustCompile(
 		`(?i)(error|failed|failure|fatal|panic|refused|timeout|unavailable|denied|stopp|disconnect|reconnect)`,
 	)
 )
@@ -317,59 +310,7 @@ func selectLogLines(output string, limit int) []string {
 	return selected
 }
 
-func sanitize(value string) string {
-	value = stripTerminalControls(value)
-	value = pemPrivateKeyPattern.ReplaceAllString(value, "[REDACTED-PRIVATE-KEY]")
-	value = authorizationPattern.ReplaceAllString(value, "$1[REDACTED]")
-	value = keyValueSecretPattern.ReplaceAllString(value, "$1[REDACTED]")
-	value = bearerPattern.ReplaceAllString(value, "Bearer [REDACTED]")
-	value = jwtPattern.ReplaceAllString(value, "[REDACTED-JWT]")
-	return brokerCredentialPattern.ReplaceAllString(value, "$1[REDACTED]@")
-}
-
-func stripTerminalControls(value string) string {
-	var result strings.Builder
-	result.Grow(len(value))
-	for i := 0; i < len(value); i++ {
-		character := value[i]
-		if character == '\x1b' {
-			i = skipEscapeSequence(value, i)
-			continue
-		}
-		if character < 0x20 && character != '\n' && character != '\t' || character == 0x7f {
-			continue
-		}
-		result.WriteByte(character)
-	}
-	return result.String()
-}
-
-func skipEscapeSequence(value string, start int) int {
-	if start+1 >= len(value) {
-		return start
-	}
-	switch value[start+1] {
-	case '[':
-		for i := start + 2; i < len(value); i++ {
-			if value[i] >= 0x40 && value[i] <= 0x7e {
-				return i
-			}
-		}
-		return len(value) - 1
-	case ']':
-		for i := start + 2; i < len(value); i++ {
-			if value[i] == '\a' {
-				return i
-			}
-			if value[i] == '\x1b' && i+1 < len(value) && value[i+1] == '\\' {
-				return i + 1
-			}
-		}
-		return len(value) - 1
-	default:
-		return start + 1
-	}
-}
+func sanitize(value string) string { return redact.Text(value) }
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"

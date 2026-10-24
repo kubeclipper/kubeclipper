@@ -312,13 +312,6 @@ func selectTask(tasks []*operations.OperationTask) (*operations.OperationTask, e
 }
 
 func (w *Worker) execute(parent context.Context, task *operations.OperationTask) error {
-	executor, ok := w.registry.Get(task.Spec.Executor)
-	if !ok {
-		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
-			Reason:  operations.TaskReasonExecutionFailed,
-			Message: fmt.Sprintf("executor %q is not registered", task.Spec.Executor),
-		})
-	}
 	if err := w.oplog.CreateOperationDir(string(task.UID)); err != nil {
 		logger.Errorf("create Task log directory for %s: %v", task.Name, err)
 	}
@@ -335,14 +328,26 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 	if logWriter != nil {
 		writer = logWriter
 	}
+	finishFailure := func(ctx context.Context, phase operations.TaskPhase, reason operations.TaskResultReason, message string) error {
+		if _, err := fmt.Fprintf(writer, "[%s] ERROR: %s\n", time.Now().Format(time.RFC3339), message); err != nil {
+			logger.Errorf("write Task failure log for %s: %v", task.Name, err)
+			logErr = err
+		}
+		return w.finish(ctx, task, phase, operations.TaskResult{
+			Reason:  reason,
+			Message: taskResultMessage(message, logErr),
+		})
+	}
+	executor, ok := w.registry.Get(task.Spec.Executor)
+	if !ok {
+		return finishFailure(parent, operations.TaskFailed, operations.TaskReasonExecutionFailed,
+			fmt.Sprintf("executor %q is not registered", task.Spec.Executor))
+	}
 
 	if task.Spec.Deadline.Time.IsZero() {
 		// A zero deadline would expire the context immediately and kill the
 		// command before it ran; fail the task with an explicit reason.
-		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
-			Reason:  operations.TaskReasonExecutionFailed,
-			Message: taskResultMessage("task has no deadline", logErr),
-		})
+		return finishFailure(parent, operations.TaskFailed, operations.TaskReasonExecutionFailed, "task has no deadline")
 	}
 	ctx, cancel := context.WithDeadline(parent, task.Spec.Deadline.Time)
 	defer cancel()
@@ -351,16 +356,14 @@ func (w *Worker) execute(parent context.Context, task *operations.OperationTask)
 		return parent.Err()
 	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(reconcileErr, context.DeadlineExceeded) {
-		return w.finish(context.Background(), task, operations.TaskTimedOut, operations.TaskResult{
-			Reason:  operations.TaskReasonDeadlineExceeded,
-			Message: taskResultMessage("task deadline exceeded", logErr),
-		})
+		message := "task deadline exceeded"
+		if reconcileErr != nil {
+			message += ": " + reconcileErr.Error()
+		}
+		return finishFailure(context.Background(), operations.TaskTimedOut, operations.TaskReasonDeadlineExceeded, message)
 	}
 	if reconcileErr != nil {
-		return w.finish(parent, task, operations.TaskFailed, operations.TaskResult{
-			Reason:  operations.TaskReasonExecutionFailed,
-			Message: taskResultMessage(reconcileErr.Error(), logErr),
-		})
+		return finishFailure(parent, operations.TaskFailed, operations.TaskReasonExecutionFailed, reconcileErr.Error())
 	}
 	result.Reason = ""
 	// The server-side log read would 404 without an explanation; surface the
@@ -396,10 +399,14 @@ func (w *Worker) finish(
 }
 
 func boundedMessage(message string) string {
-	if len(message) <= operations.MaxMessageSize {
+	return truncateMessage(message, operations.MaxMessageSize)
+}
+
+func truncateMessage(message string, limit int) string {
+	if len(message) <= limit {
 		return message
 	}
-	truncated := message[:operations.MaxMessageSize]
+	truncated := message[:limit]
 	// Do not split a rune: trim the invalid trailing bytes so the message
 	// stays valid UTF-8 after truncation.
 	for truncated != "" {
@@ -413,10 +420,13 @@ func boundedMessage(message string) string {
 }
 
 func taskResultMessage(message string, logErr error) string {
-	if logErr != nil {
-		message += "; agent task log unavailable: " + logErr.Error()
+	if logErr == nil {
+		return boundedMessage(message)
 	}
-	return boundedMessage(message)
+	// Reserve space so a verbose primary error cannot hide unavailable logs.
+	const unavailableLogNoticeLimit = operations.MaxMessageSize / 4
+	notice := truncateMessage("; agent task log unavailable: "+logErr.Error(), unavailableLogNoticeLimit)
+	return truncateMessage(message, operations.MaxMessageSize-len(notice)) + notice
 }
 
 var _ interface {
