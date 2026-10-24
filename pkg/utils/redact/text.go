@@ -21,11 +21,15 @@ import (
 	"strings"
 )
 
+const logValuePattern = `("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^",[:space:]}]+)`
+
 var (
 	keyValueSecretPattern = regexp.MustCompile(
-		`(?i)((?:"?)(?:password|passwd|token|secret|authorization)(?:"?)[=:][[:space:]]*"?)([^",[:space:]}]+)`,
+		`(?i)("?(?:password|passwd|token|secret)"?[[:space:]]*[=:][[:space:]]*)` + logValuePattern,
 	)
-	authorizationPattern    = regexp.MustCompile(`(?i)(authorization"?[=:][[:space:]]*)(?:bearer[[:space:]]+)?[^",;[:space:]}]+`)
+	authorizationPattern = regexp.MustCompile(
+		`(?i)(authorization"?[[:space:]]*[=:][[:space:]]*)(?:bearer[[:space:]]+)?` + logValuePattern,
+	)
 	bearerPattern           = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/-]+=*`)
 	jwtPattern              = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`)
 	brokerCredentialPattern = regexp.MustCompile(`(?i)([a-z][a-z0-9+.-]*://)[^@\s]+@`)
@@ -41,11 +45,22 @@ func Text(value string) string {
 	value = pemPrivateKeyPattern.ReplaceAllString(value, "[REDACTED-PRIVATE-KEY]")
 	value = pemOpenStartPattern.ReplaceAllString(value, "[REDACTED-PRIVATE-KEY]")
 	value = pemOpenEndPattern.ReplaceAllString(value, "[REDACTED-PRIVATE-KEY]")
-	value = authorizationPattern.ReplaceAllString(value, "$1[REDACTED]")
-	value = keyValueSecretPattern.ReplaceAllString(value, "$1[REDACTED]")
+	value = redactValues(authorizationPattern, value)
+	value = redactValues(keyValueSecretPattern, value)
 	value = bearerPattern.ReplaceAllString(value, "Bearer [REDACTED]")
 	value = jwtPattern.ReplaceAllString(value, "[REDACTED-JWT]")
 	return brokerCredentialPattern.ReplaceAllString(value, "$1[REDACTED]@")
+}
+
+func redactValues(pattern *regexp.Regexp, value string) string {
+	return pattern.ReplaceAllStringFunc(value, func(match string) string {
+		parts := pattern.FindStringSubmatch(match)
+		replacement := "[REDACTED]"
+		if quote := parts[2][0]; quote == '"' || quote == '\'' {
+			replacement = string(quote) + replacement + string(quote)
+		}
+		return parts[1] + replacement
+	})
 }
 
 func stripTerminalControls(value string) string {

@@ -269,3 +269,31 @@ func TestOversizedPEMIsRedacted(t *testing.T) {
 		t.Fatal("recognized PEM body leaked after 1MiB tail capture removed BEGIN marker")
 	}
 }
+
+func TestDiagnosticsRedactsQuotedPasswords(t *testing.T) {
+	bin := t.TempDir()
+	body := filepath.Join(bin, "journal")
+	payload := "{\"password\": \"fake-alpha fake-beta\", \"detail\": \"startup failed\"}\n" +
+		"{\"password\" : \"fake-gamma\"}\n"
+	if err := os.WriteFile(body, []byte(payload), 0600); err != nil {
+		t.Fatal(err)
+	}
+	writeDiagnosticCommand(t, filepath.Join(bin, "systemctl"), "#!/bin/sh\nprintf 'ActiveState=failed\\n'\n")
+	writeDiagnosticCommand(t, filepath.Join(bin, "journalctl"), "#!/bin/sh\n/bin/cat '"+body+"'\n")
+	t.Setenv("PATH", bin)
+	ctx, logs := operationLogContext(t)
+	collectUnitDiagnostics(ctx, "example.service", time.Now())
+	data, _, _, err := logs.GetStepLogContent("operation", "step", 0, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, secret := range []string{"fake-alpha", "fake-beta", "fake-gamma"} {
+		if strings.Contains(content, secret) {
+			t.Errorf("password content %q survived in task log", secret)
+		}
+	}
+	if strings.Count(content, "[REDACTED]") != 2 || !strings.Contains(content, "startup failed") {
+		t.Errorf("redaction lost diagnostic context: %s", content)
+	}
+}

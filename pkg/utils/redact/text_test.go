@@ -33,3 +33,26 @@ func TestTextRedactsExistingPatternsAndControls(t *testing.T) {
 		t.Fatal("missing redaction marker")
 	}
 }
+
+func TestTextRedactsCompleteSecretValues(t *testing.T) {
+	for _, tt := range []struct {
+		name, input, want string
+	}{
+		{"quoted spaces", `{"password": "alpha beta", "detail": "startup failed"}`, `{"password": "[REDACTED]", "detail": "startup failed"}`},
+		{"key whitespace", `{"password" : "alpha-beta"}`, `{"password" : "[REDACTED]"}`},
+		{"escaped quotes", `{"password": "alpha\" beta\\ gamma"}`, `{"password": "[REDACTED]"}`},
+		{"single quotes", `passwd = 'alpha beta' detail=failed`, `passwd = '[REDACTED]' detail=failed`},
+		{"escaped single quote", `passwd='alpha\' beta'`, `passwd='[REDACTED]'`},
+		{"quoted delimiters", `{"token":"alpha, beta]}"}`, `{"token":"[REDACTED]"}`},
+		{"quoted authorization", `{"Authorization" : "Basic YWRtaW46cGFzcw=="}`, `{"Authorization" : "[REDACTED]"}`},
+		{"bearer authorization", `Authorization : Bearer alpha-beta`, `Authorization : [REDACTED]`},
+		{"unquoted value", `secret = alpha-beta detail=failed`, `secret = [REDACTED] detail=failed`},
+		{"unquoted apostrophe", `secret=alpha'beta detail=failed`, `secret=[REDACTED] detail=failed`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Text(tt.input); got != tt.want {
+				t.Errorf("Text() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
