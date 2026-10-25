@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 
+	"github.com/kubeclipper/kubeclipper/pkg/component"
 	"github.com/kubeclipper/kubeclipper/pkg/oplog"
 	operations "github.com/kubeclipper/kubeclipper/pkg/scheme/operations/v1alpha1"
 )
@@ -346,5 +348,95 @@ func TestTaskResultMessageIncludesLogError(t *testing.T) {
 	}
 	if got, want := taskResultMessage("done", nil), "done"; got != want {
 		t.Fatalf("message without log error = %q, want %q", got, want)
+	}
+}
+
+func TestWorkerPersistsFailureInTaskLog(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		err     error
+		phase   operations.TaskPhase
+		message string
+	}{
+		{"execution failed", errors.New("restart containerd.service: failed"), operations.TaskFailed, "restart containerd.service: failed"},
+		{"deadline exceeded", context.DeadlineExceeded, operations.TaskTimedOut, "task deadline exceeded: context deadline exceeded"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeTaskClient{task: newTestTask(operations.TaskRunning)}
+			worker := newTestWorker(t, client, executorFunc(func(_ context.Context, _ *operations.OperationTask, log io.Writer) (operations.TaskResult, error) {
+				if _, err := io.WriteString(log, "rendering /etc/containerd/config.toml\n"); err != nil {
+					t.Fatal(err)
+				}
+				return operations.TaskResult{}, tt.err
+			}))
+			defer worker.Close()
+			if err := worker.execute(context.Background(), client.task.DeepCopy()); err != nil {
+				t.Fatal(err)
+			}
+			if client.task.Status.Phase != tt.phase || client.task.Status.Result.Message != tt.message {
+				t.Fatalf("unexpected task result: %#v", client.task.Status)
+			}
+			logStore, ok := worker.oplog.(component.OperationLogFile)
+			if !ok {
+				t.Fatal("worker log store cannot read task log files")
+			}
+			content, _, _, err := logStore.GetStepLogContent(string(client.task.UID), "task", 0, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(content), "ERROR: "+tt.message) {
+				t.Fatalf("task log omits failure: %s", content)
+			}
+		})
+	}
+}
+
+func TestWorkerPreservesFailureWhenLogDirectoryUnavailable(t *testing.T) {
+	client := &fakeTaskClient{task: newTestTask(operations.TaskRunning)}
+	worker := newTestWorker(t, client, executorFunc(func(context.Context, *operations.OperationTask, io.Writer) (operations.TaskResult, error) {
+		return operations.TaskResult{}, errors.New("original executor failure")
+	}))
+	defer worker.Close()
+	dir := t.TempDir()
+	logs, err := oplog.NewOperationLog(&oplog.Options{Dir: dir, OplogThreshold: oplog.DefaultThreshold})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Replace this test-owned log directory with a regular file to force real I/O failure.
+	if err = os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(dir, []byte("unavailable log directory"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	worker.oplog = logs
+	if err = worker.execute(context.Background(), client.task.DeepCopy()); err != nil {
+		t.Fatal(err)
+	}
+	if client.task.Status.Phase != operations.TaskFailed || !strings.Contains(client.task.Status.Result.Message, "original executor failure") || !strings.Contains(client.task.Status.Result.Message, "agent task log unavailable") {
+		t.Fatalf("failure was hidden: %#v", client.task.Status)
+	}
+}
+
+func TestLongErrorKeepsLogUnavailable(t *testing.T) {
+	message := "original executor failure: " + strings.Repeat("x", operations.MaxMessageSize)
+	result := taskResultMessage(message, errors.New("permission denied"))
+	if !strings.Contains(result, "original executor failure") || !strings.Contains(result, "agent task log unavailable") {
+		t.Fatalf("Result lost unavailable-log explanation; bytes=%d containsCause=%v containsLogWarning=%v", len(result), strings.Contains(result, "original executor failure"), strings.Contains(result, "agent task log unavailable"))
+	}
+}
+func TestOriginalErrorSurvivesElapsedDeadline(t *testing.T) {
+	client := &fakeTaskClient{task: newTestTask(operations.TaskRunning)}
+	client.task.Spec.Deadline = metav1.NewTime(time.Now().Add(100 * time.Millisecond))
+	worker := newTestWorker(t, client, executorFunc(func(ctx context.Context, _ *operations.OperationTask, _ io.Writer) (operations.TaskResult, error) {
+		<-ctx.Done()
+		return operations.TaskResult{}, errors.New("original service startup failure: exit 42")
+	}))
+	defer worker.Close()
+	if err := worker.execute(context.Background(), client.task.DeepCopy()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(client.task.Status.Result.Message, "original service startup failure") {
+		t.Fatalf("original error lost: phase=%s message=%q", client.task.Status.Phase, client.task.Status.Result.Message)
 	}
 }
