@@ -516,7 +516,7 @@ Then, `systemctl restart containerd`
 Pause installation from webpage, then resume from the breakpoint.
 
 You also can backup /tmp/.k8s and reboot host server, however pause & resume from webpage is much
-eaiser.
+easier.
 
 ```bash
 # Just log the steps here FYI.
@@ -721,7 +721,7 @@ kubectl edit cm cloudcore -n kubeedge
 docker exec -it kind-control-plane bash
 crictl pods
 # restart cloudcore pod
-crictl stopp cloudcore-5d9ccb9dc8-lv2qb
+crictl stop cloudcore-5d9ccb9dc8-lv2qb
 ```
 
 #### 4.3.2 EdgeCore Side
@@ -770,7 +770,7 @@ curl http://127.0.0.1:10550/api/v1/namespaces/kube-system/pods|jq '.items.[].met
 # cloud
 kubectl get pods -n kube-system -o wide
 
-# edge memroy
+# edge memory
 ps -p <PID> -o rss
 ```
 

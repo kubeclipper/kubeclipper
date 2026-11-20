@@ -2215,7 +2215,7 @@ func (h *handler) CreateRecords(request *restful.Request, response *restful.Resp
 
 func checkRecord(r *v1.Record) error {
 	if len(r.ParseRecord) == 0 {
-		return fmt.Errorf("resolve record cann not be empty")
+		return fmt.Errorf("resolve record can not be empty")
 	}
 	return nil
 }
